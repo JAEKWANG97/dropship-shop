@@ -1,0 +1,99 @@
+# Order Flow
+
+## Happy Path
+
+```text
+Customer selects product option
+-> Customer creates order
+-> Order status: PAYMENT_PENDING
+-> Customer pays through PG
+-> Server verifies payment
+-> Payment status: APPROVED
+-> Order status: PAID
+-> Order status: SUPPLIER_ORDER_PENDING
+-> Admin places supplier order manually
+-> Fulfillment status: ORDERED
+-> Order status: SUPPLIER_ORDERED
+-> Admin enters carrier and tracking number
+-> Shipment status: SHIPPED
+-> Order status: SHIPPED
+-> Shipment delivered
+-> Order status: DELIVERED
+```
+
+## Supplier Out Of Stock
+
+```text
+Order status: SUPPLIER_ORDER_PENDING
+-> Admin checks supplier
+-> Supplier says out of stock
+-> Fulfillment status: OUT_OF_STOCK
+-> Order status: OUT_OF_STOCK
+-> Customer is notified
+-> Refund is requested
+-> Refund status: COMPLETED
+-> Payment status: REFUNDED
+-> Order status: REFUNDED
+```
+
+## Payment Failure
+
+```text
+Order status: PAYMENT_PENDING
+-> PG payment fails
+-> Payment status: FAILED
+-> Order remains unconfirmed
+-> Customer can retry or abandon order
+```
+
+## Payment Amount Mismatch
+
+```text
+Order status: PAYMENT_PENDING
+-> PG says payment succeeded
+-> Server compares expected order amount and approved amount
+-> Amount mismatch detected
+-> Order is not confirmed
+-> Payment is cancelled or manually reviewed
+```
+
+## Customer Cancellation Before Supplier Order
+
+```text
+Order status: SUPPLIER_ORDER_PENDING
+-> Customer requests cancellation
+-> Order status: CANCEL_REQUESTED
+-> Admin approves cancellation
+-> PG refund/cancel is executed
+-> Payment status: CANCELLED or REFUNDED
+-> Order status: CANCELLED
+```
+
+## State Rules
+
+- `PAYMENT_PENDING` orders are not real confirmed orders.
+- `PAID` means money was approved, not that the supplier accepted the order.
+- `SUPPLIER_ORDER_PENDING` is the main admin work queue.
+- `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
+- `OUT_OF_STOCK` must lead to customer notification and refund handling.
+- `SHIPPED` requires carrier and tracking number.
+- `REFUNDED` requires a completed refund record.
+
+## Risk Points
+
+### Duplicate Payment Callback
+
+PG callbacks or client confirmations can arrive multiple times. Payment approval must be idempotent.
+
+### Client-Side Price Tampering
+
+The server must calculate order amount from product and option data. Never trust client-submitted total price.
+
+### Product Status Changed During Checkout
+
+Before creating the order or confirming payment, the server must re-check that product and option are still sellable.
+
+### Supplier Out Of Stock After Payment
+
+This is expected in this business model. The service must support refund and customer notification instead of treating it as a system error.
+

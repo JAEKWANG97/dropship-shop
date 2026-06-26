@@ -1,0 +1,16 @@
+.DS_Store
+.idea/
+.vscode/
+
+build/
+out/
+target/
+
+node_modules/
+dist/
+.next/
+
+.env
+.env.*
+!.env.example
+
