@@ -26,23 +26,24 @@ Recommended structure:
 
 - Team: Core
 - Team key: DS
+- Team ID: aeb40ff2-507c-447a-8964-825302520b12
 - Project: MVP
+- Project ID: 1e6d10e2-c4ac-4f5f-bd68-79d591838a6a
+- Project URL: https://linear.app/dropship-shop/project/mvp-c80b0bb67771
 
 ## Current Status
 
 The new Linear organization was created through the Linear GraphQL onboarding mutation.
 
-The currently available `LINEAR_API_KEY` still points to the old `mungnyang` organization. To create the `Core` team, `MVP` project, and issues inside the new `Dropship Shop` organization, generate a new API key from the new Linear organization and use that key for subsequent GraphQL calls.
+The `Core` team, `MVP` project, and MVP backlog issues were created in the new Linear organization.
 
-## Next Setup Steps
+Created issues:
 
-1. Open Linear and switch to the `Dropship Shop` organization.
-2. Create or verify team:
-   - Name: Core
-   - Key: DS
-3. Create project:
-   - Name: MVP
-4. Create issues from [Linear Backlog](linear-backlog.md).
-5. Link GitHub repository:
+- DS-1 through DS-17
+
+## Remaining Setup Steps
+
+1. Link GitHub repository in Linear:
    - `JAEKWANG97/dropship-shop`
-
+2. Decide whether to keep or archive the default `Dropship Shop / DRO` team that Linear created during organization onboarding.
+3. Keep API keys out of git and local documentation.
