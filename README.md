@@ -73,4 +73,5 @@
 - [Roadmap](docs/roadmap.md)
 - [Decision Log](docs/decision-log.md)
 - [Glossary](docs/glossary.md)
-
+- [GitHub And Linear Setup](docs/github-linear-setup.md)
+- [Linear Backlog](docs/linear-backlog.md)
