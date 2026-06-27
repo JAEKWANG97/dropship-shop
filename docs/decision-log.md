@@ -70,6 +70,23 @@ Consequences:
 - Thumbnail, gallery, and detail images are separate concepts.
 - Uploaded image binaries should live in object storage, while the database stores URLs or storage keys.
 
+## 2026-06-27: Price Change After Payment
+
+Decision:
+
+Keep the paid order price fixed at the price captured when the order was created and paid. Product price changes apply only to new orders created after the change.
+
+Context:
+
+Supplier prices can change after a customer pays. Changing an already-paid customer order would break customer trust and make payment/order reconciliation unsafe.
+
+Consequences:
+
+- Order items must store product name, option name, unit price, quantity, and line amount snapshots.
+- Product price updates must not mutate existing order item prices.
+- Customers are not charged extra if supplier price increases after payment.
+- If the supplier cannot fulfill at the paid price, the operational fallback is cancellation/refund, not additional billing.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:
