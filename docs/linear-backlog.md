@@ -23,6 +23,14 @@ Acceptance criteria:
 - Explicit non-goals are documented.
 - Any launch-blocking policy gaps are listed.
 
+Resolved decisions:
+
+- Customer MVP scope is locked in `docs/product-brief.md` and `docs/requirements.md`.
+- Admin MVP scope is locked in `docs/product-brief.md` and `docs/requirements.md`.
+- Explicit MVP non-goals are documented in `README.md` and `docs/product-brief.md`.
+- Launch-blocking checks are listed in `docs/product-brief.md`; these are launch readiness checks, not blockers for backend implementation.
+- Backend implementation can start from DS-4 after DS-1 and DS-2 are complete.
+
 References:
 
 - `README.md`

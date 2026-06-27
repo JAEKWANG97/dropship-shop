@@ -16,6 +16,23 @@ Consequences:
 - Supplier and fulfillment are core domains.
 - Admin workflows are essential.
 
+## 2026-06-27: MVP Scope Lock
+
+Decision:
+
+Lock the MVP as a single-operator supplier-fulfillment commerce product with authenticated customer checkout, Toss Payments payment, manual supplier ordering, delivery-group order handling, admin claim/refund processing, and customer-facing policy pages.
+
+Context:
+
+The project has enough product, policy, and state-model decisions to move from planning into backend implementation. Remaining launch checks are legal, business registration, PG production, privacy disclosure, and delivery tracking readiness items rather than blockers for backend scaffolding.
+
+Consequences:
+
+- DS-4 can start after DS-1 and DS-2 are complete.
+- Customer scope, admin scope, non-goals, and launch-blocking checks are documented in `docs/product-brief.md`.
+- Implementation should not add excluded MVP features unless a new decision updates the scope.
+- Launch readiness still requires final policy text, business disclosure values, Toss Payments production readiness, privacy disclosure confirmation, and delivery tracking integration confirmation.
+
 ## 2026-06-27: Inventory Model
 
 Decision:
