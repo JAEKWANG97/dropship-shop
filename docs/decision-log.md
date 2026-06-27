@@ -140,6 +140,23 @@ Consequences:
 - `SUPPLIER_ORDERED` and later states must reject customer direct address changes.
 - Admin/customer support may still handle exceptional address changes manually.
 
+## 2026-06-27: Customer Order Status Display
+
+Decision:
+
+Do not expose internal order statuses directly to customers. Map internal statuses to customer-facing display statuses.
+
+Context:
+
+Internal statuses such as `SUPPLIER_ORDER_PENDING` and `SUPPLIER_ORDERED` are operational states for payment verification and supplier fulfillment. They are useful for the admin system but too implementation-specific for customer order tracking.
+
+Consequences:
+
+- Customer order list/detail APIs need a customer display status.
+- Admin APIs can expose internal status.
+- Status mapping must be maintained as part of order policy.
+- Internal state changes should not automatically leak implementation terminology into the customer UI.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

@@ -102,6 +102,7 @@ Order status: SUPPLIER_ORDERED or later
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.
 - `REFUNDED` requires a completed refund record.
+- Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
 
 ## Risk Points
 

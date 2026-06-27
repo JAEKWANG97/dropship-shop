@@ -39,6 +39,9 @@ Status: Confirmed
 - 결제 완료 후에는 `SUPPLIER_ORDER_PENDING` 상태까지만 고객이 배송지를 직접 변경할 수 있다.
 - `SUPPLIER_ORDERED` 이후에는 고객이 배송지를 직접 변경할 수 없다.
 - `SUPPLIER_ORDERED` 이후 배송지 변경은 고객 문의와 관리자 수동 처리 대상으로 본다.
+- 고객에게 내부 주문 상태를 그대로 노출하지 않는다.
+- 고객 화면에는 내부 상태를 고객용 표시 상태로 매핑해서 노출한다.
+- 내부 상태는 운영, 결제 검증, 공급처 발주, 환불 정합성을 위한 상태로 유지한다.
 
 ## System Impact
 
@@ -51,7 +54,28 @@ Status: Confirmed
 - 만료 이후 들어온 결제 승인 검증 요청은 주문 확정으로 처리하지 않아야 한다.
 - 배송지 변경 가능 여부는 주문 상태를 기준으로 판단해야 한다.
 - `SUPPLIER_ORDERED` 이후 고객 배송지 변경 API는 거절해야 한다.
+- 고객용 주문 상태 매핑 계층이 필요하다.
+- 관리자 화면은 내부 상태를 볼 수 있지만, 고객 화면은 고객 친화적인 표시 상태를 사용해야 한다.
 
 ## Open Questions
 
-- 고객에게 내부 상태를 그대로 보여줄 것인가, 단순화된 표시 상태를 따로 둘 것인가?
+None
+
+## Customer Display Status Mapping
+
+Initial mapping:
+
+| Internal status | Customer display status |
+| --- | --- |
+| `PAYMENT_PENDING` | 결제 대기 |
+| `EXPIRED` | 주문 만료 |
+| `SUPPLIER_ORDER_PENDING` | 결제 완료 |
+| `SUPPLIER_ORDERED` | 상품 준비 중 |
+| `PREPARING_SHIPMENT` | 상품 준비 중 |
+| `SHIPPED` | 배송 중 |
+| `DELIVERED` | 배송 완료 |
+| `OUT_OF_STOCK` | 품절 안내 |
+| `CANCEL_REQUESTED` | 취소 처리 중 |
+| `CANCELLED` | 취소 완료 |
+| `REFUND_REQUESTED` | 환불 처리 중 |
+| `REFUNDED` | 환불 완료 |
