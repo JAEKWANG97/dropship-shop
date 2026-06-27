@@ -65,6 +65,7 @@
 
 ## Documentation
 
+- [Agent Operating Guide](AGENTS.md)
 - [Documentation Index](docs/README.md)
 - [Product Brief](docs/product-brief.md)
 - [Glossary](docs/glossary.md)

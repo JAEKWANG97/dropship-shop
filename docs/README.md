@@ -2,6 +2,8 @@
 
 이 문서는 Dropship Shop 문서의 읽는 순서와 기준 문서를 정리한다.
 
+AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따른다.
+
 ## Source Of Truth
 
 - 현재 제품 범위: [Product Brief](product-brief.md), [Requirements](requirements.md)
