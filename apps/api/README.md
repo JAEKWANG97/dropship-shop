@@ -77,6 +77,16 @@ curl http://localhost:8080/actuator/health
 - Checkout creation empties the cart after successful order creation.
 - Policy confirmation is stored through `/api/checkouts/{checkoutNumber}/policy-confirmation`.
 
+## Payment Foundation
+
+- Toss Payments confirmation API is available at `/api/payments/toss/confirm`.
+- Toss secret key is read from `payments.toss.secret-key` or `PAYMENTS_TOSS_SECRET_KEY`.
+- Payment confirmation verifies checkout ownership, pending state, expiration, policy confirmation, amount, payment key uniqueness, and sellability.
+- Successful confirmation moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
+- Duplicate confirmation with the same payment key and checkout is idempotent.
+- Payment exception paths record `Payment(CANCEL_REQUIRED)` and block supplier ordering.
+- Webhooks, payment detail API, automatic cancel execution, and admin retry APIs remain future work.
+
 ## Tests
 
 ```sh

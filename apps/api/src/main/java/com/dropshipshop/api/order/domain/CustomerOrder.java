@@ -132,6 +132,18 @@ public class CustomerOrder {
 		updatedAt = Instant.now();
 	}
 
+	public void markSupplierOrderPending() {
+		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
+	}
+
+	public void markPaymentException() {
+		this.status = OrderStatus.PAYMENT_EXCEPTION;
+	}
+
+	public void expire() {
+		this.status = OrderStatus.EXPIRED;
+	}
+
 	public UUID getId() {
 		return id;
 	}

@@ -1,0 +1,9 @@
+package com.dropshipshop.api.payment.domain;
+
+public enum PaymentExceptionReason {
+	AMOUNT_MISMATCH,
+	APPROVED_AFTER_EXPIRED,
+	SELLABILITY_CHECK_FAILED,
+	DUPLICATE_OR_CONFLICTING_CONFIRMATION,
+	PG_CONFIRMATION_ERROR
+}

@@ -1,0 +1,16 @@
+package com.dropshipshop.api.payment.domain;
+
+public enum PaymentStatus {
+	READY,
+	APPROVED,
+	FAILED,
+	CANCEL_REQUIRED,
+	CANCEL_REQUESTED,
+	CANCELLED,
+	CANCEL_FAILED,
+	REFUND_REQUESTED,
+	PARTIALLY_REFUNDED,
+	REFUNDED,
+	REFUND_FAILED,
+	REVIEW_REQUIRED
+}

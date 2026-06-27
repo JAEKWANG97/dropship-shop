@@ -35,6 +35,15 @@ DS-8 backend implementation notes:
 - The cart is emptied after successful checkout creation.
 - Direct-buy checkout is deferred.
 
+DS-9 backend implementation notes:
+
+- The backend confirms Toss Payments through `POST /api/payments/toss/confirm`.
+- The server validates ownership, payment pending state, expiration, policy confirmation, amount, payment key uniqueness, and current product/option sellability before finalizing orders.
+- Successful confirmation records `Payment(APPROVED)`, moves the payment group to `APPROVED`, and moves all included orders to `SUPPLIER_ORDER_PENDING`.
+- Duplicate confirmation with the same payment key and checkout returns the existing payment result.
+- Toss-approved amount mismatch records the payment exception path and blocks supplier ordering.
+- Automatic PG cancel execution remains planned.
+
 ## Multi Delivery Group Checkout
 
 ```text

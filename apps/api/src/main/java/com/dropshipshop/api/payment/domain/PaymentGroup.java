@@ -88,6 +88,20 @@ public class PaymentGroup {
 		this.policyConfirmedAt = confirmedAt;
 	}
 
+	public void approve(long approvedAmount, Instant approvedAt) {
+		this.status = PaymentGroupStatus.APPROVED;
+		this.approvedAmount = approvedAmount;
+		this.approvedAt = approvedAt;
+	}
+
+	public void markPaymentException() {
+		this.status = PaymentGroupStatus.PAYMENT_EXCEPTION;
+	}
+
+	public void expire() {
+		this.status = PaymentGroupStatus.EXPIRED;
+	}
+
 	public UUID getId() {
 		return id;
 	}

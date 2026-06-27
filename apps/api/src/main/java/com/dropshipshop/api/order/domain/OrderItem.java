@@ -116,6 +116,14 @@ public class OrderItem {
 		return order;
 	}
 
+	public Product getProduct() {
+		return product;
+	}
+
+	public ProductOption getProductOption() {
+		return productOption;
+	}
+
 	public String getProductName() {
 		return productName;
 	}

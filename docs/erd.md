@@ -10,7 +10,8 @@
 - Catalog tables: implemented in `apps/api/src/main/resources/db/migration/V2__create_catalog.sql`.
 - Cart tables: implemented in `apps/api/src/main/resources/db/migration/V3__create_cart.sql`.
 - Checkout/order tables: implemented in `apps/api/src/main/resources/db/migration/V4__create_checkout_order.sql`.
-- Payment attempt, fulfillment, shipment, refund, claim, policy, and audit tables: planned.
+- Payment attempt tables: implemented in `apps/api/src/main/resources/db/migration/V5__create_payment.sql`.
+- Fulfillment, shipment, refund, claim, policy, and audit tables: planned.
 
 ## Modeling Rules
 
@@ -52,6 +53,7 @@ Additional implemented table groups:
 - Catalog: `suppliers`, `products`, `product_options`, `product_images`, `product_detail_blocks`, `product_notices`, `product_change_histories`
 - Cart: `carts`, `cart_items`
 - Checkout/order: `payment_groups`, `orders`, `order_items`, `order_policy_agreements`
+- Payment: `payments`, `payment_events`
 
 Deletion/rejoin note:
 
@@ -425,7 +427,7 @@ Open note:
 
 ### payment_groups
 
-Implemented by DS-8 as the checkout payment aggregate. Actual PG payment attempts are implemented in DS-9.
+Implemented by DS-8 as the checkout payment aggregate. DS-9 adds PG approval transitions.
 
 - `id`
 - `checkout_number`
@@ -442,13 +444,23 @@ Implemented by DS-8 as the checkout payment aggregate. Actual PG payment attempt
 
 ### payments
 
+Implemented by DS-9.
+
 - `id`
 - `payment_group_id`
 - `provider`: `TOSS_PAYMENTS`
 - `provider_payment_key`
 - `method`: `CARD` / `EASY_PAY` / `TRANSFER`
 - `status`
-- amount, exception, idempotency, failure, provider sync fields
+- `requested_amount`
+- `approved_amount`
+- `approved_at`
+- `exception_reason`
+- `idempotency_key`
+- `failure_code`
+- `failure_message`
+- `raw_provider_status`
+- `last_synced_at`
 - `created_at`
 - `updated_at`
 
@@ -458,14 +470,17 @@ Relationship note:
 
 ### payment_events
 
+Implemented by DS-9 for payment confirmation events.
+
 - `id`
 - `payment_id`
 - `payment_group_id`
 - `order_id`
-- provider identifiers
+- `provider_payment_key`
 - `event_type`
 - `idempotency_key`
-- raw payload/result fields
+- `raw_payload`
+- `result_message`
 - `received_at`
 - `processed_at`
 - `created_at`

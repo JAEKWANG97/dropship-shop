@@ -349,7 +349,7 @@ Rules:
 
 PG 결제 기록.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - paymentGroupId
@@ -369,27 +369,36 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+Rules:
+
+- DS-9 creates one `Payment` on Toss confirmation success or payment exception.
+- Same `providerPaymentKey` for the same checkout is idempotent.
+- Same `providerPaymentKey` for another checkout is rejected.
+- `APPROVED` moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
+- `CANCEL_REQUIRED` is used for payment exception paths that need PG cancel/admin follow-up.
+
 ## PaymentEvent
 
 PG 승인, 취소, 환불, webhook, 서버 확인 요청 이력. 멱등 처리와 PG 대사를 위해 원본 이벤트 단위로 기록한다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - paymentId
 - paymentGroupId
 - orderId
-- provider
 - providerPaymentKey
-- providerEventId
-- eventType: CONFIRM_REQUESTED / CONFIRM_SUCCEEDED / CONFIRM_FAILED / CANCEL_REQUESTED / CANCEL_SUCCEEDED / CANCEL_FAILED / REFUND_REQUESTED / REFUND_SUCCEEDED / REFUND_FAILED / WEBHOOK_RECEIVED
+- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION
 - idempotencyKey
-- rawStatus
 - rawPayload
-- result
+- resultMessage
 - receivedAt
 - processedAt
 - createdAt
+
+Deferred event types:
+
+- Cancel, refund, and webhook event types are added when the corresponding APIs are implemented.
 
 ## Fulfillment
 

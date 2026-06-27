@@ -595,6 +595,19 @@ Acceptance criteria:
 - Duplicate payment confirmation is idempotent.
 - Successful payment moves order to supplier order pending.
 
+Resolved decisions:
+
+- Payment tables are created by `V5__create_payment.sql`.
+- Toss confirmation API is implemented at `POST /api/payments/toss/confirm`.
+- Toss secret key is read from `payments.toss.secret-key`; secrets are not committed.
+- Toss client is behind `TossPaymentsClient` so tests can use a fake client.
+- Server verifies checkout ownership, `PAYMENT_PENDING` status, 30-minute expiration, policy confirmation, amount, PG payment key uniqueness, and product/option sellability.
+- Successful confirmation creates `Payment(APPROVED)`, records a payment event, moves `PaymentGroup` to `APPROVED`, and moves orders to `SUPPLIER_ORDER_PENDING`.
+- Duplicate confirmation with the same payment key and checkout returns the existing payment result.
+- Same payment key on a different checkout is rejected as conflict.
+- Toss-approved amount mismatch creates a payment exception path with `Payment(CANCEL_REQUIRED)`, `PaymentGroup(PAYMENT_EXCEPTION)`, and `Order(PAYMENT_EXCEPTION)`.
+- Automatic PG cancel execution, Toss webhook handling, payment detail API, and admin payment exception retry APIs remain planned.
+
 ### DS-10: Implement customer order history
 
 Description:

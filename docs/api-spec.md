@@ -217,7 +217,7 @@ POST /api/checkouts/{checkoutNumber}/policy-confirmation
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/payments/toss/confirm` | Authenticated user | Planned | Confirm Toss Payments approved payment server-side |
+| `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented | Confirm Toss Payments approved payment server-side |
 | `POST` | `/api/payments/toss/webhook` | Provider verification | Planned | Receive Toss Payments webhook if enabled |
 | `GET` | `/api/payments/{paymentId}` | Authenticated user | Planned | Customer-visible payment state |
 | `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Planned | Retry failed payment exception cancel |
@@ -230,6 +230,22 @@ Rules:
 - Virtual account, mobile phone payment, and gift certificate payment are excluded.
 - Payment confirmation must verify amount, expiration, policy confirmation, PG key uniqueness, and product/option sellability.
 - PG-approved validation failure becomes payment exception and blocks supplier ordering.
+- Duplicate Toss confirmation with the same payment key and same checkout returns the existing payment result.
+- A payment key already attached to a different checkout is rejected as a conflict.
+- DS-9 stores payment events for confirm requested, approved, rejected, and payment exception paths.
+- Toss secret key is read from environment/config as `payments.toss.secret-key` and must not be committed.
+- Automatic PG cancel execution and admin retry APIs remain planned.
+
+Implemented request body:
+
+```json
+POST /api/payments/toss/confirm
+{
+  "checkoutNumber": "CO123456789012",
+  "paymentKey": "toss-payment-key",
+  "amount": 10000
+}
+```
 
 ## Admin Order And Fulfillment APIs
 

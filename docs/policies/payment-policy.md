@@ -96,6 +96,7 @@ Sandbox path:
 
 - Use Toss Payments test client key in the frontend.
 - Use Toss Payments test secret key only on the Spring Boot server.
+- Configure the Spring Boot server secret through `payments.toss.secret-key` or the equivalent environment variable, and never commit it.
 - Create a server-side `PaymentGroup` before invoking the Toss payment UI.
 - Confirm approved payment results on the server before moving orders to `SUPPLIER_ORDER_PENDING`.
 - Record raw PG identifiers and normalized payment events for idempotency and reconciliation.
