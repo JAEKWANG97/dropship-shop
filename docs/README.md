@@ -31,5 +31,5 @@
 
 - DS-23: payment exception and refund failure policy is reflected in payment, order, refund, domain, and flow docs.
 - DS-24: payment group and delivery-group order refund unit is reflected in payment, order, shipping, refund, legal notice, domain, and flow docs.
+- DS-26: supplier fulfillment SLA, address lock, shipment unit, and tracking correction policy is reflected in fulfillment, order, admin, domain, requirements, and flow docs.
 - Next policy issues are tracked in [Linear Backlog](linear-backlog.md) and Linear.
-

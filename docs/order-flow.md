@@ -12,6 +12,9 @@ Customer selects product option
 -> Server verifies payment
 -> Payment status: APPROVED
 -> All delivery-group orders in the payment group move to SUPPLIER_ORDER_PENDING
+-> Admin starts supplier order work
+-> Supplier order started time is recorded
+-> Shipping address is locked
 -> Admin places supplier order manually
 -> Fulfillment status: ORDERED
 -> Order status: SUPPLIER_ORDERED
@@ -187,11 +190,30 @@ Order status: PAYMENT_PENDING
 -> Customer can edit checkout address before payment
 
 Order status: SUPPLIER_ORDER_PENDING
--> Customer can directly change shipping address
+-> If addressLockedAt is empty, customer can directly change shipping address
+-> If admin started supplier order work and addressLockedAt is set, customer cannot directly change shipping address
+-> Address change requires customer support/admin manual handling
 
 Order status: SUPPLIER_ORDERED or later
 -> Customer cannot directly change shipping address
 -> Address change requires customer support/admin manual handling
+```
+
+## Supplier Order SLA And Delay Notice
+
+```text
+Order status: SUPPLIER_ORDER_PENDING
+-> Admin starts supplier order work on the same business day or next business day
+-> supplierOrderStartedAt and addressLockedAt are recorded
+-> Admin places supplier order manually
+-> Supplier order number, ordered address snapshot, expected ship date, and supplier memo are recorded
+
+Supplier response or expected ship date is not secured within 1 business day
+-> Order remains in admin follow-up queue
+
+Expected shipment remains unclear for 2 business days after supplier order
+-> Customer delay notice is sent
+-> Admin continues supplier follow-up or handles out-of-stock if confirmed
 ```
 
 ## Shipment Tracking Sync
@@ -207,6 +229,11 @@ Tracking sync failure
 -> Keep current shipment/order status
 -> Record sync failure
 -> Retry later or allow admin manual correction
+
+Admin manual correction
+-> Admin enters correction reason
+-> Manual correction is recorded
+-> Later automatic tracking sync cannot move the shipment backward or overwrite the admin correction without a valid forward transition
 ```
 
 ## Return Or Exchange After Delivery
@@ -250,13 +277,20 @@ Admin detects wrong operational state or shipment information
 - Customer can pay once for all delivery groups in the checkout.
 - Delivery groups are based on supplier, but customer UI should use delivery group wording instead of supplier wording.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
+- Customer direct shipping address change is blocked once `addressLockedAt` is set by supplier order work start.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
+- Supplier order work start does not add a new order status in MVP; it is tracked with `supplierOrderStartedAt` and `addressLockedAt`.
+- Supplier order work should start on the same business day or next business day after payment confirmation.
+- Supplier response or expected ship date should be secured within 1 business day after supplier order.
+- Customer delay notice is required when expected shipment remains unclear for 2 business days after supplier order.
 - Customer direct cancellation is allowed only until `SUPPLIER_ORDER_PENDING`.
 - After `SUPPLIER_ORDERED`, cancellation/return/exchange is handled manually by admin.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.
 - MVP includes automatic carrier tracking sync after carrier and tracking number are entered.
 - Automatic tracking sync failure must not block order, payment, or refund operations.
+- MVP uses one shipment per order and excludes partial shipment or split shipment.
+- Automatic tracking sync can move shipment state forward, but must not overwrite admin manual correction or move shipment state backward.
 - `REFUNDED` requires a completed refund record.
 - Paid orders can move to `REFUNDED` only after PG cancel/refund succeeds.
 - PG cancel/refund failure must keep the order in a processing or review-required state, not a completed state.

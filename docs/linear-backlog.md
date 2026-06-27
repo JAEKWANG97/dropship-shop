@@ -277,6 +277,18 @@ Acceptance criteria:
 - Tracking sync vs admin manual correction precedence is defined.
 - Fulfillment/shipping, order, admin operations, order-flow, domain-model, requirements, and decision-log docs are updated.
 
+Resolved decisions:
+
+- Supplier order work starts same business day or next business day after payment confirmation.
+- Orders paid before 15:00 target same-business-day supplier order work; later, weekend, and holiday orders target next-business-day work.
+- Supplier response or expected ship date should be secured within 1 business day after supplier order.
+- Customer delay notice is required when expected shipment remains unclear for 2 business days after supplier order.
+- Address locks when admin starts supplier order work.
+- Address lock uses `supplierOrderStartedAt` and `addressLockedAt`; no new order status is added for MVP.
+- MVP shipment model is one shipment per order.
+- Partial shipment and split shipment are excluded from MVP.
+- Automatic tracking sync can move state forward but must not overwrite admin manual correction or move state backward.
+
 References:
 
 - `docs/policies/fulfillment-shipping-policy.md`

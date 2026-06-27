@@ -184,6 +184,9 @@ Suggested fields:
 - expiresAt
 - deliveryGroupId
 - paymentGroupId
+- supplierOrderStartedAt
+- addressLockedAt
+- addressLockedByAdminId
 - createdAt
 - updatedAt
 
@@ -310,6 +313,15 @@ Suggested fields:
 - orderId
 - supplierId
 - status: PENDING / ORDERED / OUT_OF_STOCK / CANCELLED
+- supplierOrderStartedAt
+- supplierOrderNumber
+- orderedAddressSnapshot
+- orderedByAdminId
+- expectedShipDate
+- supplierResponseMemo
+- supplierResponseDueAt
+- delayNoticeRequiredAt
+- delayNotifiedAt
 - orderedAt
 - memo
 - createdAt
@@ -329,6 +341,10 @@ Suggested fields:
 - trackingStatus
 - trackingLastSyncedAt
 - trackingSyncFailureReason
+- manualOverride
+- manualCorrectionReason
+- manualCorrectedByAdminId
+- manualCorrectedAt
 - shippedAt
 - deliveredAt
 - createdAt
@@ -487,9 +503,15 @@ Suggested fields:
 - 결제 승인 완료 주문은 PG 취소/환불 성공 후에만 `REFUNDED`가 될 수 있다.
 - PG 취소/환불 실패는 `FAILED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED` 같은 상태로 남기고 완료 상태로 처리하지 않는다.
 - 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태까지만 허용한다.
+- 고객 직접 배송지 변경은 `SUPPLIER_ORDER_PENDING` 상태라도 `addressLockedAt`이 기록되면 거절한다.
+- 공급처 발주 작업 시작은 새 주문 상태를 추가하지 않고 `supplierOrderStartedAt`과 `addressLockedAt`으로 기록한다.
+- 공급처 발주 증빙으로 공급처 주문번호, 발주 주소 스냅샷, 발주 관리자, 예상 출고일, 공급처 응답 메모를 기록한다.
+- 공급처 발주 후 2영업일 이상 출고 예정이 불명확하면 고객 지연 안내 대상으로 관리한다.
 - 배송 후 반품/교환은 문의와 관리자 수동 처리로 시작한다.
 - 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.
 - 자동 배송조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
+- MVP 배송은 주문 1개당 배송 1개로 시작하고 부분 출고/분할 배송은 제외한다.
+- 자동 배송조회는 관리자 수동 보정 상태를 임의로 덮어쓰거나 뒤로 되돌리지 않는다.
 - MVP에서는 고객에게 별도 배송비를 청구하지 않으며 `shippingFee`는 `0`으로 시작한다.
 - MVP에서 한 주문은 하나의 배송 그룹만 포함한다.
 - 배송 그룹은 공급처 기준으로 나누지만 고객 화면에는 공급처 대신 배송 그룹으로 표시한다.

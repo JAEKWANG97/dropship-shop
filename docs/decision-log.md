@@ -381,6 +381,33 @@ Consequences:
 - Product/option/quantity-level partial refund remains deferred.
 - Policies that said partial refund is fully excluded are superseded by this decision.
 
+## 2026-06-27: Supplier Fulfillment SLA, Address Lock, And Shipment Policy
+
+Decision:
+
+Supplier ordering stays manual in MVP, but the operation must have explicit timing and locking rules. After payment confirmation, admin should start supplier order work on the same business day or next business day. Orders paid before 15:00 are targeted for same-business-day supplier order work; orders paid after 15:00, on weekends, or on holidays are targeted for next-business-day work.
+
+When admin starts supplier order work, the system records `supplierOrderStartedAt` and locks the shipping address with `addressLockedAt`. MVP does not add a new order status for this working state. Customer direct address changes are allowed in `SUPPLIER_ORDER_PENDING` only while `addressLockedAt` is empty. After address lock, address changes require customer support or admin manual handling.
+
+Supplier response or expected shipment date should be secured within 1 business day after supplier order. If expected shipment remains unclear for 2 business days after supplier order, the customer must receive a delay notice. If supplier out-of-stock is confirmed, the order moves to out-of-stock notice and delivery-group order level refund handling.
+
+MVP shipment model is one shipment per order. Partial shipment and split shipment are excluded from MVP. Automatic tracking sync can move shipment state forward, but must not move shipment backward or overwrite admin manual correction without a valid forward transition and recorded reason.
+
+Context:
+
+The shop relies on manual supplier ordering. Without a work-start lock, customer address edits can race with supplier ordering and create a mismatch between the site order and the supplier order. Adding a separate order status only for work-in-progress would increase state complexity before the full transition table is finalized. Field-based locking keeps the order state simpler while preserving auditability.
+
+Consequences:
+
+- Add supplier order work start fields to order or fulfillment models.
+- Add address lock fields: `addressLockedAt` and `addressLockedByAdminId`.
+- Supplier order evidence includes supplier order number, ordered address snapshot, ordered admin, expected ship date, and supplier response memo.
+- Delay notification tracking is required for orders with unclear expected shipment after 2 business days.
+- Customer address change API must check both order status and `addressLockedAt`.
+- Admin order actions include supplier order work start.
+- Shipment model is one shipment per order in MVP.
+- Tracking sync must respect admin manual corrections and only apply valid forward transitions.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:
