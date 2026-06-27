@@ -37,13 +37,31 @@ The new Linear organization was created through the Linear GraphQL onboarding mu
 
 The `Core` team, `MVP` project, and MVP backlog issues were created in the new Linear organization.
 
+GitHub Autolink is configured:
+
+- `DS-123` links to `https://linear.app/dropship-shop/issue/DS-123`
+
 Created issues:
 
 - DS-1 through DS-17
 
 ## Remaining Setup Steps
 
-1. Link GitHub repository in Linear:
+1. Enable Linear GitHub integration from the Linear UI:
    - `JAEKWANG97/dropship-shop`
-2. Decide whether to keep or archive the default `Dropship Shop / DRO` team that Linear created during organization onboarding.
-3. Keep API keys out of git and local documentation.
+2. Grant Linear GitHub App access to this private repository.
+3. Configure Linear automation for PR status updates.
+4. Decide whether to keep or archive the default `Dropship Shop / DRO` team that Linear created during organization onboarding.
+5. Keep API keys out of git and local documentation.
+
+## PR Workflow
+
+Use Linear issue ids in branch names, PR titles, and PR descriptions.
+
+Examples:
+
+- Branch: `feature/ds-4-backend-scaffold`
+- PR title: `DS-4 Scaffold Spring Boot backend`
+- PR body: `Fixes DS-4`
+
+See [Development Workflow](development-workflow.md).
