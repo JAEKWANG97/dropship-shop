@@ -193,6 +193,24 @@ Consequences:
 - Payment method policy still needs to decide which Toss-supported methods are enabled for MVP.
 - Virtual account/bank-transfer-like flows require separate async deposit state handling if included.
 
+## 2026-06-27: MVP Payment Methods
+
+Decision:
+
+Enable Toss Payments card, easy payment, and account transfer for MVP. Exclude virtual account/bank-transfer-like async payment, mobile phone payment, and gift certificate payment from MVP. Do not support partial cancellation in MVP. Do not show failed, pending, or expired payment orders in customer order history.
+
+Context:
+
+Card, easy payment, and account transfer fit the current synchronous payment confirmation model: `PAYMENT_PENDING` -> server verification -> `SUPPLIER_ORDER_PENDING`. Virtual account style payment requires account-issued, waiting-for-deposit, deposit-completed, and deposit-expired states, which would complicate the MVP order/payment model.
+
+Consequences:
+
+- MVP payment method enum can start with card, easy pay, and transfer.
+- Virtual account state handling is deferred.
+- Partial cancel/refund complexity is deferred.
+- Refund policy starts with full-order cancellation/refund.
+- Customer order history starts from confirmed orders, not failed/pending/expired checkout attempts.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

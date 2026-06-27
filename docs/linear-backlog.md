@@ -77,10 +77,10 @@ Finalize which Toss Payments methods are enabled in MVP and which are deferred.
 
 Acceptance criteria:
 
-- MVP payment methods are confirmed.
-- Virtual account/bank-transfer-like async payment handling is either designed or explicitly deferred.
-- Partial cancel support is decided.
-- Failed/expired payment order visibility is decided.
+- MVP payment methods are confirmed: card, easy payment, account transfer.
+- Virtual account/bank-transfer-like async payment handling is explicitly deferred.
+- Partial cancel support is excluded from MVP.
+- Failed/expired payment order visibility is decided: not shown in customer order history.
 - `docs/policies/payment-policy.md` and `docs/decision-log.md` are updated.
 
 References:

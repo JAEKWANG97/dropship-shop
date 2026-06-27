@@ -43,6 +43,7 @@ Order status: PAYMENT_PENDING
 -> Payment status: FAILED
 -> Order remains unconfirmed
 -> Customer can retry before order expiration or create a new order
+-> Order is not shown in customer order history
 ```
 
 ## Payment Pending Expiration
@@ -52,6 +53,7 @@ Order status: PAYMENT_PENDING
 -> 30 minutes pass without verified payment approval
 -> Order expires
 -> Customer must create a new order to retry checkout
+-> Order is not shown in customer order history
 ```
 
 ## Payment Amount Mismatch
@@ -63,6 +65,13 @@ Order status: PAYMENT_PENDING
 -> Amount mismatch detected
 -> Order is not confirmed
 -> Payment is cancelled or manually reviewed
+```
+
+## Deferred Virtual Account Flow
+
+```text
+Virtual account / bank-transfer-like async payment is not included in MVP.
+If added later, the order flow needs separate states for account issued, waiting for deposit, deposit completed, and deposit expired.
 ```
 
 ## Customer Cancellation Before Supplier Order
@@ -96,6 +105,9 @@ Order status: SUPPLIER_ORDERED or later
 - `PAYMENT_PENDING` orders are not real confirmed orders.
 - `PAYMENT_PENDING` orders expire 30 minutes after creation.
 - Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
+- MVP enabled payment methods are card, easy payment, and account transfer through Toss Payments.
+- Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.
+- Failed, pending, and expired payment orders are not shown in customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.

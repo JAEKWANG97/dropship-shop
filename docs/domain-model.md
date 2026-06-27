@@ -221,7 +221,7 @@ Suggested fields:
 - orderId
 - provider
 - providerPaymentKey
-- method
+- method: CARD / EASY_PAY / TRANSFER
 - status: READY / APPROVED / FAILED / CANCELLED / REFUNDED
 - requestedAmount
 - approvedAmount
@@ -292,6 +292,8 @@ Suggested fields:
 - `PAYMENT_PENDING` 주문은 결제 검증 전이므로 공급처 발주 대상이 아니다.
 - `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 `EXPIRED`로 만료 처리한다.
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
+- MVP 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
+- MVP에서는 부분 취소를 지원하지 않고 주문 단위 전액 취소/환불을 우선 지원한다.
 - 고객 화면에는 내부 주문 상태를 그대로 노출하지 않고 고객용 표시 상태로 매핑한다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
 - 주문 상태 변경 이력은 별도 테이블로 추가하는 것이 좋다.
