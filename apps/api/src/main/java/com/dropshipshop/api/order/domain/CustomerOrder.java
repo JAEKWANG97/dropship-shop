@@ -168,6 +168,26 @@ public class CustomerOrder {
 		return status;
 	}
 
+	public String getRecipientName() {
+		return recipientName;
+	}
+
+	public String getRecipientPhone() {
+		return recipientPhone;
+	}
+
+	public String getPostalCode() {
+		return postalCode;
+	}
+
+	public String getAddress1() {
+		return address1;
+	}
+
+	public String getAddress2() {
+		return address2;
+	}
+
 	public long getSubtotalAmount() {
 		return subtotalAmount;
 	}
@@ -186,5 +206,9 @@ public class CustomerOrder {
 
 	public Instant getExpiresAt() {
 		return expiresAt;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
 	}
 }

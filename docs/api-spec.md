@@ -170,8 +170,8 @@ PATCH /api/cart/items/{cartItemId}
 | `GET` | `/api/checkouts/{checkoutNumber}` | `CUSTOMER` | Implemented | Read checkout/payment group state |
 | `PATCH` | `/api/checkouts/{checkoutNumber}/shipping-address` | Authenticated user | Planned | Update checkout shipping address before payment confirmation |
 | `POST` | `/api/checkouts/{checkoutNumber}/policy-confirmation` | `CUSTOMER` | Implemented | Store order policy confirmation |
-| `GET` | `/api/orders` | Authenticated user | Planned | Customer order history |
-| `GET` | `/api/orders/{orderId}` | Authenticated user | Planned | Customer order detail |
+| `GET` | `/api/orders` | `CUSTOMER` | Implemented | Customer order history |
+| `GET` | `/api/orders/{orderId}` | `CUSTOMER` | Implemented | Customer order detail |
 | `PATCH` | `/api/orders/{orderId}/shipping-address` | Authenticated user | Planned | Change address before supplier work starts |
 | `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Planned | Self-service cancel when allowed |
 
@@ -187,6 +187,9 @@ Rules:
 - Policy confirmation is stored separately on the payment group before payment approval.
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
+- Customer order list and detail are scoped to the authenticated customer.
+- Customer order APIs expose customer display statuses instead of internal order statuses.
+- Customer order detail includes payment group summary, payment summary, shipping address, order items, and placeholder fulfillment/shipment/refund summaries.
 - Address changes are rejected after `address_locked_at` or supplier order completion.
 
 Implemented request bodies:

@@ -44,6 +44,13 @@ DS-9 backend implementation notes:
 - Toss-approved amount mismatch records the payment exception path and blocks supplier ordering.
 - Automatic PG cancel execution remains planned.
 
+DS-10 backend implementation notes:
+
+- Customer order history starts after payment confirmation or customer-visible payment exception.
+- Normal `PAYMENT_PENDING` and `EXPIRED` orders are excluded from customer order history.
+- Customer APIs return display statuses instead of raw internal order statuses.
+- Order detail includes payment, shipment, fulfillment, and refund summary surfaces; shipment, fulfillment, and refund are placeholders until later issues implement those domains.
+
 ## Multi Delivery Group Checkout
 
 ```text

@@ -620,6 +620,17 @@ Acceptance criteria:
 - Order detail includes payment, fulfillment, shipment, and refund summary.
 - Customer-facing status does not expose confusing internal states.
 
+Resolved decisions:
+
+- Customer order APIs are implemented at `GET /api/orders` and `GET /api/orders/{orderId}`.
+- Customer order APIs require `CUSTOMER`; anonymous access is rejected and admin access is forbidden.
+- Customer order list excludes `PAYMENT_PENDING` and `EXPIRED`.
+- Customer order detail also rejects non-customer-visible pending/expired orders.
+- Customers can read only their own orders.
+- Customer-facing responses expose `displayStatus` and do not expose raw internal order status.
+- Detail response includes payment group summary, payment summary, shipping address snapshot, order items, and placeholder fulfillment/shipment/refund summaries.
+- Same payment group orders include `paymentGroupId` and `checkoutNumber` so the client can group them.
+
 ## Milestone 4: Admin Fulfillment
 
 ### DS-11: Implement admin order queue

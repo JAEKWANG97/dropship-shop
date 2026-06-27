@@ -87,6 +87,14 @@ curl http://localhost:8080/actuator/health
 - Payment exception paths record `Payment(CANCEL_REQUIRED)` and block supplier ordering.
 - Webhooks, payment detail API, automatic cancel execution, and admin retry APIs remain future work.
 
+## Customer Order Foundation
+
+- Customer order APIs are available at `/api/orders`.
+- Customer order list and detail are scoped to the authenticated customer.
+- `PAYMENT_PENDING` and `EXPIRED` orders are excluded from customer order history.
+- Customer responses expose display statuses instead of raw internal order statuses.
+- Order detail includes payment group, payment summary, shipping address snapshot, order items, and placeholder fulfillment/shipment/refund summaries.
+
 ## Tests
 
 ```sh
