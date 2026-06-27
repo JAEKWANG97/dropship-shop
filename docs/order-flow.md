@@ -26,6 +26,15 @@ Customer selects product option
 -> Order status: DELIVERED
 ```
 
+DS-8 backend implementation notes:
+
+- Checkout creation is cart-based.
+- The server creates one payment group and one `PAYMENT_PENDING` order per supplier-backed delivery group.
+- The checkout request includes the shipping address directly.
+- Order items snapshot product name, summary, option name, price, product detail version, and product notice version.
+- The cart is emptied after successful checkout creation.
+- Direct-buy checkout is deferred.
+
 ## Multi Delivery Group Checkout
 
 ```text

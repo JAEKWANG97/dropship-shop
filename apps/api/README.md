@@ -66,6 +66,17 @@ curl http://localhost:8080/actuator/health
 - Cart checkout validation blocks empty carts and unavailable product/option states.
 - Cart prices are current display prices; order creation snapshots final prices later.
 
+## Checkout And Order Foundation
+
+- Customer checkout APIs are available at `/api/checkouts`.
+- Checkout creation is cart-based; direct-buy checkout is deferred.
+- Checkout creation creates one payment group and one `PAYMENT_PENDING` order per supplier-backed delivery group.
+- Shipping address fields are stored as order snapshots.
+- Order items snapshot product name, summary, option name, unit price, detail version, and notice version.
+- Server-calculated totals are authoritative; client-submitted totals are ignored.
+- Checkout creation empties the cart after successful order creation.
+- Policy confirmation is stored through `/api/checkouts/{checkoutNumber}/policy-confirmation`.
+
 ## Tests
 
 ```sh

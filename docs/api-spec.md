@@ -166,10 +166,10 @@ PATCH /api/cart/items/{cartItemId}
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/checkouts` | Authenticated user | Planned | Create payment group and delivery-group orders from cart or direct buy |
-| `GET` | `/api/checkouts/{checkoutNumber}` | Authenticated user | Planned | Read checkout/payment group state |
+| `POST` | `/api/checkouts` | `CUSTOMER` | Implemented | Create payment group and delivery-group orders from cart |
+| `GET` | `/api/checkouts/{checkoutNumber}` | `CUSTOMER` | Implemented | Read checkout/payment group state |
 | `PATCH` | `/api/checkouts/{checkoutNumber}/shipping-address` | Authenticated user | Planned | Update checkout shipping address before payment confirmation |
-| `POST` | `/api/checkouts/{checkoutNumber}/policy-confirmation` | Authenticated user | Planned | Store order policy confirmation |
+| `POST` | `/api/checkouts/{checkoutNumber}/policy-confirmation` | `CUSTOMER` | Implemented | Store order policy confirmation |
 | `GET` | `/api/orders` | Authenticated user | Planned | Customer order history |
 | `GET` | `/api/orders/{orderId}` | Authenticated user | Planned | Customer order detail |
 | `PATCH` | `/api/orders/{orderId}/shipping-address` | Authenticated user | Planned | Change address before supplier work starts |
@@ -179,9 +179,39 @@ Rules:
 
 - Order creation starts as `PAYMENT_PENDING`.
 - Payment-pending orders expire after 30 minutes.
+- DS-8 creates checkouts from cart only; direct-buy checkout is deferred.
+- Checkout request includes shipping address fields directly.
+- Server calculates all totals and ignores client-submitted totals.
+- Checkout creation groups cart items by supplier as the MVP delivery-group boundary.
+- Checkout creation empties the cart after payment group and orders are created.
+- Policy confirmation is stored separately on the payment group before payment approval.
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
 - Address changes are rejected after `address_locked_at` or supplier order completion.
+
+Implemented request bodies:
+
+```json
+POST /api/checkouts
+{
+  "recipientName": "Receiver",
+  "recipientPhone": "010-1111-2222",
+  "postalCode": "12345",
+  "address1": "Base address",
+  "address2": "Detail address",
+  "clientSubmittedTotalAmount": 1
+}
+
+POST /api/checkouts/{checkoutNumber}/policy-confirmation
+{
+  "termsVersion": "terms-2026-06-01",
+  "privacyVersion": "privacy-2026-06-01",
+  "orderPolicyVersion": "order-2026-06-01",
+  "cancellationRefundPolicyVersion": "refund-2026-06-01",
+  "outOfStockNoticeVersion": "out-of-stock-2026-06-01",
+  "confirmedNoticeText": "I agree to the checkout policies."
+}
+```
 
 ## Payment APIs
 

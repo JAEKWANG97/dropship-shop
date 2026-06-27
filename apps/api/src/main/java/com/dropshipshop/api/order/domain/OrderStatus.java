@@ -1,0 +1,15 @@
+package com.dropshipshop.api.order.domain;
+
+public enum OrderStatus {
+	PAYMENT_PENDING,
+	EXPIRED,
+	PAYMENT_EXCEPTION,
+	SUPPLIER_ORDER_PENDING,
+	SUPPLIER_ORDERED,
+	OUT_OF_STOCK,
+	SHIPPED,
+	DELIVERED,
+	CANCELLED,
+	REFUND_REQUESTED,
+	REFUNDED
+}

@@ -566,6 +566,21 @@ Acceptance criteria:
 - Order starts in payment pending state.
 - Client-submitted total amount is not trusted.
 
+Resolved decisions:
+
+- Checkout/order tables are created by `V4__create_checkout_order.sql`.
+- DS-8 creates checkouts from cart only; direct-buy checkout is deferred.
+- Checkout request includes shipping address fields directly.
+- One `PaymentGroup` is created per checkout.
+- Cart items are grouped by supplier as the MVP delivery-group boundary.
+- One `PAYMENT_PENDING` order is created per supplier-backed delivery group.
+- `OrderItem` stores product name, product summary, option name, unit price, quantity, line amount, product detail version, and product notice version snapshots.
+- `PaymentGroup` and orders expire 30 minutes after checkout creation.
+- Server calculates all totals and ignores `clientSubmittedTotalAmount`.
+- Checkout creation empties the cart after successful order creation.
+- Policy confirmation is implemented as `POST /api/checkouts/{checkoutNumber}/policy-confirmation`.
+- Separate `delivery_groups` table and direct-buy checkout are deferred.
+
 ### DS-9: Integrate PG sandbox payment approval
 
 Description:

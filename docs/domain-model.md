@@ -233,11 +233,13 @@ Rules:
 
 고객 주문의 중심 엔티티.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - orderNumber
 - userId
+- supplierId
+- paymentGroupId
 - status: PAYMENT_PENDING / EXPIRED / PAYMENT_EXCEPTION / SUPPLIER_ORDER_PENDING / SUPPLIER_ORDERED / OUT_OF_STOCK / SHIPPED / DELIVERED / CANCELLED / REFUND_REQUESTED / REFUNDED
 - recipientName
 - recipientPhone
@@ -249,15 +251,13 @@ Suggested fields:
 - discountAmount
 - totalAmount
 - expiresAt
-- deliveryGroupId
-- paymentGroupId
 - supplierOrderStartedAt
 - addressLockedAt
 - addressLockedByAdminId
 - createdAt
 - updatedAt
 
-Suggested statuses:
+Implemented statuses:
 
 - PAYMENT_PENDING
 - EXPIRED
@@ -271,11 +271,18 @@ Suggested statuses:
 - REFUND_REQUESTED
 - REFUNDED
 
+Rules:
+
+- DS-8 creates one `PAYMENT_PENDING` order per supplier-backed delivery group.
+- MVP does not create a separate `delivery_groups` table; `supplierId` is the order grouping boundary.
+- Shipping fee is 0 because shipping cost is included in product price.
+- Orders expire with their payment group 30 minutes after checkout creation.
+
 ## OrderItem
 
 주문에 포함된 상품 옵션. 주문 시점의 이름과 가격을 스냅샷으로 보관한다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - orderId
@@ -284,21 +291,25 @@ Suggested fields:
 - productName
 - optionName
 - productSummary
-- productDetailSnapshotId
-- productNoticeSnapshotId
+- productDetailVersion
+- productNoticeVersion
 - unitPrice
 - quantity
 - lineAmount
 - supplierId
-- status
 - createdAt
 - updatedAt
+
+Rules:
+
+- Product name, summary, option name, unit price, detail version, and notice version are snapshotted at checkout creation.
+- Product or option edits after checkout creation do not change existing order item snapshots.
 
 ## DeliveryGroup
 
 고객에게 노출하는 배송 묶음. MVP에서는 같은 공급처 상품을 하나의 배송 그룹으로 묶는다.
 
-Suggested fields:
+Deferred fields:
 
 - id
 - supplierId
@@ -311,7 +322,7 @@ Suggested fields:
 
 고객의 한 번 결제를 나타내는 결제 그룹. 하나의 `PaymentGroup`은 여러 배송 그룹 주문을 포함할 수 있다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - checkoutNumber
@@ -322,8 +333,17 @@ Suggested fields:
 - refundableAmount
 - expiresAt
 - approvedAt
+- policyConfirmedAt
 - createdAt
 - updatedAt
+
+Rules:
+
+- DS-8 creates `PaymentGroup` before PG payment.
+- Initial status is `PAYMENT_PENDING`.
+- `checkoutNumber` is the customer/payment-flow identifier.
+- Policy confirmation is stored separately and also reflected by `policyConfirmedAt`.
+- Actual PG payment attempts are stored by DS-9.
 
 ## Payment
 

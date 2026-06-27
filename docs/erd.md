@@ -9,7 +9,8 @@
 - `users` table: implemented in `apps/api/src/main/resources/db/migration/V1__create_users.sql`.
 - Catalog tables: implemented in `apps/api/src/main/resources/db/migration/V2__create_catalog.sql`.
 - Cart tables: implemented in `apps/api/src/main/resources/db/migration/V3__create_cart.sql`.
-- Order, payment, fulfillment, shipment, refund, claim, policy, and audit tables: planned.
+- Checkout/order tables: implemented in `apps/api/src/main/resources/db/migration/V4__create_checkout_order.sql`.
+- Payment attempt, fulfillment, shipment, refund, claim, policy, and audit tables: planned.
 
 ## Modeling Rules
 
@@ -50,6 +51,7 @@ Additional implemented table groups:
 
 - Catalog: `suppliers`, `products`, `product_options`, `product_images`, `product_detail_blocks`, `product_notices`, `product_change_histories`
 - Cart: `carts`, `cart_items`
+- Checkout/order: `payment_groups`, `orders`, `order_items`, `order_policy_agreements`
 
 Deletion/rejoin note:
 
@@ -326,6 +328,8 @@ Rules:
 
 ## Order And Checkout
 
+Implemented by DS-8 except `delivery_groups`, which is deferred and derived from supplier for MVP.
+
 ### delivery_groups
 
 - `id`
@@ -344,11 +348,18 @@ Open note:
 - `id`
 - `order_number`
 - `user_id`
-- `delivery_group_id`
+- `supplier_id`
 - `payment_group_id`
 - `status`
-- recipient and address snapshot fields
-- amount fields
+- `recipient_name`
+- `recipient_phone`
+- `postal_code`
+- `address1`
+- `address2`
+- `subtotal_amount`
+- `shipping_fee`
+- `discount_amount`
+- `total_amount`
 - `expires_at`
 - `supplier_order_started_at`
 - `address_locked_at`
@@ -376,12 +387,15 @@ Status set:
 - `order_id`
 - `product_id`
 - `product_option_id`
-- product and option snapshot fields
-- product detail and notice snapshot references
+- `supplier_id`
+- `product_name`
+- `product_summary`
+- `product_detail_version`
+- `product_notice_version`
+- `option_name`
 - `unit_price`
 - `quantity`
 - `line_amount`
-- `supplier_id`
 - `created_at`
 - `updated_at`
 
@@ -394,7 +408,11 @@ Rule:
 - `id`
 - `payment_group_id`
 - `user_id`
-- policy versions
+- `terms_version`
+- `privacy_version`
+- `order_policy_version`
+- `cancellation_refund_policy_version`
+- `out_of_stock_notice_version`
 - `confirmed_notice_text`
 - `confirmed_at`
 - `created_at`
@@ -407,6 +425,8 @@ Open note:
 
 ### payment_groups
 
+Implemented by DS-8 as the checkout payment aggregate. Actual PG payment attempts are implemented in DS-9.
+
 - `id`
 - `checkout_number`
 - `user_id`
@@ -416,6 +436,7 @@ Open note:
 - `refundable_amount`
 - `expires_at`
 - `approved_at`
+- `policy_confirmed_at`
 - `created_at`
 - `updated_at`
 
