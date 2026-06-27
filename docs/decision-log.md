@@ -307,6 +307,29 @@ Consequences:
 - Full product content diff history for HTML, images, names, and summaries is deferred.
 - Automatic rollback is excluded from MVP; correction actions are the recovery mechanism.
 
+## 2026-06-27: Legal Notice And Checkout Confirmation
+
+Decision:
+
+Expose terms of service, privacy policy, shipping policy, and cancellation/refund policy from the customer menu and footer. At first signup or first social login completion, collect terms of service and privacy policy agreement. At checkout, require one integrated confirmation checkbox per order before payment can start. The checkout confirmation covers order items, payment amount, shipping address, shipping policy, cancellation/refund policy, post-payment supplier out-of-stock possibility, and full refund on out-of-stock. Store policy versions and confirmation time with the order.
+
+Context:
+
+Account-level agreements and order-level confirmations solve different problems. Signup agreements cover service use and personal data processing. Checkout confirmation records that the customer reviewed the conditions of this specific order before payment. This is especially important because this product model allows supplier out-of-stock after payment.
+
+Consequences:
+
+- Customer menu and footer need policy page links.
+- Policy pages need version and effective date.
+- First-login flow needs required terms/privacy agreement.
+- Checkout needs one integrated confirmation checkbox.
+- Payment request must be blocked until checkout confirmation is complete.
+- Order records need policy version and confirmation timestamp fields.
+- Product detail and checkout must both mention post-payment supplier out-of-stock possibility and full refund policy.
+- MVP customer notifications start with email and order detail status display.
+- SMS, Kakao Alimtalk, and app push notifications are deferred.
+- Final legal wording remains subject to separate pre-launch legal review.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

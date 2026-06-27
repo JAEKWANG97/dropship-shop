@@ -161,10 +161,12 @@ Finalize where and how customer-facing notices and policy acknowledgements are s
 
 Acceptance criteria:
 
-- Supplier out-of-stock notice locations are decided.
-- Checkout policy acknowledgement checkbox is decided.
-- Policy versioning scope is decided.
-- Customer notification method baseline is decided.
+- Supplier out-of-stock notice locations are decided: product detail and checkout.
+- Policy page locations are decided: customer menu and footer.
+- Signup/first-login agreements are decided: terms of service and privacy policy agreement.
+- Checkout policy acknowledgement checkbox is decided: one integrated checkbox per order.
+- Policy versioning scope is decided: policy pages have version/effective date, and order confirmation stores policy versions and confirmation time.
+- Customer notification method baseline is decided: email and order detail status display for MVP.
 - `docs/policies/legal-and-customer-notice-policy.md` and `docs/decision-log.md` are updated.
 
 References:

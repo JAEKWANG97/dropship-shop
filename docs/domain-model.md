@@ -22,6 +22,9 @@ Refund
 OrderStatusHistory
 AdminActionHistory
 ProductChangeHistory
+PolicyDocument
+UserPolicyAgreement
+OrderPolicyAgreement
 ```
 
 ## User
@@ -345,6 +348,53 @@ Suggested fields:
 - reason
 - createdAt
 
+## PolicyDocument
+
+고객에게 고지하는 정책 문서. 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책을 버전 단위로 관리한다.
+
+Suggested fields:
+
+- id
+- type: TERMS_OF_SERVICE / PRIVACY_POLICY / SHIPPING_POLICY / CANCELLATION_REFUND_POLICY
+- version
+- title
+- content
+- effectiveFrom
+- status: DRAFT / ACTIVE / ARCHIVED
+- createdAt
+- updatedAt
+
+## UserPolicyAgreement
+
+회원가입 또는 첫 소셜 로그인 시점의 약관/개인정보 동의 기록.
+
+Suggested fields:
+
+- id
+- userId
+- policyDocumentId
+- policyType
+- policyVersion
+- agreedAt
+- createdAt
+
+## OrderPolicyAgreement
+
+주문서에서 주문마다 확인한 정책 고지 기록.
+
+Suggested fields:
+
+- id
+- orderId
+- userId
+- termsVersion
+- privacyVersion
+- shippingPolicyVersion
+- cancellationRefundPolicyVersion
+- confirmedNoticeText
+- confirmedAt
+- createdAt
+
 ## Modeling Notes
 
 - 상품과 옵션에는 실제 재고 수량을 두지 않는다.
@@ -377,3 +427,7 @@ Suggested fields:
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유를 필수로 기록한다.
 - 상품 변경 이력은 가격, 상품/옵션 판매 상태, 공급처 변경부터 MVP에서 기록한다.
 - 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff는 MVP 이후로 미룬다.
+- 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책은 버전과 시행일을 가진다.
+- 첫 가입 또는 첫 소셜 로그인 완료 시 이용약관과 개인정보처리방침 동의 이력을 저장한다.
+- 주문 시점에는 주문서 통합 확인 체크의 정책 버전과 확인 시각을 저장한다.
+- 주문서 통합 확인 체크는 주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 가능성, 품절 시 전액 환불 안내를 포함한다.

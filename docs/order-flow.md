@@ -7,6 +7,7 @@ Customer selects product option
 -> Cart items are grouped by delivery group
 -> Customer creates order
 -> Order status: PAYMENT_PENDING
+-> Customer confirms order notice checkbox
 -> Customer pays through PG
 -> Server verifies payment
 -> Payment status: APPROVED
@@ -66,6 +67,16 @@ Order status: PAYMENT_PENDING
 -> Order expires
 -> Customer must create a new order to retry checkout
 -> Order is not shown in customer order history
+```
+
+## Checkout Policy Confirmation
+
+```text
+Order status: PAYMENT_PENDING
+-> Customer reviews order items, amount, shipping address, shipping policy, cancellation/refund policy, out-of-stock notice
+-> Customer checks one integrated confirmation checkbox
+-> System records confirmed policy versions and confirmed time
+-> Payment request can start
 ```
 
 ## Payment Amount Mismatch
@@ -159,6 +170,8 @@ Admin detects wrong operational state or shipment information
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
 - `PAYMENT_PENDING` orders expire 30 minutes after creation.
+- Payment request requires checkout policy confirmation.
+- Checkout policy confirmation is recorded per order with policy versions and confirmation time.
 - Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
 - MVP enabled payment methods are card, easy payment, and account transfer through Toss Payments.
 - Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.
