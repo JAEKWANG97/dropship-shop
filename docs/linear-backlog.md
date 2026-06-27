@@ -79,7 +79,7 @@ Acceptance criteria:
 
 - MVP payment methods are confirmed: card, easy payment, account transfer.
 - Virtual account/bank-transfer-like async payment handling is explicitly deferred.
-- Partial cancel support is excluded from MVP.
+- Product/option/quantity-level partial cancel support is excluded from MVP; delivery-group order level partial refund is handled by DS-24.
 - Failed/expired payment order visibility is decided: not shown in customer order history.
 - `docs/policies/payment-policy.md` and `docs/decision-log.md` are updated.
 
@@ -119,7 +119,7 @@ Acceptance criteria:
 
 - Direct customer cancellation window is decided: through `SUPPLIER_ORDER_PENDING`.
 - Admin approval rules after supplier order are decided: manual admin handling after `SUPPLIER_ORDERED`.
-- Partial out-of-stock handling is decided: full-order cancellation/refund in MVP.
+- Partial out-of-stock handling is decided: delivery-group order level cancellation/refund, with product/option/quantity-level partial refund excluded from MVP.
 - Refund reason categories are decided.
 - Post-shipment return/exchange MVP scope is decided: inquiry/admin manual handling.
 - `docs/policies/cancellation-refund-policy.md` and `docs/decision-log.md` are updated.
@@ -164,8 +164,8 @@ Acceptance criteria:
 - Supplier out-of-stock notice locations are decided: product detail and checkout.
 - Policy page locations are decided: customer menu and footer.
 - Signup/first-login agreements are decided: terms of service and privacy policy agreement.
-- Checkout policy acknowledgement checkbox is decided: one integrated checkbox per order.
-- Policy versioning scope is decided: policy pages have version/effective date, and order confirmation stores policy versions and confirmation time.
+- Checkout policy acknowledgement checkbox is decided: one integrated checkbox per checkout/payment group.
+- Policy versioning scope is decided: policy pages have version/effective date, and checkout/payment group confirmation stores policy versions and confirmation time.
 - Customer notification method baseline is decided: email and order detail status display for MVP.
 - `docs/policies/legal-and-customer-notice-policy.md` and `docs/decision-log.md` are updated.
 
@@ -220,10 +220,14 @@ Decide how payment works when a cart contains multiple delivery groups.
 
 Acceptance criteria:
 
-- MVP payment unit rule is decided. Recommended: PG payment 1 = order 1 = delivery group 1.
-- Multi-delivery-group checkout UX is decided: separate payment per order or block combined checkout.
-- Failure behavior is defined when one delivery-group payment succeeds and another fails.
-- Order number and customer order history display rules are defined for split delivery-group checkout.
+- MVP payment unit rule is decided: one customer checkout can pay for multiple delivery-group orders through one payment group.
+- Payment model is decided: PG payment 1 = payment group 1, and payment group 1 can contain multiple delivery-group orders.
+- Multi-delivery-group checkout UX is decided: customer pays once for the whole cart while the server creates one order per delivery group.
+- Partial cancellation/refund scope is decided: delivery-group order level is supported.
+- Product, option, and quantity-level partial cancellation/refund remains excluded from MVP.
+- Out-of-stock behavior is defined: if one delivery-group order is out of stock, refund only that delivery-group order amount and keep other delivery-group orders active.
+- Domain model includes `PaymentGroup` or equivalent checkout payment aggregate.
+- Order number and customer order history display rules are defined for split delivery-group orders under one payment group.
 - Fulfillment/shipping, payment, order-flow, domain-model, requirements, and decision-log docs are updated.
 
 References:

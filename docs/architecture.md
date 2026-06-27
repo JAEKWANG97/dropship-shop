@@ -68,7 +68,9 @@ Primary data:
 - cart_items
 - orders
 - order_items
+- payment_groups
 - payments
+- payment_events
 - fulfillments
 - shipments
 - refunds

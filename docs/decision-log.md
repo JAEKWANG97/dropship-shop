@@ -95,7 +95,7 @@ Create an order before requesting PG payment. The initial order status is `PAYME
 
 Context:
 
-Payment needs an internal order anchor so the server can calculate the amount, pass a stable order identifier to the PG flow, and verify the PG-approved amount against the server-side order amount.
+Payment needs an internal checkout/payment group anchor so the server can calculate the amount, pass a stable identifier to the PG flow, and verify the PG-approved amount against the server-side payment group amount. The payment group can contain one or more delivery-group orders.
 
 Consequences:
 
@@ -197,7 +197,11 @@ Consequences:
 
 Decision:
 
-Enable Toss Payments card, easy payment, and account transfer for MVP. Exclude virtual account/bank-transfer-like async payment, mobile phone payment, and gift certificate payment from MVP. Do not support partial cancellation in MVP. Do not show failed, pending, or expired payment orders in customer order history.
+Enable Toss Payments card, easy payment, and account transfer for MVP. Exclude virtual account/bank-transfer-like async payment, mobile phone payment, and gift certificate payment from MVP. Do not show failed, pending, or expired payment orders in customer order history.
+
+Superseded note:
+
+The original decision excluded all partial cancellation/refund. That part is superseded by `2026-06-27: Payment Group And Delivery Group Refund Unit`, which allows delivery-group order level partial cancellation/refund while still excluding product, option, and quantity-level partial cancellation/refund.
 
 Context:
 
@@ -207,8 +211,8 @@ Consequences:
 
 - MVP payment method enum can start with card, easy pay, and transfer.
 - Virtual account state handling is deferred.
-- Partial cancel/refund complexity is deferred.
-- Refund policy starts with full-order cancellation/refund.
+- Product, option, and quantity-level partial cancel/refund complexity is deferred.
+- Refund policy starts with payment-group level refund and delivery-group order level partial refund.
 - Customer order history starts from confirmed orders, not failed/pending/expired checkout attempts.
 
 ## 2026-06-27: Automatic Shipment Tracking In MVP
@@ -256,7 +260,7 @@ In MVP, one order contains exactly one delivery group. Delivery groups are based
 
 Context:
 
-Multi-supplier orders introduce partial stock-out, partial shipment, multiple tracking numbers, and partial refund complexity. MVP payment and refund policy intentionally excludes partial cancellation/refund, so order splitting by delivery group keeps fulfillment and refund rules consistent.
+Multi-supplier orders introduce partial stock-out, partial shipment, multiple tracking numbers, and partial refund complexity. Order splitting by delivery group keeps fulfillment and refund rules aligned to the supplier-backed delivery boundary.
 
 Consequences:
 
@@ -264,25 +268,25 @@ Consequences:
 - Checkout must group items by supplier-backed delivery group.
 - Each delivery group creates a separate order.
 - Shipping fee remains `0` for all delivery groups in MVP.
-- Customer order history may show multiple orders from one cart checkout.
-- Future marketplace-like combined orders require partial cancellation/refund and multi-shipment support.
+- Customer order history may show multiple delivery-group orders from one cart checkout.
+- One cart checkout can be connected by a payment group and paid through one PG payment.
 
 ## 2026-06-27: Cancellation And Refund Scope
 
 Decision:
 
-Allow customer direct cancellation only until `SUPPLIER_ORDER_PENDING`. After `SUPPLIER_ORDERED`, cancellation, return, and exchange requests are handled manually by admin. MVP supports full-order cancellation/refund only. Partial cancellation/refund is excluded.
+Allow customer direct cancellation only until `SUPPLIER_ORDER_PENDING`. After `SUPPLIER_ORDERED`, cancellation, return, and exchange requests are handled manually by admin. MVP supports delivery-group order level cancellation/refund inside a payment group, while product, option, and quantity-level partial cancellation/refund is excluded.
 
 Context:
 
-After supplier ordering, the supplier may have started fulfillment or shipment preparation. The MVP also excludes partial cancellation/refund, so post-supplier-order changes need manual review to avoid mismatches between customer order, supplier fulfillment, payment, and shipment state.
+After supplier ordering, the supplier may have started fulfillment or shipment preparation. Post-supplier-order changes need manual review to avoid mismatches between customer order, supplier fulfillment, payment, and shipment state.
 
 Consequences:
 
 - Customer cancel button is shown only through `SUPPLIER_ORDER_PENDING`.
 - `SUPPLIER_ORDERED` and later states reject direct customer cancellation.
-- Supplier out-of-stock leads to full-order cancellation/refund.
-- Partial out-of-stock also leads to full-order cancellation/refund in MVP.
+- Supplier out-of-stock leads to delivery-group order cancellation/refund.
+- If only part of a delivery-group order is out of stock, MVP cancels/refunds that whole delivery-group order.
 - Return/exchange after delivery starts as inquiry/admin manual handling.
 - Refund reason enum starts with customer cancel, supplier out of stock, admin cancel, payment amount mismatch, return requested, and exchange requested.
 
@@ -311,7 +315,7 @@ Consequences:
 
 Decision:
 
-Expose terms of service, privacy policy, shipping policy, and cancellation/refund policy from the customer menu and footer. At first signup or first social login completion, collect terms of service and privacy policy agreement. At checkout, require one integrated confirmation checkbox per order before payment can start. The checkout confirmation covers order items, payment amount, shipping address, shipping policy, cancellation/refund policy, post-payment supplier out-of-stock possibility, and full refund on out-of-stock. Store policy versions and confirmation time with the order.
+Expose terms of service, privacy policy, shipping policy, and cancellation/refund policy from the customer menu and footer. At first signup or first social login completion, collect terms of service and privacy policy agreement. At checkout, require one integrated confirmation checkbox per checkout/payment group before payment can start. The checkout confirmation covers order items, payment amount, shipping address, shipping policy, cancellation/refund policy, post-payment supplier out-of-stock possibility, and refund of the affected delivery-group order amount on out-of-stock. Store policy versions and confirmation time with the payment group.
 
 Context:
 
@@ -322,10 +326,10 @@ Consequences:
 - Customer menu and footer need policy page links.
 - Policy pages need version and effective date.
 - First-login flow needs required terms/privacy agreement.
-- Checkout needs one integrated confirmation checkbox.
+- Checkout needs one integrated confirmation checkbox per payment group.
 - Payment request must be blocked until checkout confirmation is complete.
-- Order records need policy version and confirmation timestamp fields.
-- Product detail and checkout must both mention post-payment supplier out-of-stock possibility and full refund policy.
+- Payment group records need policy version and confirmation timestamp fields.
+- Product detail and checkout must both mention post-payment supplier out-of-stock possibility and affected delivery-group order refund policy.
 - MVP customer notifications start with email and order detail status display.
 - SMS, Kakao Alimtalk, and app push notifications are deferred.
 - Final legal wording remains subject to separate pre-launch legal review.
@@ -352,6 +356,30 @@ Consequences:
 - Refund lifecycle includes PG cancel requested, processing, completed, failed, retry required, and manual review states.
 - Payment/refund events need event history for idempotency and PG reconciliation.
 - Customer must see processing or review status for PG-approved exception cases instead of the order disappearing.
+
+## 2026-06-27: Payment Group And Delivery Group Refund Unit
+
+Decision:
+
+Support one customer checkout payment for multiple delivery groups. The server creates a payment group for the cart checkout, creates one order per delivery group, and connects all delivery-group orders to the same payment group. One PG payment belongs to one payment group. The PG approved amount must match the payment group total.
+
+MVP supports partial cancellation/refund at the delivery-group order level inside a payment group. Product, option, or quantity-level partial cancellation/refund inside a delivery-group order remains excluded from MVP. If one delivery-group order is out of stock, only that delivery-group order amount is cancelled/refunded, while the other delivery-group orders continue.
+
+Context:
+
+The earlier policy excluded partial cancellation/refund to reduce MVP complexity. After confirming that carts may contain multiple supplier-backed delivery groups, full exclusion became inconsistent with a natural commerce checkout. Cancelling the entire cart because one supplier group is out of stock would be poor customer experience. The compromise is to allow partial refund only at the delivery-group order boundary, which matches the fulfillment boundary.
+
+Consequences:
+
+- Add `PaymentGroup` or equivalent checkout payment aggregate.
+- `Payment` points to `PaymentGroup`; `Order` points to `PaymentGroup`.
+- One payment group can contain multiple delivery-group orders.
+- One order still contains exactly one delivery group.
+- Payment approval verifies payment group total, not only a single order total.
+- Refund can target one delivery-group order inside a payment group.
+- Payment group status can become `PARTIALLY_REFUNDED`.
+- Product/option/quantity-level partial refund remains deferred.
+- Policies that said partial refund is fully excluded are superseded by this decision.
 
 ## 2026-06-27: Supplier Order Model
 

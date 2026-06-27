@@ -5,13 +5,13 @@
 ```text
 Customer selects product option
 -> Cart items are grouped by delivery group
--> Customer creates order
--> Order status: PAYMENT_PENDING
+-> Customer creates checkout/payment group
+-> System creates one PAYMENT_PENDING order per delivery group
 -> Customer confirms order notice checkbox
 -> Customer pays through PG
 -> Server verifies payment
 -> Payment status: APPROVED
--> Order status: SUPPLIER_ORDER_PENDING
+-> All delivery-group orders in the payment group move to SUPPLIER_ORDER_PENDING
 -> Admin places supplier order manually
 -> Fulfillment status: ORDERED
 -> Order status: SUPPLIER_ORDERED
@@ -29,11 +29,13 @@ Customer selects product option
 Cart contains products from multiple suppliers
 -> System groups cart items by delivery group
 -> Each delivery group creates a separate order
+-> One payment group contains all delivery-group orders in the checkout
+-> Customer pays once for the whole cart
 -> Customer sees delivery groups instead of supplier names
 -> Each delivery group has shipping fee 0
 ```
 
-## Supplier Out Of Stock
+## Supplier Out Of Stock For Single Delivery Group
 
 ```text
 Order status: SUPPLIER_ORDER_PENDING
@@ -48,6 +50,26 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Refund status: COMPLETED
 -> Payment status: REFUNDED
 -> Order status: REFUNDED
+```
+
+## Supplier Out Of Stock In Multi Delivery Group Payment
+
+```text
+Payment group contains:
+  - Order A: delivery group A, 60,000
+  - Order B: delivery group B, 40,000
+PG payment total: 100,000
+
+Order A supplier order succeeds
+-> Order A continues fulfillment
+
+Order B supplier says out of stock
+-> Order B status: OUT_OF_STOCK
+-> Refund is requested for Order B amount only
+-> Refund status: PG_CANCEL_REQUESTED
+-> PG partial cancel/refund succeeds for 40,000
+-> Order B status: REFUNDED
+-> Order A remains active
 ```
 
 ## Payment Failure
@@ -77,7 +99,7 @@ Order status: PAYMENT_PENDING
 Order status: PAYMENT_PENDING
 -> Customer reviews order items, amount, shipping address, shipping policy, cancellation/refund policy, out-of-stock notice
 -> Customer checks one integrated confirmation checkbox
--> System records confirmed policy versions and confirmed time
+-> System records confirmed policy versions and confirmed time on the payment group
 -> Payment request can start
 ```
 
@@ -86,7 +108,7 @@ Order status: PAYMENT_PENDING
 ```text
 Order status: PAYMENT_PENDING
 -> PG says payment succeeded
--> Server compares expected order amount and approved amount
+-> Server compares expected payment group amount and approved amount
 -> Amount mismatch detected
 -> Order status: PAYMENT_EXCEPTION
 -> Payment status: CANCEL_REQUIRED
@@ -192,7 +214,7 @@ Tracking sync failure
 Order status: DELIVERED
 -> Customer submits return/exchange inquiry
 -> Admin reviews manually
--> If refund is approved, full-order refund is processed in MVP
+-> If refund is approved, delivery-group order level refund is processed in MVP
 ```
 
 ## Admin Manual Correction
@@ -211,7 +233,7 @@ Admin detects wrong operational state or shipment information
 - `PAYMENT_PENDING` orders are not real confirmed orders.
 - `PAYMENT_PENDING` orders expire 30 minutes after creation.
 - Payment request requires checkout policy confirmation.
-- Checkout policy confirmation is recorded per order with policy versions and confirmation time.
+- Checkout policy confirmation is recorded per payment group with policy versions and confirmation time.
 - Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
 - Payment approval verification requires order status `PAYMENT_PENDING`, unexpired order, completed checkout policy confirmation, amount match, unused/conflict-free PG payment key, and sellable product/option status.
 - If PG approves payment but order confirmation fails, the order moves to `PAYMENT_EXCEPTION` and supplier ordering is blocked.
@@ -222,6 +244,8 @@ Admin detects wrong operational state or shipment information
 - Failed, pending, and expired payment orders are not shown in customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
 - One MVP order contains exactly one delivery group.
+- One MVP payment group can contain multiple delivery-group orders.
+- Customer can pay once for all delivery groups in the checkout.
 - Delivery groups are based on supplier, but customer UI should use delivery group wording instead of supplier wording.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
@@ -234,7 +258,8 @@ Admin detects wrong operational state or shipment information
 - `REFUNDED` requires a completed refund record.
 - Paid orders can move to `REFUNDED` only after PG cancel/refund succeeds.
 - PG cancel/refund failure must keep the order in a processing or review-required state, not a completed state.
-- MVP does not support partial cancellation or partial refund.
+- MVP supports partial cancellation/refund only at delivery-group order level within a payment group.
+- Product, option, or quantity-level partial cancellation/refund inside one delivery-group order is excluded from MVP.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
 - Admin order state changes must use defined actions, not arbitrary status dropdown changes.
 - Admin can only progress an order when the next operational step is confirmed.

@@ -15,6 +15,7 @@ CartItem
 Order
 OrderItem
 DeliveryGroup
+PaymentGroup
 Payment
 PaymentEvent
 Fulfillment
@@ -182,6 +183,7 @@ Suggested fields:
 - totalAmount
 - expiresAt
 - deliveryGroupId
+- paymentGroupId
 - createdAt
 - updatedAt
 
@@ -234,6 +236,24 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+## PaymentGroup
+
+고객의 한 번 결제를 나타내는 checkout/payment aggregate. 하나의 payment group은 여러 배송그룹 주문을 포함할 수 있다.
+
+Suggested fields:
+
+- id
+- checkoutNumber
+- userId
+- status: PAYMENT_PENDING / APPROVED / PARTIALLY_REFUNDED / REFUNDED / PAYMENT_EXCEPTION / EXPIRED
+- totalAmount
+- approvedAmount
+- refundableAmount
+- expiresAt
+- approvedAt
+- createdAt
+- updatedAt
+
 ## Payment
 
 PG 결제 기록.
@@ -241,7 +261,7 @@ PG 결제 기록.
 Suggested fields:
 
 - id
-- orderId
+- paymentGroupId
 - provider
 - providerPaymentKey
 - method: CARD / EASY_PAY / TRANSFER
@@ -266,6 +286,7 @@ Suggested fields:
 
 - id
 - paymentId
+- paymentGroupId
 - orderId
 - provider
 - providerPaymentKey
@@ -320,11 +341,13 @@ Suggested fields:
 Suggested fields:
 
 - id
+- paymentGroupId
 - orderId
 - paymentId
 - reason: CUSTOMER_CANCEL / SUPPLIER_OUT_OF_STOCK / ADMIN_CANCEL / PAYMENT_AMOUNT_MISMATCH / RETURN_REQUESTED / EXCHANGE_REQUESTED
 - status: REQUESTED / APPROVED / PG_CANCEL_REQUESTED / PROCESSING / COMPLETED / FAILED / RETRY_REQUIRED / REJECTED / MANUAL_REVIEW_REQUIRED
 - refundAmount
+- refundScope: PAYMENT_GROUP / DELIVERY_GROUP_ORDER
 - providerCancelKey
 - refundTransactionId
 - idempotencyKey
@@ -421,13 +444,14 @@ Suggested fields:
 
 ## OrderPolicyAgreement
 
-주문서에서 주문마다 확인한 정책 고지 기록.
+주문서에서 checkout/payment group마다 확인한 정책 고지 기록. 하나의 확인 기록은 payment group에 포함된 배송그룹 주문들에 적용된다.
 
 Suggested fields:
 
 - id
-- orderId
+- paymentGroupId
 - userId
+- appliedOrderIds
 - termsVersion
 - privacyVersion
 - shippingPolicyVersion
@@ -455,7 +479,11 @@ Suggested fields:
 - 결제 예외는 즉시 PG 전액 취소를 시도하고, 실패하면 관리자 긴급 확인 큐로 전환한다.
 - 결제 이벤트와 환불 이벤트는 멱등 처리와 PG 대사를 위해 별도 이력으로 기록한다.
 - MVP 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
-- MVP에서는 부분 취소를 지원하지 않고 주문 단위 전액 취소/환불을 우선 지원한다.
+- MVP에서는 배송그룹 주문 단위 부분 취소/부분 환불을 지원한다.
+- 상품, 옵션, 수량 단위 부분 취소/부분 환불은 MVP에서 지원하지 않는다.
+- 하나의 payment group은 여러 배송그룹 주문을 포함할 수 있다.
+- 하나의 배송그룹 주문은 하나의 payment group에 속한다.
+- 하나의 payment group에 일부 주문만 환불되면 payment group은 `PARTIALLY_REFUNDED`가 될 수 있다.
 - 결제 승인 완료 주문은 PG 취소/환불 성공 후에만 `REFUNDED`가 될 수 있다.
 - PG 취소/환불 실패는 `FAILED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED` 같은 상태로 남기고 완료 상태로 처리하지 않는다.
 - 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태까지만 허용한다.
@@ -475,5 +503,6 @@ Suggested fields:
 - 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff는 MVP 이후로 미룬다.
 - 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책은 버전과 시행일을 가진다.
 - 첫 가입 또는 첫 소셜 로그인 완료 시 이용약관과 개인정보처리방침 동의 이력을 저장한다.
-- 주문 시점에는 주문서 통합 확인 체크의 정책 버전과 확인 시각을 저장한다.
-- 주문서 통합 확인 체크는 주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 가능성, 품절 시 전액 환불 안내를 포함한다.
+- checkout/payment group 시점에는 주문서 통합 확인 체크의 정책 버전과 확인 시각을 저장한다.
+- 주문서 통합 확인 체크는 checkout/payment group 단위로 저장한다.
+- 주문서 통합 확인 체크는 주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 가능성, 품절 시 해당 배송그룹 주문 금액 환불 안내를 포함한다.
