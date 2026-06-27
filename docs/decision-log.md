@@ -157,6 +157,25 @@ Consequences:
 - Status mapping must be maintained as part of order policy.
 - Internal state changes should not automatically leak implementation terminology into the customer UI.
 
+## 2026-06-27: Monorepo For MVP
+
+Decision:
+
+Use a single GitHub repository as a monorepo for the MVP.
+
+Context:
+
+The project will be developed by one developer. During MVP development, frontend, backend, documentation, and infrastructure changes are tightly coupled and should be reviewed in one issue/PR flow.
+
+Consequences:
+
+- Frontend code will live under `apps/web`.
+- Backend code will live under `apps/api`.
+- Infrastructure files will live under `infra`.
+- Documentation remains under `docs`.
+- One Linear issue can map to one PR even if both frontend and backend are touched.
+- Repository split can be revisited later if team ownership, release cadence, CI cost, or security boundaries require it.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

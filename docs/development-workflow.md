@@ -35,6 +35,30 @@
 - `DS-8 Implement order creation`
 - `DS-9 Integrate PG sandbox payment approval`
 
+## Repository Model
+
+This project uses a monorepo.
+
+Planned structure:
+
+```text
+apps/web   Next.js frontend
+apps/api   Spring Boot backend
+docs       product, policy, architecture, workflow docs
+infra      local and deployment infrastructure
+```
+
+One PR can include frontend, backend, docs, and infra changes when they belong to the same Linear issue.
+
+Example:
+
+```text
+DS-8 Implement order creation
+- apps/api: order creation API
+- apps/web: checkout call site
+- docs: order API notes
+```
+
 ## Branch Naming
 
 Branch names must include the Linear issue identifier.
@@ -131,4 +155,3 @@ GitHub repository autolink should map:
 ```text
 DS-123 -> https://linear.app/dropship-shop/issue/DS-123
 ```
-

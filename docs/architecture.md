@@ -11,6 +11,29 @@ Browser
   -> Payment Gateway
 ```
 
+## Repository Structure
+
+Use a monorepo for MVP development.
+
+Planned structure:
+
+```text
+dropship-shop/
+  apps/
+    web/        Next.js frontend
+    api/        Spring Boot backend
+  docs/
+  infra/
+  .github/
+```
+
+Rationale:
+
+- The project is developed by a single developer.
+- Frontend, backend, docs, and infra decisions are tightly coupled during MVP development.
+- One Linear issue can map to one PR even when the change touches both frontend and backend.
+- Splitting repositories can be revisited if release cadence, team ownership, or security boundaries require it later.
+
 ## Backend
 
 Use a Spring Boot modular monolith for the MVP.
@@ -53,7 +76,7 @@ Primary data:
 
 ## Frontend
 
-Use React or Next.js.
+Use Next.js.
 
 Initial route groups:
 
@@ -128,4 +151,3 @@ Single server
 ```
 
 Do not introduce microservices before order and fulfillment workflows are stable.
-
