@@ -95,7 +95,6 @@ Initial mapping for checkout, admin support, and exceptional customer-facing sta
 | `SHIPPED` | 배송 중 |
 | `DELIVERED` | 배송 완료 |
 | `OUT_OF_STOCK` | 품절 안내 |
-| `CANCEL_REQUESTED` | 취소 처리 중 |
 | `CANCELLED` | 취소 완료 |
 | `REFUND_REQUESTED` | 환불 처리 중 |
 | `REFUNDED` | 환불 완료 |
@@ -127,8 +126,8 @@ Initial MVP transitions:
 | `PAYMENT_PENDING` | System | Expire checkout | 30 minutes passed without verified payment | Mark checkout expired | `EXPIRED` |
 | `PAYMENT_PENDING` | System | Confirm payment | PG approved, amount matches, policy confirmed, order unexpired, sellable product/option | Store payment approval, expose order history, notify payment completed | `SUPPLIER_ORDER_PENDING` |
 | `PAYMENT_PENDING` | System | Payment confirmation exception | PG approved but validation fails | Block supplier order, attempt full PG cancel, create payment event | `PAYMENT_EXCEPTION` |
-| `PAYMENT_EXCEPTION` | System/Admin | Payment exception cancel succeeds | PG full cancel success | Notify payment cancel completed | `CANCELLED` |
-| `PAYMENT_EXCEPTION` | Admin | Manual payment exception resolved | Admin confirms final PG/refund outcome | Record admin action and customer notice | `CANCELLED` or `REFUNDED` |
+| `PAYMENT_EXCEPTION` | System/Admin | Payment exception cancel succeeds | PG full cancel success, payment group cancel recorded | Notify payment cancel completed | `CANCELLED` |
+| `PAYMENT_EXCEPTION` | Admin | Manual payment exception resolved | Admin confirms final PG/refund outcome | Record admin action and customer notice | `CANCELLED` |
 | `SUPPLIER_ORDER_PENDING` | Customer | Self-service cancel | Supplier order work not started, PG cancel/refund request accepted | Create refund, request PG cancel/refund | `REFUND_REQUESTED` |
 | `SUPPLIER_ORDER_PENDING` | Admin | Start supplier order work | Next operational step confirmed | Set `supplierOrderStartedAt`, `addressLockedAt` | `SUPPLIER_ORDER_PENDING` |
 | `SUPPLIER_ORDER_PENDING` | Admin | Supplier ordered | Supplier order placed, evidence recorded | Record fulfillment evidence, notify preparing | `SUPPLIER_ORDERED` |

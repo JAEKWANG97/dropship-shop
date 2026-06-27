@@ -498,6 +498,29 @@ Consequences:
 - Separate customer order history from checkout/retry surfaces.
 - Implement forbidden transition checks before backend order state code.
 
+## 2026-06-27: Final MVP State Sets
+
+Decision:
+
+Finalize MVP state sets before backend implementation. Order statuses are `PAYMENT_PENDING`, `EXPIRED`, `PAYMENT_EXCEPTION`, `SUPPLIER_ORDER_PENDING`, `SUPPLIER_ORDERED`, `OUT_OF_STOCK`, `SHIPPED`, `DELIVERED`, `CANCELLED`, `REFUND_REQUESTED`, and `REFUNDED`.
+
+`PREPARING_SHIPMENT` is not an MVP order status, and `CANCEL_REQUESTED` is not an MVP order status. `CANCELLED` is reserved for PG approval before-order termination or payment exception cancel completion. Paid order refund completion uses `REFUNDED` and requires PG cancel/refund success.
+
+Payment group statuses are `PAYMENT_PENDING`, `APPROVED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `PAYMENT_EXCEPTION`, `EXPIRED`, `CANCELLED`, and `CANCEL_FAILED`. Payment statuses are `READY`, `APPROVED`, `FAILED`, `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCELLED`, `CANCEL_FAILED`, `REFUND_REQUESTED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `REFUND_FAILED`, and `REVIEW_REQUIRED`.
+
+Fulfillment statuses are `PENDING`, `ORDERED`, `OUT_OF_STOCK`, and `CANCELLED`. Shipment statuses are `READY`, `SHIPPED`, and `DELIVERED`. Refund statuses are `REQUESTED`, `APPROVED`, `PG_CANCEL_REQUESTED`, `PROCESSING`, `COMPLETED`, `FAILED`, `RETRY_REQUIRED`, `REJECTED`, and `MANUAL_REVIEW_REQUIRED`.
+
+Context:
+
+DS-23 through DS-28 hardened edge cases, but the state lists still had a few transitional leftovers. DS-2 locks the final state vocabulary so backend enum definitions, transition guards, customer status mapping, and admin actions can be implemented consistently.
+
+Consequences:
+
+- Backend enums should follow the finalized state sets in `docs/domain-model.md`.
+- `PREPARING_SHIPMENT` should not be generated in code or UI for MVP.
+- `CANCEL_REQUESTED` should not be generated as an order status for MVP; in-progress cancellation uses `REFUND_REQUESTED` plus `Refund.status`.
+- Invalid state transitions remain governed by the order policy transition table and forbidden transitions.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

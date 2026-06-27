@@ -44,6 +44,18 @@ Acceptance criteria:
 - Refund statuses are finalized.
 - Invalid state transitions are listed.
 
+Resolved decisions:
+
+- Order statuses are finalized: `PAYMENT_PENDING`, `EXPIRED`, `PAYMENT_EXCEPTION`, `SUPPLIER_ORDER_PENDING`, `SUPPLIER_ORDERED`, `OUT_OF_STOCK`, `SHIPPED`, `DELIVERED`, `CANCELLED`, `REFUND_REQUESTED`, `REFUNDED`.
+- `PREPARING_SHIPMENT` and `CANCEL_REQUESTED` are not MVP order statuses.
+- `CANCELLED` is used for PG approval before-order termination or payment exception cancel completion; paid order refund completion uses `REFUNDED`.
+- Payment group statuses are finalized: `PAYMENT_PENDING`, `APPROVED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `PAYMENT_EXCEPTION`, `EXPIRED`, `CANCELLED`, `CANCEL_FAILED`.
+- Payment statuses are finalized: `READY`, `APPROVED`, `FAILED`, `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCELLED`, `CANCEL_FAILED`, `REFUND_REQUESTED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `REFUND_FAILED`, `REVIEW_REQUIRED`.
+- Fulfillment statuses are finalized: `PENDING`, `ORDERED`, `OUT_OF_STOCK`, `CANCELLED`.
+- Shipment statuses are finalized: `READY`, `SHIPPED`, `DELIVERED`.
+- Refund statuses are finalized: `REQUESTED`, `APPROVED`, `PG_CANCEL_REQUESTED`, `PROCESSING`, `COMPLETED`, `FAILED`, `RETRY_REQUIRED`, `REJECTED`, `MANUAL_REVIEW_REQUIRED`.
+- Invalid transitions are listed in order policy forbidden transitions.
+
 References:
 
 - `docs/order-flow.md`

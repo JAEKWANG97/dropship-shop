@@ -181,7 +181,7 @@ Suggested fields:
 - id
 - orderNumber
 - userId
-- status
+- status: PAYMENT_PENDING / EXPIRED / PAYMENT_EXCEPTION / SUPPLIER_ORDER_PENDING / SUPPLIER_ORDERED / OUT_OF_STOCK / SHIPPED / DELIVERED / CANCELLED / REFUND_REQUESTED / REFUNDED
 - recipientName
 - recipientPhone
 - postalCode
@@ -210,7 +210,6 @@ Suggested statuses:
 - OUT_OF_STOCK
 - SHIPPED
 - DELIVERED
-- CANCEL_REQUESTED
 - CANCELLED
 - REFUND_REQUESTED
 - REFUNDED
@@ -260,7 +259,7 @@ Suggested fields:
 - id
 - checkoutNumber
 - userId
-- status: PAYMENT_PENDING / APPROVED / PARTIALLY_REFUNDED / REFUNDED / PAYMENT_EXCEPTION / EXPIRED
+- status: PAYMENT_PENDING / APPROVED / PARTIALLY_REFUNDED / REFUNDED / PAYMENT_EXCEPTION / EXPIRED / CANCELLED / CANCEL_FAILED
 - totalAmount
 - approvedAmount
 - refundableAmount
@@ -280,7 +279,7 @@ Suggested fields:
 - provider
 - providerPaymentKey
 - method: CARD / EASY_PAY / TRANSFER
-- status: READY / APPROVED / FAILED / CANCEL_REQUIRED / CANCEL_REQUESTED / CANCELLED / CANCEL_FAILED / REFUND_REQUESTED / REFUNDED / REFUND_FAILED / REVIEW_REQUIRED
+- status: READY / APPROVED / FAILED / CANCEL_REQUIRED / CANCEL_REQUESTED / CANCELLED / CANCEL_FAILED / REFUND_REQUESTED / PARTIALLY_REFUNDED / REFUNDED / REFUND_FAILED / REVIEW_REQUIRED
 - requestedAmount
 - approvedAmount
 - approvedAt
@@ -628,6 +627,73 @@ Suggested fields:
 - createdAt
 
 ## Modeling Notes
+
+## Final MVP State Sets
+
+### Order.status
+
+- `PAYMENT_PENDING`: 결제 검증 전 주문. 공급처 발주 대상이 아니다.
+- `EXPIRED`: 결제 검증 없이 30분이 지나 만료된 주문.
+- `PAYMENT_EXCEPTION`: PG 승인은 있었지만 주문 확정 검증에 실패한 주문.
+- `SUPPLIER_ORDER_PENDING`: 결제 검증 완료 후 공급처 발주 전 주문.
+- `SUPPLIER_ORDERED`: 공급처 발주 완료 후 송장 입력 전 주문.
+- `OUT_OF_STOCK`: 공급처 품절로 고객 안내와 환불 처리가 필요한 주문.
+- `SHIPPED`: 택배사와 송장번호가 입력되어 배송 중인 주문.
+- `DELIVERED`: 배송 완료가 확인된 주문.
+- `CANCELLED`: PG 승인 전 주문 종료 또는 결제 예외 취소 완료.
+- `REFUND_REQUESTED`: 결제 승인 완료 주문의 환불 처리 중 상태.
+- `REFUNDED`: PG 취소/환불 성공이 확인된 환불 완료 주문.
+
+### PaymentGroup.status
+
+- `PAYMENT_PENDING`
+- `APPROVED`
+- `PARTIALLY_REFUNDED`
+- `REFUNDED`
+- `PAYMENT_EXCEPTION`
+- `EXPIRED`
+- `CANCELLED`
+- `CANCEL_FAILED`
+
+### Payment.status
+
+- `READY`
+- `APPROVED`
+- `FAILED`
+- `CANCEL_REQUIRED`
+- `CANCEL_REQUESTED`
+- `CANCELLED`
+- `CANCEL_FAILED`
+- `REFUND_REQUESTED`
+- `PARTIALLY_REFUNDED`
+- `REFUNDED`
+- `REFUND_FAILED`
+- `REVIEW_REQUIRED`
+
+### Fulfillment.status
+
+- `PENDING`
+- `ORDERED`
+- `OUT_OF_STOCK`
+- `CANCELLED`
+
+### Shipment.status
+
+- `READY`
+- `SHIPPED`
+- `DELIVERED`
+
+### Refund.status
+
+- `REQUESTED`
+- `APPROVED`
+- `PG_CANCEL_REQUESTED`
+- `PROCESSING`
+- `COMPLETED`
+- `FAILED`
+- `RETRY_REQUIRED`
+- `REJECTED`
+- `MANUAL_REVIEW_REQUIRED`
 
 - 상품과 옵션에는 실제 재고 수량을 두지 않는다.
 - 상품 전체 상태와 상품 옵션 상태를 분리한다.
