@@ -19,6 +19,9 @@ Payment
 Fulfillment
 Shipment
 Refund
+OrderStatusHistory
+AdminActionHistory
+ProductChangeHistory
 ```
 
 ## User
@@ -295,6 +298,53 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+## OrderStatusHistory
+
+주문 상태 변경 이력. 주문 상태는 임의 되돌리기 없이 허용된 액션을 통해서만 변경한다.
+
+Suggested fields:
+
+- id
+- orderId
+- actorUserId
+- actionType
+- fromStatus
+- toStatus
+- reason
+- createdAt
+
+## AdminActionHistory
+
+관리자 주요 작업 이력. 상태 변경 외에도 환불, 품절, 배송 수동 보정, 정정 처리 같은 운영 액션을 기록한다.
+
+Suggested fields:
+
+- id
+- adminUserId
+- targetType: ORDER / PAYMENT / REFUND / SHIPMENT / PRODUCT / PRODUCT_OPTION
+- targetId
+- actionType
+- reason
+- beforeValue
+- afterValue
+- createdAt
+
+## ProductChangeHistory
+
+상품 주요 변경 이력. MVP에서는 운영 영향이 큰 변경부터 기록한다.
+
+Suggested fields:
+
+- id
+- productId
+- productOptionId
+- adminUserId
+- changeType: PRICE / PRODUCT_STATUS / OPTION_STATUS / SUPPLIER
+- beforeValue
+- afterValue
+- reason
+- createdAt
+
 ## Modeling Notes
 
 - 상품과 옵션에는 실제 재고 수량을 두지 않는다.
@@ -321,4 +371,9 @@ Suggested fields:
 - 배송 그룹은 공급처 기준으로 나누지만 고객 화면에는 공급처 대신 배송 그룹으로 표시한다.
 - 고객 화면에는 내부 주문 상태를 그대로 노출하지 않고 고객용 표시 상태로 매핑한다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
-- 주문 상태 변경 이력은 별도 테이블로 추가하는 것이 좋다.
+- 주문 상태 변경 이력은 MVP부터 별도 테이블에 기록한다.
+- 관리자 주문 액션은 현재 상태에서 허용된 다음 액션으로만 실행한다.
+- 자동 상태 되돌리기 버튼은 MVP에서 제공하지 않고, 잘못된 상태 변경은 관리자 정정 액션과 이력으로 처리한다.
+- 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유를 필수로 기록한다.
+- 상품 변경 이력은 가격, 상품/옵션 판매 상태, 공급처 변경부터 MVP에서 기록한다.
+- 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff는 MVP 이후로 미룬다.

@@ -144,6 +144,17 @@ Order status: DELIVERED
 -> If refund is approved, full-order refund is processed in MVP
 ```
 
+## Admin Manual Correction
+
+```text
+Admin detects wrong operational state or shipment information
+-> Admin selects a defined correction action
+-> Admin enters correction reason
+-> System validates that the correction action is allowed
+-> System records admin action history and order status history
+-> Customer-facing status is recalculated from the corrected internal state
+```
+
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
@@ -166,6 +177,10 @@ Order status: DELIVERED
 - `REFUNDED` requires a completed refund record.
 - MVP does not support partial cancellation or partial refund.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
+- Admin order state changes must use defined actions, not arbitrary status dropdown changes.
+- Admin can only progress an order when the next operational step is confirmed.
+- Automatic state rollback is excluded from MVP.
+- Wrong state changes are handled by admin correction actions with required reason and history.
 
 ## Risk Points
 

@@ -286,6 +286,27 @@ Consequences:
 - Return/exchange after delivery starts as inquiry/admin manual handling.
 - Refund reason enum starts with customer cancel, supplier out of stock, admin cancel, payment amount mismatch, return requested, and exchange requested.
 
+## 2026-06-27: Admin Operations And Audit Scope
+
+Decision:
+
+Use a single `ADMIN` role for MVP. Admin accounts are granted by DB seed or manual registration only. Admins cannot freely change order status through arbitrary dropdown values; they must use defined action buttons, and an order can only progress when the next operational step is confirmed. MVP excludes automatic state rollback. Wrong state changes are handled through explicit admin correction actions with required reason and history.
+
+Context:
+
+Order status is connected to payment, fulfillment, shipment tracking, customer display status, notification, cancellation, and refund handling. A generic rollback button can create inconsistent side effects after customers have already seen shipment or refund state changes. The safer MVP model is to restrict state transitions to valid operational actions and keep an audit trail for corrections.
+
+Consequences:
+
+- Admin UI needs action buttons instead of arbitrary status dropdown editing.
+- Order state transition APIs must validate the current state and requested action.
+- Order status history is required from MVP.
+- Admin action history is required for cancellation, refund, out-of-stock, shipment manual correction, and admin correction.
+- Cancellation, refund, out-of-stock, shipment manual correction, and admin correction actions require a reason.
+- Product change history starts with price, product/option sales status, and supplier changes.
+- Full product content diff history for HTML, images, names, and summaries is deferred.
+- Automatic rollback is excluded from MVP; correction actions are the recovery mechanism.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

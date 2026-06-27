@@ -138,11 +138,13 @@ Finalize admin role, audit, and manual operation policy for MVP.
 
 Acceptance criteria:
 
-- Admin role model is decided.
-- Admin account creation flow is decided.
-- Admin action history scope is decided.
-- Refund action reason requirement is decided.
-- State rollback support is decided.
+- Admin role model is decided: `ADMIN` single role for MVP.
+- Admin account creation flow is decided: DB seed or manual registration only.
+- Admin order operation model is decided: defined action buttons, not arbitrary status dropdown changes.
+- Admin action history scope is decided: order status changes, cancellation/refund, out-of-stock, shipment manual correction, admin correction actions.
+- Product change history scope is decided: price, product/option sales status, supplier changes.
+- Refund and correction reason requirements are decided: required for cancellation, refund, out-of-stock, shipment manual correction, and admin correction.
+- State rollback support is decided: no automatic rollback button in MVP; corrections are explicit admin actions with history.
 - `docs/policies/admin-operations-policy.md` and `docs/decision-log.md` are updated.
 
 References:
