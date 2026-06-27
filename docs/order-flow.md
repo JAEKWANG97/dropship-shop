@@ -196,7 +196,7 @@ supplierOrderStartedAt is empty
 -> Order status: REFUNDED
 
 PG cancel/refund fails
--> Refund status: FAILED or RETRY_REQUIRED
+-> Refund status: RETRY_REQUIRED
 -> Order remains REFUND_REQUESTED
 -> Admin retry or manual review is required
 ```

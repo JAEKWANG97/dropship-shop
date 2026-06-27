@@ -10,6 +10,9 @@ import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
+import com.dropshipshop.api.refund.domain.RefundReason;
+import com.dropshipshop.api.refund.domain.RefundScope;
+import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 
 import jakarta.validation.constraints.NotBlank;
@@ -51,6 +54,7 @@ final class AdminOrderDtos {
 		AdminPaymentResponse payment,
 		AdminFulfillmentResponse fulfillment,
 		AdminShipmentResponse shipment,
+		AdminRefundResponse refund,
 		List<AdminOrderItemResponse> items
 	) {
 	}
@@ -132,6 +136,22 @@ final class AdminOrderDtos {
 		Instant deliveredAt,
 		Instant trackingSyncedAt,
 		String manualCorrectionReason
+	) {
+	}
+
+	record AdminRefundResponse(
+		UUID refundId,
+		RefundReason reason,
+		RefundStatus status,
+		long refundAmount,
+		RefundScope refundScope,
+		String providerPaymentKey,
+		String providerCancelTransactionKey,
+		String failureCode,
+		String failureMessage,
+		Instant requestedAt,
+		Instant completedAt,
+		Instant failedAt
 	) {
 	}
 

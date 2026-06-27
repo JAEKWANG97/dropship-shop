@@ -712,6 +712,8 @@ Acceptance criteria:
 
 ### DS-15: Implement refund handling
 
+Status: Implemented
+
 Description:
 
 Implement refund records and PG refund/cancel integration.
@@ -720,6 +722,9 @@ Acceptance criteria:
 
 - Refund record is created for approved cancellation or out-of-stock.
 - PG refund/cancel result is stored.
+- Refund queue and PG cancel/retry APIs are implemented by `GET /api/admin/refunds`, `POST /api/admin/refunds/{refundId}/request-pg-cancel`, and `POST /api/admin/refunds/{refundId}/retry`.
+- Delivery-group order level partial refund updates payment and payment group to `PARTIALLY_REFUNDED`.
+- PG cancel failure keeps the order in `REFUND_REQUESTED` and refund in `RETRY_REQUIRED`.
 - Order and payment status are updated consistently.
 - Refund completion is visible to customer and admin.
 

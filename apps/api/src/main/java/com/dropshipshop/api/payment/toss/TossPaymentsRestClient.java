@@ -58,6 +58,38 @@ class TossPaymentsRestClient implements TossPaymentsClient {
 		}
 	}
 
+	@Override
+	public TossCancelledPayment cancel(String paymentKey, String cancelReason, long cancelAmount, String idempotencyKey) {
+		if (secretKey == null || secretKey.isBlank()) {
+			throw new TossPaymentException("Toss Payments secret key is not configured");
+		}
+		try {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> body = restClient.post()
+				.uri("/v1/payments/{paymentKey}/cancel", paymentKey)
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.header("Idempotency-Key", idempotencyKey)
+				.body(Map.of("cancelReason", cancelReason, "cancelAmount", cancelAmount))
+				.retrieve()
+				.body(Map.class);
+			if (body == null) {
+				throw new TossPaymentException("Toss Payments cancel response is empty");
+			}
+			return new TossCancelledPayment(
+				stringValue(body.get("paymentKey")),
+				stringValue(body.get("orderId")),
+				longValue(body.get("totalAmount")),
+				longValue(body.get("balanceAmount")),
+				cancelTransactionKey(body.get("cancels")),
+				stringValue(body.get("status"))
+			);
+		} catch (TossPaymentException exception) {
+			throw exception;
+		} catch (RuntimeException exception) {
+			throw new TossPaymentException("Toss Payments cancel failed: " + exception.getMessage());
+		}
+	}
+
 	private String authorizationHeader() {
 		String credential = secretKey + ":";
 		String encoded = Base64.getEncoder().encodeToString(credential.getBytes(StandardCharsets.UTF_8));
@@ -87,5 +119,19 @@ class TossPaymentsRestClient implements TossPaymentsClient {
 			case "계좌이체", "TRANSFER" -> PaymentMethod.TRANSFER;
 			default -> throw new TossPaymentException("Unsupported Toss Payments method: " + value);
 		};
+	}
+
+	@SuppressWarnings("unchecked")
+	private String cancelTransactionKey(Object value) {
+		if (!(value instanceof Iterable<?> cancels)) {
+			return null;
+		}
+		String transactionKey = null;
+		for (Object cancel : cancels) {
+			if (cancel instanceof Map<?, ?> cancelMap) {
+				transactionKey = stringValue(cancelMap.get("transactionKey"));
+			}
+		}
+		return transactionKey;
 	}
 }

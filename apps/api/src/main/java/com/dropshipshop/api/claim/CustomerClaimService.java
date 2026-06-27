@@ -16,6 +16,7 @@ import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.refund.RefundService;
 
 @Service
 class CustomerClaimService {
@@ -29,10 +30,16 @@ class CustomerClaimService {
 
 	private final CustomerOrderRepository orderRepository;
 	private final ClaimRepository claimRepository;
+	private final RefundService refundService;
 
-	CustomerClaimService(CustomerOrderRepository orderRepository, ClaimRepository claimRepository) {
+	CustomerClaimService(
+		CustomerOrderRepository orderRepository,
+		ClaimRepository claimRepository,
+		RefundService refundService
+	) {
 		this.orderRepository = orderRepository;
 		this.claimRepository = claimRepository;
+		this.refundService = refundService;
 	}
 
 	@Transactional
@@ -56,6 +63,7 @@ class CustomerClaimService {
 			RequestedAction.REFUND,
 			request.reason()
 		));
+		refundService.createCustomerCancelRefund(order);
 		return toResponse(claim);
 	}
 

@@ -75,7 +75,7 @@ Implemented fields:
 
 고객이 저장한 배송지. 주문에는 이 값을 그대로 참조하지 않고 주문 시점 주소 스냅샷을 저장한다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - userId
@@ -485,22 +485,34 @@ Suggested fields:
 - status: REQUESTED / APPROVED / PG_CANCEL_REQUESTED / PROCESSING / COMPLETED / FAILED / RETRY_REQUIRED / REJECTED / MANUAL_REVIEW_REQUIRED
 - refundAmount
 - refundScope: PAYMENT_GROUP / DELIVERY_GROUP_ORDER
-- providerCancelKey
-- refundTransactionId
+- providerPaymentKey
+- providerCancelTransactionKey
 - idempotencyKey
-- requestedByUserId
-- approvedByAdminId
 - failureCode
 - failureMessage
-- retryCount
 - rawProviderStatus
 - requestedAt
+- completedAt
+- failedAt
+- createdAt
+- updatedAt
+
+Planned fields:
+
+- requestedByUserId
+- approvedByAdminId
+- retryCount
 - pgCancelRequestedAt
 - pgCancelApprovedAt
 - customerNotifiedAt
-- completedAt
-- createdAt
-- updatedAt
+
+Rules:
+
+- DS-15 creates refund records for approved cancellation and supplier out-of-stock.
+- MVP refund scope is the delivery-group order.
+- PG cancel/refund success is required before an order can move to `REFUNDED`.
+- If the payment group still has active orders after one delivery-group order refund, the payment group and payment become `PARTIALLY_REFUNDED`.
+- PG cancel/refund failure keeps the order in `REFUND_REQUESTED` and marks the refund `RETRY_REQUIRED`.
 
 ## Claim
 

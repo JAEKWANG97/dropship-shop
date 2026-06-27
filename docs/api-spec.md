@@ -309,19 +309,22 @@ Rules:
 | `POST` | `/api/admin/claims/{claimId}/request-evidence` | `ADMIN` | Planned | Request evidence |
 | `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Planned | Mark return received |
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
-| `GET` | `/api/admin/refunds` | `ADMIN` | Planned | Refund queue |
+| `GET` | `/api/admin/refunds` | `ADMIN` | Implemented | Refund queue |
 | `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Planned | Approve refund execution |
-| `POST` | `/api/admin/refunds/{refundId}/request-pg-cancel` | `ADMIN` | Planned | Request PG cancel/refund |
-| `POST` | `/api/admin/refunds/{refundId}/retry` | `ADMIN` | Planned | Retry failed refund |
+| `POST` | `/api/admin/refunds/{refundId}/request-pg-cancel` | `ADMIN` | Implemented | Request PG cancel/refund |
+| `POST` | `/api/admin/refunds/{refundId}/retry` | `ADMIN` | Implemented | Retry failed refund |
 | `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Planned | Mark manual review result |
 
 Rules:
 
 - Customer self-service cancel is allowed only while `SUPPLIER_ORDER_PENDING` and supplier work has not started.
-- Self-service cancellation creates an approved cancellation claim and moves the order to `REFUND_REQUESTED`; PG refund execution remains DS-15.
+- Self-service cancellation creates an approved cancellation claim, refund record, and moves the order to `REFUND_REQUESTED`.
 - After supplier work starts, cancellation becomes a `CANCEL` claim that admin can approve or reject.
 - Return and exchange claims remain planned.
 - Refund completion requires PG cancel/refund success.
+- Refund records are created for approved customer cancellation and supplier out-of-stock.
+- PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
+- PG cancel failure leaves the order in `REFUND_REQUESTED`, marks the refund `RETRY_REQUIRED`, and does not expose refund completion.
 - Delivery-group order level partial refund is supported.
 - Product, option, and quantity-level partial refund inside one delivery-group order is excluded.
 

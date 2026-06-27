@@ -17,6 +17,9 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.domain.RefundStatus;
+import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
@@ -39,17 +42,20 @@ public class CustomerOrderQueryService {
 	private final OrderItemRepository orderItemRepository;
 	private final PaymentRepository paymentRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final RefundRepository refundRepository;
 
 	public CustomerOrderQueryService(
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		PaymentRepository paymentRepository,
-		ShipmentRepository shipmentRepository
+		ShipmentRepository shipmentRepository,
+		RefundRepository refundRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.refundRepository = refundRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -95,6 +101,7 @@ public class CustomerOrderQueryService {
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
+		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
 		return new OrderDtos.OrderDetailResponse(
 			order.getId(),
 			order.getOrderNumber(),
@@ -123,7 +130,17 @@ public class CustomerOrderQueryService {
 			items,
 			new OrderDtos.FulfillmentSummaryResponse("발주 대기"),
 			toShipmentSummary(shipment),
-			new OrderDtos.RefundSummaryResponse("환불 없음", null)
+			toRefundSummary(refund)
+		);
+	}
+
+	private OrderDtos.RefundSummaryResponse toRefundSummary(Refund refund) {
+		if (refund == null) {
+			return new OrderDtos.RefundSummaryResponse("환불 없음", null);
+		}
+		return new OrderDtos.RefundSummaryResponse(
+			refundDisplayStatus(refund.getStatus()),
+			refund.getRefundAmount()
 		);
 	}
 
@@ -209,6 +226,15 @@ public class CustomerOrderQueryService {
 			case READY -> "배송 준비";
 			case SHIPPED -> "배송 중";
 			case DELIVERED -> "배송 완료";
+		};
+	}
+
+	private String refundDisplayStatus(RefundStatus status) {
+		return switch (status) {
+			case REQUESTED, APPROVED, PG_CANCEL_REQUESTED, PROCESSING -> "환불 처리 중";
+			case COMPLETED -> "환불 완료";
+			case FAILED, RETRY_REQUIRED, MANUAL_REVIEW_REQUIRED -> "환불 확인 중";
+			case REJECTED -> "환불 거절";
 		};
 	}
 }

@@ -42,6 +42,7 @@ import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.payment.toss.TossCancelledPayment;
 import com.dropshipshop.api.payment.toss.TossApprovedPayment;
 import com.dropshipshop.api.payment.toss.TossPaymentsClient;
 import com.dropshipshop.api.user.domain.SocialProvider;
@@ -337,6 +338,11 @@ class PaymentApiIntegrationTest {
 				Instant.now(),
 				"DONE"
 			);
+		}
+
+		@Override
+		public TossCancelledPayment cancel(String paymentKey, String cancelReason, long cancelAmount, String idempotencyKey) {
+			return new TossCancelledPayment(paymentKey, "cancel-order", cancelAmount, 0, "cancel-" + paymentKey, "CANCELED");
 		}
 
 		void reset() {

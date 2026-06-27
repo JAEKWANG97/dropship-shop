@@ -18,6 +18,8 @@ import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -30,19 +32,22 @@ class AdminOrderQueryService {
 	private final PaymentRepository paymentRepository;
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final RefundRepository refundRepository;
 
 	AdminOrderQueryService(
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		PaymentRepository paymentRepository,
 		FulfillmentRepository fulfillmentRepository,
-		ShipmentRepository shipmentRepository
+		ShipmentRepository shipmentRepository,
+		RefundRepository refundRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.refundRepository = refundRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -68,7 +73,8 @@ class AdminOrderQueryService {
 			.orElse(null);
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
-		return toDetailResponse(order, payment, fulfillment, shipment, items);
+		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
+		return toDetailResponse(order, payment, fulfillment, shipment, refund, items);
 	}
 
 	private AdminOrderDtos.AdminOrderSummaryResponse toSummaryResponse(CustomerOrder order) {
@@ -93,6 +99,7 @@ class AdminOrderQueryService {
 		Payment payment,
 		Fulfillment fulfillment,
 		Shipment shipment,
+		Refund refund,
 		List<AdminOrderDtos.AdminOrderItemResponse> items
 	) {
 		UserAccount customer = order.getUser();
@@ -132,6 +139,7 @@ class AdminOrderQueryService {
 			toPaymentResponse(payment),
 			toFulfillmentResponse(order, fulfillment),
 			toShipmentResponse(shipment),
+			toRefundResponse(refund),
 			items
 		);
 	}
@@ -163,6 +171,26 @@ class AdminOrderQueryService {
 			shipment.getDeliveredAt(),
 			shipment.getTrackingSyncedAt(),
 			shipment.getManualCorrectionReason()
+		);
+	}
+
+	AdminOrderDtos.AdminRefundResponse toRefundResponse(Refund refund) {
+		if (refund == null) {
+			return null;
+		}
+		return new AdminOrderDtos.AdminRefundResponse(
+			refund.getId(),
+			refund.getReason(),
+			refund.getStatus(),
+			refund.getRefundAmount(),
+			refund.getRefundScope(),
+			refund.getProviderPaymentKey(),
+			refund.getProviderCancelTransactionKey(),
+			refund.getFailureCode(),
+			refund.getFailureMessage(),
+			refund.getRequestedAt(),
+			refund.getCompletedAt(),
+			refund.getFailedAt()
 		);
 	}
 

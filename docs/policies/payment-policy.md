@@ -117,6 +117,7 @@ Production readiness:
 - `PaymentGroup` 또는 동등한 checkout payment aggregate가 필요하다.
 - `PaymentGroup`은 PG 결제 1건과 여러 배송 그룹 주문을 연결한다.
 - 환불 실행 결과를 별도 기록해야 한다.
+- 환불 실행 결과는 `refunds`에 PG 취소 거래 키, 멱등 키, 실패 코드/메시지, 완료/실패 시각으로 기록한다. Implemented by DS-15.
 - PG 승인 이벤트, 취소 요청, 취소 결과는 멱등 처리를 위해 별도 이벤트 이력으로 기록한다.
 - 결제 예외 큐가 관리자 화면에 필요하다.
 - 결제 예외 자동 취소는 idempotency key를 사용해야 한다.
@@ -124,6 +125,7 @@ Production readiness:
 - 가상계좌/무통장입금성 결제를 제외하므로 MVP에서는 입금 대기, 입금 만료, 입금 webhook 상태를 구현하지 않는다.
 - 환불 모델은 결제 그룹(PaymentGroup) 안의 배송 그룹 주문 단위 환불을 지원해야 한다.
 - 환불 금액은 환불 대상 배송 그룹 주문 금액의 합계와 일치해야 한다.
+- 배송 그룹 주문 단위 환불 성공 시 남은 환불 가능 금액에 따라 `PaymentGroup`과 `Payment`를 `REFUNDED` 또는 `PARTIALLY_REFUNDED`로 갱신한다. Implemented by DS-15.
 - 고객 주문 내역 API는 결제 성공 후 확정된 주문부터 노출한다.
 - 단, PG 승인이 발생한 결제 예외는 고객에게 처리 상태를 보여줘야 한다.
 

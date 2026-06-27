@@ -98,6 +98,17 @@ public class PaymentGroup {
 		this.status = PaymentGroupStatus.PAYMENT_EXCEPTION;
 	}
 
+	public void applyRefund(long refundAmount) {
+		if (status != PaymentGroupStatus.APPROVED && status != PaymentGroupStatus.PARTIALLY_REFUNDED) {
+			throw new IllegalStateException("Payment group is not refundable");
+		}
+		if (refundAmount <= 0 || refundAmount > refundableAmount) {
+			throw new IllegalArgumentException("Refund amount exceeds refundable amount");
+		}
+		this.refundableAmount -= refundAmount;
+		this.status = refundableAmount == 0 ? PaymentGroupStatus.REFUNDED : PaymentGroupStatus.PARTIALLY_REFUNDED;
+	}
+
 	public void expire() {
 		this.status = PaymentGroupStatus.EXPIRED;
 	}

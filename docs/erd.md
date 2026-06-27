@@ -15,7 +15,8 @@
 - Fulfillment and admin order action history tables: implemented in `apps/api/src/main/resources/db/migration/V6__create_fulfillment.sql`.
 - Shipment table: implemented in `apps/api/src/main/resources/db/migration/V7__create_shipment.sql`.
 - Claim table: implemented in `apps/api/src/main/resources/db/migration/V8__create_claim.sql`.
-- Refund, policy, and remaining audit tables: planned.
+- Refund table: implemented in `apps/api/src/main/resources/db/migration/V9__create_refund.sql`.
+- Policy and remaining audit tables: planned.
 
 ## Modeling Rules
 
@@ -557,9 +558,23 @@ Constraints and indexes:
 - `status`
 - `refund_amount`
 - `refund_scope`: `PAYMENT_GROUP` / `DELIVERY_GROUP_ORDER`
-- PG cancel/refund identifiers, idempotency, failure, retry, notification fields
+- `provider_payment_key`
+- `provider_cancel_transaction_key`
+- `idempotency_key`
+- `failure_code`
+- `failure_message`
+- `raw_provider_status`
+- `requested_at`
+- `completed_at`
+- `failed_at`
 - `created_at`
 - `updated_at`
+
+Implemented DS-15 scope:
+
+- One refund per delivery-group order in MVP.
+- Refunds are created for approved cancellation and supplier out-of-stock.
+- PG cancel result fields and retry failure fields are stored on the refund.
 
 ### claims
 

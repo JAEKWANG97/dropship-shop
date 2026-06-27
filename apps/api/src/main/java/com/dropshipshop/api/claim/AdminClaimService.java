@@ -12,16 +12,23 @@ import com.dropshipshop.api.claim.domain.Claim;
 import com.dropshipshop.api.claim.domain.ClaimStatus;
 import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
+import com.dropshipshop.api.refund.RefundService;
 
 @Service
 class AdminClaimService {
 
 	private final ClaimRepository claimRepository;
 	private final CustomerClaimService customerClaimService;
+	private final RefundService refundService;
 
-	AdminClaimService(ClaimRepository claimRepository, CustomerClaimService customerClaimService) {
+	AdminClaimService(
+		ClaimRepository claimRepository,
+		CustomerClaimService customerClaimService,
+		RefundService refundService
+	) {
 		this.claimRepository = claimRepository;
 		this.customerClaimService = customerClaimService;
+		this.refundService = refundService;
 	}
 
 	@Transactional(readOnly = true)
@@ -44,6 +51,7 @@ class AdminClaimService {
 		try {
 			claim.approve(adminUserId, request.reason(), Instant.now());
 			claim.getOrder().markRefundRequested();
+			refundService.createCustomerCancelRefund(claim.getOrder());
 			return customerClaimService.toResponse(claim);
 		} catch (IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());

@@ -16,6 +16,7 @@ import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.refund.RefundService;
 
 @Service
 class AdminOrderFulfillmentService {
@@ -24,17 +25,20 @@ class AdminOrderFulfillmentService {
 	private final FulfillmentRepository fulfillmentRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
+	private final RefundService refundService;
 
 	AdminOrderFulfillmentService(
 		CustomerOrderRepository orderRepository,
 		FulfillmentRepository fulfillmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
-		AdminOrderQueryService adminOrderQueryService
+		AdminOrderQueryService adminOrderQueryService,
+		RefundService refundService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
+		this.refundService = refundService;
 	}
 
 	@Transactional
@@ -99,6 +103,7 @@ class AdminOrderFulfillmentService {
 			Fulfillment fulfillment = getOrCreateFulfillment(order);
 			fulfillment.markOutOfStock(request.reason());
 			fulfillmentRepository.save(fulfillment);
+			refundService.createOutOfStockRefund(order);
 			recordHistory(order, adminUserId, AdminOrderActionType.OUT_OF_STOCK, beforeStatus, request.reason());
 			return actionResponse(order, fulfillment);
 		} catch (IllegalStateException ex) {

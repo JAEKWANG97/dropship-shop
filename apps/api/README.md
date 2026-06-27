@@ -116,7 +116,16 @@ curl http://localhost:8080/actuator/health
 - Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
 - After supplier work starts or after supplier order completion, customers can submit a cancellation claim with `POST /api/orders/{orderId}/claims`.
 - Admin cancellation review APIs are available at `/api/admin/claims`.
-- PG refund execution and refund records are handled by the refund foundation.
+- Approved customer cancellation and supplier out-of-stock create delivery-group order refund records.
+
+## Refund Foundation
+
+- Admin refund queue APIs are available at `/api/admin/refunds`.
+- `POST /api/admin/refunds/{refundId}/request-pg-cancel` calls Toss Payments cancel API with an idempotency key.
+- `POST /api/admin/refunds/{refundId}/retry` retries failed PG cancel requests.
+- PG cancel success moves the order to `REFUNDED` and updates the payment/payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
+- PG cancel failure keeps the order in `REFUND_REQUESTED` and marks the refund `RETRY_REQUIRED`.
+- Customer and admin order detail responses include refund summary when a refund exists.
 
 ## Tests
 

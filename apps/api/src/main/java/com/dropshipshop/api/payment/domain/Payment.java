@@ -134,6 +134,16 @@ public class Payment {
 		return payment;
 	}
 
+	public void markRefundCompleted(boolean fullyRefunded) {
+		this.status = fullyRefunded ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED;
+	}
+
+	public void markRefundFailed(String failureCode, String failureMessage) {
+		this.status = PaymentStatus.REFUND_FAILED;
+		this.failureCode = failureCode;
+		this.failureMessage = failureMessage;
+	}
+
 	public UUID getId() {
 		return id;
 	}

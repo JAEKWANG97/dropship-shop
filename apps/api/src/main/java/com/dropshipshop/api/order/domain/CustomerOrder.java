@@ -178,12 +178,22 @@ public class CustomerOrder {
 	}
 
 	public void markRefundRequested() {
+		if (status == OrderStatus.REFUND_REQUESTED) {
+			return;
+		}
 		if (status != OrderStatus.SUPPLIER_ORDER_PENDING
 			&& status != OrderStatus.SUPPLIER_ORDERED
 			&& status != OrderStatus.OUT_OF_STOCK) {
 			throw new IllegalStateException("Refund can be requested only before refund completion");
 		}
 		this.status = OrderStatus.REFUND_REQUESTED;
+	}
+
+	public void markRefunded() {
+		if (status != OrderStatus.REFUND_REQUESTED) {
+			throw new IllegalStateException("Order can be refunded only after refund request");
+		}
+		this.status = OrderStatus.REFUNDED;
 	}
 
 	public void markPaymentException() {

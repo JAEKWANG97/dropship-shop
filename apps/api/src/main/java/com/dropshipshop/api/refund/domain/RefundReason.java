@@ -1,0 +1,11 @@
+package com.dropshipshop.api.refund.domain;
+
+public enum RefundReason {
+	CUSTOMER_CANCEL,
+	SUPPLIER_OUT_OF_STOCK,
+	ADMIN_CANCEL,
+	PAYMENT_AMOUNT_MISMATCH,
+	RETURN_REQUESTED,
+	EXCHANGE_REQUESTED,
+	DELIVERY_GROUP_OUT_OF_STOCK
+}
