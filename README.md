@@ -78,3 +78,9 @@
 - [Development Workflow](docs/development-workflow.md)
 - [Decision Log](docs/decision-log.md)
 - [GitHub And Linear Setup](docs/github-linear-setup.md)
+
+## Local Development
+
+- Backend API: [apps/api](apps/api)
+- Start local PostgreSQL: `docker compose -f infra/local/postgres/compose.yml up -d`
+- Run backend tests: `cd apps/api && ./gradlew test`

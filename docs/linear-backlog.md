@@ -413,6 +413,16 @@ Acceptance criteria:
 - Basic health endpoint exists.
 - Test command is documented.
 
+Resolved decisions:
+
+- Spring Boot API scaffold lives in `apps/api`.
+- Java target is 21 and the generated Gradle wrapper is committed with the API project.
+- PostgreSQL local configuration lives in `apps/api/src/main/resources/application-local.yml`.
+- Local PostgreSQL compose file lives in `infra/local/postgres/compose.yml`.
+- Basic health endpoint is `GET /api/health`; Actuator health is also enabled at `/actuator/health`.
+- Local profile and test command are documented in `apps/api/README.md`.
+- API tests run with the `test` profile and an H2 in-memory database in PostgreSQL compatibility mode.
+
 ### DS-5: Implement user and admin authentication foundation
 
 Description:

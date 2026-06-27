@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: dropship-shop-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: dropship_shop
+      POSTGRES_USER: dropship
+      POSTGRES_PASSWORD: dropship
+    volumes:
+      - dropship-shop-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  dropship-shop-postgres-data:
