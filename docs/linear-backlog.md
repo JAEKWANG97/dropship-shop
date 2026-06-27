@@ -179,6 +179,15 @@ References:
 
 These issues come from the multi-perspective policy review for a supplier-based commerce operation. They should be resolved before DS-2 is finalized or backend implementation starts.
 
+Recommended execution order:
+
+1. DS-23
+2. DS-24
+3. DS-26
+4. DS-25
+5. DS-27
+6. DS-28
+
 ### DS-23: Finalize payment exception and refund failure policy
 
 Description:
@@ -187,18 +196,19 @@ Close payment and refund edge cases that can create approved payment without a f
 
 Acceptance criteria:
 
-- Payment exception states are defined for amount mismatch, approval after expiration, and approval for unsellable products.
-- Automatic full PG cancel behavior is decided for each exception.
-- Admin emergency queue behavior is defined when automatic cancel/refund fails.
-- Refund lifecycle includes requested, PG cancel requested, processing, completed, failed, retry required, or manual review states.
-- Customer-facing statuses are defined for refund processing and refund failure/manual review.
+- Payment exception states are defined for amount mismatch, approval after expiration, unsellable products, duplicate/conflicting confirmation, and PG confirmation error.
+- Automatic full PG cancel behavior is decided: attempt immediate full PG cancel for approved payment exceptions.
+- Admin emergency queue behavior is defined: automatic cancel/refund failure enters admin emergency review and stays customer-visible.
+- Refund lifecycle includes requested, approved, PG cancel requested, processing, completed, failed, retry required, rejected, and manual review states.
+- Customer-facing statuses are defined: refund received, refund processing, refund completed, payment review/cancel processing.
 - PG event, payment, and refund audit fields are defined for Toss Payments reconciliation and idempotency.
-- Payment, cancellation/refund, order-flow, domain-model, and decision-log docs are updated.
+- Payment, cancellation/refund, order policy, order-flow, domain-model, and decision-log docs are updated.
 
 References:
 
 - `docs/policies/payment-policy.md`
 - `docs/policies/cancellation-refund-policy.md`
+- `docs/policies/order-policy.md`
 - `docs/order-flow.md`
 - `docs/domain-model.md`
 

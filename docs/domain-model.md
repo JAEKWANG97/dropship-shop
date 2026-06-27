@@ -16,6 +16,7 @@ Order
 OrderItem
 DeliveryGroup
 Payment
+PaymentEvent
 Fulfillment
 Shipment
 Refund
@@ -188,6 +189,7 @@ Suggested statuses:
 
 - PAYMENT_PENDING
 - EXPIRED
+- PAYMENT_EXCEPTION
 - SUPPLIER_ORDER_PENDING
 - SUPPLIER_ORDERED
 - OUT_OF_STOCK
@@ -243,12 +245,39 @@ Suggested fields:
 - provider
 - providerPaymentKey
 - method: CARD / EASY_PAY / TRANSFER
-- status: READY / APPROVED / FAILED / CANCELLED / REFUNDED
+- status: READY / APPROVED / FAILED / CANCEL_REQUIRED / CANCEL_REQUESTED / CANCELLED / CANCEL_FAILED / REFUND_REQUESTED / REFUNDED / REFUND_FAILED / REVIEW_REQUIRED
 - requestedAmount
 - approvedAmount
 - approvedAt
+- exceptionReason: AMOUNT_MISMATCH / APPROVED_AFTER_EXPIRED / SELLABILITY_CHECK_FAILED / DUPLICATE_OR_CONFLICTING_CONFIRMATION / PG_CONFIRMATION_ERROR
+- idempotencyKey
+- failureCode
+- failureMessage
+- rawProviderStatus
+- lastSyncedAt
 - createdAt
 - updatedAt
+
+## PaymentEvent
+
+PG 승인, 취소, 환불, webhook, 서버 확인 요청 이력. 멱등 처리와 PG 대사를 위해 원본 이벤트 단위로 기록한다.
+
+Suggested fields:
+
+- id
+- paymentId
+- orderId
+- provider
+- providerPaymentKey
+- providerEventId
+- eventType: CONFIRM_REQUESTED / CONFIRM_SUCCEEDED / CONFIRM_FAILED / CANCEL_REQUESTED / CANCEL_SUCCEEDED / CANCEL_FAILED / WEBHOOK_RECEIVED
+- idempotencyKey
+- rawStatus
+- rawPayload
+- result
+- receivedAt
+- processedAt
+- createdAt
 
 ## Fulfillment
 
@@ -294,9 +323,21 @@ Suggested fields:
 - orderId
 - paymentId
 - reason: CUSTOMER_CANCEL / SUPPLIER_OUT_OF_STOCK / ADMIN_CANCEL / PAYMENT_AMOUNT_MISMATCH / RETURN_REQUESTED / EXCHANGE_REQUESTED
-- status: REQUESTED / APPROVED / REJECTED / COMPLETED
+- status: REQUESTED / APPROVED / PG_CANCEL_REQUESTED / PROCESSING / COMPLETED / FAILED / RETRY_REQUIRED / REJECTED / MANUAL_REVIEW_REQUIRED
 - refundAmount
+- providerCancelKey
+- refundTransactionId
+- idempotencyKey
+- requestedByUserId
+- approvedByAdminId
+- failureCode
+- failureMessage
+- retryCount
+- rawProviderStatus
 - requestedAt
+- pgCancelRequestedAt
+- pgCancelApprovedAt
+- customerNotifiedAt
 - completedAt
 - createdAt
 - updatedAt
@@ -410,8 +451,13 @@ Suggested fields:
 - `PAYMENT_PENDING` 주문은 결제 검증 전이므로 공급처 발주 대상이 아니다.
 - `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 `EXPIRED`로 만료 처리한다.
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
+- PG 결제가 승인됐지만 주문을 확정할 수 없으면 주문은 `PAYMENT_EXCEPTION`으로 전환하고 공급처 발주를 차단한다.
+- 결제 예외는 즉시 PG 전액 취소를 시도하고, 실패하면 관리자 긴급 확인 큐로 전환한다.
+- 결제 이벤트와 환불 이벤트는 멱등 처리와 PG 대사를 위해 별도 이력으로 기록한다.
 - MVP 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
 - MVP에서는 부분 취소를 지원하지 않고 주문 단위 전액 취소/환불을 우선 지원한다.
+- 결제 승인 완료 주문은 PG 취소/환불 성공 후에만 `REFUNDED`가 될 수 있다.
+- PG 취소/환불 실패는 `FAILED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED` 같은 상태로 남기고 완료 상태로 처리하지 않는다.
 - 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태까지만 허용한다.
 - 배송 후 반품/교환은 문의와 관리자 수동 처리로 시작한다.
 - 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.

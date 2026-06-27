@@ -330,6 +330,29 @@ Consequences:
 - SMS, Kakao Alimtalk, and app push notifications are deferred.
 - Final legal wording remains subject to separate pre-launch legal review.
 
+## 2026-06-27: Payment Exception And Refund Failure Handling
+
+Decision:
+
+If PG payment is approved but the order cannot be confirmed, treat it as a payment exception, block supplier ordering, record the exception reason, and immediately attempt a full PG cancel. Payment exception reasons start with amount mismatch, approval after expiration, sellability check failure, duplicate or conflicting confirmation, and PG confirmation error. If automatic cancel fails, move the case to an admin emergency review queue and keep the processing status visible to the customer.
+
+Refund completion is only allowed after PG cancel/refund success. Paid orders must not move to final `REFUNDED` state until the PG result is confirmed. PG cancel/refund failures stay in failed, retry required, or manual review states and must not be shown as completed to customers.
+
+Context:
+
+A supplier-based shop expects out-of-stock and cancellation/refund operations. The highest-risk failure is collecting money while hiding or failing to fulfill the order. The previous policy said to not confirm mismatched or invalid payments, but it did not fully define what happens when the PG has already approved the payment.
+
+Consequences:
+
+- Payment approval verification requires unexpired `PAYMENT_PENDING` order, checkout confirmation, amount match, conflict-free PG payment key, and sellable product/option status.
+- `PAYMENT_EXCEPTION` is introduced for approved payments that cannot become confirmed orders.
+- Payment exceptions never enter supplier ordering.
+- Approved payment exceptions attempt immediate full PG cancel with idempotency.
+- Automatic cancel/refund failure creates an admin emergency review item.
+- Refund lifecycle includes PG cancel requested, processing, completed, failed, retry required, and manual review states.
+- Payment/refund events need event history for idempotency and PG reconciliation.
+- Customer must see processing or review status for PG-approved exception cases instead of the order disappearing.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

@@ -43,6 +43,8 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Order status: OUT_OF_STOCK
 -> Customer is notified
 -> Refund is requested
+-> Refund status: PG_CANCEL_REQUESTED
+-> PG full cancel/refund succeeds
 -> Refund status: COMPLETED
 -> Payment status: REFUNDED
 -> Order status: REFUNDED
@@ -86,8 +88,36 @@ Order status: PAYMENT_PENDING
 -> PG says payment succeeded
 -> Server compares expected order amount and approved amount
 -> Amount mismatch detected
--> Order is not confirmed
--> Payment is cancelled or manually reviewed
+-> Order status: PAYMENT_EXCEPTION
+-> Payment status: CANCEL_REQUIRED
+-> System attempts immediate full PG cancel
+-> If PG cancel succeeds, payment status becomes CANCELLED and customer sees payment cancel completed
+-> If PG cancel fails, payment status becomes CANCEL_FAILED and admin emergency review is required
+```
+
+## Payment Exception
+
+```text
+PG payment is approved
+-> Server cannot confirm order because one validation failed:
+   - order expired
+   - amount mismatch
+   - product or option is no longer sellable
+   - duplicate or conflicting PG payment key
+   - PG confirmation error
+-> Order status: PAYMENT_EXCEPTION
+-> Payment exception reason is recorded
+-> Supplier order is blocked
+-> System attempts immediate full PG cancel with idempotency key
+
+PG cancel succeeds
+-> Payment status: CANCELLED
+-> Customer sees payment cancel completed
+
+PG cancel fails
+-> Payment status: CANCEL_FAILED
+-> Admin emergency payment queue item is created
+-> Customer sees payment review or cancel processing status
 ```
 
 ## Deferred Virtual Account Flow
@@ -102,9 +132,19 @@ If added later, the order flow needs separate states for account issued, waiting
 ```text
 Order status: SUPPLIER_ORDER_PENDING
 -> Customer requests cancellation
--> Order status: CANCELLED
--> PG refund/cancel is executed
--> Payment status: CANCELLED or REFUNDED
+-> Order status: REFUND_REQUESTED
+-> Refund status: REQUESTED
+-> PG full cancel/refund is requested
+-> Refund status: PG_CANCEL_REQUESTED
+-> PG cancel/refund succeeds
+-> Refund status: COMPLETED
+-> Payment status: REFUNDED
+-> Order status: REFUNDED
+
+PG cancel/refund fails
+-> Refund status: FAILED or RETRY_REQUIRED
+-> Order remains REFUND_REQUESTED
+-> Admin retry or manual review is required
 ```
 
 ## Customer Cancellation After Supplier Order
@@ -173,6 +213,10 @@ Admin detects wrong operational state or shipment information
 - Payment request requires checkout policy confirmation.
 - Checkout policy confirmation is recorded per order with policy versions and confirmation time.
 - Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
+- Payment approval verification requires order status `PAYMENT_PENDING`, unexpired order, completed checkout policy confirmation, amount match, unused/conflict-free PG payment key, and sellable product/option status.
+- If PG approves payment but order confirmation fails, the order moves to `PAYMENT_EXCEPTION` and supplier ordering is blocked.
+- Payment exceptions attempt immediate full PG cancel.
+- Failed automatic PG cancel creates an admin emergency review item and must not be hidden from the customer.
 - MVP enabled payment methods are card, easy payment, and account transfer through Toss Payments.
 - Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.
 - Failed, pending, and expired payment orders are not shown in customer order history.
@@ -188,6 +232,8 @@ Admin detects wrong operational state or shipment information
 - MVP includes automatic carrier tracking sync after carrier and tracking number are entered.
 - Automatic tracking sync failure must not block order, payment, or refund operations.
 - `REFUNDED` requires a completed refund record.
+- Paid orders can move to `REFUNDED` only after PG cancel/refund succeeds.
+- PG cancel/refund failure must keep the order in a processing or review-required state, not a completed state.
 - MVP does not support partial cancellation or partial refund.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
 - Admin order state changes must use defined actions, not arbitrary status dropdown changes.
@@ -200,6 +246,8 @@ Admin detects wrong operational state or shipment information
 ### Duplicate Payment Callback
 
 PG callbacks or client confirmations can arrive multiple times. Payment approval must be idempotent.
+
+Payment and refund events must be recorded with idempotency keys and provider identifiers so duplicate confirmations or retries do not create multiple state transitions.
 
 ### Client-Side Price Tampering
 

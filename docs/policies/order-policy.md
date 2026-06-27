@@ -33,6 +33,8 @@ Status: Confirmed
 - PG 결제 요청은 서버에 생성된 주문 식별자와 서버 계산 금액을 기준으로 진행한다.
 - 결제 성공 후 서버가 PG 승인 결과와 주문 금액을 검증한 뒤 주문을 확정한다.
 - 결제 승인 검증이 성공하면 주문은 `SUPPLIER_ORDER_PENDING` 상태로 진입한다.
+- PG 결제가 승인됐지만 주문을 확정할 수 없으면 주문은 `PAYMENT_EXCEPTION` 상태로 진입하고 공급처 발주를 차단한다.
+- `PAYMENT_EXCEPTION`은 결제 취소 처리 중 또는 결제 확인 필요 상태로 고객에게 노출한다.
 - `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 만료 처리한다.
 - 만료된 결제 대기 주문은 결제 재시도 대상이 아니며, 고객은 새 주문을 생성해야 한다.
 - `PAYMENT_PENDING` 상태에서는 결제 전 주문서 수정으로 배송지를 변경할 수 있다.
@@ -56,6 +58,8 @@ Status: Confirmed
 - `SUPPLIER_ORDERED` 이후 고객 배송지 변경 API는 거절해야 한다.
 - 고객용 주문 상태 매핑 계층이 필요하다.
 - 관리자 화면은 내부 상태를 볼 수 있지만, 고객 화면은 고객 친화적인 표시 상태를 사용해야 한다.
+- 환불 표시 상태는 주문 상태뿐 아니라 `Refund.status`를 함께 보고 계산해야 한다.
+- PG 취소/환불 실패 건은 고객에게 환불 완료로 표시하지 않아야 한다.
 
 ## Open Questions
 
@@ -69,6 +73,7 @@ Initial mapping:
 | --- | --- |
 | `PAYMENT_PENDING` | 결제 대기 |
 | `EXPIRED` | 주문 만료 |
+| `PAYMENT_EXCEPTION` | 결제 확인 중 |
 | `SUPPLIER_ORDER_PENDING` | 결제 완료 |
 | `SUPPLIER_ORDERED` | 상품 준비 중 |
 | `PREPARING_SHIPMENT` | 상품 준비 중 |
@@ -79,3 +84,12 @@ Initial mapping:
 | `CANCELLED` | 취소 완료 |
 | `REFUND_REQUESTED` | 환불 처리 중 |
 | `REFUNDED` | 환불 완료 |
+
+Refund-derived display statuses:
+
+| Order status | Refund status | Customer display status |
+| --- | --- | --- |
+| `REFUND_REQUESTED` | `REQUESTED` / `APPROVED` | 환불 접수 |
+| `REFUND_REQUESTED` | `PG_CANCEL_REQUESTED` / `PROCESSING` | 환불 처리 중 |
+| `REFUND_REQUESTED` | `FAILED` / `RETRY_REQUIRED` / `MANUAL_REVIEW_REQUIRED` | 환불 확인 필요 |
+| `REFUNDED` | `COMPLETED` | 환불 완료 |
