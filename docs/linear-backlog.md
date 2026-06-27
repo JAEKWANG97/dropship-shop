@@ -87,6 +87,15 @@ Notes:
 - Toss Payments is confirmed for MVP.
 - DS-18 tracks the remaining payment method policy decisions.
 
+Resolved decisions:
+
+- Toss Payments is selected for MVP.
+- PortOne is not used for MVP.
+- Sandbox integration path is documented in `docs/policies/payment-policy.md`.
+- Refund/cancel support is handled through Toss Payments payment cancel APIs and reflected in the payment/refund policies.
+- Production readiness requirements are documented in `docs/policies/payment-policy.md`.
+- DS-18 resolved the enabled Toss Payments method set: card, easy payment, and account transfer.
+
 ## Milestone 1.5: MVP Policy Completion
 
 ### DS-18: Finalize Toss Payments method policy

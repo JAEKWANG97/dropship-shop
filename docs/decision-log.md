@@ -207,8 +207,10 @@ Consequences:
 
 - Payment integration issues should target Toss Payments APIs and SDKs.
 - Spring Boot must verify payment approvals server-side with Toss Payments.
-- Payment method policy still needs to decide which Toss-supported methods are enabled for MVP.
-- Virtual account/bank-transfer-like flows require separate async deposit state handling if included.
+- Payment method policy enables card, easy payment, and account transfer for MVP.
+- Virtual account/bank-transfer-like flows remain deferred because they require separate async deposit state handling.
+- PortOne is not used for MVP because the first implementation benefits from a narrower direct PG integration.
+- Live operation requires Toss Payments merchant readiness, live keys, enabled payment methods, cancel/partial-cancel readiness, and customer-facing policy pages.
 
 ## 2026-06-27: MVP Payment Methods
 

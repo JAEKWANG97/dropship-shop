@@ -73,6 +73,41 @@ Status: Confirmed
 - 결제 실패, 결제 대기, 결제 만료 주문은 고객 주문 내역에 노출하지 않는다.
 - PG 승인이 발생한 결제 예외 주문은 고객 주문 내역 또는 별도 결제 확인 화면에 노출한다.
 
+## Provider Selection
+
+Toss Payments is selected for MVP instead of PortOne.
+
+Selection reasons:
+
+- The MVP needs a direct domestic PG integration path for Korean commerce.
+- Toss Payments provides client-side payment window/widget integration and server-side payment confirmation APIs.
+- Toss Payments provides payment cancel APIs that can be used for full cancel and partial cancel/refund handling.
+- Using the PG directly keeps the first integration path narrower than adding an aggregator abstraction before the product has real order volume.
+
+Official references:
+
+- Toss Payments payment window integration: `https://docs.tosspayments.com/guides/v2/payment-window/integration`
+- Toss Payments payment widget integration: `https://docs.tosspayments.com/guides/v2/payment-widget/integration`
+- Toss Payments API reference: `https://docs.tosspayments.com/reference`
+
+## Sandbox And Production Readiness
+
+Sandbox path:
+
+- Use Toss Payments test client key in the frontend.
+- Use Toss Payments test secret key only on the Spring Boot server.
+- Create a server-side `PaymentGroup` before invoking the Toss payment UI.
+- Confirm approved payment results on the server before moving orders to `SUPPLIER_ORDER_PENDING`.
+- Record raw PG identifiers and normalized payment events for idempotency and reconciliation.
+
+Production readiness:
+
+- Toss Payments merchant account and contract must be ready before live keys are used.
+- Live client key and live secret key must be configured outside source control.
+- Enabled live payment methods must match the MVP method policy: card, easy payment, and account transfer only.
+- Cancel and partial cancel permissions must be verified in the live Toss Payments merchant configuration before launch.
+- Return, cancellation, privacy, and business disclosure pages must be reachable before production payment activation.
+
 ## System Impact
 
 - 서버에는 PG secret key가 필요하다.
