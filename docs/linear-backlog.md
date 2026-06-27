@@ -732,16 +732,19 @@ Acceptance criteria:
 
 ### DS-16: Add policy pages
 
+Status: Implemented
+
 Description:
 
 Add customer-facing policy pages for shipping, cancellation, refund, and supplier stock risk.
 
 Acceptance criteria:
 
-- Shipping policy page exists.
-- Cancellation/refund policy page exists.
-- Order-after-payment supplier stock risk is clearly disclosed.
-- Policy links are visible from product detail and checkout.
+- Shipping policy page exists at `GET /api/policies/shipping`.
+- Cancellation/refund policy page exists at `GET /api/policies/cancellation-refund`.
+- Order-after-payment supplier stock risk is clearly disclosed at `GET /api/policies/stock-risk`.
+- Policy links are visible from product detail and checkout through `policyLinks`.
+- Public policy page access, customer-facing core policy text, product detail links, and checkout links are covered by `PolicyPageApiIntegrationTest`.
 
 ### DS-17: Add production readiness baseline
 

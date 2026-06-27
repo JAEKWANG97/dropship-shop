@@ -41,6 +41,11 @@ public class CheckoutService {
 
 	private static final SecureRandom RANDOM = new SecureRandom();
 	private static final int CHECKOUT_EXPIRATION_MINUTES = 30;
+	private static final List<CheckoutDtos.PolicyLinkResponse> CHECKOUT_POLICY_LINKS = List.of(
+		new CheckoutDtos.PolicyLinkResponse("배송 정책", "/api/policies/shipping", "SHIPPING_POLICY"),
+		new CheckoutDtos.PolicyLinkResponse("취소/환불 정책", "/api/policies/cancellation-refund", "CANCELLATION_REFUND_POLICY"),
+		new CheckoutDtos.PolicyLinkResponse("결제 후 품절 안내", "/api/policies/stock-risk", "OUT_OF_STOCK_NOTICE")
+	);
 
 	private final CartItemRepository cartItemRepository;
 	private final ProductNoticeRepository productNoticeRepository;
@@ -209,6 +214,7 @@ public class CheckoutService {
 			paymentGroup.getRefundableAmount(),
 			paymentGroup.getExpiresAt(),
 			paymentGroup.getPolicyConfirmedAt(),
+			CHECKOUT_POLICY_LINKS,
 			orders
 		);
 	}

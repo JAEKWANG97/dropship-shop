@@ -75,7 +75,15 @@ curl http://localhost:8080/actuator/health
 - Order items snapshot product name, summary, option name, unit price, detail version, and notice version.
 - Server-calculated totals are authoritative; client-submitted totals are ignored.
 - Checkout creation empties the cart after successful order creation.
+- Checkout responses include customer policy links for shipping, cancellation/refund, and payment-after-stockout notices.
 - Policy confirmation is stored through `/api/checkouts/{checkoutNumber}/policy-confirmation`.
+
+## Policy Page Foundation
+
+- Public customer policy APIs are available at `/api/policies`.
+- Implemented MVP policy pages are `/api/policies/shipping`, `/api/policies/cancellation-refund`, and `/api/policies/stock-risk`.
+- Product detail and checkout responses include the same policy links so customer-facing policy notice is not embedded only in product HTML or images.
+- Admin policy management, business disclosure, terms of service, and privacy-processing table APIs remain future work.
 
 ## Payment Foundation
 

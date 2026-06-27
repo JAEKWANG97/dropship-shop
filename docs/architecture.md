@@ -50,6 +50,7 @@ payment
 fulfillment
 shipment
 refund
+policy
 admin
 common
 ```
@@ -90,6 +91,7 @@ Initial route groups:
 /checkout
 /orders
 /orders/:id
+/policies/:slug
 /admin
 /admin/products
 /admin/orders

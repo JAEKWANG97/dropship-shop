@@ -85,8 +85,8 @@ Status: Confirmed
 
 ## System Impact
 
-- 상품 상세와 체크아웃 화면에 정책 링크가 필요하다.
-- 정책 페이지 라우트가 필요하다.
+- 상품 상세와 체크아웃 화면에 정책 링크가 필요하다. Backend API responses include policy links by DS-16.
+- 정책 페이지 라우트가 필요하다. Backend public policy APIs are implemented by DS-16; frontend menu/footer routes remain for `apps/web`.
 - 고객 메뉴와 푸터에 정책 페이지 링크가 필요하다.
 - 사업자 정보와 통신판매업 신고 정보를 관리하는 설정 모델이 필요하다.
 - 상품 상세에는 품목별 상품 정보 제공 고시 블록이 필요하다.

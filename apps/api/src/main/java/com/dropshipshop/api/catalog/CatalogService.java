@@ -40,6 +40,11 @@ public class CatalogService {
 	private static final Pattern EVENT_ATTRIBUTE = Pattern.compile("(?i)\\son[a-z]+\\s*=\\s*(['\"]).*?\\1");
 	private static final Pattern JAVASCRIPT_URL = Pattern.compile("(?i)javascript:");
 	private static final List<String> ALLOWED_IMAGE_EXTENSIONS = List.of(".jpg", ".jpeg", ".png", ".webp");
+	private static final List<CatalogDtos.PolicyLinkResponse> PRODUCT_POLICY_LINKS = List.of(
+		new CatalogDtos.PolicyLinkResponse("배송 정책", "/api/policies/shipping", "SHIPPING_POLICY"),
+		new CatalogDtos.PolicyLinkResponse("취소/환불 정책", "/api/policies/cancellation-refund", "CANCELLATION_REFUND_POLICY"),
+		new CatalogDtos.PolicyLinkResponse("결제 후 품절 안내", "/api/policies/stock-risk", "OUT_OF_STOCK_NOTICE")
+	);
 
 	private final SupplierRepository supplierRepository;
 	private final ProductRepository productRepository;
@@ -475,7 +480,8 @@ public class CatalogService {
 			images,
 			options,
 			blocks,
-			notice
+			notice,
+			PRODUCT_POLICY_LINKS
 		);
 	}
 

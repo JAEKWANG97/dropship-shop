@@ -190,7 +190,15 @@ final class CatalogDtos {
 		List<ProductImageResponse> images,
 		List<ProductOptionResponse> options,
 		List<ProductDetailBlockResponse> detailBlocks,
-		ProductNoticeResponse productNotice
+		ProductNoticeResponse productNotice,
+		List<PolicyLinkResponse> policyLinks
+	) {
+	}
+
+	record PolicyLinkResponse(
+		String label,
+		String href,
+		String policyType
 	) {
 	}
 }

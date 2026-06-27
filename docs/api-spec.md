@@ -74,14 +74,14 @@ Notes:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/products` | Public | Implemented | List customer-visible active products |
-| `GET` | `/api/products/{productId}` | Public | Implemented | Product detail with options, images, and detail blocks |
+| `GET` | `/api/products/{productId}` | Public | Implemented | Product detail with options, images, detail blocks, and customer policy links |
 
 Customer visibility rules:
 
 - Show only products customer can view.
 - Purchase is allowed only when product status is `ACTIVE` and option status is `ACTIVE`.
 - Do not expose raw supplier information to customers.
-- Show delivery, cancellation, refund, and out-of-stock notices outside arbitrary product HTML/images.
+- Product detail responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notices so operational policy is not embedded only in arbitrary product HTML/images.
 
 ### Admin Catalog
 
@@ -184,6 +184,7 @@ Rules:
 - Server calculates all totals and ignores client-submitted totals.
 - Checkout creation groups cart items by supplier as the MVP delivery-group boundary.
 - Checkout creation empties the cart after payment group and orders are created.
+- Checkout create/read responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notice.
 - Policy confirmation is stored separately on the payment group before payment approval.
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
@@ -332,7 +333,9 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/policies/{type}/current` | Public | Planned | Active policy document by type |
+| `GET` | `/api/policies` | Public | Implemented | List customer-facing MVP policy pages |
+| `GET` | `/api/policies/{slug}` | Public | Implemented | Customer-facing policy page by slug |
+| `GET` | `/api/policies/{type}/current` | Public | Planned | Active managed policy document by type |
 | `GET` | `/api/policies/{type}/versions/{version}` | Public | Planned | Specific policy version |
 | `GET` | `/api/business-profile` | Public | Planned | Active business disclosure |
 | `GET` | `/api/privacy-processing-items` | Public | Planned | Active privacy processing table |
@@ -345,6 +348,9 @@ Rules:
 
 Rules:
 
+- Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
+- Implemented policy pages are static backend responses based on confirmed policy docs; admin policy management remains planned.
+- Product detail and checkout responses include links to the implemented policy page endpoints.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.
 - Checkout stores policy versions per payment group.
@@ -499,11 +505,23 @@ Rule:
     "asInfo": "AS information",
     "returnExchangeInfo": "Return and exchange information"
   },
-  "policyNotice": {
-    "shipping": "Policy text or reference",
-    "cancellationRefund": "Policy text or reference",
-    "outOfStock": "Policy text or reference"
-  }
+  "policyLinks": [
+    {
+      "label": "배송 정책",
+      "href": "/api/policies/shipping",
+      "policyType": "SHIPPING_POLICY"
+    },
+    {
+      "label": "취소/환불 정책",
+      "href": "/api/policies/cancellation-refund",
+      "policyType": "CANCELLATION_REFUND_POLICY"
+    },
+    {
+      "label": "결제 후 품절 안내",
+      "href": "/api/policies/stock-risk",
+      "policyType": "OUT_OF_STOCK_NOTICE"
+    }
+  ]
 }
 ```
 

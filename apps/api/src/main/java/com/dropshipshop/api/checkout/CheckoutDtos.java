@@ -43,6 +43,7 @@ final class CheckoutDtos {
 		long refundableAmount,
 		Instant expiresAt,
 		Instant policyConfirmedAt,
+		List<PolicyLinkResponse> policyLinks,
 		List<OrderResponse> orders
 	) {
 	}
@@ -76,6 +77,13 @@ final class CheckoutDtos {
 	record PolicyConfirmationResponse(
 		String checkoutNumber,
 		Instant policyConfirmedAt
+	) {
+	}
+
+	record PolicyLinkResponse(
+		String label,
+		String href,
+		String policyType
 	) {
 	}
 }

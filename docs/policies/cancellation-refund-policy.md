@@ -79,6 +79,8 @@ Status: Confirmed
 - 환불 상태는 PG 요청/성공/실패/재시도를 구분해야 한다. Implemented by DS-15.
 - 환불 실패 건을 처리하는 관리자 큐가 필요하다. Refund queue and retry are implemented by DS-15.
 - 환불 완료 고객 고지는 PG 취소/환불 성공 이후에만 발송한다.
+- 고객 취소/환불 정책 페이지는 `GET /api/policies/cancellation-refund`으로 노출한다. Implemented by DS-16.
+- 결제 후 공급처 품절 가능성과 배송 그룹 주문 단위 환불 안내는 `GET /api/policies/stock-risk`으로 노출한다. Implemented by DS-16.
 
 ## Open Questions
 

@@ -85,6 +85,7 @@ Status: Confirmed
 - 자동 배송조회와 관리자 수동 보정이 충돌하지 않도록 상태 변경 이력을 남겨야 한다.
 - 수동 배송 보정은 `manualOverride`, `manualCorrectionReason`, `manualCorrectedByAdminId` 같은 정보를 남겨야 한다.
 - 배송조회 연동 방식 선택을 위한 별도 기술 조사 이슈가 필요하다.
+- 고객 배송 정책 페이지는 `GET /api/policies/shipping`으로 노출한다. Implemented by DS-16.
 
 ## Open Questions
 
