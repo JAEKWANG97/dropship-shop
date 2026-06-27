@@ -6,7 +6,6 @@
 
 - `Implemented`: 현재 `apps/api`에 구현되어 있다.
 - `Planned`: 아직 구현 전이다.
-- `DS-6`: 다음 catalog 구현 이슈에서 다뤄야 한다.
 
 ## API Rules
 
@@ -74,8 +73,8 @@ Notes:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/products` | Public | DS-6 | List customer-visible active products |
-| `GET` | `/api/products/{productId}` | Public | DS-6 | Product detail with options, images, and detail blocks |
+| `GET` | `/api/products` | Public | Implemented | List customer-visible active products |
+| `GET` | `/api/products/{productId}` | Public | Implemented | Product detail with options, images, and detail blocks |
 
 Customer visibility rules:
 
@@ -88,20 +87,21 @@ Customer visibility rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/admin/suppliers` | `ADMIN` | DS-6 | List suppliers |
-| `POST` | `/api/admin/suppliers` | `ADMIN` | DS-6 | Create supplier |
-| `GET` | `/api/admin/suppliers/{supplierId}` | `ADMIN` | DS-6 | Supplier detail |
-| `PATCH` | `/api/admin/suppliers/{supplierId}` | `ADMIN` | DS-6 | Update supplier |
-| `GET` | `/api/admin/products` | `ADMIN` | DS-6 | List products including hidden/stopped products |
-| `POST` | `/api/admin/products` | `ADMIN` | DS-6 | Create product |
-| `GET` | `/api/admin/products/{productId}` | `ADMIN` | DS-6 | Product detail for admin editing |
-| `PATCH` | `/api/admin/products/{productId}` | `ADMIN` | DS-6 | Update product base fields |
-| `PATCH` | `/api/admin/products/{productId}/status` | `ADMIN` | DS-6 | Change product sales status |
-| `POST` | `/api/admin/products/{productId}/options` | `ADMIN` | DS-6 | Create product option |
-| `PATCH` | `/api/admin/products/{productId}/options/{optionId}` | `ADMIN` | DS-6 | Update product option |
-| `PATCH` | `/api/admin/products/{productId}/options/{optionId}/status` | `ADMIN` | DS-6 | Change option sales status |
-| `PUT` | `/api/admin/products/{productId}/images` | `ADMIN` | DS-6 | Replace thumbnail/gallery image metadata |
-| `PUT` | `/api/admin/products/{productId}/detail-blocks` | `ADMIN` | DS-6 | Replace ordered IMAGE/HTML detail blocks |
+| `GET` | `/api/admin/suppliers` | `ADMIN` | Implemented | List suppliers |
+| `POST` | `/api/admin/suppliers` | `ADMIN` | Implemented | Create supplier |
+| `GET` | `/api/admin/suppliers/{supplierId}` | `ADMIN` | Implemented | Supplier detail |
+| `PATCH` | `/api/admin/suppliers/{supplierId}` | `ADMIN` | Implemented | Update supplier |
+| `GET` | `/api/admin/products` | `ADMIN` | Implemented | List products including hidden/stopped products |
+| `POST` | `/api/admin/products` | `ADMIN` | Implemented | Create product |
+| `GET` | `/api/admin/products/{productId}` | `ADMIN` | Implemented | Product detail for admin editing |
+| `PATCH` | `/api/admin/products/{productId}` | `ADMIN` | Implemented | Update product base fields |
+| `PATCH` | `/api/admin/products/{productId}/status` | `ADMIN` | Implemented | Change product sales status |
+| `POST` | `/api/admin/products/{productId}/options` | `ADMIN` | Implemented | Create product option |
+| `PATCH` | `/api/admin/products/{productId}/options/{optionId}` | `ADMIN` | Implemented | Update product option |
+| `PATCH` | `/api/admin/products/{productId}/options/{optionId}/status` | `ADMIN` | Implemented | Change option sales status |
+| `PUT` | `/api/admin/products/{productId}/images` | `ADMIN` | Implemented | Replace thumbnail/gallery image metadata |
+| `PUT` | `/api/admin/products/{productId}/detail-blocks` | `ADMIN` | Implemented | Replace ordered IMAGE/HTML detail blocks |
+| `PUT` | `/api/admin/products/{productId}/notice` | `ADMIN` | Implemented | Create next active product notice version |
 | `GET` | `/api/admin/products/{productId}/change-history` | `ADMIN` | Planned | Product change audit history |
 
 DS-6 minimum:

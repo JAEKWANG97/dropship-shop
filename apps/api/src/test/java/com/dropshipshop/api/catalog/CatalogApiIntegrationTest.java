@@ -1,0 +1,205 @@
+package com.dropshipshop.api.catalog;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.dropshipshop.api.auth.security.TestAuthentication;
+import com.dropshipshop.api.catalog.repository.ProductChangeHistoryRepository;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class CatalogApiIntegrationTest {
+
+	@Autowired
+	private MockMvc mockMvc;
+
+	@Autowired
+	private ProductChangeHistoryRepository productChangeHistoryRepository;
+
+	@Test
+	void managesCatalogAndExposesPublicProducts() throws Exception {
+		mockMvc.perform(get("/api/products"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$", hasSize(0)));
+
+		mockMvc.perform(get("/api/admin/products"))
+			.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(get("/api/admin/products")
+				.with(authentication(TestAuthentication.customer())))
+			.andExpect(status().isForbidden());
+
+		UUID supplierId = createSupplier();
+		UUID productId = createProduct(supplierId);
+
+		mockMvc.perform(post("/api/admin/products/{productId}/options", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Black / Large",
+					  "additionalPrice": 1000,
+					  "status": "ACTIVE"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status", is("ACTIVE")));
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Initial image setup",
+					  "images": [
+					    {
+					      "type": "THUMBNAIL",
+					      "imageUrl": "https://cdn.example.com/thumb.webp",
+					      "sortOrder": 0,
+					      "altText": "Thumbnail"
+					    },
+					    {
+					      "type": "GALLERY",
+					      "imageUrl": "https://cdn.example.com/gallery-1.jpg",
+					      "sortOrder": 1,
+					      "altText": "Gallery"
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.thumbnailImageUrl", is("https://cdn.example.com/thumb.webp")))
+			.andExpect(jsonPath("$.images", hasSize(2)));
+
+		mockMvc.perform(put("/api/admin/products/{productId}/detail-blocks", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Initial detail setup",
+					  "detailBlocks": [
+					    {
+					      "type": "HTML",
+					      "htmlContent": "<p onclick='bad()'>Safe</p><script>alert(1)</script>",
+					      "sortOrder": 1
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.detailVersion", is(2)))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", containsString("<p>Safe</p>")))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("script"))));
+
+		mockMvc.perform(put("/api/admin/products/{productId}/notice", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Initial notice setup",
+					  "productInfoNotice": "Product info notice",
+					  "shippingInfo": "Shipping info",
+					  "asInfo": "AS info",
+					  "returnExchangeInfo": "Return exchange info"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.productNoticeVersion", is(1)))
+			.andExpect(jsonPath("$.productNotice.productInfoNotice", is("Product info notice")));
+
+		mockMvc.perform(get("/api/products"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$", hasSize(1)))
+			.andExpect(jsonPath("$[0].id", is(productId.toString())));
+
+		mockMvc.perform(get("/api/products/{productId}", productId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.options", hasSize(1)))
+			.andExpect(jsonPath("$.images", hasSize(2)))
+			.andExpect(jsonPath("$.productNoticeVersion", is(1)));
+
+		mockMvc.perform(patch("/api/admin/products/{productId}/status", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "HIDDEN",
+					  "reason": "Hide from public list"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("HIDDEN")));
+
+		mockMvc.perform(get("/api/products/{productId}", productId))
+			.andExpect(status().isNotFound());
+
+		org.assertj.core.api.Assertions.assertThat(productChangeHistoryRepository.count()).isGreaterThanOrEqualTo(4);
+	}
+
+	private UUID createSupplier() throws Exception {
+		MvcResult result = mockMvc.perform(post("/api/admin/suppliers")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Supplier A",
+					  "contactName": "Manager",
+					  "phone": "010-0000-0000",
+					  "email": "supplier@example.com",
+					  "memo": "Internal memo"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status", is("ACTIVE")))
+			.andReturn();
+		return idFrom(result);
+	}
+
+	private UUID createProduct(UUID supplierId) throws Exception {
+		MvcResult result = mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Product A",
+					  "summary": "Summary",
+					  "basePrice": 39000,
+					  "status": "ACTIVE"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status", is("ACTIVE")))
+			.andReturn();
+		return idFrom(result);
+	}
+
+	private UUID idFrom(MvcResult result) throws Exception {
+		String json = result.getResponse().getContentAsString();
+		int idKeyIndex = json.indexOf("\"id\":\"");
+		int idStart = idKeyIndex + "\"id\":\"".length();
+		int idEnd = json.indexOf('"', idStart);
+		return UUID.fromString(json.substring(idStart, idEnd));
+	}
+}

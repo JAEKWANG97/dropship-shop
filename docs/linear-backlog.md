@@ -514,6 +514,17 @@ Acceptance criteria:
 - Customer can read public product list and detail APIs.
 - Public product APIs are permitted by security configuration while admin catalog APIs remain `ADMIN` only.
 
+Resolved decisions:
+
+- Catalog tables are created by `V2__create_catalog.sql`.
+- Product and option sellability uses status fields and no stock quantity.
+- Public catalog APIs are implemented at `GET /api/products` and `GET /api/products/{productId}`.
+- Admin supplier and product APIs are implemented under `/api/admin`.
+- Product image and detail block APIs manage URL/object-key metadata; binary upload remains future work.
+- Product notice version source is implemented through `product_notices`.
+- Product mutations write `product_change_histories`; read API for change history remains planned.
+- `SecurityConfig` permits public product APIs and keeps `/api/admin/**` protected by `ADMIN`.
+
 ### DS-7: Implement cart domain
 
 Description:

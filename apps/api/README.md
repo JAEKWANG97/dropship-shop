@@ -47,6 +47,15 @@ curl http://localhost:8080/actuator/health
 - Customer APIs read the authenticated user id through `CurrentUser`.
 - Basic login and form login are disabled; social OAuth/JWT integration is added in later auth work.
 
+## Catalog Foundation
+
+- Public product APIs are available at `/api/products`.
+- Admin catalog APIs are available under `/api/admin`.
+- Catalog tables include suppliers, products, options, images, detail blocks, notices, and product change histories.
+- Product and option sellability uses status fields, not stock quantity.
+- Product images and detail images store URL/object-key metadata; binary upload is separate future work.
+- Product notice versions support later order item snapshot references.
+
 ## Tests
 
 ```sh
