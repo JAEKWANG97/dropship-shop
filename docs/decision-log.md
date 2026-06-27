@@ -87,6 +87,24 @@ Consequences:
 - Customers are not charged extra if supplier price increases after payment.
 - If the supplier cannot fulfill at the paid price, the operational fallback is cancellation/refund, not additional billing.
 
+## 2026-06-27: Order Creation Before Payment
+
+Decision:
+
+Create an order before requesting PG payment. The initial order status is `PAYMENT_PENDING`.
+
+Context:
+
+Payment needs an internal order anchor so the server can calculate the amount, pass a stable order identifier to the PG flow, and verify the PG-approved amount against the server-side order amount.
+
+Consequences:
+
+- Checkout creates a `PAYMENT_PENDING` order before redirecting or invoking PG payment.
+- `PAYMENT_PENDING` orders are not confirmed orders.
+- `PAYMENT_PENDING` orders do not appear in the admin supplier order queue.
+- Server-side payment verification is required before the order moves to `SUPPLIER_ORDER_PENDING`.
+- The payment and order records must be linked by order id or order number.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

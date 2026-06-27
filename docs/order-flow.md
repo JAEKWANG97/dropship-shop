@@ -9,7 +9,6 @@ Customer selects product option
 -> Customer pays through PG
 -> Server verifies payment
 -> Payment status: APPROVED
--> Order status: PAID
 -> Order status: SUPPLIER_ORDER_PENDING
 -> Admin places supplier order manually
 -> Fulfillment status: ORDERED
@@ -72,7 +71,7 @@ Order status: SUPPLIER_ORDER_PENDING
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
-- `PAID` means money was approved, not that the supplier accepted the order.
+- Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
@@ -96,4 +95,3 @@ Before creating the order or confirming payment, the server must re-check that p
 ### Supplier Out Of Stock After Payment
 
 This is expected in this business model. The service must support refund and customer notification instead of treating it as a system error.
-
