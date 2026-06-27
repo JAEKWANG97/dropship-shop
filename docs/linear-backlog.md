@@ -175,6 +175,146 @@ References:
 - `docs/policies/catalog-inventory-policy.md`
 - `docs/policies/cancellation-refund-policy.md`
 
+## Milestone 1.6: Policy Hardening From Operational Review
+
+These issues come from the multi-perspective policy review for a supplier-based commerce operation. They should be resolved before DS-2 is finalized or backend implementation starts.
+
+### DS-23: Finalize payment exception and refund failure policy
+
+Description:
+
+Close payment and refund edge cases that can create approved payment without a fulfillable or visible order.
+
+Acceptance criteria:
+
+- Payment exception states are defined for amount mismatch, approval after expiration, and approval for unsellable products.
+- Automatic full PG cancel behavior is decided for each exception.
+- Admin emergency queue behavior is defined when automatic cancel/refund fails.
+- Refund lifecycle includes requested, PG cancel requested, processing, completed, failed, retry required, or manual review states.
+- Customer-facing statuses are defined for refund processing and refund failure/manual review.
+- PG event, payment, and refund audit fields are defined for Toss Payments reconciliation and idempotency.
+- Payment, cancellation/refund, order-flow, domain-model, and decision-log docs are updated.
+
+References:
+
+- `docs/policies/payment-policy.md`
+- `docs/policies/cancellation-refund-policy.md`
+- `docs/order-flow.md`
+- `docs/domain-model.md`
+
+### DS-24: Finalize delivery-group checkout payment unit policy
+
+Description:
+
+Decide how payment works when a cart contains multiple delivery groups.
+
+Acceptance criteria:
+
+- MVP payment unit rule is decided. Recommended: PG payment 1 = order 1 = delivery group 1.
+- Multi-delivery-group checkout UX is decided: separate payment per order or block combined checkout.
+- Failure behavior is defined when one delivery-group payment succeeds and another fails.
+- Order number and customer order history display rules are defined for split delivery-group checkout.
+- Fulfillment/shipping, payment, order-flow, domain-model, requirements, and decision-log docs are updated.
+
+References:
+
+- `docs/policies/fulfillment-shipping-policy.md`
+- `docs/policies/payment-policy.md`
+- `docs/order-flow.md`
+- `docs/domain-model.md`
+
+### DS-25: Finalize cancellation, return, exchange, and claim policy
+
+Description:
+
+Separate self-service cancellation from customer cancellation, return, exchange, and claim handling rights.
+
+Acceptance criteria:
+
+- Customer self-service cancel button and cancellation/return/exchange claim rights are separated.
+- After-supplier-order cancellation request flow before shipment is defined.
+- Post-delivery return/exchange request windows and manual review flow are defined.
+- Claim reason categories are defined: simple change of mind, defect, wrong delivery, different from product info, delivery issue.
+- Shipping cost burden rules are defined for simple change of mind vs seller fault.
+- Evidence requirements such as photos are defined for defect or wrong delivery.
+- Claim entity/model requirements and admin handling statuses are defined.
+- Cancellation/refund, legal/customer notice, order-flow, domain-model, requirements, and decision-log docs are updated.
+
+References:
+
+- `docs/policies/cancellation-refund-policy.md`
+- `docs/policies/legal-and-customer-notice-policy.md`
+- `docs/order-flow.md`
+- `docs/domain-model.md`
+
+### DS-26: Finalize supplier fulfillment SLA, address lock, and shipment policy
+
+Description:
+
+Define operating rules for manual supplier ordering, delayed fulfillment, customer address lock, and shipment corrections.
+
+Acceptance criteria:
+
+- Supplier order SLA after payment confirmation is defined.
+- Supplier response/follow-up SLA and delay notification threshold are defined.
+- Address lock behavior is defined when admin starts supplier-order work.
+- Supplier order evidence fields are defined: supplier order number, ordered address snapshot, orderedByAdminId, expected ship date, supplier response memo.
+- MVP shipment model is decided: one shipment per order or multiple shipments.
+- Tracking sync vs admin manual correction precedence is defined.
+- Fulfillment/shipping, order, admin operations, order-flow, domain-model, requirements, and decision-log docs are updated.
+
+References:
+
+- `docs/policies/fulfillment-shipping-policy.md`
+- `docs/policies/order-policy.md`
+- `docs/policies/admin-operations-policy.md`
+- `docs/order-flow.md`
+
+### DS-27: Finalize privacy, business notice, and legal disclosure policy
+
+Description:
+
+Expand customer notice policy into concrete business disclosure, privacy processing, and retention requirements.
+
+Acceptance criteria:
+
+- Business/operator disclosure fields are defined for footer and customer pages.
+- Commerce notice scope is defined: customer center, business registration, mail-order sales registration, product information notice, shipping/AS/return information.
+- Privacy processing table is defined: collection item, purpose, retention period, processor/consignee, third-party sharing if any.
+- Transactional notifications are separated from optional marketing consent.
+- Account deletion, anonymization, legally retained order/payment/claim records, and rejoin behavior are defined.
+- Checkout notice versioning includes out-of-stock and checkout notice text.
+- Account, legal/customer notice, domain-model, requirements, and decision-log docs are updated.
+
+References:
+
+- `docs/policies/account-policy.md`
+- `docs/policies/legal-and-customer-notice-policy.md`
+- `docs/domain-model.md`
+
+### DS-28: Harden order state transition table and operational audit models
+
+Description:
+
+Prepare the state transition and audit model needed before DS-2 is finalized.
+
+Acceptance criteria:
+
+- Transition table is added with fromStatus, actor, action, guard, side effect, and toStatus.
+- Forbidden transitions are defined, including refund without PG success, shipped without tracking number, delivered without shipment, and out-of-stock after shipped except manual claim path.
+- `PREPARING_SHIPMENT` is either removed from MVP or given a clear transition.
+- Customer order history visibility is separated from checkout/retry screens.
+- Notification log model and required notification triggers are defined.
+- Order item/detail content version snapshot policy is defined.
+- Order-flow, order policy, admin operations, domain-model, requirements, and decision-log docs are updated.
+
+References:
+
+- `docs/order-flow.md`
+- `docs/policies/order-policy.md`
+- `docs/policies/admin-operations-policy.md`
+- `docs/domain-model.md`
+
 ## Milestone 2: Backend Foundation
 
 ### DS-4: Scaffold Spring Boot backend
