@@ -128,17 +128,39 @@ DS-6 implementation notes:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/cart` | Authenticated user | Planned | Get current user cart |
-| `POST` | `/api/cart/items` | Authenticated user | Planned | Add product option to cart |
-| `PATCH` | `/api/cart/items/{cartItemId}` | Authenticated user | Planned | Update quantity |
-| `DELETE` | `/api/cart/items/{cartItemId}` | Authenticated user | Planned | Remove cart item |
-| `POST` | `/api/cart/validate` | Authenticated user | Planned | Revalidate sellability before checkout |
+| `GET` | `/api/cart` | `CUSTOMER` | Implemented | Get current user cart |
+| `POST` | `/api/cart/items` | `CUSTOMER` | Implemented | Add product option to cart |
+| `PATCH` | `/api/cart/items/{cartItemId}` | `CUSTOMER` | Implemented | Update quantity |
+| `DELETE` | `/api/cart/items/{cartItemId}` | `CUSTOMER` | Implemented | Remove cart item |
+| `POST` | `/api/cart/validate` | `CUSTOMER` | Implemented | Revalidate sellability before checkout |
 
 Rules:
 
-- Cart belongs to authenticated user.
+- Cart belongs to authenticated customer.
+- Guest cart is excluded from MVP.
+- One customer has one current cart.
+- Adding the same product option increases the existing cart item quantity.
+- Cart item quantity is 1 through 99.
+- Product option can be added only when product status is `ACTIVE` and option status is `ACTIVE`.
+- If product or option status changes after being added, the cart item remains but `checkoutAvailable` becomes false.
+- Cart response shows current product/option price. Final price is snapshotted by order creation, not cart.
 - Cart items can span multiple delivery groups.
 - Checkout splits cart into delivery-group orders.
+
+Implemented request bodies:
+
+```json
+POST /api/cart/items
+{
+  "productOptionId": "uuid",
+  "quantity": 1
+}
+
+PATCH /api/cart/items/{cartItemId}
+{
+  "quantity": 1
+}
+```
 
 ## Checkout And Order APIs
 

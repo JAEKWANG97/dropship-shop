@@ -538,6 +538,19 @@ Acceptance criteria:
 - Customer can remove cart item.
 - Cart validates product and option sellability before checkout.
 
+Resolved decisions:
+
+- Cart tables are created by `V3__create_cart.sql`.
+- One customer has one current cart.
+- Guest cart is excluded from MVP.
+- Adding the same product option increases the existing cart item quantity.
+- Cart item quantity is limited to 1 through 99.
+- Product options can be added only when product status is `ACTIVE` and option status is `ACTIVE`.
+- Items already in cart remain when product or option status later becomes unavailable.
+- `POST /api/cart/validate` blocks checkout when cart is empty or contains unavailable items.
+- Cart responses show current product/option prices; order creation will snapshot final prices.
+- Customer cart APIs require `CUSTOMER`; admin access is forbidden.
+
 ## Milestone 3: Checkout MVP
 
 ### DS-8: Implement order creation

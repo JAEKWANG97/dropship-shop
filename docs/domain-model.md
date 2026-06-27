@@ -194,18 +194,25 @@ Suggested fields:
 
 고객의 장바구니.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - userId
 - createdAt
 - updatedAt
 
+Rules:
+
+- 비회원 장바구니는 MVP에서 제외한다.
+- 고객 1명은 현재 장바구니 1개를 가진다.
+- 장바구니 가격은 현재 상품/옵션 가격을 보여주기 위한 값이다.
+- 결제 가격 확정은 주문 생성 시점의 스냅샷으로 처리한다.
+
 ## CartItem
 
 장바구니의 상품 옵션 항목.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - cartId
@@ -214,6 +221,13 @@ Suggested fields:
 - quantity
 - createdAt
 - updatedAt
+
+Rules:
+
+- 같은 상품 옵션을 다시 담으면 새 항목을 만들지 않고 기존 수량을 증가시킨다.
+- 수량은 1개 이상 99개 이하로 제한한다.
+- 상품 또는 옵션이 장바구니에 담긴 뒤 품절/숨김/판매중지되어도 항목은 남긴다.
+- 주문서 진입 또는 주문 생성 전에 상품/옵션 판매 가능 상태를 다시 검증한다.
 
 ## Order
 

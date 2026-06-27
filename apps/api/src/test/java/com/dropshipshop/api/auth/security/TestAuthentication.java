@@ -21,6 +21,10 @@ public final class TestAuthentication {
 		return authentication(CUSTOMER_ID, UserRole.CUSTOMER);
 	}
 
+	public static Authentication customer(UUID userId) {
+		return authentication(userId, UserRole.CUSTOMER);
+	}
+
 	public static Authentication admin() {
 		return authentication(ADMIN_ID, UserRole.ADMIN);
 	}

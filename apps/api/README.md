@@ -56,6 +56,16 @@ curl http://localhost:8080/actuator/health
 - Product images and detail images store URL/object-key metadata; binary upload is separate future work.
 - Product notice versions support later order item snapshot references.
 
+## Cart Foundation
+
+- Customer cart APIs are available at `/api/cart`.
+- Cart tables include one current cart per customer and cart items keyed by product option.
+- Adding the same product option increases quantity instead of creating duplicate rows.
+- Quantity is limited to 1 through 99.
+- Cart APIs require `CUSTOMER`; admin access is forbidden.
+- Cart checkout validation blocks empty carts and unavailable product/option states.
+- Cart prices are current display prices; order creation snapshots final prices later.
+
 ## Tests
 
 ```sh

@@ -7,8 +7,9 @@
 ## Status
 
 - `users` table: implemented in `apps/api/src/main/resources/db/migration/V1__create_users.sql`.
-- Catalog, cart, order, payment, fulfillment, shipment, refund, claim, policy, and audit tables: planned.
-- DS-6 should start from the catalog section in this document.
+- Catalog tables: implemented in `apps/api/src/main/resources/db/migration/V2__create_catalog.sql`.
+- Cart tables: implemented in `apps/api/src/main/resources/db/migration/V3__create_cart.sql`.
+- Order, payment, fulfillment, shipment, refund, claim, policy, and audit tables: planned.
 
 ## Modeling Rules
 
@@ -44,6 +45,11 @@ erDiagram
 Current implementation intentionally stores social identity directly on `users`.
 
 Conceptually, `User` and `SocialAccount` are separate in `docs/domain-model.md`, but MVP social-login-only policy and no account-merge scope allow the first implementation to keep provider identity on `users`. If account merge or multiple linked providers becomes necessary later, split `users` and `social_accounts` with a migration.
+
+Additional implemented table groups:
+
+- Catalog: `suppliers`, `products`, `product_options`, `product_images`, `product_detail_blocks`, `product_notices`, `product_change_histories`
+- Cart: `carts`, `cart_items`
 
 Deletion/rejoin note:
 
@@ -167,7 +173,7 @@ For MVP, social identity is collapsed into `users`. Split this table later only 
 
 ## Catalog
 
-DS-6 should implement this group first.
+Implemented by DS-6.
 
 ### suppliers
 
@@ -251,7 +257,7 @@ Rules:
 
 ### product_notices
 
-Planned.
+Implemented by DS-6.
 
 Purpose:
 
@@ -278,12 +284,19 @@ Rule:
 
 ## Cart
 
+Implemented by DS-7.
+
 ### carts
 
 - `id`
 - `user_id`
 - `created_at`
 - `updated_at`
+
+Constraints:
+
+- `user_id` is unique. One customer has one current cart.
+- `user_id` references `users(id)`.
 
 ### cart_items
 
@@ -295,9 +308,21 @@ Rule:
 - `created_at`
 - `updated_at`
 
-Rule:
+Constraints:
 
+- `(cart_id, product_option_id)` is unique. Adding the same option increases quantity instead of creating a second row.
+- `quantity` is constrained to 1 through 99.
+- `cart_id` references `carts(id)` with cascade delete.
+- `product_id` references `products(id)`.
+- `product_option_id` references `product_options(id)`.
+
+Rules:
+
+- Guest carts are excluded from MVP.
+- A product option can be added only while product status is `ACTIVE` and option status is `ACTIVE`.
+- If product or option status changes after being added, the cart item remains but is marked unavailable.
 - Cart items must revalidate product and option sellability before order creation.
+- Cart item prices are displayed from current product and option prices. Final order price is snapshotted during order creation.
 
 ## Order And Checkout
 
@@ -506,9 +531,9 @@ Rules:
 - Admin order actions must be action-based, not arbitrary status mutation.
 - Product change history starts with price, product status, option status, and supplier changes.
 
-## DS-6 Catalog Table Expectations
+## Implemented Catalog Table Notes
 
-DS-6 should implement:
+DS-6 implemented:
 
 - `suppliers`
 - `products`
@@ -516,11 +541,9 @@ DS-6 should implement:
 - `product_images`
 - `product_detail_blocks`
 - `product_change_histories`
-- `product_notices` or an explicitly equivalent product notice/version source
+- `product_notices`
 
-DS-6 may split large controller work into follow-up issues only if the first DS-6 patch clearly blocks DS-8 order creation until product detail version and product notice version sources exist.
-
-DS-6 must not add:
+Implemented catalog must not add:
 
 - Real stock quantity fields.
 - Customer-facing supplier exposure.
@@ -530,6 +553,5 @@ DS-6 must not add:
 
 - `User` and `SocialAccount` are conceptually separate, but currently collapsed into `users`.
 - `user_addresses` is required by requirements but not yet present in `docs/domain-model.md`.
-- Product detail versioning still needs an implementation choice: version rows, immutable snapshots, or event-style change history.
 - Delivery group can be derived from supplier at first; one active delivery group per supplier is the MVP baseline.
 - Image binary storage is outside PostgreSQL; database tables store URLs or object storage keys.
