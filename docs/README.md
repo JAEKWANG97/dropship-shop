@@ -34,4 +34,5 @@
 - DS-25: cancellation, return, exchange, and claim policy is reflected in cancellation/refund, legal notice, domain, requirements, and flow docs.
 - DS-26: supplier fulfillment SLA, address lock, shipment unit, and tracking correction policy is reflected in fulfillment, order, admin, domain, requirements, and flow docs.
 - DS-27: privacy, business notice, legal disclosure, account deletion, and marketing consent policy is reflected in account, legal notice, domain, requirements, and decision docs.
+- DS-28: order transition table, forbidden transitions, notification log, visibility split, and order snapshot policy is reflected in order, admin, domain, requirements, flow, and decision docs.
 - Next policy issues are tracked in [Linear Backlog](linear-backlog.md) and Linear.

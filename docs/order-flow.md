@@ -308,6 +308,7 @@ Admin detects wrong operational state or shipment information
 - MVP enabled payment methods are card, easy payment, and account transfer through Toss Payments.
 - Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.
 - Failed, pending, and expired payment orders are not shown in customer order history.
+- `PAYMENT_PENDING`, `EXPIRED`, and payment failure states belong to checkout/retry surfaces, not normal customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
 - One MVP order contains exactly one delivery group.
 - One MVP payment group can contain multiple delivery-group orders.
@@ -316,6 +317,7 @@ Admin detects wrong operational state or shipment information
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - Customer direct shipping address change is blocked once `addressLockedAt` is set by supplier order work start.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
+- `PREPARING_SHIPMENT` is not used as an MVP order status; `SUPPLIER_ORDERED` covers supplier-ordered and waiting-for-tracking state.
 - Supplier order work start does not add a new order status in MVP; it is tracked with `supplierOrderStartedAt` and `addressLockedAt`.
 - Supplier order work should start on the same business day or next business day after payment confirmation.
 - Supplier response or expected ship date should be secured within 1 business day after supplier order.
@@ -331,12 +333,14 @@ Admin detects wrong operational state or shipment information
 - Seller-fault return/exchange shipping cost is borne by the seller/operator by default.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.
+- `DELIVERED` requires a shipment record plus delivered tracking or admin correction evidence.
 - MVP includes automatic carrier tracking sync after carrier and tracking number are entered.
 - Automatic tracking sync failure must not block order, payment, or refund operations.
 - MVP uses one shipment per order and excludes partial shipment or split shipment.
 - Automatic tracking sync can move shipment state forward, but must not overwrite admin manual correction or move shipment state backward.
 - `REFUNDED` requires a completed refund record.
 - Paid orders can move to `REFUNDED` only after PG cancel/refund succeeds.
+- Refund without PG cancel/refund success is forbidden.
 - PG cancel/refund failure must keep the order in a processing or review-required state, not a completed state.
 - MVP supports partial cancellation/refund only at delivery-group order level within a payment group.
 - Product, option, or quantity-level partial cancellation/refund inside one delivery-group order is excluded from MVP.
@@ -345,6 +349,8 @@ Admin detects wrong operational state or shipment information
 - Admin can only progress an order when the next operational step is confirmed.
 - Automatic state rollback is excluded from MVP.
 - Wrong state changes are handled by admin correction actions with required reason and history.
+- State transitions are validated by from status, actor, action, guard, side effect, and target status.
+- Required transaction notifications are recorded in `NotificationLog`.
 
 ## Risk Points
 

@@ -360,6 +360,16 @@ Acceptance criteria:
 - Order item/detail content version snapshot policy is defined.
 - Order-flow, order policy, admin operations, domain-model, requirements, and decision-log docs are updated.
 
+Resolved decisions:
+
+- MVP removes `PREPARING_SHIPMENT`; `SUPPLIER_ORDERED` covers supplier-ordered and waiting-for-tracking state.
+- Transition table is defined in order policy with fromStatus, actor, action, guard, side effect, and toStatus.
+- Forbidden transitions include refund without PG success, shipped without tracking number, delivered without shipment evidence, out-of-stock after shipped except claim/manual correction path, supplier ordering from payment exception, and expired checkout confirmation.
+- Customer order history excludes `PAYMENT_PENDING`, `EXPIRED`, and payment failure states; those belong to checkout/retry surfaces.
+- `NotificationLog` is added for transaction notifications.
+- Notification triggers include payment completed, payment exception, out of stock, shipment started, delivery completed, delay notice, claim status changed, and refund completed.
+- Order item snapshots include product/option names, price, product summary, product detail snapshot reference, and product notice snapshot reference.
+
 References:
 
 - `docs/order-flow.md`

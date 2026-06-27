@@ -468,6 +468,36 @@ Consequences:
 - Rejoin behavior does not merge deleted account history into the new customer account.
 - Product detail and policy pages need structured legal notice sections.
 
+## 2026-06-27: Order State Transition Table And Operational Audit Policy
+
+Decision:
+
+MVP removes `PREPARING_SHIPMENT` as an order status. The period after supplier order completion and before carrier/tracking input is represented by `SUPPLIER_ORDERED`. This keeps the state model smaller before implementation and avoids another customer-facing status that maps to the same "상품 준비 중" display.
+
+Order state transitions are defined by from status, actor, action, guard, side effect, and target status. Admins cannot change arbitrary status values through a dropdown. They must execute defined actions, and each action validates its guard before changing state or recording side effects.
+
+Customer order history is separated from checkout/retry screens. `PAYMENT_PENDING`, `EXPIRED`, and payment failure states are not normal order-history rows. They belong to the current checkout, retry, or payment-result surface. Customer order history includes confirmed orders and customer-visible payment exceptions.
+
+Forbidden transitions include refund completion without PG cancel/refund success, shipment without carrier and tracking number, delivery completion without shipment evidence, out-of-stock after shipment except through claim/manual correction handling, supplier ordering from payment exception, and confirming an expired checkout.
+
+Transaction notifications are recorded in `NotificationLog`. Initial triggers are payment completed, payment exception/cancel processing, supplier out of stock, shipment started, delivery completed, delay notice, claim status changed, and refund completed. Marketing notifications remain separate through `MarketingConsent`.
+
+Order item snapshots include product/option names, price, product summary, product detail snapshot reference, and product information notice snapshot reference. Later product content changes do not mutate completed order snapshots.
+
+Context:
+
+The project is ready to move toward DS-2 and backend implementation. Without a transition table, implementation can accidentally allow invalid state jumps or hide important side effects such as notifications, refund events, and shipment evidence. The audit model also needs to capture why an action was allowed, not only the before/after status.
+
+Consequences:
+
+- Add transition table to order policy.
+- Remove `PREPARING_SHIPMENT` from MVP status lists and customer display mapping.
+- Add `NotificationLog`.
+- Extend `OrderItem` snapshot fields.
+- Extend order status history with guard result and side effect summary.
+- Separate customer order history from checkout/retry surfaces.
+- Implement forbidden transition checks before backend order state code.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

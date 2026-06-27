@@ -22,6 +22,7 @@ Fulfillment
 Shipment
 Refund
 Claim
+NotificationLog
 OrderStatusHistory
 AdminActionHistory
 ProductChangeHistory
@@ -207,7 +208,6 @@ Suggested statuses:
 - SUPPLIER_ORDER_PENDING
 - SUPPLIER_ORDERED
 - OUT_OF_STOCK
-- PREPARING_SHIPMENT
 - SHIPPED
 - DELIVERED
 - CANCEL_REQUESTED
@@ -227,6 +227,9 @@ Suggested fields:
 - productOptionId
 - productName
 - optionName
+- productSummary
+- productDetailSnapshotId
+- productNoticeSnapshotId
 - unitPrice
 - quantity
 - lineAmount
@@ -424,6 +427,30 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+## NotificationLog
+
+주문, 결제, 배송, 환불, 클레임 처리 알림 발송 이력. 거래 알림과 마케팅 알림을 구분해서 기록한다.
+
+Suggested fields:
+
+- id
+- userId
+- orderId
+- paymentGroupId
+- claimId
+- refundId
+- type: PAYMENT_COMPLETED / PAYMENT_EXCEPTION / OUT_OF_STOCK / SHIPMENT_STARTED / DELIVERY_COMPLETED / DELAY_NOTICE / CLAIM_STATUS_CHANGED / REFUND_COMPLETED / MARKETING
+- channel: EMAIL / ORDER_DETAIL / SMS / KAKAO_ALIMTALK / PUSH
+- transactional
+- status: PENDING / SENT / FAILED / SKIPPED
+- recipient
+- templateKey
+- payloadSnapshot
+- failureReason
+- sentAt
+- createdAt
+- updatedAt
+
 ## OrderStatusHistory
 
 주문 상태 변경 이력. 주문 상태는 임의 되돌리기 없이 허용된 액션을 통해서만 변경한다.
@@ -436,6 +463,8 @@ Suggested fields:
 - actionType
 - fromStatus
 - toStatus
+- guardResult
+- sideEffectSummary
 - reason
 - createdAt
 
@@ -608,7 +637,9 @@ Suggested fields:
 - `HTML` 블록은 XSS 방지를 위해 sanitize해야 한다.
 - 배송, 교환, 환불, 품절 가능성 같은 운영 정책 고지는 상품 상세 콘텐츠와 별도로 관리한다.
 - 주문 상품에는 상품명, 옵션명, 가격을 스냅샷으로 저장한다.
+- 주문 상품에는 상품 요약, 상품 상세 버전, 상품 정보 제공 고시 버전 참조도 스냅샷으로 저장한다.
 - 상품 가격이 변경되어도 기존 주문 상품의 스냅샷 가격은 변경하지 않는다.
+- 상품 상세 HTML/이미지 내용이 변경되어도 결제 완료 주문의 주문 상품 스냅샷은 변경하지 않는다.
 - 주문은 결제 요청 전에 `PAYMENT_PENDING` 상태로 생성한다.
 - `PAYMENT_PENDING` 주문은 결제 검증 전이므로 공급처 발주 대상이 아니다.
 - `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 `EXPIRED`로 만료 처리한다.
@@ -637,6 +668,7 @@ Suggested fields:
 - 공급처 발주 후 2영업일 이상 출고 예정이 불명확하면 고객 지연 안내 대상으로 관리한다.
 - 배송 후 반품/교환은 클레임 접수와 관리자 수동 심사로 시작한다.
 - 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.
+- `PREPARING_SHIPMENT`은 MVP 주문 상태에서 제거하고 공급처 발주 완료 후 송장 입력 전 구간은 `SUPPLIER_ORDERED`로 표현한다.
 - 자동 배송조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
 - MVP 배송은 주문 1개당 배송 1개로 시작하고 부분 출고/분할 배송은 제외한다.
 - 자동 배송조회는 관리자 수동 보정 상태를 임의로 덮어쓰거나 뒤로 되돌리지 않는다.
@@ -644,8 +676,12 @@ Suggested fields:
 - MVP에서 한 주문은 하나의 배송 그룹만 포함한다.
 - 배송 그룹은 공급처 기준으로 나누지만 고객 화면에는 공급처 대신 배송 그룹으로 표시한다.
 - 고객 화면에는 내부 주문 상태를 그대로 노출하지 않고 고객용 표시 상태로 매핑한다.
+- 고객 주문 내역에는 결제 성공 후 확정된 주문과 고객에게 처리 상태를 보여줘야 하는 결제 예외 주문만 노출한다.
+- `PAYMENT_PENDING`, `EXPIRED`, 결제 실패 주문은 일반 고객 주문 내역이 아니라 체크아웃/결제 재시도 화면에서만 다룬다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
 - 주문 상태 변경 이력은 MVP부터 별도 테이블에 기록한다.
+- 주문 상태 변경 이력은 action, guard result, side effect summary를 남긴다.
+- 결제 완료, 결제 예외, 품절, 배송 시작, 배송 완료, 지연 안내, 클레임 상태 변경, 환불 완료는 `NotificationLog`에 기록한다.
 - 관리자 주문 액션은 현재 상태에서 허용된 다음 액션으로만 실행한다.
 - 자동 상태 되돌리기 버튼은 MVP에서 제공하지 않고, 잘못된 상태 변경은 관리자 정정 액션과 이력으로 처리한다.
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유를 필수로 기록한다.
