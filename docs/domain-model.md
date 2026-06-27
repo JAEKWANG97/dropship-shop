@@ -21,12 +21,17 @@ PaymentEvent
 Fulfillment
 Shipment
 Refund
+Claim
 OrderStatusHistory
 AdminActionHistory
 ProductChangeHistory
+BusinessProfile
 PolicyDocument
 UserPolicyAgreement
 OrderPolicyAgreement
+MarketingConsent
+PrivacyProcessingItem
+LegalRetentionRecord
 ```
 
 ## User
@@ -41,6 +46,8 @@ Suggested fields:
 - phone
 - role: CUSTOMER / ADMIN
 - status: ACTIVE / SUSPENDED / DELETED
+- deletedAt
+- anonymizedAt
 - createdAt
 - updatedAt
 
@@ -56,6 +63,8 @@ Suggested fields:
 - providerUserId
 - email
 - displayName
+- linkedAt
+- unlinkedAt
 - createdAt
 - updatedAt
 
@@ -478,6 +487,85 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+## BusinessProfile
+
+고객에게 표시하는 사업자, 통신판매, 고객센터, 개인정보 보호책임자 정보.
+
+Suggested fields:
+
+- id
+- companyName
+- representativeName
+- businessRegistrationNumber
+- mailOrderSalesRegistrationNumber
+- mailOrderSalesRegistrationAuthority
+- businessAddress
+- customerCenterPhone
+- customerCenterEmail
+- customerCenterHours
+- privacyOfficerName
+- privacyOfficerEmail
+- privacyOfficerPhone
+- hostingProvider
+- status: DRAFT / ACTIVE / ARCHIVED
+- effectiveFrom
+- createdAt
+- updatedAt
+
+## PrivacyProcessingItem
+
+개인정보처리방침의 처리표 항목.
+
+Suggested fields:
+
+- id
+- category: SOCIAL_LOGIN / ACCOUNT / ORDER_CONTACT / SHIPPING_ADDRESS / PAYMENT / CLAIM / MARKETING / LOG
+- collectedItems
+- purpose
+- retentionPeriod
+- processorName
+- processorPurpose
+- thirdPartyRecipient
+- thirdPartyPurpose
+- thirdPartyItems
+- thirdPartyRetentionPeriod
+- status: ACTIVE / ARCHIVED
+- createdAt
+- updatedAt
+
+## MarketingConsent
+
+선택 마케팅 수신 동의. 주문, 배송, 결제, 환불, 클레임 거래 알림과 분리한다.
+
+Suggested fields:
+
+- id
+- userId
+- channel: EMAIL / SMS / KAKAO_ALIMTALK / PUSH
+- agreed
+- policyVersion
+- agreedAt
+- withdrawnAt
+- createdAt
+- updatedAt
+
+## LegalRetentionRecord
+
+회원 탈퇴 후에도 법정 보존 또는 분쟁 대응을 위해 분리 보관하는 기록의 색인.
+
+Suggested fields:
+
+- id
+- sourceType: ORDER / PAYMENT / SHIPMENT / REFUND / CLAIM / POLICY_AGREEMENT
+- sourceId
+- formerUserId
+- retentionReason
+- retentionUntil
+- accessScope: LEGAL_ADMIN_ONLY
+- anonymized
+- createdAt
+- updatedAt
+
 ## UserPolicyAgreement
 
 회원가입 또는 첫 소셜 로그인 시점의 약관/개인정보 동의 기록.
@@ -565,6 +653,18 @@ Suggested fields:
 - 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff는 MVP 이후로 미룬다.
 - 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책은 버전과 시행일을 가진다.
 - 첫 가입 또는 첫 소셜 로그인 완료 시 이용약관과 개인정보처리방침 동의 이력을 저장한다.
+- 소셜 로그인 필수 저장 항목은 제공자, 제공자 user id, 이메일, 표시 이름으로 시작한다.
+- 전화번호는 소셜 로그인 필수 항목이 아니라 주문, 배송, 클레임에 필요한 시점에 수집한다.
+- 회원 탈퇴 시 고객 프로필과 소셜 계정 연결은 삭제 또는 비식별화한다.
+- 법정 보존 대상 주문, 결제, 배송, 클레임, 정책 동의 기록은 탈퇴 후에도 분리 보관한다.
+- 법정 보존 기록은 보존 사유와 보존 만료일을 저장한다.
+- 전자상거래 표시/광고 기록은 6개월, 계약/청약철회 기록은 5년, 대금결제/재화 공급 기록은 5년, 소비자 불만/분쟁 처리 기록은 3년 보존 기준으로 시작한다.
+- 탈퇴 후 같은 소셜 계정으로 재가입하면 새 고객 계정으로 생성하고 기존 주문 내역은 고객 화면에 자동 복구하지 않는다.
+- 푸터와 고객센터/회사 정보 페이지에는 사업자 정보, 통신판매업 신고 정보, 고객센터, 개인정보 보호책임자 정보를 표시한다.
+- 상품 상세에는 품목별 상품 정보 제공 고시, 배송, AS, 반품, 교환 정보를 표시한다.
+- 개인정보 처리표는 수집 항목, 처리 목적, 보유 기간, 처리 위탁처, 제3자 제공 여부를 관리한다.
+- 거래 알림은 주문, 배송, 결제, 환불, 클레임 처리에 필요한 알림으로 보고 선택 마케팅 수신 동의와 분리한다.
+- 마케팅 알림은 채널별 선택 동의와 철회 이력을 저장한다.
 - 결제 그룹(PaymentGroup) 시점에는 주문서 통합 확인 체크의 정책 버전과 확인 시각을 저장한다.
 - 주문서 통합 확인 체크는 결제 그룹(PaymentGroup) 단위로 저장한다.
 - 주문서 통합 확인 체크는 주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 가능성, 품절 시 해당 배송 그룹 주문 금액 환불 안내를 포함한다.

@@ -326,6 +326,18 @@ Acceptance criteria:
 - Checkout notice versioning includes out-of-stock and checkout notice text.
 - Account, legal/customer notice, domain-model, requirements, and decision-log docs are updated.
 
+Resolved decisions:
+
+- Business/operator disclosure includes company name, representative, business registration number, mail-order sales registration number, mail-order sales registration authority, address, customer center phone/email/hours, privacy officer, and hosting provider.
+- Commerce notice scope includes customer center, business registration, mail-order sales registration, product information notice, shipping, AS, return, exchange, and claim information.
+- Privacy processing table includes collection item, purpose, retention period, processor/consignee, and third-party sharing fields.
+- Social login stores provider, provider user id, email, and display name; phone is collected only when needed for order, shipping, or claim.
+- Transactional notifications for order, shipping, payment, refund, and claim are separated from optional marketing consent.
+- Optional marketing consent is stored per channel with agreement, withdrawal, and policy version.
+- Account deletion anonymizes or deletes profile and social account linkage while legally retained records are separated.
+- Rejoining with the same social account creates a new user account and does not automatically restore old order history to the customer screen.
+- Legal retention starts with 6 months for display/advertising records, 5 years for contract/withdrawal records, 5 years for payment/supply records, and 3 years for complaint/dispute records.
+
 References:
 
 - `docs/policies/account-policy.md`

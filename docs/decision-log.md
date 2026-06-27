@@ -436,6 +436,38 @@ Consequences:
 - Shipment model is one shipment per order in MVP.
 - Tracking sync must respect admin manual corrections and only apply valid forward transitions.
 
+## 2026-06-27: Privacy, Business Notice, And Legal Disclosure Policy
+
+Decision:
+
+Customer-facing legal disclosure starts with business/operator information in the footer and customer center/company information pages. The displayed fields are company name, representative name, business registration number, mail-order sales registration number, mail-order sales registration authority, business address, customer center phone, customer center email, customer center hours, privacy officer contact, and hosting provider.
+
+Product detail pages must include product information notice fields, shipping information, AS information, return/exchange information, and claim guidance. Policy pages must include terms, privacy policy, shipping policy, cancellation/refund policy, and return/exchange/claim policy.
+
+The privacy policy must include processing purpose, collected items, retention period, third-party provision, processing consignment, destruction procedure, data subject rights, and privacy officer. A privacy processing table stores collection item, purpose, retention period, processor/consignee, and third-party sharing fields.
+
+Social login stores provider, provider user id, email, and display name as the baseline. Phone number is not required for social login and is collected only when needed for order, shipping, or claim handling.
+
+Transactional notifications for order, shipping, payment, refund, and claim handling are separated from optional marketing consent. Marketing notifications require separate channel-level opt-in and store agreement time, withdrawal time, and policy version.
+
+On account deletion, customer profile and social account linkage are deleted or anonymized. Legal-retention order, payment, shipment, refund, claim, and policy agreement records are separated from normal service lookup and retained until their retention period expires. Rejoining with the same social account creates a new user account and does not automatically restore old order history to the customer screen.
+
+Legal retention starts with 6 months for display/advertising records, 5 years for contract or withdrawal records, 5 years for payment and goods supply records, and 3 years for consumer complaint or dispute records.
+
+Context:
+
+The project is moving from high-level policy pages to a product that can be launched as a commerce site. The implementation needs concrete fields for footer disclosure, privacy processing, legal retention, account deletion, and marketing consent separation before auth, order, notification, and policy-page models are finalized.
+
+Consequences:
+
+- Add `BusinessProfile` for footer/customer center disclosure.
+- Add `PrivacyProcessingItem` for privacy policy processing table.
+- Add `MarketingConsent` separate from transactional notifications.
+- Add `LegalRetentionRecord` for separated legal-retention records after withdrawal.
+- Account deletion must anonymize or remove profile/social account linkage while preserving legally required records.
+- Rejoin behavior does not merge deleted account history into the new customer account.
+- Product detail and policy pages need structured legal notice sections.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:
