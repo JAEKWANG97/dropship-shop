@@ -14,6 +14,7 @@ Cart
 CartItem
 Order
 OrderItem
+DeliveryGroup
 Payment
 Fulfillment
 Shipment
@@ -173,6 +174,7 @@ Suggested fields:
 - discountAmount
 - totalAmount
 - expiresAt
+- deliveryGroupId
 - createdAt
 - updatedAt
 
@@ -208,6 +210,19 @@ Suggested fields:
 - lineAmount
 - supplierId
 - status
+- createdAt
+- updatedAt
+
+## DeliveryGroup
+
+고객에게 노출하는 배송 묶음. MVP에서는 같은 공급처 상품을 하나의 배송 그룹으로 묶는다.
+
+Suggested fields:
+
+- id
+- supplierId
+- displayName
+- shippingFee
 - createdAt
 - updatedAt
 
@@ -255,6 +270,9 @@ Suggested fields:
 - carrier
 - trackingNumber
 - status: READY / SHIPPED / DELIVERED
+- trackingStatus
+- trackingLastSyncedAt
+- trackingSyncFailureReason
 - shippedAt
 - deliveredAt
 - createdAt
@@ -294,6 +312,11 @@ Suggested fields:
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
 - MVP 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
 - MVP에서는 부분 취소를 지원하지 않고 주문 단위 전액 취소/환불을 우선 지원한다.
+- 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.
+- 자동 배송조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
+- MVP에서는 고객에게 별도 배송비를 청구하지 않으며 `shippingFee`는 `0`으로 시작한다.
+- MVP에서 한 주문은 하나의 배송 그룹만 포함한다.
+- 배송 그룹은 공급처 기준으로 나누지만 고객 화면에는 공급처 대신 배송 그룹으로 표시한다.
 - 고객 화면에는 내부 주문 상태를 그대로 노출하지 않고 고객용 표시 상태로 매핑한다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
 - 주문 상태 변경 이력은 별도 테이블로 추가하는 것이 좋다.

@@ -211,6 +211,62 @@ Consequences:
 - Refund policy starts with full-order cancellation/refund.
 - Customer order history starts from confirmed orders, not failed/pending/expired checkout attempts.
 
+## 2026-06-27: Automatic Shipment Tracking In MVP
+
+Decision:
+
+Include automatic carrier tracking sync in MVP after an admin enters carrier and tracking number.
+
+Context:
+
+The product should show reliable shipment progress without requiring the admin to manually update every delivered order. However, supplier fulfillment is still manual and tracking providers can fail, so the system needs manual correction as a fallback.
+
+Consequences:
+
+- Admin still manually enters carrier and tracking number.
+- The system syncs carrier tracking status after shipment starts.
+- Delivered tracking status can automatically move shipment/order to `DELIVERED`.
+- Tracking sync failures must be recorded and retried or manually corrected.
+- Tracking integration failure must not block order, payment, or refund operations.
+- A later technical decision is needed: direct carrier integrations vs a tracking aggregation service. This implementation choice does not change the MVP policy that automatic tracking sync is included.
+
+## 2026-06-27: Shipping Fee Included In Product Price
+
+Decision:
+
+Do not charge customers a separate shipping fee in MVP. Product sale prices include expected shipping cost, and order shipping fee is displayed as `0`.
+
+Context:
+
+Charging shipping per supplier or delivery group can create customer friction, especially when a cart contains products from different suppliers. Including shipping cost in product pricing simplifies checkout and avoids exposing supplier-level shipping complexity to customers.
+
+Consequences:
+
+- `shippingFee` starts as `0` in MVP orders.
+- Product pricing must account for expected supplier shipping cost and margin.
+- There is no free-shipping threshold policy in MVP.
+- Supplier-specific shipping cost differences affect product margin instead of checkout shipping fee.
+- Future paid-shipping or free-shipping-threshold campaigns can be added later as a pricing/promotion policy.
+
+## 2026-06-27: Delivery Group Based Orders
+
+Decision:
+
+In MVP, one order contains exactly one delivery group. Delivery groups are based on supplier, but the customer UI should use delivery group wording instead of supplier wording. Cart items from multiple suppliers are split into separate delivery-group orders at checkout.
+
+Context:
+
+Multi-supplier orders introduce partial stock-out, partial shipment, multiple tracking numbers, and partial refund complexity. MVP payment and refund policy intentionally excludes partial cancellation/refund, so order splitting by delivery group keeps fulfillment and refund rules consistent.
+
+Consequences:
+
+- Cart can contain multiple delivery groups.
+- Checkout must group items by supplier-backed delivery group.
+- Each delivery group creates a separate order.
+- Shipping fee remains `0` for all delivery groups in MVP.
+- Customer order history may show multiple orders from one cart checkout.
+- Future marketplace-like combined orders require partial cancellation/refund and multi-shipment support.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

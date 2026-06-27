@@ -4,6 +4,7 @@
 
 ```text
 Customer selects product option
+-> Cart items are grouped by delivery group
 -> Customer creates order
 -> Order status: PAYMENT_PENDING
 -> Customer pays through PG
@@ -16,8 +17,19 @@ Customer selects product option
 -> Admin enters carrier and tracking number
 -> Shipment status: SHIPPED
 -> Order status: SHIPPED
+-> System syncs carrier tracking status
 -> Shipment delivered
 -> Order status: DELIVERED
+```
+
+## Multi Delivery Group Checkout
+
+```text
+Cart contains products from multiple suppliers
+-> System groups cart items by delivery group
+-> Each delivery group creates a separate order
+-> Customer sees delivery groups instead of supplier names
+-> Each delivery group has shipping fee 0
 ```
 
 ## Supplier Out Of Stock
@@ -100,6 +112,21 @@ Order status: SUPPLIER_ORDERED or later
 -> Address change requires customer support/admin manual handling
 ```
 
+## Shipment Tracking Sync
+
+```text
+Order status: SHIPPED
+-> System periodically syncs carrier tracking status
+-> Tracking says delivered
+-> Shipment status: DELIVERED
+-> Order status: DELIVERED
+
+Tracking sync failure
+-> Keep current shipment/order status
+-> Record sync failure
+-> Retry later or allow admin manual correction
+```
+
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
@@ -109,10 +136,14 @@ Order status: SUPPLIER_ORDERED or later
 - Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.
 - Failed, pending, and expired payment orders are not shown in customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
+- One MVP order contains exactly one delivery group.
+- Delivery groups are based on supplier, but customer UI should use delivery group wording instead of supplier wording.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.
+- MVP includes automatic carrier tracking sync after carrier and tracking number are entered.
+- Automatic tracking sync failure must not block order, payment, or refund operations.
 - `REFUNDED` requires a completed refund record.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
 

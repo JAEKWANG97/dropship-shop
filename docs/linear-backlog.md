@@ -97,10 +97,10 @@ Finalize supplier order and shipping policy for MVP operations.
 
 Acceptance criteria:
 
-- Manual supplier ordering is confirmed or revised.
-- Shipping fee policy is decided.
-- Multiple-supplier order policy is decided.
-- Shipment tracking input and delivery completion handling are decided.
+- Manual supplier ordering is confirmed: admin manual supplier order.
+- Shipping fee policy is decided: shipping fee is included in product price and customer shipping fee is 0.
+- Multiple-supplier order policy is decided: checkout splits orders by delivery group.
+- Shipment tracking input and delivery completion handling are decided: admin enters carrier/tracking number, automatic tracking sync is included, admin manual correction is available.
 - `docs/policies/fulfillment-shipping-policy.md` and `docs/decision-log.md` are updated.
 
 References:
