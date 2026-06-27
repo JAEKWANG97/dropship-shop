@@ -456,6 +456,44 @@ Resolved decisions:
 - Basic login and form login are disabled to preserve the social-login-only policy.
 - Actual Kakao, Google, and Naver OAuth callback/token integration remains a later auth implementation step.
 
+### DS-29: Create MVP ERD and API specification docs
+
+Description:
+
+Create the documentation baseline that should exist before DS-6 catalog implementation starts.
+
+Acceptance criteria:
+
+- `docs/erd.md` exists.
+- MVP entities and relationships are documented with Mermaid ERD.
+- Current implemented `users` table is reflected.
+- Planned catalog, cart, order, payment, fulfillment, shipment, refund, claim, policy, and audit entities are included at the right level of detail.
+- `docs/api-spec.md` exists.
+- MVP APIs are grouped by customer, admin, auth, catalog, cart, checkout/order, payment, fulfillment/shipment, refund/claim, and policy pages.
+- Current implemented endpoints are marked as implemented.
+- Future endpoints are marked as planned.
+- DS-6 catalog API and table expectations are clearly identified.
+- Documentation index links to the new ERD and API specification docs.
+
+Resolved decisions:
+
+- `docs/erd.md` is the ERD baseline for MVP implementation.
+- `docs/api-spec.md` is the API baseline for MVP implementation.
+- Current implemented endpoints and tables are marked separately from planned endpoints and tables.
+- DS-6 catalog table and endpoint expectations are explicitly identified before catalog implementation starts.
+
+References:
+
+- `docs/domain-model.md`
+- `docs/requirements.md`
+- `docs/policies/README.md`
+- `docs/linear-backlog.md`
+- `apps/api/README.md`
+
+Dependency:
+
+Handle this before DS-6.
+
 ### DS-6: Implement catalog domain
 
 Description:
@@ -467,8 +505,14 @@ Acceptance criteria:
 - Supplier model exists.
 - Product model exists.
 - Product option model exists.
+- Product image metadata model exists.
+- Product detail block model exists.
+- Product notice/version source exists for product information notice, shipping, AS, return, and exchange information.
+- Product change history writes exist for price, product status, option status, and supplier changes.
 - Product and option support sales status instead of real stock quantity.
 - Admin can create and update catalog data through APIs.
+- Customer can read public product list and detail APIs.
+- Public product APIs are permitted by security configuration while admin catalog APIs remain `ADMIN` only.
 
 ### DS-7: Implement cart domain
 

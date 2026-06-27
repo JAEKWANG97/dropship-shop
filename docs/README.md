@@ -8,7 +8,7 @@
 - 현재 운영 정책: [Policy Documents](policies/README.md)
 - 정책 결정 이력과 이유: [Decision Log](decision-log.md)
 - 실행 단위와 Linear 이슈 기준: [Linear Backlog](linear-backlog.md)
-- 구현 설계 초안: [Domain Model](domain-model.md), [Order Flow](order-flow.md), [Architecture](architecture.md)
+- 구현 설계 초안: [Domain Model](domain-model.md), [MVP ERD](erd.md), [MVP API Specification](api-spec.md), [Order Flow](order-flow.md), [Architecture](architecture.md)
 
 정책 파일에서는 `Confirmed Policy`가 현재 구현 기준이다. `Initial Direction`은 논의 초기에 잡은 방향이므로, 충돌이 있으면 `Confirmed Policy`와 `Decision Log`를 우선한다.
 
@@ -20,12 +20,14 @@
 4. [Policy Documents](policies/README.md)
 5. [Order Flow](order-flow.md)
 6. [Domain Model](domain-model.md)
-7. [Architecture](architecture.md)
-8. [Roadmap](roadmap.md)
-9. [Linear Backlog](linear-backlog.md)
-10. [Development Workflow](development-workflow.md)
-11. [Decision Log](decision-log.md)
-12. [GitHub And Linear Setup](github-linear-setup.md)
+7. [MVP ERD](erd.md)
+8. [MVP API Specification](api-spec.md)
+9. [Architecture](architecture.md)
+10. [Roadmap](roadmap.md)
+11. [Linear Backlog](linear-backlog.md)
+12. [Development Workflow](development-workflow.md)
+13. [Decision Log](decision-log.md)
+14. [GitHub And Linear Setup](github-linear-setup.md)
 
 ## Current Policy Hardening
 

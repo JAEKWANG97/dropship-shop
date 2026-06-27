@@ -5,10 +5,12 @@
 ```text
 User
 SocialAccount
+UserAddress
 Product
 ProductImage
 ProductOption
 ProductDetailBlock
+ProductNotice
 Supplier
 Cart
 CartItem
@@ -69,6 +71,23 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+## UserAddress
+
+고객이 저장한 배송지. 주문에는 이 값을 그대로 참조하지 않고 주문 시점 주소 스냅샷을 저장한다.
+
+Suggested fields:
+
+- id
+- userId
+- recipientName
+- recipientPhone
+- postalCode
+- address1
+- address2
+- defaultAddress
+- createdAt
+- updatedAt
+
 ## Supplier
 
 상품을 실제로 출고하는 공급처.
@@ -98,13 +117,13 @@ Suggested fields:
 - description
 - basePrice
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
-- thumbnailImageUrl
+- thumbnailImageUrl: optional denormalized cache of the thumbnail `ProductImage`
 - createdAt
 - updatedAt
 
 ## ProductImage
 
-상품 대표 이미지와 갤러리 이미지를 나타낸다.
+상품 대표 이미지와 갤러리 이미지를 나타낸다. 대표 이미지는 `ProductImage.type = THUMBNAIL`이 기준이고, `Product.thumbnailImageUrl`은 목록 조회 성능을 위한 선택적 캐시로만 사용한다.
 
 Suggested fields:
 
@@ -116,6 +135,12 @@ Suggested fields:
 - altText
 - createdAt
 - updatedAt
+
+Modeling notes:
+
+- One product can have one `THUMBNAIL` image.
+- One product can have up to ten `GALLERY` images.
+- If `Product.thumbnailImageUrl` is kept, it must be updated from the canonical thumbnail image.
 
 ## ProductOption
 
@@ -144,6 +169,24 @@ Suggested fields:
 - htmlContent
 - sortOrder
 - altText
+- createdAt
+- updatedAt
+
+## ProductNotice
+
+상품 정보 제공 고시와 상품별 배송, AS, 반품, 교환 안내 버전. 주문 상품 스냅샷에서 `productNoticeSnapshotId` 또는 동등한 버전 참조로 연결된다.
+
+Suggested fields:
+
+- id
+- productId
+- version
+- status: DRAFT / ACTIVE / ARCHIVED
+- productInfoNotice
+- shippingInfo
+- asInfo
+- returnExchangeInfo
+- effectiveFrom
 - createdAt
 - updatedAt
 
