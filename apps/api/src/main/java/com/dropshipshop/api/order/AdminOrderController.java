@@ -24,15 +24,18 @@ class AdminOrderController {
 
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final AdminOrderFulfillmentService adminOrderFulfillmentService;
+	private final AdminOrderShipmentService adminOrderShipmentService;
 	private final CurrentUser currentUser;
 
 	AdminOrderController(
 		AdminOrderQueryService adminOrderQueryService,
 		AdminOrderFulfillmentService adminOrderFulfillmentService,
+		AdminOrderShipmentService adminOrderShipmentService,
 		CurrentUser currentUser
 	) {
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.adminOrderFulfillmentService = adminOrderFulfillmentService;
+		this.adminOrderShipmentService = adminOrderShipmentService;
 		this.currentUser = currentUser;
 	}
 
@@ -74,5 +77,15 @@ class AdminOrderController {
 		Authentication authentication
 	) {
 		return adminOrderFulfillmentService.markOutOfStock(orderId, currentUser.id(authentication), request);
+	}
+
+	@PostMapping("/{orderId}/shipments")
+	@ResponseStatus(HttpStatus.OK)
+	AdminOrderDtos.AdminOrderActionResponse createShipment(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.ShipmentCreateRequest request,
+		Authentication authentication
+	) {
+		return adminOrderShipmentService.createShipment(orderId, currentUser.id(authentication), request);
 	}
 }

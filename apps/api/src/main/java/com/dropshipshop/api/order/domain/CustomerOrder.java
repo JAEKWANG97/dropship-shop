@@ -159,6 +159,13 @@ public class CustomerOrder {
 		this.status = OrderStatus.OUT_OF_STOCK;
 	}
 
+	public void markShipped() {
+		if (status != OrderStatus.SUPPLIER_ORDERED) {
+			throw new IllegalStateException("Shipment can be entered only after supplier order completion");
+		}
+		this.status = OrderStatus.SHIPPED;
+	}
+
 	public void markPaymentException() {
 		this.status = OrderStatus.PAYMENT_EXCEPTION;
 	}

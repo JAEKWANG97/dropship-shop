@@ -670,9 +670,20 @@ Acceptance criteria:
 
 ### DS-13: Implement shipment tracking input
 
+Status: Implemented
+
 Description:
 
 Allow admin to enter carrier and tracking number.
+
+Acceptance criteria:
+
+- Admin can enter carrier and tracking number.
+- Order enters shipped state.
+- Customer can see shipment summary.
+- Carrier and tracking number are required.
+- Duplicate shipment creation is rejected for the same order.
+- Implemented by `POST /api/admin/orders/{orderId}/shipments`; customer order detail now includes shipment summary.
 
 Acceptance criteria:
 

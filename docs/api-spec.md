@@ -259,7 +259,7 @@ POST /api/payments/toss/confirm
 | `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Implemented | Lock address and mark supplier work started |
 | `POST` | `/api/admin/orders/{orderId}/supplier-order-completed` | `ADMIN` | Implemented | Mark manual supplier order completed |
 | `POST` | `/api/admin/orders/{orderId}/out-of-stock` | `ADMIN` | Implemented | Mark supplier out-of-stock and prepare refund flow |
-| `POST` | `/api/admin/orders/{orderId}/shipments` | `ADMIN` | Planned | Enter carrier and tracking number |
+| `POST` | `/api/admin/orders/{orderId}/shipments` | `ADMIN` | Implemented | Enter carrier and tracking number |
 | `PATCH` | `/api/admin/orders/{orderId}/shipment-correction` | `ADMIN` | Planned | Manually correct shipment state with reason |
 | `POST` | `/api/admin/orders/{orderId}/corrections` | `ADMIN` | Planned | Admin correction action with reason |
 
@@ -273,6 +273,8 @@ Rules:
 - Supplier work start requires a reason and records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId`.
 - Supplier order completion requires `supplierOrderNumber` and reason. `expectedShipDate` and `supplierResponseMemo` are optional evidence fields.
 - Supplier out-of-stock requires a reason and moves the order to `OUT_OF_STOCK`.
+- Shipment creation requires `carrier` and `trackingNumber`, creates one shipment for the order, and moves the order to `SHIPPED`.
+- MVP allows only one shipment per order; duplicate shipment creation is rejected.
 - Reason is required for cancellation, refund, out-of-stock, shipment correction, and admin correction.
 - `PREPARING_SHIPMENT` is not an MVP order status.
 
@@ -286,6 +288,9 @@ Rules:
 
 Rules:
 
+- Customer order detail includes shipment summary when an admin-entered shipment exists.
+- Shipment creation requires carrier and tracking number.
+- MVP supports one shipment per order.
 - Automatic tracking moves shipment forward only.
 - Tracking failure must not block order, payment, or refund operations.
 - Manual correction requires reason and history.

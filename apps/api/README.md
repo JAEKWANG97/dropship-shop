@@ -105,7 +105,9 @@ curl http://localhost:8080/actuator/health
 - `POST /api/admin/orders/{orderId}/supplier-work-start` records supplier work start and locks the order shipping address.
 - `POST /api/admin/orders/{orderId}/supplier-order-completed` records supplier order evidence and moves the order to `SUPPLIER_ORDERED`.
 - `POST /api/admin/orders/{orderId}/out-of-stock` records stockout reason and moves the order to `OUT_OF_STOCK`.
+- `POST /api/admin/orders/{orderId}/shipments` records carrier/tracking number, creates one shipment, and moves the order to `SHIPPED`.
 - Supplier order actions write admin order action history rows with before/after order status and reason.
+- Customer order detail shows shipment display status, carrier, and tracking number after shipment creation.
 
 ## Tests
 

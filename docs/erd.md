@@ -13,7 +13,8 @@
 - Payment attempt tables: implemented in `apps/api/src/main/resources/db/migration/V5__create_payment.sql`.
 - DS-11 admin order queue is implemented with existing order, order item, payment, supplier, and user tables; no schema change was required.
 - Fulfillment and admin order action history tables: implemented in `apps/api/src/main/resources/db/migration/V6__create_fulfillment.sql`.
-- Shipment, refund, claim, policy, and remaining audit tables: planned.
+- Shipment table: implemented in `apps/api/src/main/resources/db/migration/V7__create_shipment.sql`.
+- Refund, claim, policy, and remaining audit tables: planned.
 
 ## Modeling Rules
 
@@ -516,7 +517,7 @@ Constraints and indexes:
 - `id`
 - `order_id`
 - `admin_user_id`
-- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK`
+- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED`
 - `before_status`
 - `after_status`
 - `reason`
@@ -529,13 +530,21 @@ Constraints and indexes:
 - `carrier`
 - `tracking_number`
 - `status`: `READY` / `SHIPPED` / `DELIVERED`
-- tracking sync and manual correction fields
+- `shipped_at`
+- `delivered_at`
+- `tracking_synced_at`
+- `manual_correction_reason`
 - `created_at`
 - `updated_at`
 
 MVP rule:
 
 - One order has at most one shipment.
+
+Constraints and indexes:
+
+- Unique `order_id`
+- Indexes on `order_id`, `status`, and `(carrier, tracking_number)`
 
 ### refunds
 

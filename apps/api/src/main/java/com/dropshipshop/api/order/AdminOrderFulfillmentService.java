@@ -137,7 +137,8 @@ class AdminOrderFulfillmentService {
 		return new AdminOrderDtos.AdminOrderActionResponse(
 			order.getId(),
 			order.getStatus(),
-			adminOrderQueryService.toFulfillmentResponse(order, fulfillment)
+			adminOrderQueryService.toFulfillmentResponse(order, fulfillment),
+			null
 		);
 	}
 

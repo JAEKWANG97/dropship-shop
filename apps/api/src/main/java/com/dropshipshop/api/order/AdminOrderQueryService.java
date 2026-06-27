@@ -18,6 +18,8 @@ import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
 
 @Service
@@ -27,17 +29,20 @@ class AdminOrderQueryService {
 	private final OrderItemRepository orderItemRepository;
 	private final PaymentRepository paymentRepository;
 	private final FulfillmentRepository fulfillmentRepository;
+	private final ShipmentRepository shipmentRepository;
 
 	AdminOrderQueryService(
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		PaymentRepository paymentRepository,
-		FulfillmentRepository fulfillmentRepository
+		FulfillmentRepository fulfillmentRepository,
+		ShipmentRepository shipmentRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
+		this.shipmentRepository = shipmentRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -62,7 +67,8 @@ class AdminOrderQueryService {
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
-		return toDetailResponse(order, payment, fulfillment, items);
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
+		return toDetailResponse(order, payment, fulfillment, shipment, items);
 	}
 
 	private AdminOrderDtos.AdminOrderSummaryResponse toSummaryResponse(CustomerOrder order) {
@@ -86,6 +92,7 @@ class AdminOrderQueryService {
 		CustomerOrder order,
 		Payment payment,
 		Fulfillment fulfillment,
+		Shipment shipment,
 		List<AdminOrderDtos.AdminOrderItemResponse> items
 	) {
 		UserAccount customer = order.getUser();
@@ -124,6 +131,7 @@ class AdminOrderQueryService {
 			),
 			toPaymentResponse(payment),
 			toFulfillmentResponse(order, fulfillment),
+			toShipmentResponse(shipment),
 			items
 		);
 	}
@@ -139,6 +147,22 @@ class AdminOrderQueryService {
 			payment.getRequestedAmount(),
 			payment.getApprovedAmount(),
 			payment.getApprovedAt()
+		);
+	}
+
+	AdminOrderDtos.AdminShipmentResponse toShipmentResponse(Shipment shipment) {
+		if (shipment == null) {
+			return null;
+		}
+		return new AdminOrderDtos.AdminShipmentResponse(
+			shipment.getId(),
+			shipment.getStatus(),
+			shipment.getCarrier(),
+			shipment.getTrackingNumber(),
+			shipment.getShippedAt(),
+			shipment.getDeliveredAt(),
+			shipment.getTrackingSyncedAt(),
+			shipment.getManualCorrectionReason()
 		);
 	}
 

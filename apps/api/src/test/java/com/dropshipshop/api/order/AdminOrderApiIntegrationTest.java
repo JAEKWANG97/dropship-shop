@@ -42,6 +42,7 @@ import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
@@ -82,6 +83,9 @@ class AdminOrderApiIntegrationTest {
 
 	@Autowired
 	private FulfillmentRepository fulfillmentRepository;
+
+	@Autowired
+	private ShipmentRepository shipmentRepository;
 
 	@Test
 	void rejectsAnonymousAndCustomerAdminOrderQueueAccess() throws Exception {
@@ -291,6 +295,91 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	void rejectsCustomerShipmentAccess() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-8");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-AUTH-1", "ADM-SHIP-AUTH-CO-1", 31000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/shipments", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "carrier": "CJ대한통운",
+					  "trackingNumber": "1234567890"
+					}
+					"""))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void validatesShipmentCarrierAndTrackingNumber() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-9");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-VALIDATION-1", "ADM-SHIP-VALIDATION-CO-1", 32000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/shipments", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "carrier": "",
+					  "trackingNumber": ""
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void createsShipmentMovesOrderToShippedAndBlocksDuplicateShipment() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-10");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-1", "ADM-SHIP-CO-1", 34000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/shipments", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "carrier": "CJ대한통운",
+					  "trackingNumber": "1234567890"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("SHIPPED")))
+			.andExpect(jsonPath("$.shipment.status", is("SHIPPED")))
+			.andExpect(jsonPath("$.shipment.carrier", is("CJ대한통운")))
+			.andExpect(jsonPath("$.shipment.trackingNumber", is("1234567890")))
+			.andExpect(jsonPath("$.shipment.shippedAt").exists());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/shipments", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "carrier": "CJ대한통운",
+					  "trackingNumber": "1234567890"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
+		assertThat(shipmentRepository.findByOrder_Id(order.getId()).orElseThrow().getTrackingNumber()).isEqualTo("1234567890");
+	}
+
+	@Test
+	void returnsShipmentSummaryOnCustomerOrderDetail() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-11");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-CUSTOMER-1", "ADM-SHIP-CUSTOMER-CO-1", 35000);
+		createShipment(order, "롯데택배", "9988776655");
+
+		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.displayStatus", is("배송 중")))
+			.andExpect(jsonPath("$.shipment.displayStatus", is("배송 중")))
+			.andExpect(jsonPath("$.shipment.carrier", is("롯데택배")))
+			.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")));
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		return userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,
@@ -366,6 +455,18 @@ class AdminOrderApiIntegrationTest {
 		return order;
 	}
 
+	private CustomerOrder createSupplierOrderedOrder(
+		UserAccount customer,
+		String orderNumber,
+		String checkoutNumber,
+		long amount
+	) throws Exception {
+		CustomerOrder order = createApprovedOrder(customer, orderNumber, checkoutNumber, amount);
+		startSupplierWork(order);
+		markSupplierOrderCompleted(order);
+		return orderRepository.findById(order.getId()).orElseThrow();
+	}
+
 	private void startSupplierWork(CustomerOrder order) throws Exception {
 		mockMvc.perform(post("/api/admin/orders/{orderId}/supplier-work-start", order.getId())
 				.with(authentication(TestAuthentication.admin()))
@@ -375,6 +476,34 @@ class AdminOrderApiIntegrationTest {
 					  "reason": "Supplier order work started"
 					}
 					"""))
+			.andExpect(status().isOk());
+	}
+
+	private void markSupplierOrderCompleted(CustomerOrder order) throws Exception {
+		mockMvc.perform(post("/api/admin/orders/{orderId}/supplier-order-completed", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierOrderNumber": "SO-%s",
+					  "expectedShipDate": "2026-07-01",
+					  "supplierResponseMemo": "Supplier confirmed",
+					  "reason": "Supplier order placed"
+					}
+					""".formatted(order.getOrderNumber())))
+			.andExpect(status().isOk());
+	}
+
+	private void createShipment(CustomerOrder order, String carrier, String trackingNumber) throws Exception {
+		mockMvc.perform(post("/api/admin/orders/{orderId}/shipments", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "carrier": "%s",
+					  "trackingNumber": "%s"
+					}
+					""".formatted(carrier, trackingNumber)))
 			.andExpect(status().isOk());
 	}
 }

@@ -17,6 +17,8 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
 @Service
 public class CustomerOrderQueryService {
@@ -36,15 +38,18 @@ public class CustomerOrderQueryService {
 	private final CustomerOrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
 	private final PaymentRepository paymentRepository;
+	private final ShipmentRepository shipmentRepository;
 
 	public CustomerOrderQueryService(
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
-		PaymentRepository paymentRepository
+		PaymentRepository paymentRepository,
+		ShipmentRepository shipmentRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
+		this.shipmentRepository = shipmentRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -89,6 +94,7 @@ public class CustomerOrderQueryService {
 			.toList();
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		return new OrderDtos.OrderDetailResponse(
 			order.getId(),
 			order.getOrderNumber(),
@@ -116,8 +122,19 @@ public class CustomerOrderQueryService {
 			),
 			items,
 			new OrderDtos.FulfillmentSummaryResponse("발주 대기"),
-			new OrderDtos.ShipmentSummaryResponse("배송 전", null, null),
+			toShipmentSummary(shipment),
 			new OrderDtos.RefundSummaryResponse("환불 없음", null)
+		);
+	}
+
+	private OrderDtos.ShipmentSummaryResponse toShipmentSummary(Shipment shipment) {
+		if (shipment == null) {
+			return new OrderDtos.ShipmentSummaryResponse("배송 전", null, null);
+		}
+		return new OrderDtos.ShipmentSummaryResponse(
+			shipmentDisplayStatus(shipment.getStatus()),
+			shipment.getCarrier(),
+			shipment.getTrackingNumber()
 		);
 	}
 
@@ -184,6 +201,14 @@ public class CustomerOrderQueryService {
 			case EXPIRED -> "주문 만료";
 			case CANCELLED -> "취소 완료";
 			case CANCEL_FAILED -> "결제 취소 확인 필요";
+		};
+	}
+
+	private String shipmentDisplayStatus(com.dropshipshop.api.shipment.domain.ShipmentStatus status) {
+		return switch (status) {
+			case READY -> "배송 준비";
+			case SHIPPED -> "배송 중";
+			case DELIVERED -> "배송 완료";
 		};
 	}
 }

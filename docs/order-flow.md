@@ -348,6 +348,8 @@ Admin detects wrong operational state or shipment information
 - Supplier work start records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId` without changing order status.
 - Supplier order completion is allowed only after supplier work start and records supplier order evidence before moving to `SUPPLIER_ORDERED`.
 - Supplier out-of-stock before shipment moves the order to `OUT_OF_STOCK` and records the reason for refund handling.
+- DS-13 implements admin shipment entry with carrier and tracking number; shipment entry is allowed only from `SUPPLIER_ORDERED`.
+- Shipment entry creates one shipment record, moves the order to `SHIPPED`, and exposes the shipment summary on customer order detail.
 - `PREPARING_SHIPMENT` is not used as an MVP order status; `SUPPLIER_ORDERED` covers supplier-ordered and waiting-for-tracking state.
 - Supplier order work start does not add a new order status in MVP; it is tracked with `supplierOrderStartedAt` and `addressLockedAt`.
 - Supplier order work should start on the same business day or next business day after payment confirmation.

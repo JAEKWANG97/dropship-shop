@@ -58,7 +58,7 @@ Implemented fields:
 
 카카오, 구글, 네이버 소셜 로그인 식별 정보를 나타낸다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - userId
@@ -449,17 +449,27 @@ Suggested fields:
 - carrier
 - trackingNumber
 - status: READY / SHIPPED / DELIVERED
-- trackingStatus
-- trackingLastSyncedAt
-- trackingSyncFailureReason
-- manualOverride
 - manualCorrectionReason
-- manualCorrectedByAdminId
-- manualCorrectedAt
 - shippedAt
 - deliveredAt
+- trackingSyncedAt
 - createdAt
 - updatedAt
+
+Planned fields:
+
+- trackingStatus
+- trackingSyncFailureReason
+- manualOverride
+- manualCorrectedByAdminId
+- manualCorrectedAt
+
+Rules:
+
+- DS-13 creates one shipment per order when admin enters carrier and tracking number.
+- Shipment creation is allowed only from `SUPPLIER_ORDERED` and moves the order to `SHIPPED`.
+- Duplicate shipment creation for the same order is rejected.
+- Customer order detail exposes shipment display status, carrier, and tracking number.
 
 ## Refund
 

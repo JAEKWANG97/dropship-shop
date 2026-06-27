@@ -10,6 +10,7 @@ import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
+import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -49,6 +50,7 @@ final class AdminOrderDtos {
 		AdminPaymentGroupResponse paymentGroup,
 		AdminPaymentResponse payment,
 		AdminFulfillmentResponse fulfillment,
+		AdminShipmentResponse shipment,
 		List<AdminOrderItemResponse> items
 	) {
 	}
@@ -116,7 +118,20 @@ final class AdminOrderDtos {
 	record AdminOrderActionResponse(
 		UUID orderId,
 		OrderStatus status,
-		AdminFulfillmentResponse fulfillment
+		AdminFulfillmentResponse fulfillment,
+		AdminShipmentResponse shipment
+	) {
+	}
+
+	record AdminShipmentResponse(
+		UUID shipmentId,
+		ShipmentStatus status,
+		String carrier,
+		String trackingNumber,
+		Instant shippedAt,
+		Instant deliveredAt,
+		Instant trackingSyncedAt,
+		String manualCorrectionReason
 	) {
 	}
 
@@ -161,6 +176,17 @@ final class AdminOrderDtos {
 		@NotBlank
 		@Size(max = 1000)
 		String reason
+	) {
+	}
+
+	record ShipmentCreateRequest(
+		@NotBlank
+		@Size(max = 100)
+		String carrier,
+
+		@NotBlank
+		@Size(max = 100)
+		String trackingNumber
 	) {
 	}
 }
