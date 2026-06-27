@@ -4,8 +4,11 @@
 
 ```text
 User
+SocialAccount
 Product
+ProductImage
 ProductOption
+ProductDetailBlock
 Supplier
 Cart
 CartItem
@@ -25,11 +28,25 @@ Suggested fields:
 
 - id
 - email
-- passwordHash
 - name
 - phone
 - role: CUSTOMER / ADMIN
 - status: ACTIVE / SUSPENDED / DELETED
+- createdAt
+- updatedAt
+
+## SocialAccount
+
+카카오, 구글, 네이버 소셜 로그인 식별 정보를 나타낸다.
+
+Suggested fields:
+
+- id
+- userId
+- provider: KAKAO / GOOGLE / NAVER
+- providerUserId
+- email
+- displayName
 - createdAt
 - updatedAt
 
@@ -62,6 +79,22 @@ Suggested fields:
 - description
 - basePrice
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
+- thumbnailImageUrl
+- createdAt
+- updatedAt
+
+## ProductImage
+
+상품 대표 이미지와 갤러리 이미지를 나타낸다.
+
+Suggested fields:
+
+- id
+- productId
+- type: THUMBNAIL / GALLERY
+- imageUrl
+- sortOrder
+- altText
 - createdAt
 - updatedAt
 
@@ -76,6 +109,22 @@ Suggested fields:
 - name
 - additionalPrice
 - status: ACTIVE / SOLD_OUT / STOPPED
+- createdAt
+- updatedAt
+
+## ProductDetailBlock
+
+상품 상세 콘텐츠를 구성하는 블록. 공급처 상세 이미지와 관리자 HTML 설명을 순서대로 노출하기 위해 사용한다.
+
+Suggested fields:
+
+- id
+- productId
+- type: IMAGE / HTML
+- imageUrl
+- htmlContent
+- sortOrder
+- altText
 - createdAt
 - updatedAt
 
@@ -230,8 +279,13 @@ Suggested fields:
 ## Modeling Notes
 
 - 상품과 옵션에는 실제 재고 수량을 두지 않는다.
+- 상품 전체 상태와 상품 옵션 상태를 분리한다.
+- 고객이 구매할 수 있는 조건은 상품 상태가 `ACTIVE`이고 옵션 상태도 `ACTIVE`인 경우다.
+- 상품이 `ACTIVE`여도 특정 옵션이 `SOLD_OUT`이면 해당 옵션은 구매할 수 없다.
+- 상품 상세 콘텐츠는 `IMAGE`와 `HTML` 블록으로 구성하고 `sortOrder`에 따라 노출한다.
+- `HTML` 블록은 XSS 방지를 위해 sanitize해야 한다.
+- 배송, 교환, 환불, 품절 가능성 같은 운영 정책 고지는 상품 상세 콘텐츠와 별도로 관리한다.
 - 주문 상품에는 상품명, 옵션명, 가격을 스냅샷으로 저장한다.
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
 - 주문 상태 변경 이력은 별도 테이블로 추가하는 것이 좋다.
-

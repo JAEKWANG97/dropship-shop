@@ -20,7 +20,7 @@ Consequences:
 
 Decision:
 
-Do not manage real stock quantity in MVP. Use product and option sales status instead.
+Do not manage real stock quantity in MVP. Use product and option sales status instead. Product status and product option status are separate.
 
 Context:
 
@@ -29,8 +29,46 @@ The site assumes products are available and discovers supplier stock issues afte
 Consequences:
 
 - Product status must support active, sold out, hidden, and stopped.
+- Product option status must support active, sold out, and stopped.
+- A product option can be sold out while the product remains active.
+- Customer purchase is allowed only when both product and option are active.
 - Supplier out-of-stock flow must be designed.
 - Customer-facing policy must explain possible post-order stock issues.
+
+## 2026-06-27: Product Detail Content
+
+Decision:
+
+Use `IMAGE` and `HTML` blocks for product detail content in MVP. Operational policy notices must be managed separately from product detail content.
+
+Context:
+
+Dropshipping products often come with supplier-provided detail images, but some content such as size tables or additional explanations may need HTML. At the same time, shipping, exchange, refund, and post-order out-of-stock notices should not exist only inside images or arbitrary HTML.
+
+Consequences:
+
+- Product detail content needs ordered blocks.
+- HTML blocks are admin-only and must be sanitized.
+- Detail images can be uploaded and ordered.
+- Policy notices should be managed as structured text or reusable policy sections.
+- Product detail content and customer-facing policy notices are separate concerns.
+
+## 2026-06-27: Product Image Limits
+
+Decision:
+
+Use fixed MVP image limits: one thumbnail image, up to ten gallery images, up to fifty detail block images, max 5MB per image, and allowed extensions `jpg`, `jpeg`, `png`, and `webp`.
+
+Context:
+
+Product detail pages may use many supplier-provided images. A strict low detail-image count would make operations difficult, but file size and extension limits are still needed for performance and abuse control.
+
+Consequences:
+
+- Product image upload requires count validation.
+- Image upload requires extension and file size validation.
+- Thumbnail, gallery, and detail images are separate concepts.
+- Uploaded image binaries should live in object storage, while the database stores URLs or storage keys.
 
 ## 2026-06-27: Supplier Order Model
 
@@ -64,3 +102,40 @@ Consequences:
 - Prefer PostgreSQL and JPA.
 - Avoid microservices in MVP.
 
+## 2026-06-27: Guest Checkout
+
+Decision:
+
+Do not allow guest checkout in MVP.
+
+Context:
+
+The first version should minimize order, payment, refund, and shipment ownership complexity. Every order should belong to an authenticated customer.
+
+Consequences:
+
+- All orders require `userId`.
+- Guest cart and guest order lookup are out of MVP scope.
+- Checkout requires login.
+- Customer order history, refund requests, and shipment lookup can rely on authenticated user ownership checks.
+
+## 2026-06-27: Social Login And Admin Access
+
+Decision:
+
+Support only Kakao, Google, and Naver social login in MVP. Admin users also use social login, but only DB-registered accounts can access admin features.
+
+Context:
+
+The product owner does not want to operate a separate email/password login flow. Social-only login removes password storage, email verification, and password reset scope from MVP. Admin access should rely on internal authorization, not a separate admin password login.
+
+Consequences:
+
+- Customer email/password login is out of MVP scope.
+- Password hash storage is not needed for customer or admin accounts.
+- User identity must store provider and provider user id.
+- Kakao, Google, and Naver OAuth flows are required.
+- Same email across different providers is treated as separate accounts in MVP.
+- Account merge is deferred.
+- Admin authorization is controlled by DB role or an admin allowlist.
+- A social account without DB admin permission cannot access admin features.

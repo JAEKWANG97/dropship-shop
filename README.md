@@ -75,3 +75,4 @@
 - [Glossary](docs/glossary.md)
 - [GitHub And Linear Setup](docs/github-linear-setup.md)
 - [Linear Backlog](docs/linear-backlog.md)
+- [Policy Documents](docs/policies/README.md)
