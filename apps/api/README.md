@@ -38,6 +38,15 @@ curl http://localhost:8080/api/health
 curl http://localhost:8080/actuator/health
 ```
 
+## Authentication Foundation
+
+- User accounts live in the `users` table.
+- Social identity is keyed by `provider` and `provider_user_id`.
+- Supported roles start with `CUSTOMER` and `ADMIN`.
+- `/api/admin/**` requires `ADMIN`.
+- Customer APIs read the authenticated user id through `CurrentUser`.
+- Basic login and form login are disabled; social OAuth/JWT integration is added in later auth work.
+
 ## Tests
 
 ```sh

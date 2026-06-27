@@ -445,6 +445,17 @@ Acceptance criteria:
 - Admin APIs are protected.
 - Customer APIs are scoped to authenticated user.
 
+Resolved decisions:
+
+- User entity is `UserAccount` mapped to the `users` table.
+- Social identity is represented by `SocialProvider` and `providerUserId`; supported providers start with Kakao, Google, and Naver.
+- Role model starts with `CUSTOMER` and `ADMIN`.
+- User status starts with `ACTIVE` and `DELETED`.
+- `GET /api/admin/me` proves admin API protection with `ADMIN` role.
+- `GET /api/me` proves customer API scoping through authenticated user id.
+- Basic login and form login are disabled to preserve the social-login-only policy.
+- Actual Kakao, Google, and Naver OAuth callback/token integration remains a later auth implementation step.
+
 ### DS-6: Implement catalog domain
 
 Description:

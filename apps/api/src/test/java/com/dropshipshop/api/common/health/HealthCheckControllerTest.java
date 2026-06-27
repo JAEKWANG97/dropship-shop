@@ -8,9 +8,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.dropshipshop.api.auth.security.SecurityConfig;
+
 @WebMvcTest(HealthCheckController.class)
+@Import(SecurityConfig.class)
 class HealthCheckControllerTest {
 
 	@Autowired
