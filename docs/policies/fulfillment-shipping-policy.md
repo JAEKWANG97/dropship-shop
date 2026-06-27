@@ -66,9 +66,9 @@ Status: Confirmed
 ## System Impact
 
 - `SUPPLIER_ORDER_PENDING` 주문을 관리자 작업 큐로 보여줘야 한다. Implemented by DS-11.
-- 공급처 발주 작업 시작 액션은 `supplierOrderStartedAt`, `addressLockedAt`, `addressLockedByAdminId`를 기록해야 한다.
-- 관리자 액션으로 `SUPPLIER_ORDERED`, `OUT_OF_STOCK`, `SHIPPED` 상태가 변경된다.
-- 공급처 발주 완료 액션은 공급처 주문번호, 발주 주소 스냅샷, 발주 관리자, 예상 출고일, 공급처 응답 메모를 저장해야 한다.
+- 공급처 발주 작업 시작 액션은 `supplierOrderStartedAt`, `addressLockedAt`, `addressLockedByAdminId`를 기록해야 한다. Implemented by DS-12.
+- 관리자 액션으로 `SUPPLIER_ORDERED`, `OUT_OF_STOCK`, `SHIPPED` 상태가 변경된다. DS-12 implements `SUPPLIER_ORDERED` and `OUT_OF_STOCK`.
+- 공급처 발주 완료 액션은 공급처 주문번호, 발주 주소 스냅샷, 발주 관리자, 예상 출고일, 공급처 응답 메모를 저장해야 한다. Implemented by DS-12.
 - 송장번호 없는 주문은 `SHIPPED` 상태로 전환할 수 없다.
 - 배송비는 고객에게 별도 청구하지 않으므로 주문 금액 계산에서 shippingFee는 `0`으로 시작한다.
 - 상품 운영자는 상품 판매가에 예상 배송비와 공급처 비용을 반영해야 한다.

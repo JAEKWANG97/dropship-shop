@@ -41,7 +41,7 @@ LegalRetentionRecord
 
 고객 또는 관리자를 나타낸다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - email
@@ -418,13 +418,25 @@ Suggested fields:
 - orderedByAdminId
 - expectedShipDate
 - supplierResponseMemo
+- orderedAt
+- outOfStockReason
+- createdAt
+- updatedAt
+
+Planned fields:
+
 - supplierResponseDueAt
 - delayNoticeRequiredAt
 - delayNotifiedAt
-- orderedAt
 - memo
-- createdAt
-- updatedAt
+
+Rules:
+
+- DS-12 creates a fulfillment row when supplier work starts or an out-of-stock action is recorded.
+- Supplier work start keeps order status `SUPPLIER_ORDER_PENDING` and records address lock fields on `CustomerOrder`.
+- Supplier order completion is allowed only after supplier work start and moves the order to `SUPPLIER_ORDERED`.
+- Supplier out-of-stock is allowed only before shipment and moves the order to `OUT_OF_STOCK`.
+- Admin order actions are recorded in `admin_order_action_histories`.
 
 ## Shipment
 

@@ -651,6 +651,8 @@ Acceptance criteria:
 
 ### DS-12: Implement supplier order actions
 
+Status: Implemented
+
 Description:
 
 Allow admin to mark supplier order completion or supplier out-of-stock.
@@ -661,6 +663,10 @@ Acceptance criteria:
 - Admin can mark out of stock.
 - Out-of-stock order enters refund handling flow.
 - Status changes are recorded.
+- Admin can start supplier order work and lock the shipping address.
+- Supplier order completion requires supplier order number evidence and reason.
+- Out-of-stock requires reason and moves the order to `OUT_OF_STOCK`.
+- Implemented by `POST /api/admin/orders/{orderId}/supplier-work-start`, `POST /api/admin/orders/{orderId}/supplier-order-completed`, and `POST /api/admin/orders/{orderId}/out-of-stock`.
 
 ### DS-13: Implement shipment tracking input
 

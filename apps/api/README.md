@@ -101,7 +101,11 @@ curl http://localhost:8080/actuator/health
 - Only `ADMIN` users can access admin order APIs.
 - `GET /api/admin/orders` returns `SUPPLIER_ORDER_PENDING` orders for supplier order handling.
 - `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
-- Admin order detail includes internal order/payment statuses, supplier info, product and option ids, customer shipping info, and payment summary.
+- Admin order detail includes internal order/payment/fulfillment statuses, supplier info, product and option ids, customer shipping info, and payment summary.
+- `POST /api/admin/orders/{orderId}/supplier-work-start` records supplier work start and locks the order shipping address.
+- `POST /api/admin/orders/{orderId}/supplier-order-completed` records supplier order evidence and moves the order to `SUPPLIER_ORDERED`.
+- `POST /api/admin/orders/{orderId}/out-of-stock` records stockout reason and moves the order to `OUT_OF_STOCK`.
+- Supplier order actions write admin order action history rows with before/after order status and reason.
 
 ## Tests
 

@@ -12,7 +12,8 @@
 - Checkout/order tables: implemented in `apps/api/src/main/resources/db/migration/V4__create_checkout_order.sql`.
 - Payment attempt tables: implemented in `apps/api/src/main/resources/db/migration/V5__create_payment.sql`.
 - DS-11 admin order queue is implemented with existing order, order item, payment, supplier, and user tables; no schema change was required.
-- Fulfillment, shipment, refund, claim, policy, and audit tables: planned.
+- Fulfillment and admin order action history tables: implemented in `apps/api/src/main/resources/db/migration/V6__create_fulfillment.sql`.
+- Shipment, refund, claim, policy, and remaining audit tables: planned.
 
 ## Modeling Rules
 
@@ -494,9 +495,32 @@ Implemented by DS-9 for payment confirmation events.
 - `order_id`
 - `supplier_id`
 - `status`: `PENDING` / `ORDERED` / `OUT_OF_STOCK` / `CANCELLED`
-- supplier order, address snapshot, SLA, delay, and memo fields
+- `supplier_order_started_at`
+- `supplier_order_number`
+- `ordered_address_snapshot`
+- `ordered_by_admin_id`
+- `ordered_at`
+- `expected_ship_date`
+- `supplier_response_memo`
+- `out_of_stock_reason`
 - `created_at`
 - `updated_at`
+
+Constraints and indexes:
+
+- Unique `order_id`
+- Indexes on `order_id`, `supplier_id`, and `status`
+
+### admin_order_action_histories
+
+- `id`
+- `order_id`
+- `admin_user_id`
+- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK`
+- `before_status`
+- `after_status`
+- `reason`
+- `created_at`
 
 ### shipments
 

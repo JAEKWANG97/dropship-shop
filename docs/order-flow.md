@@ -344,6 +344,10 @@ Admin detects wrong operational state or shipment information
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - Customer direct shipping address change is blocked once `addressLockedAt` is set by supplier order work start.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
+- DS-12 implements admin supplier actions: supplier work start, supplier order completed, and supplier out-of-stock.
+- Supplier work start records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId` without changing order status.
+- Supplier order completion is allowed only after supplier work start and records supplier order evidence before moving to `SUPPLIER_ORDERED`.
+- Supplier out-of-stock before shipment moves the order to `OUT_OF_STOCK` and records the reason for refund handling.
 - `PREPARING_SHIPMENT` is not used as an MVP order status; `SUPPLIER_ORDERED` covers supplier-ordered and waiting-for-tracking state.
 - Supplier order work start does not add a new order status in MVP; it is tracked with `supplierOrderStartedAt` and `addressLockedAt`.
 - Supplier order work should start on the same business day or next business day after payment confirmation.

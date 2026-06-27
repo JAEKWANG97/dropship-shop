@@ -136,6 +136,29 @@ public class CustomerOrder {
 		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
 	}
 
+	public void startSupplierOrderWork(UUID adminUserId, Instant startedAt) {
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING || supplierOrderStartedAt != null || addressLockedAt != null) {
+			throw new IllegalStateException("Supplier order work can start only once from supplier order pending");
+		}
+		this.supplierOrderStartedAt = startedAt;
+		this.addressLockedAt = startedAt;
+		this.addressLockedByAdminId = adminUserId;
+	}
+
+	public void markSupplierOrdered() {
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING || supplierOrderStartedAt == null || addressLockedAt == null) {
+			throw new IllegalStateException("Supplier order can be completed only after supplier work has started");
+		}
+		this.status = OrderStatus.SUPPLIER_ORDERED;
+	}
+
+	public void markOutOfStock() {
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING && status != OrderStatus.SUPPLIER_ORDERED) {
+			throw new IllegalStateException("Out of stock can be marked only before shipment");
+		}
+		this.status = OrderStatus.OUT_OF_STOCK;
+	}
+
 	public void markPaymentException() {
 		this.status = OrderStatus.PAYMENT_EXCEPTION;
 	}
@@ -206,6 +229,18 @@ public class CustomerOrder {
 
 	public Instant getExpiresAt() {
 		return expiresAt;
+	}
+
+	public Instant getSupplierOrderStartedAt() {
+		return supplierOrderStartedAt;
+	}
+
+	public Instant getAddressLockedAt() {
+		return addressLockedAt;
+	}
+
+	public UUID getAddressLockedByAdminId() {
+		return addressLockedByAdminId;
 	}
 
 	public Instant getCreatedAt() {

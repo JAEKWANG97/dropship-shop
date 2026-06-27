@@ -1,13 +1,18 @@
 package com.dropshipshop.api.order;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 final class AdminOrderDtos {
 
@@ -43,6 +48,7 @@ final class AdminOrderDtos {
 		AdminShippingAddressResponse shippingAddress,
 		AdminPaymentGroupResponse paymentGroup,
 		AdminPaymentResponse payment,
+		AdminFulfillmentResponse fulfillment,
 		List<AdminOrderItemResponse> items
 	) {
 	}
@@ -92,6 +98,28 @@ final class AdminOrderDtos {
 	) {
 	}
 
+	record AdminFulfillmentResponse(
+		UUID fulfillmentId,
+		FulfillmentStatus status,
+		Instant supplierOrderStartedAt,
+		Instant addressLockedAt,
+		UUID addressLockedByAdminId,
+		String supplierOrderNumber,
+		UUID orderedByAdminId,
+		Instant orderedAt,
+		LocalDate expectedShipDate,
+		String supplierResponseMemo,
+		String outOfStockReason
+	) {
+	}
+
+	record AdminOrderActionResponse(
+		UUID orderId,
+		OrderStatus status,
+		AdminFulfillmentResponse fulfillment
+	) {
+	}
+
 	record AdminOrderItemResponse(
 		UUID orderItemId,
 		UUID productId,
@@ -103,6 +131,36 @@ final class AdminOrderDtos {
 		long lineAmount,
 		int productDetailVersion,
 		Integer productNoticeVersion
+	) {
+	}
+
+	record SupplierWorkStartRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
+	record SupplierOrderCompletedRequest(
+		@NotBlank
+		@Size(max = 100)
+		String supplierOrderNumber,
+
+		LocalDate expectedShipDate,
+
+		@Size(max = 2000)
+		String supplierResponseMemo,
+
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
+	record OutOfStockRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason
 	) {
 	}
 }

@@ -32,9 +32,9 @@ Status: Confirmed
 - 관리자는 주문 상태를 임의 드롭다운으로 변경하지 않는다.
 - 주문 처리는 현재 상태에서 허용된 다음 액션이 확보된 경우에만 진행한다.
 - 관리자 주문 액션은 정해진 버튼으로 제공한다.
-  - 공급처 발주 작업 시작
-  - 공급처 발주 완료
-  - 공급처 품절
+  - 공급처 발주 작업 시작: Implemented by DS-12
+  - 공급처 발주 완료: Implemented by DS-12
+  - 공급처 품절: Implemented by DS-12
   - 택배사/송장번호 입력
   - 배송 상태 수동 보정
   - 취소/환불 승인
@@ -64,6 +64,7 @@ Status: Confirmed
 
 - 관리자 API는 역할 검증이 필요하다.
 - 관리자 주문 큐는 `SUPPLIER_ORDER_PENDING` 주문만 보여주고 `PAYMENT_PENDING`, `EXPIRED` 주문은 공급처 작업 큐에서 제외한다. Implemented by DS-11.
+- 공급처 발주 작업 시작, 발주 완료, 품절 액션은 상태 전이를 검증하고 `admin_order_action_histories`에 사유와 전후 상태를 기록한다. Implemented by DS-12.
 - 주문 상태 변경은 action 기반으로 제한해야 한다.
 - 주문 상태 변경 이력 테이블이 필요하다.
 - 주요 관리자 액션 이력 테이블이 필요하다.

@@ -256,9 +256,9 @@ POST /api/payments/toss/confirm
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Supplier order pending admin queue |
 | `GET` | `/api/admin/orders/{orderId}` | `ADMIN` | Implemented | Admin order detail |
-| `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Planned | Lock address and mark supplier work started |
-| `POST` | `/api/admin/orders/{orderId}/supplier-order-completed` | `ADMIN` | Planned | Mark manual supplier order completed |
-| `POST` | `/api/admin/orders/{orderId}/out-of-stock` | `ADMIN` | Planned | Mark supplier out-of-stock and start refund flow |
+| `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Implemented | Lock address and mark supplier work started |
+| `POST` | `/api/admin/orders/{orderId}/supplier-order-completed` | `ADMIN` | Implemented | Mark manual supplier order completed |
+| `POST` | `/api/admin/orders/{orderId}/out-of-stock` | `ADMIN` | Implemented | Mark supplier out-of-stock and prepare refund flow |
 | `POST` | `/api/admin/orders/{orderId}/shipments` | `ADMIN` | Planned | Enter carrier and tracking number |
 | `PATCH` | `/api/admin/orders/{orderId}/shipment-correction` | `ADMIN` | Planned | Manually correct shipment state with reason |
 | `POST` | `/api/admin/orders/{orderId}/corrections` | `ADMIN` | Planned | Admin correction action with reason |
@@ -269,7 +269,10 @@ Rules:
 - Admin actions must map to valid transition table actions.
 - Admin order queue currently returns `SUPPLIER_ORDER_PENDING` orders only.
 - `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
-- Admin order detail exposes internal order/payment statuses plus supplier, product option, customer shipping, and payment summary fields.
+- Admin order detail exposes internal order/payment/fulfillment statuses plus supplier, product option, customer shipping, and payment summary fields.
+- Supplier work start requires a reason and records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId`.
+- Supplier order completion requires `supplierOrderNumber` and reason. `expectedShipDate` and `supplierResponseMemo` are optional evidence fields.
+- Supplier out-of-stock requires a reason and moves the order to `OUT_OF_STOCK`.
 - Reason is required for cancellation, refund, out-of-stock, shipment correction, and admin correction.
 - `PREPARING_SHIPMENT` is not an MVP order status.
 

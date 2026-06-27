@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.fulfillment.domain.Fulfillment;
+import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
@@ -24,15 +26,18 @@ class AdminOrderQueryService {
 	private final CustomerOrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
 	private final PaymentRepository paymentRepository;
+	private final FulfillmentRepository fulfillmentRepository;
 
 	AdminOrderQueryService(
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
-		PaymentRepository paymentRepository
+		PaymentRepository paymentRepository,
+		FulfillmentRepository fulfillmentRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
+		this.fulfillmentRepository = fulfillmentRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -56,7 +61,8 @@ class AdminOrderQueryService {
 			.toList();
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
-		return toDetailResponse(order, payment, items);
+		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
+		return toDetailResponse(order, payment, fulfillment, items);
 	}
 
 	private AdminOrderDtos.AdminOrderSummaryResponse toSummaryResponse(CustomerOrder order) {
@@ -79,6 +85,7 @@ class AdminOrderQueryService {
 	private AdminOrderDtos.AdminOrderDetailResponse toDetailResponse(
 		CustomerOrder order,
 		Payment payment,
+		Fulfillment fulfillment,
 		List<AdminOrderDtos.AdminOrderItemResponse> items
 	) {
 		UserAccount customer = order.getUser();
@@ -116,6 +123,7 @@ class AdminOrderQueryService {
 				order.getPaymentGroup().getApprovedAt()
 			),
 			toPaymentResponse(payment),
+			toFulfillmentResponse(order, fulfillment),
 			items
 		);
 	}
@@ -131,6 +139,37 @@ class AdminOrderQueryService {
 			payment.getRequestedAmount(),
 			payment.getApprovedAmount(),
 			payment.getApprovedAt()
+		);
+	}
+
+	AdminOrderDtos.AdminFulfillmentResponse toFulfillmentResponse(CustomerOrder order, Fulfillment fulfillment) {
+		if (fulfillment == null) {
+			return new AdminOrderDtos.AdminFulfillmentResponse(
+				null,
+				null,
+				order.getSupplierOrderStartedAt(),
+				order.getAddressLockedAt(),
+				order.getAddressLockedByAdminId(),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			);
+		}
+		return new AdminOrderDtos.AdminFulfillmentResponse(
+			fulfillment.getId(),
+			fulfillment.getStatus(),
+			fulfillment.getSupplierOrderStartedAt(),
+			order.getAddressLockedAt(),
+			order.getAddressLockedByAdminId(),
+			fulfillment.getSupplierOrderNumber(),
+			fulfillment.getOrderedByAdminId(),
+			fulfillment.getOrderedAt(),
+			fulfillment.getExpectedShipDate(),
+			fulfillment.getSupplierResponseMemo(),
+			fulfillment.getOutOfStockReason()
 		);
 	}
 
