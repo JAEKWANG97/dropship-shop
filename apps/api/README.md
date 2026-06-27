@@ -95,6 +95,14 @@ curl http://localhost:8080/actuator/health
 - Customer responses expose display statuses instead of raw internal order statuses.
 - Order detail includes payment group, payment summary, shipping address snapshot, order items, and placeholder fulfillment/shipment/refund summaries.
 
+## Admin Order Foundation
+
+- Admin order queue APIs are available at `/api/admin/orders`.
+- Only `ADMIN` users can access admin order APIs.
+- `GET /api/admin/orders` returns `SUPPLIER_ORDER_PENDING` orders for supplier order handling.
+- `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
+- Admin order detail includes internal order/payment statuses, supplier info, product and option ids, customer shipping info, and payment summary.
+
 ## Tests
 
 ```sh

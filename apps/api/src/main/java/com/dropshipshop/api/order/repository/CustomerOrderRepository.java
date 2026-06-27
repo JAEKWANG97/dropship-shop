@@ -14,6 +14,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UU
 
 	List<CustomerOrder> findAllByPaymentGroup_IdOrderByCreatedAtAsc(UUID paymentGroupId);
 
+	List<CustomerOrder> findAllByStatusOrderByCreatedAtAsc(OrderStatus status);
+
 	List<CustomerOrder> findAllByUser_IdAndStatusInOrderByCreatedAtDesc(UUID userId, Collection<OrderStatus> statuses);
 
 	Optional<CustomerOrder> findByIdAndUser_Id(UUID id, UUID userId);

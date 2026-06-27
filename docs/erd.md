@@ -11,6 +11,7 @@
 - Cart tables: implemented in `apps/api/src/main/resources/db/migration/V3__create_cart.sql`.
 - Checkout/order tables: implemented in `apps/api/src/main/resources/db/migration/V4__create_checkout_order.sql`.
 - Payment attempt tables: implemented in `apps/api/src/main/resources/db/migration/V5__create_payment.sql`.
+- DS-11 admin order queue is implemented with existing order, order item, payment, supplier, and user tables; no schema change was required.
 - Fulfillment, shipment, refund, claim, policy, and audit tables: planned.
 
 ## Modeling Rules

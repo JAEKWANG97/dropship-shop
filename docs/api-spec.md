@@ -254,8 +254,8 @@ POST /api/payments/toss/confirm
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/admin/orders` | `ADMIN` | Planned | Admin order list with filters |
-| `GET` | `/api/admin/orders/{orderId}` | `ADMIN` | Planned | Admin order detail |
+| `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Supplier order pending admin queue |
+| `GET` | `/api/admin/orders/{orderId}` | `ADMIN` | Implemented | Admin order detail |
 | `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Planned | Lock address and mark supplier work started |
 | `POST` | `/api/admin/orders/{orderId}/supplier-order-completed` | `ADMIN` | Planned | Mark manual supplier order completed |
 | `POST` | `/api/admin/orders/{orderId}/out-of-stock` | `ADMIN` | Planned | Mark supplier out-of-stock and start refund flow |
@@ -267,6 +267,9 @@ Rules:
 
 - Admin cannot write arbitrary order status values.
 - Admin actions must map to valid transition table actions.
+- Admin order queue currently returns `SUPPLIER_ORDER_PENDING` orders only.
+- `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
+- Admin order detail exposes internal order/payment statuses plus supplier, product option, customer shipping, and payment summary fields.
 - Reason is required for cancellation, refund, out-of-stock, shipment correction, and admin correction.
 - `PREPARING_SHIPMENT` is not an MVP order status.
 

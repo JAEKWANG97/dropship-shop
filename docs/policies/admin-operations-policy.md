@@ -63,6 +63,7 @@ Status: Confirmed
 ## System Impact
 
 - 관리자 API는 역할 검증이 필요하다.
+- 관리자 주문 큐는 `SUPPLIER_ORDER_PENDING` 주문만 보여주고 `PAYMENT_PENDING`, `EXPIRED` 주문은 공급처 작업 큐에서 제외한다. Implemented by DS-11.
 - 주문 상태 변경은 action 기반으로 제한해야 한다.
 - 주문 상태 변경 이력 테이블이 필요하다.
 - 주요 관리자 액션 이력 테이블이 필요하다.

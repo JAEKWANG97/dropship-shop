@@ -65,7 +65,7 @@ Status: Confirmed
 
 ## System Impact
 
-- `SUPPLIER_ORDER_PENDING` 주문을 관리자 작업 큐로 보여줘야 한다.
+- `SUPPLIER_ORDER_PENDING` 주문을 관리자 작업 큐로 보여줘야 한다. Implemented by DS-11.
 - 공급처 발주 작업 시작 액션은 `supplierOrderStartedAt`, `addressLockedAt`, `addressLockedByAdminId`를 기록해야 한다.
 - 관리자 액션으로 `SUPPLIER_ORDERED`, `OUT_OF_STOCK`, `SHIPPED` 상태가 변경된다.
 - 공급처 발주 완료 액션은 공급처 주문번호, 발주 주소 스냅샷, 발주 관리자, 예상 출고일, 공급처 응답 메모를 저장해야 한다.

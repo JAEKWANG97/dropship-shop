@@ -635,6 +635,8 @@ Resolved decisions:
 
 ### DS-11: Implement admin order queue
 
+Status: Implemented
+
 Description:
 
 Create the core admin work queue for paid orders waiting for supplier handling.
@@ -644,6 +646,8 @@ Acceptance criteria:
 - Admin can filter supplier order pending orders.
 - Admin can open order detail.
 - Admin sees supplier, product option, customer shipping info, and payment summary.
+- `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
+- Implemented by `GET /api/admin/orders` and `GET /api/admin/orders/{orderId}`.
 
 ### DS-12: Implement supplier order actions
 

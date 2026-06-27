@@ -335,6 +335,8 @@ Admin detects wrong operational state or shipment information
 - Failed, pending, and expired payment orders are not shown in customer order history.
 - `PAYMENT_PENDING`, `EXPIRED`, and payment failure states belong to checkout/retry surfaces, not normal customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
+- DS-11 implements the admin supplier order queue with `GET /api/admin/orders`; it shows only `SUPPLIER_ORDER_PENDING` orders.
+- Admin order detail shows internal statuses and fulfillment inputs, while customer order detail keeps customer-facing display statuses.
 - One MVP order contains exactly one delivery group.
 - One MVP payment group can contain multiple delivery-group orders.
 - Customer can pay once for all delivery groups in the checkout.

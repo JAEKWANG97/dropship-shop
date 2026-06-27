@@ -274,6 +274,8 @@ Implemented statuses:
 Rules:
 
 - DS-8 creates one `PAYMENT_PENDING` order per supplier-backed delivery group.
+- DS-11 exposes `SUPPLIER_ORDER_PENDING` orders through the admin supplier order queue.
+- DS-11 admin order detail reads supplier, product option, shipping address snapshot, and payment summary from existing order/payment/catalog tables.
 - MVP does not create a separate `delivery_groups` table; `supplierId` is the order grouping boundary.
 - Shipping fee is 0 because shipping cost is included in product price.
 - Orders expire with their payment group 30 minutes after checkout creation.
