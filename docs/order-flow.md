@@ -77,12 +77,27 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Order status: CANCELLED
 ```
 
+## Shipping Address Change
+
+```text
+Order status: PAYMENT_PENDING
+-> Customer can edit checkout address before payment
+
+Order status: SUPPLIER_ORDER_PENDING
+-> Customer can directly change shipping address
+
+Order status: SUPPLIER_ORDERED or later
+-> Customer cannot directly change shipping address
+-> Address change requires customer support/admin manual handling
+```
+
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
 - `PAYMENT_PENDING` orders expire 30 minutes after creation.
 - Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
+- Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.

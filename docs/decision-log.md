@@ -123,6 +123,23 @@ Consequences:
 - Payment verification arriving after expiration must not confirm the order.
 - Customers must create a new order after expiration.
 
+## 2026-06-27: Shipping Address Change Window
+
+Decision:
+
+Allow customers to directly change the shipping address only until the order is in `SUPPLIER_ORDER_PENDING`. After `SUPPLIER_ORDERED`, shipping address changes require customer support/admin manual handling.
+
+Context:
+
+Before supplier ordering, the operator has not sent the fulfillment request to the supplier. After supplier ordering, the supplier may already have received or started processing the shipping information, so customer-side edits can desynchronize the shop order and supplier shipment.
+
+Consequences:
+
+- `PAYMENT_PENDING` address edits are treated as checkout edits before payment.
+- `SUPPLIER_ORDER_PENDING` orders can expose customer self-service address editing.
+- `SUPPLIER_ORDERED` and later states must reject customer direct address changes.
+- Admin/customer support may still handle exceptional address changes manually.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:
