@@ -254,6 +254,20 @@ Acceptance criteria:
 - Claim entity/model requirements and admin handling statuses are defined.
 - Cancellation/refund, legal/customer notice, order-flow, domain-model, requirements, and decision-log docs are updated.
 
+Resolved decisions:
+
+- Customer self-service cancel button is shown only when the order is `SUPPLIER_ORDER_PENDING` and supplier order work has not started.
+- After supplier order work starts and before shipment, customer cancellation is handled as a cancellation claim with admin review.
+- Post-delivery return/exchange is handled as a claim with admin manual review.
+- Simple change-of-mind return/exchange request window is 7 days from delivery completion.
+- Defect, wrong delivery, different-from-product-info, and delivery issue claims must be requested within 3 months from delivery completion and within 30 days from discovery.
+- Claim reasons start with simple change of mind, defect, wrong delivery, different from product info, and delivery issue.
+- Simple change-of-mind return/exchange shipping cost is borne by the customer by default.
+- Seller-fault return/exchange shipping cost is borne by the seller/operator by default.
+- Defect, wrong delivery, different-from-product-info, and delivery issue claims require photo evidence by default.
+- Refund request starts within 3 business days from return receipt confirmation or cancellation approval.
+- `Claim` model and claim handling statuses are added separately from `Refund`.
+
 References:
 
 - `docs/policies/cancellation-refund-policy.md`

@@ -381,6 +381,34 @@ Consequences:
 - Product/option/quantity-level partial refund remains deferred.
 - Policies that said partial refund is fully excluded are superseded by this decision.
 
+## 2026-06-27: Cancellation, Return, Exchange, And Claim Policy
+
+Decision:
+
+Customer self-service cancellation is allowed only while an order is `SUPPLIER_ORDER_PENDING` and supplier order work has not started. If `supplierOrderStartedAt` or `addressLockedAt` is already set, the customer cannot directly cancel and must submit a cancellation claim. After `SUPPLIER_ORDERED`, cancellation, return, and exchange are handled through claim submission and admin manual review.
+
+Post-delivery return/exchange is handled as a `Claim`, separate from `Refund`. Claim types start with cancellation, return, and exchange. Claim reasons start with simple change of mind, defect, wrong delivery, different from product information, and delivery issue.
+
+Simple change-of-mind return/exchange requests are accepted for review within 7 days from delivery completion. Defect, wrong delivery, different-from-product-information, and delivery issue claims are accepted for review within 3 months from delivery completion and within 30 days from the customer discovering or being able to discover the issue. Defect, wrong delivery, product-information mismatch, and delivery issue claims require photo evidence by default.
+
+Simple change-of-mind return/exchange shipping cost is borne by the customer by default. Seller-fault return/exchange shipping cost is borne by the seller/operator by default. Claim approval does not itself complete a refund; PG cancel/refund still follows the `Refund` lifecycle and must succeed before the customer sees refund completed.
+
+For refunds that require returned goods, PG cancel/refund request should start within 3 business days from return receipt confirmation. For cancellation refunds that do not require returned goods, PG cancel/refund request should start within 3 business days from cancellation approval.
+
+Context:
+
+The earlier policy only said that post-supplier-order cancellation and post-delivery return/exchange would be handled manually. That was not enough for implementation because self-service cancellation, cancellation claims, return claims, exchange claims, evidence requirements, and shipping cost burden need different UI, API, state, and admin handling rules.
+
+Consequences:
+
+- Customer cancel button visibility must check order status and supplier order work start.
+- Add `Claim` model and claim statuses separate from `Refund`.
+- Admin needs actions for evidence request, claim approval, claim rejection, return received, and exchange shipping.
+- Claim reason and evidence rules must be shown on customer claim screens.
+- Refund execution timing needs a 3-business-day operational target after return receipt confirmation or cancellation approval.
+- Legal/customer notice policy must include claim windows and shipping cost burden rules.
+- Refund processing remains delivery-group order level and PG-success based.
+
 ## 2026-06-27: Supplier Fulfillment SLA, Address Lock, And Shipment Policy
 
 Decision:

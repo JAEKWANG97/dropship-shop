@@ -381,6 +381,40 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+## Claim
+
+취소, 반품, 교환 클레임 접수와 관리자 처리 상태.
+
+Suggested fields:
+
+- id
+- orderId
+- paymentGroupId
+- userId
+- claimType: CANCEL / RETURN / EXCHANGE
+- reason: SIMPLE_CHANGE_OF_MIND / DEFECT / WRONG_DELIVERY / DIFFERENT_FROM_PRODUCT_INFO / DELIVERY_ISSUE
+- status: REQUESTED / UNDER_REVIEW / EVIDENCE_REQUESTED / APPROVED / REJECTED / RETURN_WAITING / RETURN_RECEIVED / REFUND_PROCESSING / EXCHANGE_SHIPPING / COMPLETED / WITHDRAWN
+- requestedAction: REFUND / EXCHANGE
+- shippingCostBearer: CUSTOMER / SELLER / UNDECIDED
+- returnShippingFeeAmount
+- exchangeShippingFeeAmount
+- evidenceUrls
+- customerMemo
+- adminMemo
+- rejectionReason
+- requestedAt
+- deliveredAtAtRequest
+- discoveryDate
+- approvedByAdminId
+- approvedAt
+- returnCarrier
+- returnTrackingNumber
+- returnReceivedAt
+- inspectedAt
+- refundId
+- createdAt
+- updatedAt
+
 ## OrderStatusHistory
 
 주문 상태 변경 이력. 주문 상태는 임의 되돌리기 없이 허용된 액션을 통해서만 변경한다.
@@ -404,7 +438,7 @@ Suggested fields:
 
 - id
 - adminUserId
-- targetType: ORDER / PAYMENT / REFUND / SHIPMENT / PRODUCT / PRODUCT_OPTION
+- targetType: ORDER / PAYMENT / REFUND / CLAIM / SHIPMENT / PRODUCT / PRODUCT_OPTION
 - targetId
 - actionType
 - reason
@@ -502,12 +536,18 @@ Suggested fields:
 - 하나의 결제 그룹(PaymentGroup)에 일부 주문만 환불되면 결제 그룹은 `PARTIALLY_REFUNDED`가 될 수 있다.
 - 결제 승인 완료 주문은 PG 취소/환불 성공 후에만 `REFUNDED`가 될 수 있다.
 - PG 취소/환불 실패는 `FAILED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED` 같은 상태로 남기고 완료 상태로 처리하지 않는다.
-- 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태까지만 허용한다.
+- 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태이면서 공급처 발주 작업이 시작되지 않은 주문에만 허용한다.
+- 공급처 발주 작업 시작 후 배송 전 취소는 `Claim`으로 접수하고 관리자 수동 심사로 처리한다.
+- 배송 후 반품/교환은 `Claim`으로 접수하고 관리자 수동 심사로 처리한다.
+- 단순 변심 반품/교환 클레임은 배송 완료일로부터 7일 이내 접수된 건만 심사한다.
+- 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 배송 완료일로부터 3개월 이내이면서 고객이 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내 접수된 건만 심사한다.
+- 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 사진 증빙을 필수로 저장한다.
+- 클레임 상태와 환불 상태는 분리하고, 클레임 승인 후 PG 환불은 `Refund`에서 처리한다.
 - 고객 직접 배송지 변경은 `SUPPLIER_ORDER_PENDING` 상태라도 `addressLockedAt`이 기록되면 거절한다.
 - 공급처 발주 작업 시작은 새 주문 상태를 추가하지 않고 `supplierOrderStartedAt`과 `addressLockedAt`으로 기록한다.
 - 공급처 발주 증빙으로 공급처 주문번호, 발주 주소 스냅샷, 발주 관리자, 예상 출고일, 공급처 응답 메모를 기록한다.
 - 공급처 발주 후 2영업일 이상 출고 예정이 불명확하면 고객 지연 안내 대상으로 관리한다.
-- 배송 후 반품/교환은 문의와 관리자 수동 처리로 시작한다.
+- 배송 후 반품/교환은 클레임 접수와 관리자 수동 심사로 시작한다.
 - 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.
 - 자동 배송조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
 - MVP 배송은 주문 1개당 배송 1개로 시작하고 부분 출고/분할 배송은 제외한다.

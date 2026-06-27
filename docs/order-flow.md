@@ -156,6 +156,7 @@ If added later, the order flow needs separate states for account issued, waiting
 
 ```text
 Order status: SUPPLIER_ORDER_PENDING
+supplierOrderStartedAt is empty
 -> Customer requests cancellation
 -> Order status: REFUND_REQUESTED
 -> Refund status: REQUESTED
@@ -173,14 +174,24 @@ PG cancel/refund fails
 -> Admin retry or manual review is required
 ```
 
-## Customer Cancellation After Supplier Order
+## Customer Cancellation Claim After Supplier Order Work Starts
 
 ```text
-Order status: SUPPLIER_ORDERED or later
+Order status: SUPPLIER_ORDER_PENDING with supplierOrderStartedAt set, or SUPPLIER_ORDERED before shipment
 -> Customer cannot directly cancel order
--> Customer can submit cancellation/return/exchange inquiry
--> Admin checks supplier/shipment situation
--> Admin manually approves or rejects follow-up action
+-> Customer submits cancellation claim
+-> Claim type: CANCEL
+-> Claim status: REQUESTED
+-> Admin checks supplier cancellation possibility and shipment situation
+
+Supplier cancellation is possible
+-> Claim status: APPROVED
+-> Order status: REFUND_REQUESTED
+-> Refund is processed at delivery-group order level
+
+Supplier cancellation is not possible or order already shipped
+-> Claim status: REJECTED
+-> Customer is guided to post-delivery return claim if applicable
 ```
 
 ## Shipping Address Change
@@ -236,13 +247,39 @@ Admin manual correction
 -> Later automatic tracking sync cannot move the shipment backward or overwrite the admin correction without a valid forward transition
 ```
 
-## Return Or Exchange After Delivery
+## Return Or Exchange Claim After Delivery
 
 ```text
 Order status: DELIVERED
--> Customer submits return/exchange inquiry
--> Admin reviews manually
--> If refund is approved, delivery-group order level refund is processed in MVP
+-> Customer submits return or exchange claim
+-> Claim type: RETURN or EXCHANGE
+-> Customer selects claim reason:
+   - simple change of mind
+   - defect
+   - wrong delivery
+   - different from product info
+   - delivery issue
+
+Simple change of mind
+-> Request must be within 7 days from deliveredAt
+-> Return or exchange shipping cost bearer: CUSTOMER
+
+Seller fault claim
+-> Request must be within 3 months from deliveredAt and within 30 days from discovery
+-> Photo evidence is required
+-> Return or exchange shipping cost bearer: SELLER
+
+Admin approves claim
+-> If return is needed, customer sends product back
+-> Claim status: RETURN_WAITING
+-> Admin receives and inspects returned product
+-> Claim status: RETURN_RECEIVED
+-> Refund request starts within 3 business days if refund is needed
+-> Exchange proceeds if exchange is approved
+
+Admin rejects claim
+-> Claim status: REJECTED
+-> Customer sees rejection reason
 ```
 
 ## Admin Manual Correction
@@ -283,8 +320,15 @@ Admin detects wrong operational state or shipment information
 - Supplier order work should start on the same business day or next business day after payment confirmation.
 - Supplier response or expected ship date should be secured within 1 business day after supplier order.
 - Customer delay notice is required when expected shipment remains unclear for 2 business days after supplier order.
-- Customer direct cancellation is allowed only until `SUPPLIER_ORDER_PENDING`.
-- After `SUPPLIER_ORDERED`, cancellation/return/exchange is handled manually by admin.
+- Customer direct cancellation is allowed only when order status is `SUPPLIER_ORDER_PENDING` and supplier order work has not started.
+- After supplier order work starts, cancellation is handled as a claim with admin manual review.
+- After delivery, return and exchange are handled as claims with admin manual review.
+- Simple change-of-mind return/exchange request window is 7 days from delivery completion.
+- Seller-fault claim request window is within 3 months from delivery completion and within 30 days from discovery.
+- Claim reasons start with simple change of mind, defect, wrong delivery, different from product info, and delivery issue.
+- Defect, wrong delivery, different-from-product-info, and delivery issue claims require photo evidence by default.
+- Simple change-of-mind return/exchange shipping cost is borne by the customer by default.
+- Seller-fault return/exchange shipping cost is borne by the seller/operator by default.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.
 - MVP includes automatic carrier tracking sync after carrier and tracking number are entered.
