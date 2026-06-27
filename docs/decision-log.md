@@ -105,6 +105,24 @@ Consequences:
 - Server-side payment verification is required before the order moves to `SUPPLIER_ORDER_PENDING`.
 - The payment and order records must be linked by order id or order number.
 
+## 2026-06-27: Payment Pending Expiration
+
+Decision:
+
+Expire `PAYMENT_PENDING` orders 30 minutes after creation.
+
+Context:
+
+Payment-pending orders should not remain valid forever. They are not confirmed orders, but they reserve a server-side checkout record for PG payment verification. A 30-minute window gives customers enough time to complete payment while keeping abandoned checkout data bounded.
+
+Consequences:
+
+- Orders need an `expiresAt` field or equivalent expiration calculation.
+- Expired payment-pending orders should transition to `EXPIRED`.
+- Expired orders are not supplier-order candidates.
+- Payment verification arriving after expiration must not confirm the order.
+- Customers must create a new order after expiration.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

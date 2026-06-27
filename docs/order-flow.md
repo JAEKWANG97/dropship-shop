@@ -42,7 +42,16 @@ Order status: PAYMENT_PENDING
 -> PG payment fails
 -> Payment status: FAILED
 -> Order remains unconfirmed
--> Customer can retry or abandon order
+-> Customer can retry before order expiration or create a new order
+```
+
+## Payment Pending Expiration
+
+```text
+Order status: PAYMENT_PENDING
+-> 30 minutes pass without verified payment approval
+-> Order expires
+-> Customer must create a new order to retry checkout
 ```
 
 ## Payment Amount Mismatch
@@ -71,6 +80,7 @@ Order status: SUPPLIER_ORDER_PENDING
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
+- `PAYMENT_PENDING` orders expire 30 minutes after creation.
 - Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.

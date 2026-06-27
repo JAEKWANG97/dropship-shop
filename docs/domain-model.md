@@ -172,12 +172,14 @@ Suggested fields:
 - shippingFee
 - discountAmount
 - totalAmount
+- expiresAt
 - createdAt
 - updatedAt
 
 Suggested statuses:
 
 - PAYMENT_PENDING
+- EXPIRED
 - SUPPLIER_ORDER_PENDING
 - SUPPLIER_ORDERED
 - OUT_OF_STOCK
@@ -288,6 +290,7 @@ Suggested fields:
 - 상품 가격이 변경되어도 기존 주문 상품의 스냅샷 가격은 변경하지 않는다.
 - 주문은 결제 요청 전에 `PAYMENT_PENDING` 상태로 생성한다.
 - `PAYMENT_PENDING` 주문은 결제 검증 전이므로 공급처 발주 대상이 아니다.
+- `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 `EXPIRED`로 만료 처리한다.
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
 - 주문 상태 변경 이력은 별도 테이블로 추가하는 것이 좋다.
