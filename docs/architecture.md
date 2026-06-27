@@ -157,3 +157,12 @@ Single server
 ```
 
 Do not introduce microservices before order and fulfillment workflows are stable.
+
+Production baseline is tracked in [Production Readiness](production-readiness.md).
+
+- Run the API with `SPRING_PROFILES_ACTIVE=prod`.
+- Use managed PostgreSQL with automated backup and point-in-time recovery before live payments.
+- Run Flyway migrations for schema changes; production Hibernate mode is `validate`.
+- Use `/actuator/health/readiness` for readiness probes and `/actuator/health/liveness` for liveness probes.
+- Configure CORS through `APP_CORS_ALLOWED_ORIGINS` with only the deployed customer/admin frontend origins.
+- Keep Toss Payments secret key and DB credentials in runtime environment or secret manager only.

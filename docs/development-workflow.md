@@ -130,6 +130,27 @@ Default flow:
 5. Link the issue in the PR body.
 6. Merge after review and verification.
 
+## Production Baseline Verification
+
+운영 설정, 보안 설정, DB migration, 결제 설정, health endpoint를 바꾸는 PR은 다음을 확인한다.
+
+```sh
+cd apps/api
+./gradlew test --rerun-tasks
+cd ../..
+git diff --check
+```
+
+필요하면 API를 실행하고 health endpoints를 직접 확인한다.
+
+```sh
+curl -fsS http://localhost:8080/api/health
+curl -fsS http://localhost:8080/actuator/health/readiness
+curl -fsS http://localhost:8080/actuator/health/liveness
+```
+
+운영 환경 변수와 체크리스트 기준은 [Production Readiness](production-readiness.md)를 따른다.
+
 ## Status Rules
 
 Recommended Linear status usage:

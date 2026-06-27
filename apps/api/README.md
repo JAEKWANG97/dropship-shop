@@ -31,11 +31,20 @@ DB_PASSWORD=dropship
 
 The local profile reads the values above from environment variables and falls back to those defaults.
 
+## Production Profile
+
+- Production runs with `SPRING_PROFILES_ACTIVE=prod`.
+- Required production variables are documented in [Production Readiness](../../docs/production-readiness.md).
+- The `prod` profile requires `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `PAYMENTS_TOSS_SECRET_KEY`, and `APP_CORS_ALLOWED_ORIGINS`.
+- Flyway is enabled and Hibernate uses `ddl-auto=validate` in production.
+
 ## Health Checks
 
 ```sh
 curl http://localhost:8080/api/health
 curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/health/readiness
+curl http://localhost:8080/actuator/health/liveness
 ```
 
 ## Authentication Foundation

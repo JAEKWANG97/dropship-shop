@@ -748,14 +748,17 @@ Acceptance criteria:
 
 ### DS-17: Add production readiness baseline
 
+Status: Implemented
+
 Description:
 
 Prepare production deployment and operational baseline.
 
 Acceptance criteria:
 
-- Production environment variables are documented.
-- Logging baseline exists.
-- Error monitoring plan exists.
-- Backup plan for PostgreSQL is documented.
-- Admin operating checklist is documented.
+- Production environment variables are documented in `docs/production-readiness.md`.
+- Logging baseline exists in `application-prod.yml` and `docs/production-readiness.md`.
+- Error monitoring plan exists in `docs/production-readiness.md`.
+- Backup plan for PostgreSQL is documented in `docs/production-readiness.md`.
+- Admin operating checklist is documented in `docs/production-readiness.md`.
+- Prod profile, readiness/liveness health probes, and env-based CORS baseline are covered by `ProductionReadinessIntegrationTest`.

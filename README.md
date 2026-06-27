@@ -75,6 +75,7 @@
 - [Order Flow](docs/order-flow.md)
 - [Domain Model](docs/domain-model.md)
 - [Architecture](docs/architecture.md)
+- [Production Readiness](docs/production-readiness.md)
 - [Roadmap](docs/roadmap.md)
 - [Linear Backlog](docs/linear-backlog.md)
 - [Development Workflow](docs/development-workflow.md)

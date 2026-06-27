@@ -18,7 +18,7 @@
 - Server calculates all order, payment, refund, and shipping amounts.
 - Client-submitted totals are never trusted.
 - Mutating admin actions that affect order, refund, shipment, claim, or product status should record audit history.
-- API error format is not finalized yet.
+- API error format is not finalized yet. Current baseline uses Spring/default domain HTTP errors until a stable frontend contract is defined.
 
 ## Grouping Index
 
@@ -39,6 +39,8 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/health` | Public | Implemented | Application health check |
 | `GET` | `/actuator/health` | Public | Implemented | Actuator health check |
+| `GET` | `/actuator/health/readiness` | Public | Implemented | Readiness probe |
+| `GET` | `/actuator/health/liveness` | Public | Implemented | Liveness probe |
 | `GET` | `/actuator/info` | Public | Implemented | Actuator info endpoint |
 | `GET` | `/api/me` | Authenticated user | Implemented | Return authenticated user id |
 | `GET` | `/api/admin/me` | `ADMIN` | Implemented | Prove admin access and return admin user id |
@@ -529,7 +531,7 @@ DS-6 should keep request/response DTOs separate from JPA entities.
 
 ## Open API Notes
 
-- Final error response format is not defined.
+- Final error response format is not defined. This is documented as a production-readiness follow-up, and current APIs must still return the correct HTTP status for policy/state failures.
 - Pagination format is not defined.
 - Image upload binary flow is not defined; DS-6 can start with image URL/object key metadata.
 - OAuth token/session format is not defined.
