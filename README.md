@@ -1,6 +1,6 @@
 # Dropship Shop
 
-단일 운영자가 상품을 판매하고, 실제 출고는 공급처가 처리하는 위탁/드롭쉬핑형 쇼핑몰 프로젝트입니다.
+단일 운영자가 상품을 판매하고, 실제 출고는 공급처가 처리하는 공급처 출고형 자사몰 프로젝트입니다.
 
 ## Product Definition
 
@@ -60,20 +60,21 @@
 - Auth: Spring Security
 - Frontend: React or Next.js
 - Storage: S3-compatible object storage
-- Payment: Toss Payments, PortOne, or another Korean PG
+- Payment: Toss Payments
 - Deployment: Single application server + managed PostgreSQL at first
 
 ## Documentation
 
+- [Documentation Index](docs/README.md)
 - [Product Brief](docs/product-brief.md)
+- [Glossary](docs/glossary.md)
 - [Requirements](docs/requirements.md)
-- [Domain Model](docs/domain-model.md)
+- [Policy Documents](docs/policies/README.md)
 - [Order Flow](docs/order-flow.md)
+- [Domain Model](docs/domain-model.md)
 - [Architecture](docs/architecture.md)
 - [Roadmap](docs/roadmap.md)
-- [Decision Log](docs/decision-log.md)
-- [Glossary](docs/glossary.md)
-- [GitHub And Linear Setup](docs/github-linear-setup.md)
 - [Linear Backlog](docs/linear-backlog.md)
-- [Policy Documents](docs/policies/README.md)
 - [Development Workflow](docs/development-workflow.md)
+- [Decision Log](docs/decision-log.md)
+- [GitHub And Linear Setup](docs/github-linear-setup.md)

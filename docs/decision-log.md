@@ -95,7 +95,7 @@ Create an order before requesting PG payment. The initial order status is `PAYME
 
 Context:
 
-Payment needs an internal checkout/payment group anchor so the server can calculate the amount, pass a stable identifier to the PG flow, and verify the PG-approved amount against the server-side payment group amount. The payment group can contain one or more delivery-group orders.
+Payment needs an internal payment group anchor so the server can calculate the amount, pass a stable identifier to the PG flow, and verify the PG-approved amount against the server-side payment group amount. The payment group can contain one or more delivery-group orders.
 
 Consequences:
 
@@ -315,7 +315,7 @@ Consequences:
 
 Decision:
 
-Expose terms of service, privacy policy, shipping policy, and cancellation/refund policy from the customer menu and footer. At first signup or first social login completion, collect terms of service and privacy policy agreement. At checkout, require one integrated confirmation checkbox per checkout/payment group before payment can start. The checkout confirmation covers order items, payment amount, shipping address, shipping policy, cancellation/refund policy, post-payment supplier out-of-stock possibility, and refund of the affected delivery-group order amount on out-of-stock. Store policy versions and confirmation time with the payment group.
+Expose terms of service, privacy policy, shipping policy, and cancellation/refund policy from the customer menu and footer. At first signup or first social login completion, collect terms of service and privacy policy agreement. At checkout, require one integrated confirmation checkbox per payment group before payment can start. The checkout confirmation covers order items, payment amount, shipping address, shipping policy, cancellation/refund policy, post-payment supplier out-of-stock possibility, and refund of the affected delivery-group order amount on out-of-stock. Store policy versions and confirmation time with the payment group.
 
 Context:
 

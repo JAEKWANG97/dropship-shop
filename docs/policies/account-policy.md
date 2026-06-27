@@ -16,7 +16,7 @@ Status: Confirmed
 - 관리자 권한 범위
 - 계정 정지/탈퇴 처리
 
-## Proposed MVP Direction
+## Initial Direction
 
 - 비회원 주문은 MVP에서 제외한다.
 - 고객은 로그인 후 주문할 수 있다.

@@ -16,7 +16,7 @@ Status: Confirmed
 - 관리자 작업 이력
 - 운영 실수 복구 기준
 
-## Proposed MVP Direction
+## Initial Direction
 
 - MVP에서는 `ADMIN` 단일 관리자 권한으로 시작한다.
 - 관리자 작업 이력은 주문 상태 변경에 대해서 우선 기록한다.

@@ -17,7 +17,7 @@ Status: Confirmed
 - 상품/옵션 판매 상태
 - 주문 후 공급처 품절 처리
 
-## Proposed MVP Direction
+## Initial Direction
 
 - 실제 재고 수량은 관리하지 않는다.
 - 상품과 옵션은 판매 상태만 가진다.

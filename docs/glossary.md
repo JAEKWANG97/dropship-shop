@@ -28,9 +28,9 @@
 
 PG를 통한 결제 기록. 주문 상태와 분리해서 관리한다.
 
-## Payment Group
+## PaymentGroup / 결제 그룹
 
-고객의 한 번 결제를 나타내는 checkout 결제 묶음. 하나의 Payment Group은 여러 배송그룹 주문을 포함할 수 있다.
+고객의 한 번 결제를 나타내는 결제 묶음. 하나의 `PaymentGroup`은 여러 배송 그룹 주문을 포함할 수 있다.
 
 ## Fulfillment
 

@@ -5,7 +5,7 @@
 ```text
 Customer selects product option
 -> Cart items are grouped by delivery group
--> Customer creates checkout/payment group
+-> Customer creates payment group
 -> System creates one PAYMENT_PENDING order per delivery group
 -> Customer confirms order notice checkbox
 -> Customer pays through PG
@@ -35,7 +35,7 @@ Cart contains products from multiple suppliers
 -> Each delivery group has shipping fee 0
 ```
 
-## Supplier Out Of Stock For Single Delivery Group
+## Supplier Out Of Stock For Single-Order Payment Group
 
 ```text
 Order status: SUPPLIER_ORDER_PENDING
@@ -44,9 +44,9 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Fulfillment status: OUT_OF_STOCK
 -> Order status: OUT_OF_STOCK
 -> Customer is notified
--> Refund is requested
+-> Refund is requested for this order amount
 -> Refund status: PG_CANCEL_REQUESTED
--> PG full cancel/refund succeeds
+-> PG full cancel/refund succeeds because the payment group contains only this order
 -> Refund status: COMPLETED
 -> Payment status: REFUNDED
 -> Order status: REFUNDED
@@ -156,11 +156,12 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Customer requests cancellation
 -> Order status: REFUND_REQUESTED
 -> Refund status: REQUESTED
--> PG full cancel/refund is requested
+-> Refund is requested for the cancelled order amount
 -> Refund status: PG_CANCEL_REQUESTED
--> PG cancel/refund succeeds
+-> If the payment group has no other active orders, PG full cancel/refund succeeds
+-> If the payment group has other active orders, PG partial cancel/refund succeeds
 -> Refund status: COMPLETED
--> Payment status: REFUNDED
+-> Payment status: REFUNDED or PARTIALLY_REFUNDED
 -> Order status: REFUNDED
 
 PG cancel/refund fails
@@ -238,6 +239,7 @@ Admin detects wrong operational state or shipment information
 - Payment approval verification requires order status `PAYMENT_PENDING`, unexpired order, completed checkout policy confirmation, amount match, unused/conflict-free PG payment key, and sellable product/option status.
 - If PG approves payment but order confirmation fails, the order moves to `PAYMENT_EXCEPTION` and supplier ordering is blocked.
 - Payment exceptions attempt immediate full PG cancel.
+- Immediate full PG cancel applies to payment exceptions before order confirmation, not to normal delivery-group order level refund after a payment group is confirmed.
 - Failed automatic PG cancel creates an admin emergency review item and must not be hidden from the customer.
 - MVP enabled payment methods are card, easy payment, and account transfer through Toss Payments.
 - Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.

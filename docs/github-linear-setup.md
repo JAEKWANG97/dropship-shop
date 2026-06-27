@@ -1,4 +1,8 @@
-# GitHub And Linear Setup
+# GitHub And Linear Setup Record
+
+This document records the initial GitHub and Linear setup for Dropship Shop.
+
+Later issue planning is tracked in [Linear Backlog](linear-backlog.md) and Linear.
 
 ## GitHub
 
@@ -41,9 +45,9 @@ GitHub Autolink is configured:
 
 - `DS-123` links to `https://linear.app/dropship-shop/issue/DS-123`
 
-Created issues:
+Created initial issues:
 
-- DS-1 through DS-17
+- Initial issues DS-1 through DS-17
 
 ## Remaining Setup Steps
 

@@ -16,7 +16,7 @@ Status: Confirmed
 - 주문 상태 변경 주체
 - 고객에게 노출할 주문 상태
 
-## Proposed MVP Direction
+## Initial Direction
 
 - 주문은 결제 요청 전에 `PAYMENT_PENDING` 상태로 생성한다.
 - 결제 성공 후 `SUPPLIER_ORDER_PENDING`으로 전환한다.
@@ -27,12 +27,12 @@ Status: Confirmed
 
 ## Confirmed Policy
 
-- checkout/payment group과 배송그룹별 주문은 결제 요청 전에 먼저 생성한다.
-- 결제 전 배송그룹 주문의 초기 상태는 `PAYMENT_PENDING`이다.
+- 결제 그룹(PaymentGroup)과 배송 그룹별 주문은 결제 요청 전에 먼저 생성한다.
+- 결제 전 배송 그룹 주문의 초기 상태는 `PAYMENT_PENDING`이다.
 - `PAYMENT_PENDING` 주문은 아직 확정 주문이 아니다.
-- PG 결제 요청은 서버에 생성된 payment group 식별자와 서버 계산 payment group 총액을 기준으로 진행한다.
-- 결제 성공 후 서버가 PG 승인 결과와 payment group 총액을 검증한 뒤 포함 주문들을 확정한다.
-- 결제 승인 검증이 성공하면 payment group에 포함된 배송그룹 주문들은 `SUPPLIER_ORDER_PENDING` 상태로 진입한다.
+- PG 결제 요청은 서버에 생성된 결제 그룹(PaymentGroup) 식별자와 서버 계산 결제 그룹 총액을 기준으로 진행한다.
+- 결제 성공 후 서버가 PG 승인 결과와 결제 그룹 총액을 검증한 뒤 포함 주문들을 확정한다.
+- 결제 승인 검증이 성공하면 결제 그룹(PaymentGroup)에 포함된 배송 그룹 주문들은 `SUPPLIER_ORDER_PENDING` 상태로 진입한다.
 - PG 결제가 승인됐지만 주문을 확정할 수 없으면 주문은 `PAYMENT_EXCEPTION` 상태로 진입하고 공급처 발주를 차단한다.
 - `PAYMENT_EXCEPTION`은 결제 취소 처리 중 또는 결제 확인 필요 상태로 고객에게 노출한다.
 - `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 만료 처리한다.
@@ -43,16 +43,16 @@ Status: Confirmed
 - `SUPPLIER_ORDERED` 이후 배송지 변경은 고객 문의와 관리자 수동 처리 대상으로 본다.
 - 고객에게 내부 주문 상태를 그대로 노출하지 않는다.
 - 고객 화면에는 내부 상태를 고객용 표시 상태로 매핑해서 노출한다.
-- 고객 주문 내역에는 배송그룹별 주문을 표시하되, 같은 checkout/payment group에서 생성된 주문임을 묶어 보여줄 수 있어야 한다.
+- 고객 주문 내역에는 배송 그룹별 주문을 표시하되, 같은 결제 그룹(PaymentGroup)에서 생성된 주문임을 묶어 보여줄 수 있어야 한다.
 - 내부 상태는 운영, 결제 검증, 공급처 발주, 환불 정합성을 위한 상태로 유지한다.
 
 ## System Impact
 
 - 결제 전 주문과 결제 완료 주문을 명확히 구분해야 한다.
-- PG 결제 승인 금액과 서버 payment group 총액을 비교해야 한다.
+- PG 결제 승인 금액과 서버 결제 그룹(PaymentGroup) 총액을 비교해야 한다.
 - 주문 상태 변경 이력이 필요하다.
-- 결제 요청과 결제 검증은 payment group ID 또는 checkout number를 기준으로 연결되어야 한다.
-- 각 배송그룹 주문은 payment group ID를 저장해야 한다.
+- 결제 요청과 결제 검증은 결제 그룹(PaymentGroup) ID 또는 checkout number를 기준으로 연결되어야 한다.
+- 각 배송 그룹 주문은 결제 그룹(PaymentGroup) ID를 저장해야 한다.
 - `PAYMENT_PENDING` 주문은 관리자 공급처 발주 큐에 노출하지 않는다.
 - 결제 대기 주문 만료 처리를 위한 스케줄러 또는 만료 검증 로직이 필요하다.
 - 만료 이후 들어온 결제 승인 검증 요청은 주문 확정으로 처리하지 않아야 한다.
@@ -69,7 +69,7 @@ None
 
 ## Customer Display Status Mapping
 
-Initial mapping:
+Initial mapping for checkout, admin support, and exceptional customer-facing states. Failed, pending, and expired payment orders are not shown in normal customer order history.
 
 | Internal status | Customer display status |
 | --- | --- |
