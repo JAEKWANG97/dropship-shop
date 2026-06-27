@@ -28,6 +28,7 @@ Status: Draft
 
 ## Confirmed Policy
 
+- MVP PG provider is Toss Payments.
 - 결제 요청 전에 서버 주문을 `PAYMENT_PENDING` 상태로 생성한다.
 - 결제 승인 검증은 Spring Boot 서버에서 수행한다.
 - PG 승인 금액과 서버 주문 금액이 일치해야 주문을 확정한다.
@@ -43,6 +44,7 @@ Status: Draft
 
 ## Open Questions
 
-- PG는 Toss Payments로 시작할 것인가, PortOne으로 시작할 것인가?
+- MVP에서 활성화할 Toss Payments 결제수단은 무엇인가?
+- 가상계좌/무통장입금성 비동기 결제는 MVP에서 제외할 것인가?
 - 부분 취소를 MVP에서 지원할 것인가?
 - 결제 실패 주문은 고객 주문 내역에 보여줄 것인가?

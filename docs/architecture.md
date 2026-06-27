@@ -113,7 +113,9 @@ First admin screens:
 
 ### Payment Gateway
 
-The server must verify payment result directly with the PG before approving an order.
+Use Toss Payments for MVP.
+
+The server must verify payment result directly with Toss Payments before approving an order.
 
 ### Object Storage
 

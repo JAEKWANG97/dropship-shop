@@ -176,6 +176,23 @@ Consequences:
 - One Linear issue can map to one PR even if both frontend and backend are touched.
 - Repository split can be revisited later if team ownership, release cadence, CI cost, or security boundaries require it.
 
+## 2026-06-27: Payment Gateway Provider
+
+Decision:
+
+Use Toss Payments as the MVP payment gateway provider.
+
+Context:
+
+The product targets a Korean commerce flow and needs a domestic PG that supports card, easy payment, account transfer, and optional virtual account flows. Toss Payments is the selected provider for the first implementation path.
+
+Consequences:
+
+- Payment integration issues should target Toss Payments APIs and SDKs.
+- Spring Boot must verify payment approvals server-side with Toss Payments.
+- Payment method policy still needs to decide which Toss-supported methods are enabled for MVP.
+- Virtual account/bank-transfer-like flows require separate async deposit state handling if included.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

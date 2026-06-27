@@ -64,7 +64,112 @@ Acceptance criteria:
 
 Notes:
 
-- Toss Payments and PortOne are initial candidates.
+- Toss Payments is confirmed for MVP.
+- DS-18 tracks the remaining payment method policy decisions.
+
+## Milestone 1.5: MVP Policy Completion
+
+### DS-18: Finalize Toss Payments method policy
+
+Description:
+
+Finalize which Toss Payments methods are enabled in MVP and which are deferred.
+
+Acceptance criteria:
+
+- MVP payment methods are confirmed.
+- Virtual account/bank-transfer-like async payment handling is either designed or explicitly deferred.
+- Partial cancel support is decided.
+- Failed/expired payment order visibility is decided.
+- `docs/policies/payment-policy.md` and `docs/decision-log.md` are updated.
+
+References:
+
+- `docs/policies/payment-policy.md`
+- `docs/policies/order-policy.md`
+- `docs/order-flow.md`
+
+### DS-19: Finalize fulfillment and shipping policy
+
+Description:
+
+Finalize supplier order and shipping policy for MVP operations.
+
+Acceptance criteria:
+
+- Manual supplier ordering is confirmed or revised.
+- Shipping fee policy is decided.
+- Multiple-supplier order policy is decided.
+- Shipment tracking input and delivery completion handling are decided.
+- `docs/policies/fulfillment-shipping-policy.md` and `docs/decision-log.md` are updated.
+
+References:
+
+- `docs/policies/fulfillment-shipping-policy.md`
+- `docs/order-flow.md`
+- `docs/domain-model.md`
+
+### DS-20: Finalize cancellation and refund policy
+
+Description:
+
+Finalize customer cancellation, supplier out-of-stock, refund, return, and exchange policy for MVP.
+
+Acceptance criteria:
+
+- Direct customer cancellation window is decided.
+- Admin approval rules after supplier order are decided.
+- Partial out-of-stock handling is decided.
+- Refund reason categories are decided.
+- Post-shipment return/exchange MVP scope is decided.
+- `docs/policies/cancellation-refund-policy.md` and `docs/decision-log.md` are updated.
+
+References:
+
+- `docs/policies/cancellation-refund-policy.md`
+- `docs/policies/payment-policy.md`
+- `docs/order-flow.md`
+
+### DS-21: Finalize admin operations policy
+
+Description:
+
+Finalize admin role, audit, and manual operation policy for MVP.
+
+Acceptance criteria:
+
+- Admin role model is decided.
+- Admin account creation flow is decided.
+- Admin action history scope is decided.
+- Refund action reason requirement is decided.
+- State rollback support is decided.
+- `docs/policies/admin-operations-policy.md` and `docs/decision-log.md` are updated.
+
+References:
+
+- `docs/policies/admin-operations-policy.md`
+- `docs/policies/account-policy.md`
+- `docs/policies/order-policy.md`
+
+### DS-22: Finalize legal and customer notice policy
+
+Description:
+
+Finalize where and how customer-facing notices and policy acknowledgements are shown in MVP.
+
+Acceptance criteria:
+
+- Supplier out-of-stock notice locations are decided.
+- Checkout policy acknowledgement checkbox is decided.
+- Policy versioning scope is decided.
+- Customer notification method baseline is decided.
+- `docs/policies/legal-and-customer-notice-policy.md` and `docs/decision-log.md` are updated.
+
+References:
+
+- `docs/policies/legal-and-customer-notice-policy.md`
+- `docs/policies/catalog-inventory-policy.md`
+- `docs/policies/cancellation-refund-policy.md`
 
 ## Milestone 2: Backend Foundation
 
@@ -257,4 +362,3 @@ Acceptance criteria:
 - Error monitoring plan exists.
 - Backup plan for PostgreSQL is documented.
 - Admin operating checklist is documented.
-
