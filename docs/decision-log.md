@@ -267,6 +267,25 @@ Consequences:
 - Customer order history may show multiple orders from one cart checkout.
 - Future marketplace-like combined orders require partial cancellation/refund and multi-shipment support.
 
+## 2026-06-27: Cancellation And Refund Scope
+
+Decision:
+
+Allow customer direct cancellation only until `SUPPLIER_ORDER_PENDING`. After `SUPPLIER_ORDERED`, cancellation, return, and exchange requests are handled manually by admin. MVP supports full-order cancellation/refund only. Partial cancellation/refund is excluded.
+
+Context:
+
+After supplier ordering, the supplier may have started fulfillment or shipment preparation. The MVP also excludes partial cancellation/refund, so post-supplier-order changes need manual review to avoid mismatches between customer order, supplier fulfillment, payment, and shipment state.
+
+Consequences:
+
+- Customer cancel button is shown only through `SUPPLIER_ORDER_PENDING`.
+- `SUPPLIER_ORDERED` and later states reject direct customer cancellation.
+- Supplier out-of-stock leads to full-order cancellation/refund.
+- Partial out-of-stock also leads to full-order cancellation/refund in MVP.
+- Return/exchange after delivery starts as inquiry/admin manual handling.
+- Refund reason enum starts with customer cancel, supplier out of stock, admin cancel, payment amount mismatch, return requested, and exchange requested.
+
 ## 2026-06-27: Supplier Order Model
 
 Decision:

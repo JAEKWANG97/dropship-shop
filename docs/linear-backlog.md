@@ -117,11 +117,11 @@ Finalize customer cancellation, supplier out-of-stock, refund, return, and excha
 
 Acceptance criteria:
 
-- Direct customer cancellation window is decided.
-- Admin approval rules after supplier order are decided.
-- Partial out-of-stock handling is decided.
+- Direct customer cancellation window is decided: through `SUPPLIER_ORDER_PENDING`.
+- Admin approval rules after supplier order are decided: manual admin handling after `SUPPLIER_ORDERED`.
+- Partial out-of-stock handling is decided: full-order cancellation/refund in MVP.
 - Refund reason categories are decided.
-- Post-shipment return/exchange MVP scope is decided.
+- Post-shipment return/exchange MVP scope is decided: inquiry/admin manual handling.
 - `docs/policies/cancellation-refund-policy.md` and `docs/decision-log.md` are updated.
 
 References:

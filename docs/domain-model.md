@@ -287,7 +287,7 @@ Suggested fields:
 - id
 - orderId
 - paymentId
-- reason
+- reason: CUSTOMER_CANCEL / SUPPLIER_OUT_OF_STOCK / ADMIN_CANCEL / PAYMENT_AMOUNT_MISMATCH / RETURN_REQUESTED / EXCHANGE_REQUESTED
 - status: REQUESTED / APPROVED / REJECTED / COMPLETED
 - refundAmount
 - requestedAt
@@ -312,6 +312,8 @@ Suggested fields:
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
 - MVP 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
 - MVP에서는 부분 취소를 지원하지 않고 주문 단위 전액 취소/환불을 우선 지원한다.
+- 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태까지만 허용한다.
+- 배송 후 반품/교환은 문의와 관리자 수동 처리로 시작한다.
 - 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.
 - 자동 배송조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
 - MVP에서는 고객에게 별도 배송비를 청구하지 않으며 `shippingFee`는 `0`으로 시작한다.

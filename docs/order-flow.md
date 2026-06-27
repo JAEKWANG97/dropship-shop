@@ -91,11 +91,19 @@ If added later, the order flow needs separate states for account issued, waiting
 ```text
 Order status: SUPPLIER_ORDER_PENDING
 -> Customer requests cancellation
--> Order status: CANCEL_REQUESTED
--> Admin approves cancellation
+-> Order status: CANCELLED
 -> PG refund/cancel is executed
 -> Payment status: CANCELLED or REFUNDED
--> Order status: CANCELLED
+```
+
+## Customer Cancellation After Supplier Order
+
+```text
+Order status: SUPPLIER_ORDERED or later
+-> Customer cannot directly cancel order
+-> Customer can submit cancellation/return/exchange inquiry
+-> Admin checks supplier/shipment situation
+-> Admin manually approves or rejects follow-up action
 ```
 
 ## Shipping Address Change
@@ -127,6 +135,15 @@ Tracking sync failure
 -> Retry later or allow admin manual correction
 ```
 
+## Return Or Exchange After Delivery
+
+```text
+Order status: DELIVERED
+-> Customer submits return/exchange inquiry
+-> Admin reviews manually
+-> If refund is approved, full-order refund is processed in MVP
+```
+
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
@@ -140,11 +157,14 @@ Tracking sync failure
 - Delivery groups are based on supplier, but customer UI should use delivery group wording instead of supplier wording.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
+- Customer direct cancellation is allowed only until `SUPPLIER_ORDER_PENDING`.
+- After `SUPPLIER_ORDERED`, cancellation/return/exchange is handled manually by admin.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - `SHIPPED` requires carrier and tracking number.
 - MVP includes automatic carrier tracking sync after carrier and tracking number are entered.
 - Automatic tracking sync failure must not block order, payment, or refund operations.
 - `REFUNDED` requires a completed refund record.
+- MVP does not support partial cancellation or partial refund.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
 
 ## Risk Points
