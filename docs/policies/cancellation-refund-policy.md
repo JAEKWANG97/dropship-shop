@@ -67,14 +67,14 @@ Status: Confirmed
 ## System Impact
 
 - 취소 가능 여부는 주문 상태와 `supplierOrderStartedAt`, `addressLockedAt`을 함께 기준으로 계산한다.
-- `SUPPLIER_ORDER_PENDING`이면서 공급처 발주 작업이 시작되지 않은 주문만 고객 직접 취소가 가능하다.
-- `SUPPLIER_ORDERED` 이후는 관리자 승인 또는 수동 처리 흐름이 필요하다.
-- `Claim` 모델이 필요하다.
+- `SUPPLIER_ORDER_PENDING`이면서 공급처 발주 작업이 시작되지 않은 주문만 고객 직접 취소가 가능하다. Implemented by DS-14.
+- `SUPPLIER_ORDERED` 이후는 관리자 승인 또는 수동 처리 흐름이 필요하다. Implemented for cancellation claims by DS-14.
+- `Claim` 모델이 필요하다. Implemented by DS-14.
 - 클레임 처리 상태와 환불 상태는 분리한다.
 - 클레임 승인 후 실제 환불은 `Refund` 모델과 PG 취소/환불 성공 기준을 따른다.
 - 배송 그룹 주문 단위 환불을 허용하되, 상품/옵션/수량 단위 환불을 제외해 주문/결제/환불 모델 복잡도를 제한한다.
 - 고객 취소 버튼 노출 여부는 주문 상태로 판단해야 한다.
-- 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다.
+- 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다. Cancellation claim flow is implemented by DS-14; return/exchange remain planned.
 - 환불 사유 enum이 필요하다.
 - 환불 상태는 PG 요청/성공/실패/재시도를 구분해야 한다.
 - 환불 실패 건을 처리하는 관리자 큐가 필요하다.

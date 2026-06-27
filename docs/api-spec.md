@@ -299,11 +299,13 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Planned | Create cancellation, return, or exchange claim |
+| `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Implemented | Self-service cancel when eligible |
+| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Implemented | Create cancellation claim after supplier work starts |
 | `GET` | `/api/orders/{orderId}/claims` | Authenticated user | Planned | Customer claim list for an order |
 | `GET` | `/api/claims/{claimId}` | Authenticated user | Planned | Customer claim detail |
-| `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Planned | Approve claim |
-| `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Planned | Reject claim |
+| `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin cancellation claim queue |
+| `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve cancellation claim |
+| `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject cancellation claim |
 | `POST` | `/api/admin/claims/{claimId}/request-evidence` | `ADMIN` | Planned | Request evidence |
 | `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Planned | Mark return received |
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
@@ -316,8 +318,9 @@ Rules:
 Rules:
 
 - Customer self-service cancel is allowed only while `SUPPLIER_ORDER_PENDING` and supplier work has not started.
-- After supplier work starts, cancellation becomes a claim.
-- Return and exchange are claims.
+- Self-service cancellation creates an approved cancellation claim and moves the order to `REFUND_REQUESTED`; PG refund execution remains DS-15.
+- After supplier work starts, cancellation becomes a `CANCEL` claim that admin can approve or reject.
+- Return and exchange claims remain planned.
 - Refund completion requires PG cancel/refund success.
 - Delivery-group order level partial refund is supported.
 - Product, option, and quantity-level partial refund inside one delivery-group order is excluded.

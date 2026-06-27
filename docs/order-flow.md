@@ -184,6 +184,8 @@ Order status: SUPPLIER_ORDER_PENDING
 supplierOrderStartedAt is empty
 -> Customer requests cancellation
 -> Order status: REFUND_REQUESTED
+-> Claim type: CANCEL
+-> Claim status: APPROVED
 -> Refund status: REQUESTED
 -> Refund is requested for the cancelled order amount
 -> Refund status: PG_CANCEL_REQUESTED
@@ -216,6 +218,7 @@ Supplier cancellation is possible
 
 Supplier cancellation is not possible or order already shipped
 -> Claim status: REJECTED
+-> Order status stays unchanged
 -> Customer is guided to post-delivery return claim if applicable
 ```
 

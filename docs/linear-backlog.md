@@ -695,6 +695,8 @@ Acceptance criteria:
 
 ### DS-14: Implement customer cancellation request
 
+Status: Implemented
+
 Description:
 
 Allow customers to request cancellation before shipment.
@@ -704,6 +706,9 @@ Acceptance criteria:
 - Customer can request cancellation for eligible orders.
 - Ineligible orders cannot be cancelled from customer UI.
 - Admin can review cancellation requests.
+- Self-service cancellation is implemented by `POST /api/orders/{orderId}/cancel`.
+- Post-supplier-work cancellation claim is implemented by `POST /api/orders/{orderId}/claims`.
+- Admin cancellation review is implemented by `GET /api/admin/claims`, `POST /api/admin/claims/{claimId}/approve`, and `POST /api/admin/claims/{claimId}/reject`.
 
 ### DS-15: Implement refund handling
 

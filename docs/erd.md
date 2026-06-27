@@ -14,7 +14,8 @@
 - DS-11 admin order queue is implemented with existing order, order item, payment, supplier, and user tables; no schema change was required.
 - Fulfillment and admin order action history tables: implemented in `apps/api/src/main/resources/db/migration/V6__create_fulfillment.sql`.
 - Shipment table: implemented in `apps/api/src/main/resources/db/migration/V7__create_shipment.sql`.
-- Refund, claim, policy, and remaining audit tables: planned.
+- Claim table: implemented in `apps/api/src/main/resources/db/migration/V8__create_claim.sql`.
+- Refund, policy, and remaining audit tables: planned.
 
 ## Modeling Rules
 
@@ -564,14 +565,23 @@ Constraints and indexes:
 
 - `id`
 - `order_id`
-- `payment_group_id`
 - `user_id`
 - `claim_type`: `CANCEL` / `RETURN` / `EXCHANGE`
-- `reason`
-- `status`
-- evidence, memo, return, exchange, approval, and refund fields
+- `claim_reason`: `SIMPLE_CHANGE_OF_MIND` / `DEFECT` / `WRONG_DELIVERY` / `DIFFERENT_FROM_PRODUCT_INFO` / `DELIVERY_ISSUE`
+- `status`: `REQUESTED` / `UNDER_REVIEW` / `EVIDENCE_REQUESTED` / `APPROVED` / `REJECTED` / `RETURN_WAITING` / `RETURN_RECEIVED` / `REFUND_PROCESSING` / `EXCHANGE_SHIPPING` / `COMPLETED` / `WITHDRAWN`
+- `requested_action`: `REFUND` / `EXCHANGE`
+- `customer_memo`
+- `reviewed_by_admin_id`
+- `admin_review_reason`
+- `reviewed_at`
 - `created_at`
 - `updated_at`
+
+Implemented DS-14 scope:
+
+- Self-service eligible cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
+- Post-supplier-work cancellation creates a requested `CANCEL` claim for admin review.
+- Return and exchange claim processing details remain planned.
 
 Rule:
 

@@ -506,23 +506,39 @@ Suggested fields:
 
 취소, 반품, 교환 클레임 접수와 관리자 처리 상태.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - orderId
-- paymentGroupId
 - userId
 - claimType: CANCEL / RETURN / EXCHANGE
 - reason: SIMPLE_CHANGE_OF_MIND / DEFECT / WRONG_DELIVERY / DIFFERENT_FROM_PRODUCT_INFO / DELIVERY_ISSUE
 - status: REQUESTED / UNDER_REVIEW / EVIDENCE_REQUESTED / APPROVED / REJECTED / RETURN_WAITING / RETURN_RECEIVED / REFUND_PROCESSING / EXCHANGE_SHIPPING / COMPLETED / WITHDRAWN
 - requestedAction: REFUND / EXCHANGE
+- customerMemo
+- reviewedByAdminId
+- adminReviewReason
+- reviewedAt
+- createdAt
+- updatedAt
+
+Planned fields:
+
+- paymentGroupId
 - shippingCostBearer: CUSTOMER / SELLER / UNDECIDED
 - returnShippingFeeAmount
 - exchangeShippingFeeAmount
 - evidenceUrls
-- customerMemo
 - adminMemo
 - rejectionReason
+
+Rules:
+
+- DS-14 implements `CANCEL` claim creation and admin review.
+- Customer self-service cancellation is allowed only for `SUPPLIER_ORDER_PENDING` orders whose supplier work and address lock fields are empty.
+- Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
+- After supplier work starts or after `SUPPLIER_ORDERED`, the customer can submit a `CANCEL` claim for admin review before shipment.
+- Admin approval moves the order to `REFUND_REQUESTED`; admin rejection keeps the order status unchanged.
 - requestedAt
 - deliveredAtAtRequest
 - discoveryDate

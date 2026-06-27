@@ -166,6 +166,26 @@ public class CustomerOrder {
 		this.status = OrderStatus.SHIPPED;
 	}
 
+	public boolean isSelfServiceCancellable() {
+		return status == OrderStatus.SUPPLIER_ORDER_PENDING
+			&& supplierOrderStartedAt == null
+			&& addressLockedAt == null;
+	}
+
+	public boolean canRequestCancellationClaim() {
+		return (status == OrderStatus.SUPPLIER_ORDER_PENDING && (supplierOrderStartedAt != null || addressLockedAt != null))
+			|| status == OrderStatus.SUPPLIER_ORDERED;
+	}
+
+	public void markRefundRequested() {
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING
+			&& status != OrderStatus.SUPPLIER_ORDERED
+			&& status != OrderStatus.OUT_OF_STOCK) {
+			throw new IllegalStateException("Refund can be requested only before refund completion");
+		}
+		this.status = OrderStatus.REFUND_REQUESTED;
+	}
+
 	public void markPaymentException() {
 		this.status = OrderStatus.PAYMENT_EXCEPTION;
 	}

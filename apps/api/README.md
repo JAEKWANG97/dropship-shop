@@ -109,6 +109,15 @@ curl http://localhost:8080/actuator/health
 - Supplier order actions write admin order action history rows with before/after order status and reason.
 - Customer order detail shows shipment display status, carrier, and tracking number after shipment creation.
 
+## Cancellation Foundation
+
+- Customer self-service cancellation is available at `POST /api/orders/{orderId}/cancel`.
+- Self-service cancellation is allowed only for `SUPPLIER_ORDER_PENDING` orders before supplier work starts and before address lock.
+- Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
+- After supplier work starts or after supplier order completion, customers can submit a cancellation claim with `POST /api/orders/{orderId}/claims`.
+- Admin cancellation review APIs are available at `/api/admin/claims`.
+- PG refund execution and refund records are handled by the refund foundation.
+
 ## Tests
 
 ```sh
