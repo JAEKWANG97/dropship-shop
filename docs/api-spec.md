@@ -468,9 +468,10 @@ Rules:
 Rules:
 
 - Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
-- Implemented policy pages are static backend responses based on confirmed policy docs; admin policy management remains planned.
+- Implemented policy pages are backed by active `policy_documents` rows.
 - Business profile and privacy processing item APIs are static backend responses in DS-40; admin management remains planned.
 - Managed policy documents support draft creation, draft update, activation, current public lookup, and version public lookup in DS-41.
+- Public policy document types include `SHIPPING_POLICY`, `CANCELLATION_REFUND_POLICY`, and `OUT_OF_STOCK_NOTICE`.
 - Product detail and checkout responses include links to the implemented policy page endpoints.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.

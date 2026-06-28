@@ -18,7 +18,8 @@
 - Refund table: implemented in `apps/api/src/main/resources/db/migration/V9__create_refund.sql`.
 - User policy agreement table: implemented in `apps/api/src/main/resources/db/migration/V10__create_user_policy_agreements.sql`.
 - User address table: implemented in `apps/api/src/main/resources/db/migration/V11__create_user_addresses.sql`.
-- Policy and remaining audit tables: planned.
+- Policy document table: implemented in `apps/api/src/main/resources/db/migration/V17__create_policy_documents.sql`.
+- Remaining legal/audit tables: planned.
 
 ## Modeling Rules
 
@@ -703,7 +704,7 @@ DS-40 exposes business profile and privacy processing item public APIs as static
 ### policy_documents
 
 - `id`
-- `type`: `TERMS_OF_SERVICE` / `PRIVACY_POLICY` / `SHIPPING_POLICY` / `CANCELLATION_REFUND_POLICY`
+- `type`: `TERMS_OF_SERVICE` / `PRIVACY_POLICY` / `SHIPPING_POLICY` / `CANCELLATION_REFUND_POLICY` / `OUT_OF_STOCK_NOTICE`
 - `version`
 - `title`
 - `content`
@@ -713,6 +714,8 @@ DS-40 exposes business profile and privacy processing item public APIs as static
 - `updated_at`
 
 DS-41 implements persisted managed policy versions. Unique `(type, version)` prevents duplicate versions, and activation archives the previous active policy of the same type.
+
+Public policy pages for `shipping`, `cancellation-refund`, and `stock-risk` are backed by active `policy_documents` rows.
 
 Audit/notification tables:
 
