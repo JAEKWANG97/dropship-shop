@@ -481,8 +481,8 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Planned | Order status transition history |
-| `GET` | `/api/admin/actions` | `ADMIN` | Planned | Admin action history |
+| `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Implemented | Order status transition history |
+| `GET` | `/api/admin/actions` | `ADMIN` | Implemented | Admin order action history |
 | `GET` | `/api/admin/notifications` | `ADMIN` | Implemented | Notification log search |
 | `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Planned | Retry failed notification |
 
@@ -491,6 +491,7 @@ Rules:
 - Transactional notifications are separate from marketing consent.
 - Payment completed, payment exception, out-of-stock, shipment started, delivered, delay notice, claim changed, and refund completed should create notification logs.
 - DS-39 records transactional email notification logs with `SENT` status as the MVP email baseline.
+- DS-44 exposes order status history and admin order action history read APIs.
 
 ## DS-6 Catalog Request And Response Expectations
 

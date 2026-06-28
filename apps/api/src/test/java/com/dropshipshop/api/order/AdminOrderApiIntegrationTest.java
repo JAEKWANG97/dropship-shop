@@ -1,9 +1,9 @@
 package com.dropshipshop.api.order;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -520,6 +521,43 @@ class AdminOrderApiIntegrationTest {
 		assertThat(history.getFromStatus()).isEqualTo(OrderStatus.SHIPPED);
 		assertThat(history.getToStatus()).isEqualTo(OrderStatus.DELIVERED);
 		assertThat(history.getReason()).isEqualTo("Carrier site shows delivered");
+	}
+
+	@Test
+	void exposesOrderStatusAndAdminActionHistories() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-17");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-AUDIT-1", "ADM-AUDIT-CO-1", 41000);
+		createShipment(order, "CJ대한통운", "AUDIT-123");
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}/status-history", order.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.histories", hasSize(2)))
+			.andExpect(jsonPath("$.histories[*].actorUserId", hasItem(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.histories[*].actionType", hasItem("SUPPLIER_ORDER_COMPLETED")))
+			.andExpect(jsonPath("$.histories[*].actionType", hasItem("SHIPMENT_STARTED")))
+			.andExpect(jsonPath("$.histories[*].toStatus", hasItem("SHIPPED")))
+			.andExpect(jsonPath("$.histories[*].guardResult", hasItem("ALLOWED")));
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}/status-history", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}/status-history", UUID.randomUUID())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isNotFound());
+
+		mockMvc.perform(get("/api/admin/actions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].adminUserId".formatted(order.getId()), hasItem(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("SUPPLIER_WORK_START")))
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("SUPPLIER_ORDER_COMPLETED")))
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("SHIPMENT_STARTED")));
+
+		mockMvc.perform(get("/api/admin/actions")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isForbidden());
 	}
 
 	@Test

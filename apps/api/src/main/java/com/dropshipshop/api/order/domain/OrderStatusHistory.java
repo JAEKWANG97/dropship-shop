@@ -85,6 +85,10 @@ public class OrderStatusHistory {
 		return id;
 	}
 
+	public UUID getActorUserId() {
+		return actorUserId;
+	}
+
 	public String getActionType() {
 		return actionType;
 	}
@@ -97,7 +101,19 @@ public class OrderStatusHistory {
 		return toStatus;
 	}
 
+	public String getGuardResult() {
+		return guardResult;
+	}
+
+	public String getSideEffectSummary() {
+		return sideEffectSummary;
+	}
+
 	public String getReason() {
 		return reason;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
 	}
 }

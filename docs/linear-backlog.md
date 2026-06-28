@@ -949,7 +949,7 @@ Acceptance criteria:
 
 ### DS-44: Implement admin audit APIs
 
-Status: Planned
+Status: Implemented
 
 Description:
 
@@ -957,8 +957,8 @@ Implement admin read APIs for order status history and admin action history.
 
 Acceptance criteria:
 
-- Admin can read order status history for one order.
-- Admin can list admin action histories.
+- `GET /api/admin/orders/{orderId}/status-history` returns order status history for one order.
+- `GET /api/admin/actions` lists admin order action histories.
 - Responses expose actor, target, action, before/after values, reason, and created time.
 - APIs are admin-only.
 - API spec, ERD, domain model, admin policy, and integration tests are updated.

@@ -717,7 +717,7 @@ DS-41 implements persisted managed policy versions. Unique `(type, version)` pre
 Audit/notification tables:
 
 - `order_status_histories`
-- `admin_action_histories`
+- `admin_order_action_histories`
 - `product_change_histories`
 - `notification_logs`
 
@@ -745,6 +745,7 @@ Rules:
 
 - Transactional notifications are not marketing notifications.
 - Admin order actions must be action-based, not arbitrary status mutation.
+- DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
 - Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
 ## Implemented Catalog Table Notes

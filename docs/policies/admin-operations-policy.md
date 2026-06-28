@@ -72,7 +72,7 @@ Status: Confirmed
 - 환불 PG 취소 요청과 실패 재시도는 관리자 권한 API로만 수행한다. Implemented by DS-15. Refund approval and manual review hardening implemented by DS-38.
 - 주문 상태 변경은 action 기반으로 제한해야 한다.
 - 주문 상태 변경 이력 테이블이 필요하다. Implemented by DS-36.
-- 주요 관리자 액션 이력 테이블이 필요하다.
+- 주요 관리자 액션 이력 테이블과 관리자 조회 API가 필요하다. Implemented by DS-44.
 - 주요 상품 변경 이력 테이블과 관리자 조회 API가 필요하다. Implemented by DS-43.
 - 주문 상태 변경 API는 현재 상태와 요청 액션의 유효한 전이 여부를 검증해야 한다.
 - 주문 상태 변경 API는 fromStatus, actor, action, guard, sideEffect, toStatus 전이표를 기준으로 검증해야 한다.

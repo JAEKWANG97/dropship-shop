@@ -49,6 +49,11 @@ class AdminOrderController {
 		return adminOrderQueryService.getOrder(orderId);
 	}
 
+	@GetMapping("/{orderId}/status-history")
+	AdminOrderDtos.OrderStatusHistoryListResponse listOrderStatusHistory(@PathVariable UUID orderId) {
+		return adminOrderQueryService.listOrderStatusHistory(orderId);
+	}
+
 	@PostMapping("/{orderId}/supplier-work-start")
 	@ResponseStatus(HttpStatus.OK)
 	AdminOrderDtos.AdminOrderActionResponse startSupplierWork(

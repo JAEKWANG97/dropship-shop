@@ -11,11 +11,15 @@ import org.springframework.web.server.ResponseStatusException;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
+import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.domain.Refund;
@@ -33,6 +37,8 @@ class AdminOrderQueryService {
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
 	private final RefundRepository refundRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
+	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 
 	AdminOrderQueryService(
 		CustomerOrderRepository orderRepository,
@@ -40,7 +46,9 @@ class AdminOrderQueryService {
 		PaymentRepository paymentRepository,
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
-		RefundRepository refundRepository
+		RefundRepository refundRepository,
+		OrderStatusHistoryRepository statusHistoryRepository,
+		AdminOrderActionHistoryRepository actionHistoryRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
@@ -48,6 +56,8 @@ class AdminOrderQueryService {
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
 		this.refundRepository = refundRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
+		this.actionHistoryRepository = actionHistoryRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -77,6 +87,28 @@ class AdminOrderQueryService {
 		return toDetailResponse(order, payment, fulfillment, shipment, refund, items);
 	}
 
+	@Transactional(readOnly = true)
+	AdminOrderDtos.OrderStatusHistoryListResponse listOrderStatusHistory(UUID orderId) {
+		orderRepository.findById(orderId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		return new AdminOrderDtos.OrderStatusHistoryListResponse(
+			statusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(orderId)
+				.stream()
+				.map(this::toStatusHistoryResponse)
+				.toList()
+		);
+	}
+
+	@Transactional(readOnly = true)
+	AdminOrderDtos.AdminActionHistoryListResponse listAdminActions() {
+		return new AdminOrderDtos.AdminActionHistoryListResponse(
+			actionHistoryRepository.findAllByOrderByCreatedAtDesc()
+				.stream()
+				.map(this::toActionHistoryResponse)
+				.toList()
+		);
+	}
+
 	private AdminOrderDtos.AdminOrderSummaryResponse toSummaryResponse(CustomerOrder order) {
 		UserAccount customer = order.getUser();
 		Supplier supplier = order.getSupplier();
@@ -91,6 +123,33 @@ class AdminOrderQueryService {
 			order.getPaymentGroup().getCheckoutNumber(),
 			order.getTotalAmount(),
 			order.getCreatedAt()
+		);
+	}
+
+	private AdminOrderDtos.OrderStatusHistoryResponse toStatusHistoryResponse(OrderStatusHistory history) {
+		return new AdminOrderDtos.OrderStatusHistoryResponse(
+			history.getId(),
+			history.getActorUserId(),
+			history.getActionType(),
+			history.getFromStatus(),
+			history.getToStatus(),
+			history.getGuardResult(),
+			history.getSideEffectSummary(),
+			history.getReason(),
+			history.getCreatedAt()
+		);
+	}
+
+	private AdminOrderDtos.AdminActionHistoryResponse toActionHistoryResponse(AdminOrderActionHistory history) {
+		return new AdminOrderDtos.AdminActionHistoryResponse(
+			history.getId(),
+			history.getOrder().getId(),
+			history.getAdminUserId(),
+			history.getActionType(),
+			history.getBeforeStatus(),
+			history.getAfterStatus(),
+			history.getReason(),
+			history.getCreatedAt()
 		);
 	}
 

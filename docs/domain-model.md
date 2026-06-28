@@ -657,6 +657,7 @@ Implemented DS-36 scope:
 - Status history is persisted in `order_status_histories`.
 - Admin fulfillment/shipment actions and shipment tracking/manual correction delivery completion record order status history.
 - System tracking sync uses a null actor; admin correction stores the admin user id.
+- DS-44 exposes admin order status history reads at `GET /api/admin/orders/{orderId}/status-history`.
 
 ## AdminActionHistory
 
@@ -673,6 +674,11 @@ Suggested fields:
 - beforeValue
 - afterValue
 - createdAt
+
+Implemented DS-44 scope:
+
+- Admin order action history is read from `admin_order_action_histories`.
+- `GET /api/admin/actions` returns order id, admin user id, action type, before/after status, reason, and created time.
 
 ## ProductChangeHistory
 
