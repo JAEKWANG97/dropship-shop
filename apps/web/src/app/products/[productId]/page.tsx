@@ -59,6 +59,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
   return (
     <article className="product-detail">
+      <nav className="breadcrumb" aria-label="breadcrumb">
+        <Link href="/">홈</Link>
+        <span>/</span>
+        <Link href="/products">상품목록</Link>
+        <span>/</span>
+        <strong>{product.name}</strong>
+      </nav>
       <section className="product-hero">
         <div className="product-gallery">
           <ProductImage
@@ -91,9 +98,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <h1>{product.name}</h1>
           <p>{product.summary}</p>
           <strong className="product-price">{formatPrice(product.basePrice)}</strong>
+          <span className="product-tax-note">배송비 포함, VAT 정책은 결제 단계 기준으로 확인합니다.</span>
           <div className="product-buy-info">
-            <span>주문 방식</span>
-            <strong>옵션 선택 후 구매</strong>
+            <span>최소 주문</span>
+            <strong>옵션별 1개</strong>
             <span>판매 상태</span>
             <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
             <span>배송 정보</span>

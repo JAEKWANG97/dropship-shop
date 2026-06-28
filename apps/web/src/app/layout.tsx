@@ -17,8 +17,11 @@ export default function RootLayout({
       <body>
         <header className="site-header">
           <Link href="/" className="brand" aria-label="SafeHub Pro home">
-            <span>SafeHub</span>
-            <em>Pro</em>
+            <strong>
+              <span>SafeHub</span>
+              <em>Pro</em>
+            </strong>
+            <small>건설안전장비 B2B 전문몰</small>
           </Link>
           <form action="/products" className="site-search">
             <input
@@ -32,10 +35,10 @@ export default function RootLayout({
           </form>
           <nav className="site-nav" aria-label="Primary navigation">
             <Link href="/products">상품목록</Link>
+            <Link href="/products">카테고리</Link>
             <Link href="/cart">장바구니</Link>
-            <Link href="/orders">주문</Link>
-            <Link href="/policies">정책</Link>
-            <Link href="/account">내 계정</Link>
+            <Link href="/orders">주문조회</Link>
+            <Link href="/account">사업자회원</Link>
             <Link href="/login">로그인</Link>
             <Link href="/admin">관리자</Link>
           </nav>

@@ -62,15 +62,27 @@ textarea {
 }
 
 .brand {
+  display: grid;
+  gap: 2px;
   color: var(--navy);
-  font-size: 28px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.brand strong {
+  font-size: 28px;
+  line-height: 1;
 }
 
 .brand em {
   color: var(--accent);
   font-style: normal;
+}
+
+.brand small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .site-search {
@@ -145,7 +157,7 @@ textarea {
   min-height: 430px;
   padding: 52px 56px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: linear-gradient(90deg, #ffffff 0%, #ffffff 42%, #f7f9fd 100%);
   box-shadow: 0 18px 50px rgba(6, 27, 73, 0.08);
   overflow: hidden;
@@ -281,9 +293,9 @@ p {
 
 .category-strip {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: 0 10px 28px rgba(6, 27, 73, 0.06);
 }
@@ -306,7 +318,7 @@ p {
   grid-template-columns: repeat(4, 1fr);
   gap: 0;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: 0 10px 28px rgba(6, 27, 73, 0.06);
 }
@@ -337,10 +349,50 @@ p {
   max-width: 640px;
 }
 
+.login-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 28px;
+  align-items: start;
+  max-width: 1040px;
+}
+
+.login-copy,
+.login-panel {
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.login-copy h1 {
+  font-size: 42px;
+}
+
+.login-policy-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.login-policy-list span {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .button-stack {
   display: grid;
   gap: 10px;
-  max-width: 360px;
 }
 
 .oauth-button {
@@ -440,7 +492,7 @@ p {
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: 0 10px 28px rgba(6, 27, 73, 0.05);
 }
@@ -483,6 +535,17 @@ p {
   font-size: 14px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.product-card-price {
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.product-card-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .product-card-cta {
@@ -550,6 +613,25 @@ p {
   font-size: 30px;
 }
 
+.product-tax-note {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.breadcrumb a:hover {
+  color: var(--accent);
+}
+
 .catalog-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -576,6 +658,9 @@ p {
 }
 
 .catalog-sidebar a {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
   padding: 8px 10px;
   border-radius: 6px;
   color: var(--muted);
@@ -957,7 +1042,7 @@ textarea {
 
 .cart-list-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px 120px;
+  grid-template-columns: 150px minmax(0, 1fr) 220px 120px;
   gap: 16px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
@@ -968,10 +1053,17 @@ textarea {
 
 .cart-item {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) minmax(220px, auto);
+  grid-template-columns: 24px 120px minmax(0, 1fr) minmax(220px, auto);
   gap: 16px;
+  align-items: start;
   padding: 18px 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.cart-item > input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+  margin-top: 48px;
 }
 
 .cart-item:last-child {
@@ -1458,6 +1550,7 @@ textarea {
   .product-hero,
   .cart-layout,
   .checkout-layout,
+  .login-page,
   .admin-shell,
   .admin-dashboard-grid,
   .admin-orders-layout,
@@ -1508,6 +1601,18 @@ textarea {
   .checkout-main-form,
   .cart-item {
     grid-template-columns: 1fr;
+  }
+
+  .login-policy-list {
+    grid-template-columns: 1fr;
+  }
+
+  .login-copy h1 {
+    font-size: 34px;
+  }
+
+  .cart-item > input[type="checkbox"] {
+    margin-top: 0;
   }
 
   .cart-list-head {

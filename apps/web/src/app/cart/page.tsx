@@ -89,12 +89,14 @@ function CartContents({ cart }: { cart: Cart }) {
       <div>
         <div className="cart-list">
           <div className="cart-list-head">
+            <span>전체선택 ({cart.items.length})</span>
             <span>상품 정보</span>
             <span>수량</span>
             <span>금액</span>
           </div>
           {cart.items.map((item) => (
             <article className="cart-item" key={item.id}>
+              <input aria-label={`${item.productName} 선택`} defaultChecked type="checkbox" />
               <ProductImage
                 alt={item.productName}
                 className="cart-item-image"
@@ -150,7 +152,7 @@ function CartContents({ cart }: { cart: Cart }) {
       <aside className="cart-summary">
         <h2>주문요약</h2>
         <div>
-          <span>상품 금액</span>
+          <span>상품 금액 ({cart.items.length}개)</span>
           <strong>{formatPrice(cart.subtotalAmount)}</strong>
         </div>
         <div>

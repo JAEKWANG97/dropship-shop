@@ -63,7 +63,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
       <div className="section-heading">
         <p className="eyebrow">Checkout</p>
         <h1>주문 결제</h1>
-        <p>주문 정보를 확인하고 결제를 완료해 주세요.</p>
+        <p>주문자, 배송지, 결제수단과 필수 정책을 확인한 뒤 결제를 진행합니다.</p>
       </div>
 
       {params.message ? (
@@ -131,7 +131,10 @@ function RequiredAgreementForm({
 function CheckoutCartSummary({ cart }: { cart: Cart }) {
   return (
     <aside className="checkout-summary-card">
-      <h2>주문 상품</h2>
+      <div className="catalog-heading">
+        <h2>주문 상품</h2>
+        <span>{cart.items.length}개 상품</span>
+      </div>
       <div className="summary-list">
         {cart.items.map((item) => (
           <div key={item.id}>
@@ -146,7 +149,7 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
           <strong>0원</strong>
         </div>
         <div>
-          <span>합계</span>
+          <span>최종 결제금액</span>
           <strong>{formatPrice(cart.subtotalAmount)}</strong>
         </div>
       </div>
@@ -173,7 +176,7 @@ function CreateCheckoutForm({
 }) {
   return (
     <form action={createCheckout} className="checkout-form checkout-main-form">
-      <h2>배송지</h2>
+      <h2>주문자 / 배송지</h2>
       <input name="clientSubmittedTotalAmount" type="hidden" value={cart.subtotalAmount} />
       <label>
         받는 사람
@@ -204,7 +207,7 @@ function CreateCheckoutForm({
         <input name="address2" defaultValue={defaultAddress?.address2 ?? ""} />
       </label>
       <button className="button primary" disabled={disabled} type="submit">
-        주문서 생성
+        주문 결제하기
       </button>
     </form>
   );

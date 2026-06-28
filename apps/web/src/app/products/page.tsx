@@ -49,7 +49,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <aside className="catalog-sidebar">
           <h2>카테고리</h2>
           <Link className={!params.q ? "active" : ""} href="/products">
-            전체 상품
+            전체 상품 <span>{products.length}</span>
           </Link>
           {categories.map((category) => (
             <Link
@@ -87,7 +87,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <div className="product-card-copy">
                   <span className="product-card-name">{product.name}</span>
                   <span className="product-card-summary">{product.summary}</span>
-                  <strong>{formatPrice(product.basePrice)}</strong>
+                  <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
+                  <span className="product-card-meta">배송비 포함</span>
                 </div>
                 <span className="product-card-actions">
                   <span>장바구니</span>
