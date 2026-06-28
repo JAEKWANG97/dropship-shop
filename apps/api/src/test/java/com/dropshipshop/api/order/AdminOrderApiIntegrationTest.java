@@ -34,9 +34,11 @@ import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.domain.ShippingAddressSnapshot;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
@@ -82,6 +84,9 @@ class AdminOrderApiIntegrationTest {
 
 	@Autowired
 	private OrderItemRepository orderItemRepository;
+
+	@Autowired
+	private OrderStatusHistoryRepository orderStatusHistoryRepository;
 
 	@Autowired
 	private FulfillmentRepository fulfillmentRepository;
@@ -416,6 +421,8 @@ class AdminOrderApiIntegrationTest {
 
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
 		assertThat(shipmentRepository.findById(shipment.getId()).orElseThrow().getStatus()).isEqualTo(ShipmentStatus.DELIVERED);
+		var histories = orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId());
+		assertThat(histories.get(histories.size() - 1).getActionType()).isEqualTo("SHIPMENT_TRACKING_SYNC");
 	}
 
 	@Test
@@ -467,6 +474,61 @@ class AdminOrderApiIntegrationTest {
 					}
 					"""))
 			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void manuallyCorrectsShipmentToDeliveredWithStatusHistory() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-15");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-MANUAL-1", "ADM-SHIP-MANUAL-CO-1", 39000);
+		createShipment(order, "우체국택배", "MANUAL-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/manual-correction", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "DELIVERED",
+					  "reason": "Carrier site shows delivered"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipmentStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.manualCorrectionReason", is("Carrier site shows delivered")));
+
+		Shipment savedShipment = shipmentRepository.findById(shipment.getId()).orElseThrow();
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(savedShipment.isManualOverride()).isTrue();
+		assertThat(savedShipment.getManualCorrectionReason()).isEqualTo("Carrier site shows delivered");
+		assertThat(savedShipment.getManualCorrectedByAdminId()).isEqualTo(TestAuthentication.ADMIN_ID);
+		assertThat(savedShipment.getManualCorrectedAt()).isNotNull();
+
+		var histories = orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId());
+		OrderStatusHistory history = histories.get(histories.size() - 1);
+		assertThat(history.getActionType()).isEqualTo("SHIPMENT_MANUAL_CORRECTION");
+		assertThat(history.getFromStatus()).isEqualTo(OrderStatus.SHIPPED);
+		assertThat(history.getToStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(history.getReason()).isEqualTo("Carrier site shows delivered");
+	}
+
+	@Test
+	void rejectsUnsupportedShipmentManualCorrectionStatus() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-16");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-MANUAL-INVALID-1", "ADM-SHIP-MANUAL-INVALID-CO-1", 40000);
+		createShipment(order, "우체국택배", "MANUAL-INVALID-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/manual-correction", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "SHIPPED",
+					  "reason": "Do not move backward"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
 	}
 
 	private UserAccount createCustomer(String providerUserId) {

@@ -274,6 +274,7 @@ Admin manual correction
 -> Admin enters correction reason
 -> Manual correction is recorded
 -> Later automatic tracking sync cannot move the shipment backward or overwrite the admin correction without a valid forward transition
+-> DS-36 records admin action history and order status history
 ```
 
 ## Return Or Exchange Claim After Delivery

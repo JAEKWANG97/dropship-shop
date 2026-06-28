@@ -470,15 +470,15 @@ Suggested fields:
 - deliveredAt
 - trackingSyncedAt
 - trackingSyncFailureReason
+- manualOverride
+- manualCorrectedByAdminId
+- manualCorrectedAt
 - createdAt
 - updatedAt
 
 Planned fields:
 
 - trackingStatus
-- manualOverride
-- manualCorrectedByAdminId
-- manualCorrectedAt
 
 Rules:
 
@@ -488,6 +488,7 @@ Rules:
 - DS-35 syncs tracking results by shipment id or carrier/tracking number.
 - Delivered tracking moves shipment and order to `DELIVERED`; non-delivered tracking does not move state backward.
 - Tracking sync failure records `trackingSyncFailureReason` and keeps current order/shipment state.
+- DS-36 supports admin manual correction to `DELIVERED` with reason, admin id, correction time, admin action history, and order status history.
 - Customer order detail exposes shipment display status, carrier, and tracking number.
 
 ## Refund
@@ -623,6 +624,12 @@ Suggested fields:
 - sideEffectSummary
 - reason
 - createdAt
+
+Implemented DS-36 scope:
+
+- Status history is persisted in `order_status_histories`.
+- Admin fulfillment/shipment actions and shipment tracking/manual correction delivery completion record order status history.
+- System tracking sync uses a null actor; admin correction stores the admin user id.
 
 ## AdminActionHistory
 

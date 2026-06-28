@@ -173,6 +173,13 @@ public class CustomerOrder {
 		this.status = OrderStatus.DELIVERED;
 	}
 
+	public void markDeliveredByAdminCorrection() {
+		if (status != OrderStatus.SHIPPED) {
+			throw new IllegalStateException("Order can be manually delivered only after shipment");
+		}
+		this.status = OrderStatus.DELIVERED;
+	}
+
 	public boolean isSelfServiceCancellable() {
 		return status == OrderStatus.SUPPLIER_ORDER_PENDING
 			&& supplierOrderStartedAt == null

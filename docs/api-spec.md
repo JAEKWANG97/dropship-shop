@@ -394,6 +394,7 @@ Rules:
 | `GET` | `/api/orders/{orderId}/shipment` | Authenticated user | Planned | Customer shipment detail |
 | `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler | Implemented | Sync tracking status batch by carrier/tracking number |
 | `POST` | `/api/admin/shipments/{shipmentId}/tracking-sync` | `ADMIN` | Implemented | Manual retry tracking sync |
+| `POST` | `/api/admin/shipments/{shipmentId}/manual-correction` | `ADMIN` | Implemented | Manually correct shipment status to delivered |
 
 Rules:
 
@@ -404,7 +405,7 @@ Rules:
 - `DELIVERED` tracking status moves shipment and order to `DELIVERED`; other tracking statuses keep the current state.
 - Sync failure stores `trackingSyncFailureReason` and keeps current shipment/order state.
 - Tracking failure must not block order, payment, or refund operations.
-- Manual correction requires reason and history.
+- Manual correction supports `DELIVERED` only, requires reason, records admin action history, and records order status history when the order state changes.
 
 ## Refund And Claim APIs
 

@@ -10,6 +10,7 @@ import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 final class ShipmentTrackingDtos {
@@ -23,6 +24,16 @@ final class ShipmentTrackingDtos {
 
 		@Size(max = 2000)
 		String failureReason
+	) {
+	}
+
+	record ManualCorrectionRequest(
+		@NotNull
+		ShipmentStatus status,
+
+		@NotBlank
+		@Size(max = 1000)
+		String reason
 	) {
 	}
 
@@ -54,7 +65,8 @@ final class ShipmentTrackingDtos {
 		ShipmentStatus shipmentStatus,
 		OrderStatus orderStatus,
 		Instant trackingSyncedAt,
-		String trackingSyncFailureReason
+		String trackingSyncFailureReason,
+		String manualCorrectionReason
 	) {
 	}
 

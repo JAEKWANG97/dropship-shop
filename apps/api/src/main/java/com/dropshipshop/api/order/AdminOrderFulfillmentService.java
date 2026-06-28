@@ -13,9 +13,11 @@ import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.refund.RefundService;
 
 @Service
@@ -24,6 +26,7 @@ class AdminOrderFulfillmentService {
 	private final CustomerOrderRepository orderRepository;
 	private final FulfillmentRepository fulfillmentRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final RefundService refundService;
 
@@ -31,12 +34,14 @@ class AdminOrderFulfillmentService {
 		CustomerOrderRepository orderRepository,
 		FulfillmentRepository fulfillmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
+		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
 		RefundService refundService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.refundService = refundService;
 	}
@@ -136,6 +141,18 @@ class AdminOrderFulfillmentService {
 			order.getStatus(),
 			reason
 		));
+		if (beforeStatus != order.getStatus()) {
+			statusHistoryRepository.save(new OrderStatusHistory(
+				order,
+				adminUserId,
+				actionType.name(),
+				beforeStatus,
+				order.getStatus(),
+				"ALLOWED",
+				"Admin fulfillment action",
+				reason
+			));
+		}
 	}
 
 	private AdminOrderDtos.AdminOrderActionResponse actionResponse(CustomerOrder order, Fulfillment fulfillment) {

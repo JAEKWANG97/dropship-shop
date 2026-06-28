@@ -136,6 +136,9 @@ final class AdminOrderDtos {
 		Instant deliveredAt,
 		Instant trackingSyncedAt,
 		String trackingSyncFailureReason,
+		boolean manualOverride,
+		UUID manualCorrectedByAdminId,
+		Instant manualCorrectedAt,
 		String manualCorrectionReason
 	) {
 	}

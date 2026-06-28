@@ -14,8 +14,10 @@ import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
@@ -26,6 +28,7 @@ class AdminOrderShipmentService {
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
 
 	AdminOrderShipmentService(
@@ -33,12 +36,14 @@ class AdminOrderShipmentService {
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
+		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
 	}
 
@@ -67,6 +72,16 @@ class AdminOrderShipmentService {
 			AdminOrderActionType.SHIPMENT_STARTED,
 			beforeStatus,
 			order.getStatus(),
+			"Shipment tracking entered"
+		));
+		statusHistoryRepository.save(new OrderStatusHistory(
+			order,
+			adminUserId,
+			AdminOrderActionType.SHIPMENT_STARTED.name(),
+			beforeStatus,
+			order.getStatus(),
+			"ALLOWED",
+			"Shipment tracking entered",
 			"Shipment tracking entered"
 		));
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);

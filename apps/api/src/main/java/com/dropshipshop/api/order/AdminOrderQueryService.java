@@ -171,6 +171,9 @@ class AdminOrderQueryService {
 			shipment.getDeliveredAt(),
 			shipment.getTrackingSyncedAt(),
 			shipment.getTrackingSyncFailureReason(),
+			shipment.isManualOverride(),
+			shipment.getManualCorrectedByAdminId(),
+			shipment.getManualCorrectedAt(),
 			shipment.getManualCorrectionReason()
 		);
 	}

@@ -784,6 +784,7 @@ Child issues:
 - DS-33 is implemented.
 - DS-34 is implemented.
 - DS-35 is implemented.
+- DS-36 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -802,6 +803,23 @@ Acceptance criteria:
 - Non-delivered tracking does not move delivered shipments backward.
 - Tracking sync failure records `trackingSyncFailureReason` without changing shipment/order state.
 - API spec, ERD, domain model, fulfillment policy, and integration tests are updated.
+
+### DS-36: Implement shipment manual correction and status history
+
+Status: Implemented
+
+Description:
+
+Implement admin shipment manual correction and order status history persistence.
+
+Acceptance criteria:
+
+- `POST /api/admin/shipments/{shipmentId}/manual-correction` requires admin auth and reason.
+- Manual correction supports forward correction to `DELIVERED`; backward correction is rejected.
+- Shipment stores `manualOverride`, `manualCorrectionReason`, `manualCorrectedByAdminId`, and `manualCorrectedAt`.
+- Manual correction records admin action history.
+- Order status changes from shipment creation, tracking delivery completion, and manual correction are recorded in `order_status_histories`.
+- API spec, ERD, domain model, fulfillment/admin policy docs, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

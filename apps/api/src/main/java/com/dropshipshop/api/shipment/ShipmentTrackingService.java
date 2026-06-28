@@ -9,21 +9,37 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
+import com.dropshipshop.api.order.domain.AdminOrderActionType;
+import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
+import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.InternalTrackingSyncItem;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.InternalTrackingSyncRequest;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.InternalTrackingSyncResponse;
+import com.dropshipshop.api.shipment.ShipmentTrackingDtos.ManualCorrectionRequest;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.TrackingSyncRequest;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.TrackingSyncResponse;
 import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
 @Service
 class ShipmentTrackingService {
 
 	private final ShipmentRepository shipmentRepository;
+	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 
-	ShipmentTrackingService(ShipmentRepository shipmentRepository) {
+	ShipmentTrackingService(
+		ShipmentRepository shipmentRepository,
+		AdminOrderActionHistoryRepository actionHistoryRepository,
+		OrderStatusHistoryRepository statusHistoryRepository
+	) {
 		this.shipmentRepository = shipmentRepository;
+		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 	}
 
 	@Transactional
@@ -31,6 +47,41 @@ class ShipmentTrackingService {
 		Shipment shipment = shipmentRepository.findById(shipmentId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shipment not found"));
 		sync(shipment, request.trackingStatus(), request.failureReason());
+		return toResponse(shipment);
+	}
+
+	@Transactional
+	TrackingSyncResponse manuallyCorrectShipment(UUID shipmentId, UUID adminUserId, ManualCorrectionRequest request) {
+		if (request.status() != ShipmentStatus.DELIVERED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only delivered correction is supported");
+		}
+		Shipment shipment = shipmentRepository.findById(shipmentId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shipment not found"));
+		OrderStatus beforeStatus = shipment.getOrder().getStatus();
+		try {
+			boolean delivered = shipment.markDeliveredByManualCorrection(Instant.now(), adminUserId, request.reason());
+			if (delivered) {
+				shipment.getOrder().markDeliveredByAdminCorrection();
+			}
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+		actionHistoryRepository.save(new AdminOrderActionHistory(
+			shipment.getOrder(),
+			adminUserId,
+			AdminOrderActionType.SHIPMENT_MANUAL_CORRECTION,
+			beforeStatus,
+			shipment.getOrder().getStatus(),
+			request.reason()
+		));
+		recordStatusHistory(
+			shipment,
+			adminUserId,
+			AdminOrderActionType.SHIPMENT_MANUAL_CORRECTION.name(),
+			beforeStatus,
+			"Manual shipment correction",
+			request.reason()
+		);
 		return toResponse(shipment);
 	}
 
@@ -72,7 +123,9 @@ class ShipmentTrackingService {
 		if ("DELIVERED".equalsIgnoreCase(trackingStatus)) {
 			boolean delivered = shipment.markDeliveredByTracking(now);
 			if (delivered) {
+				OrderStatus beforeStatus = shipment.getOrder().getStatus();
 				shipment.getOrder().markDeliveredByTracking();
+				recordStatusHistory(shipment, null, "SHIPMENT_TRACKING_SYNC", beforeStatus, "Tracking status delivered", null);
 			}
 			return new SyncResult(delivered, false);
 		}
@@ -86,8 +139,32 @@ class ShipmentTrackingService {
 			shipment.getStatus(),
 			shipment.getOrder().getStatus(),
 			shipment.getTrackingSyncedAt(),
-			shipment.getTrackingSyncFailureReason()
+			shipment.getTrackingSyncFailureReason(),
+			shipment.getManualCorrectionReason()
 		);
+	}
+
+	private void recordStatusHistory(
+		Shipment shipment,
+		UUID actorUserId,
+		String actionType,
+		OrderStatus beforeStatus,
+		String sideEffectSummary,
+		String reason
+	) {
+		if (beforeStatus == shipment.getOrder().getStatus()) {
+			return;
+		}
+		statusHistoryRepository.save(new OrderStatusHistory(
+			shipment.getOrder(),
+			actorUserId,
+			actionType,
+			beforeStatus,
+			shipment.getOrder().getStatus(),
+			"ALLOWED",
+			sideEffectSummary,
+			reason
+		));
 	}
 
 	private boolean isBlank(String value) {

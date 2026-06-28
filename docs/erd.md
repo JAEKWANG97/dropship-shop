@@ -582,9 +582,22 @@ Constraints and indexes:
 - `id`
 - `order_id`
 - `admin_user_id`
-- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED`
+- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `SHIPMENT_MANUAL_CORRECTION`
 - `before_status`
 - `after_status`
+- `reason`
+- `created_at`
+
+### order_status_histories
+
+- `id`
+- `order_id`
+- `actor_user_id`
+- `action_type`
+- `from_status`
+- `to_status`
+- `guard_result`
+- `side_effect_summary`
 - `reason`
 - `created_at`
 
@@ -599,7 +612,10 @@ Constraints and indexes:
 - `delivered_at`
 - `tracking_synced_at`
 - `tracking_sync_failure_reason`
+- `manual_override`
 - `manual_correction_reason`
+- `manual_corrected_by_admin_id`
+- `manual_corrected_at`
 - `created_at`
 - `updated_at`
 

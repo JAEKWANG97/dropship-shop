@@ -51,8 +51,8 @@ Status: Confirmed
 - 공급처 발주 완료 액션은 공급처 주문번호, 발주 주소 스냅샷, 예상 출고일, 공급처 응답 메모를 기록한다.
 - 출고 예정일이 불명확하거나 지연 기준에 도달한 주문은 관리자 지연 안내 대상으로 표시한다.
 - 반품/교환/취소 클레임은 정해진 관리자 액션으로 처리하고 처리 사유와 고객 안내 문구를 기록한다. Cancellation claim review is implemented by DS-14.
-- 주문 상태 변경 이력은 MVP부터 기록한다.
-- 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유 입력을 필수로 한다.
+- 주문 상태 변경 이력은 MVP부터 기록한다. Implemented by DS-36 for admin fulfillment/shipment actions and shipment tracking/manual correction delivery completion.
+- 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유 입력을 필수로 한다. Shipment manual correction implemented by DS-36.
 - 상품 변경 이력은 MVP에서 다음 항목부터 기록한다.
   - 상품 가격 변경
   - 상품 판매 상태 변경
@@ -69,7 +69,7 @@ Status: Confirmed
 - 취소 클레임 승인/거절은 관리자 권한과 사유를 검증하고 claim review fields를 기록한다. Implemented by DS-14.
 - 환불 PG 취소 요청과 실패 재시도는 관리자 권한 API로만 수행한다. Implemented by DS-15.
 - 주문 상태 변경은 action 기반으로 제한해야 한다.
-- 주문 상태 변경 이력 테이블이 필요하다.
+- 주문 상태 변경 이력 테이블이 필요하다. Implemented by DS-36.
 - 주요 관리자 액션 이력 테이블이 필요하다.
 - 주요 상품 변경 이력 테이블이 필요하다.
 - 주문 상태 변경 API는 현재 상태와 요청 액션의 유효한 전이 여부를 검증해야 한다.
