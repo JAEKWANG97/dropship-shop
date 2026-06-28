@@ -740,11 +740,17 @@ Suggested fields:
 
 - id
 - userId
-- policyDocumentId
-- policyType
-- policyVersion
+- termsVersion
+- privacyVersion
 - agreedAt
 - createdAt
+
+DS-31 implementation note:
+
+- The first implementation stores required terms and privacy versions directly.
+- `PolicyDocument` linkage can be added later when managed policy version APIs are implemented.
+- Duplicate agreement for the same user, terms version, and privacy version is idempotent.
+- Checkout creation requires the current required terms/privacy agreement.
 
 ## OrderPolicyAgreement
 

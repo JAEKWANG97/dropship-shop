@@ -26,6 +26,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.dropshipshop.api.account.domain.UserPolicyAgreement;
+import com.dropshipshop.api.account.repository.UserPolicyAgreementRepository;
 import com.dropshipshop.api.auth.security.TestAuthentication;
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductOption;
@@ -64,6 +66,9 @@ class PaymentApiIntegrationTest {
 
 	@Autowired
 	private UserAccountRepository userAccountRepository;
+
+	@Autowired
+	private UserPolicyAgreementRepository userPolicyAgreementRepository;
 
 	@Autowired
 	private SupplierRepository supplierRepository;
@@ -181,13 +186,20 @@ class PaymentApiIntegrationTest {
 	}
 
 	private UserAccount createCustomer(String providerUserId) {
-		return userAccountRepository.save(new UserAccount(
+		UserAccount customer = userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,
 			providerUserId,
 			providerUserId + "@example.com",
 			providerUserId,
 			UserRole.CUSTOMER
 		));
+		userPolicyAgreementRepository.save(new UserPolicyAgreement(
+			customer,
+			"terms-2026-06-01",
+			"privacy-2026-06-01",
+			Instant.now()
+		));
+		return customer;
 	}
 
 	private ProductOption createOption(

@@ -629,3 +629,22 @@ Consequences:
 - API authorization remains stateless; each request verifies the JWT and reloads the current active user role from the database.
 - Logout clears the access token cookie.
 - Refresh token rotation, long-lived sessions, and account linking are deferred from DS-30.
+
+## 2026-06-28: Account Agreement Gate
+
+Decision:
+
+Store required terms/privacy agreement per user and require current agreement before checkout creation.
+
+Context:
+
+The product has no separate signup form because customers enter through social login. Required legal agreement therefore happens after login and before the first order creation.
+
+Consequences:
+
+- `user_policy_agreements` stores terms version, privacy version, and agreement time.
+- `GET /api/me/agreements` exposes whether the user has accepted the current required versions.
+- `POST /api/me/agreements` records required agreement and is idempotent for the same version pair.
+- Product browsing and cart management can happen before agreement.
+- `POST /api/checkouts` rejects users without current required terms/privacy agreement.
+- Marketing consent remains separate and is not included in DS-31.

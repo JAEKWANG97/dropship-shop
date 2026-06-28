@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.dropshipshop.api.account.AccountAgreementService;
 import com.dropshipshop.api.cart.domain.CartItem;
 import com.dropshipshop.api.cart.repository.CartItemRepository;
 import com.dropshipshop.api.catalog.domain.Product;
@@ -54,6 +55,7 @@ public class CheckoutService {
 	private final OrderItemRepository orderItemRepository;
 	private final OrderPolicyAgreementRepository orderPolicyAgreementRepository;
 	private final UserAccountRepository userAccountRepository;
+	private final AccountAgreementService accountAgreementService;
 	private final Clock clock;
 
 	public CheckoutService(
@@ -63,7 +65,8 @@ public class CheckoutService {
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		OrderPolicyAgreementRepository orderPolicyAgreementRepository,
-		UserAccountRepository userAccountRepository
+		UserAccountRepository userAccountRepository,
+		AccountAgreementService accountAgreementService
 	) {
 		this.cartItemRepository = cartItemRepository;
 		this.productNoticeRepository = productNoticeRepository;
@@ -72,12 +75,14 @@ public class CheckoutService {
 		this.orderItemRepository = orderItemRepository;
 		this.orderPolicyAgreementRepository = orderPolicyAgreementRepository;
 		this.userAccountRepository = userAccountRepository;
+		this.accountAgreementService = accountAgreementService;
 		this.clock = Clock.systemUTC();
 	}
 
 	@Transactional
 	public CheckoutDtos.CheckoutResponse createCheckout(UUID userId, CheckoutDtos.CreateCheckoutRequest request) {
 		UserAccount user = findUser(userId);
+		accountAgreementService.requireCurrentAgreement(userId);
 		List<CartItem> cartItems = cartItemRepository.findAllByCart_User_IdOrderByCreatedAtAsc(userId);
 		if (cartItems.isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");

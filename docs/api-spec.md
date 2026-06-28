@@ -100,8 +100,8 @@ Initial error codes:
 | `GET` | `/api/auth/oauth2/{provider}/callback` | Public | Implemented | Handle provider callback, create or find user, and set access token cookie |
 | `POST` | `/api/auth/logout` | Authenticated user | Implemented | Clear current access token cookie |
 | `GET` | `/api/me` | Authenticated user | Implemented | Current user identity |
-| `GET` | `/api/me/agreements` | Authenticated user | Planned | Current user policy agreement state |
-| `POST` | `/api/me/agreements` | Authenticated user | Planned | Agree to required terms/privacy policies |
+| `GET` | `/api/me/agreements` | Authenticated user | Implemented | Current user policy agreement state |
+| `POST` | `/api/me/agreements` | Authenticated user | Implemented | Agree to required terms/privacy policies |
 | `GET` | `/api/me/addresses` | Authenticated user | Planned | List saved shipping addresses |
 | `POST` | `/api/me/addresses` | Authenticated user | Planned | Create shipping address |
 | `PATCH` | `/api/me/addresses/{addressId}` | Authenticated user | Planned | Update shipping address |
@@ -117,6 +117,22 @@ Notes:
 - OAuth login uses provider authorization-code callbacks, provider token/userinfo requests, and social identity lookup by provider plus provider user id.
 - Successful login sets `ACCESS_TOKEN` as an HttpOnly cookie with `SameSite=Lax`; production must use `Secure`.
 - Access tokens are stateless JWTs signed by the API. Refresh tokens are deferred from MVP auth foundation.
+- Current required versions start as `terms-2026-06-01` and `privacy-2026-06-01`.
+- `POST /api/me/agreements` requires both `termsAgreed=true` and `privacyAgreed=true` with current required versions.
+- Reposting the same current versions is idempotent and returns the existing agreement record.
+- `POST /api/checkouts` requires current account terms/privacy agreement before order creation.
+
+Implemented request bodies:
+
+```json
+POST /api/me/agreements
+{
+  "termsAgreed": true,
+  "privacyAgreed": true,
+  "termsVersion": "terms-2026-06-01",
+  "privacyVersion": "privacy-2026-06-01"
+}
+```
 
 ## Catalog APIs
 
@@ -197,6 +213,7 @@ Rules:
 - Cart response shows current product/option price. Final price is snapshotted by order creation, not cart.
 - Cart items can span multiple delivery groups.
 - Checkout splits cart into delivery-group orders.
+- Cart viewing and editing are allowed before account agreement, but checkout creation requires current account agreement.
 
 Implemented request bodies:
 
@@ -230,6 +247,7 @@ Rules:
 
 - Order creation starts as `PAYMENT_PENDING`.
 - Payment-pending orders expire after 30 minutes.
+- Checkout creation requires current account terms/privacy agreement.
 - DS-8 creates checkouts from cart only; direct-buy checkout is deferred.
 - Checkout request includes shipping address fields directly.
 - Server calculates all totals and ignores client-submitted totals.

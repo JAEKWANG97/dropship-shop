@@ -16,6 +16,7 @@
 - Shipment table: implemented in `apps/api/src/main/resources/db/migration/V7__create_shipment.sql`.
 - Claim table: implemented in `apps/api/src/main/resources/db/migration/V8__create_claim.sql`.
 - Refund table: implemented in `apps/api/src/main/resources/db/migration/V9__create_refund.sql`.
+- User policy agreement table: implemented in `apps/api/src/main/resources/db/migration/V10__create_user_policy_agreements.sql`.
 - Policy and remaining audit tables: planned.
 
 ## Modeling Rules
@@ -47,6 +48,17 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+
+    USER_POLICY_AGREEMENTS {
+        uuid id PK
+        uuid user_id FK
+        varchar terms_version
+        varchar privacy_version
+        timestamptz agreed_at
+        timestamptz created_at
+    }
+
+    USERS ||--o{ USER_POLICY_AGREEMENTS : agrees
 ```
 
 Current implementation intentionally stores social identity directly on `users`.
@@ -55,6 +67,7 @@ Conceptually, `User` and `SocialAccount` are separate in `docs/domain-model.md`,
 
 Additional implemented table groups:
 
+- Account: `users`, `user_policy_agreements`
 - Catalog: `suppliers`, `products`, `product_options`, `product_images`, `product_detail_blocks`, `product_notices`, `product_change_histories`
 - Cart: `carts`, `cart_items`
 - Checkout/order: `payment_groups`, `orders`, `order_items`, `order_policy_agreements`
@@ -154,6 +167,29 @@ Current fields:
 Open note:
 
 - `docs/domain-model.md` mentions `SUSPENDED`, but current code has only `ACTIVE` and `DELETED`. Treat suspension as post-MVP until a decision adds it.
+
+### user_policy_agreements
+
+Implemented by DS-31.
+
+Purpose:
+
+- Records required terms and privacy agreement after first login or before checkout.
+- Keeps agreement history by policy version pair.
+
+Current fields:
+
+- `id`
+- `user_id`
+- `terms_version`
+- `privacy_version`
+- `agreed_at`
+- `created_at`
+
+Constraints:
+
+- Unique `(user_id, terms_version, privacy_version)` makes reposting the same required agreement idempotent.
+- Checkout creation requires an agreement for the current required terms and privacy versions.
 
 ### user_addresses
 

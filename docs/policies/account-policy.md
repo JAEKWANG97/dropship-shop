@@ -46,6 +46,8 @@ Status: Confirmed
 - 관리자 권한은 DB에 등록된 계정에만 부여한다.
 - 로그인 성공 후 API는 JWT access token을 HttpOnly cookie로 내려준다.
 - MVP 인증은 stateless access token 방식으로 시작하고, refresh token은 MVP 이후로 미룬다.
+- 필수 이용약관/개인정보처리방침 현재 버전에 동의하지 않은 고객은 주문 생성으로 진행할 수 없다.
+- 상품 조회와 장바구니 조회/수정은 동의 전에도 허용하지만, `POST /api/checkouts`는 현재 필수 동의가 있어야 한다.
 
 ## System Impact
 
@@ -61,6 +63,7 @@ Status: Confirmed
 - 운영에서는 인증 cookie에 `Secure`를 적용하고 HTTPS 환경에서만 사용한다.
 - 첫 가입 또는 첫 소셜 로그인 완료 후 약관 동의 상태를 검증해야 한다.
 - 약관 동의 기록에는 정책 버전과 동의 시각이 필요하다.
+- 같은 필수 약관/개인정보 버전에 대한 중복 동의 요청은 기존 동의 기록을 반환한다.
 - 계정 병합은 MVP에서 제공하지 않는다.
 - 관리자 여부는 소셜 제공자가 아니라 내부 DB 권한으로 판단한다.
 - 관리자 후보 계정은 provider와 provider user id 기준으로 사전 등록할 수 있어야 한다.

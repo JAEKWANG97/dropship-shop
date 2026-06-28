@@ -775,8 +775,9 @@ Track backend API, policy, state transition, notification, and audit work remain
 
 Child issues:
 
-- DS-31 through DS-44 remain tracked in Linear.
+- DS-32 through DS-44 remain tracked in Linear.
 - DS-30 is implemented.
+- DS-31 is implemented.
 - DS-45 is implemented.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
@@ -796,6 +797,23 @@ Acceptance criteria:
 - Logout clears the access token cookie.
 - Basic login, form login, guest checkout, and refresh token rotation remain excluded from DS-30.
 - API spec, account policy, decision log, and production readiness docs describe the implemented auth model.
+
+### DS-31: Implement account agreements
+
+Status: Implemented
+
+Description:
+
+Implement required terms and privacy agreement state for authenticated customers.
+
+Acceptance criteria:
+
+- `GET /api/me/agreements` returns current required versions and the user's latest agreement state.
+- `POST /api/me/agreements` stores required terms/privacy agreement with agreement time.
+- Duplicate agreement for the same required version pair is idempotent.
+- `POST /api/checkouts` requires current account agreement before order creation.
+- `user_policy_agreements` is added through Flyway and reflected in ERD/API/policy docs.
+- Integration tests cover agreement state, agreement creation, duplicate agreement, invalid consent/version, and checkout access before/after agreement.
 
 ### DS-45: Standardize API error response
 

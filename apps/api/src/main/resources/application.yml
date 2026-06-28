@@ -24,3 +24,6 @@ app:
     access-token-ttl-seconds: 7200
     oauth-state-cookie-name: OAUTH2_STATE
     oauth-state-ttl-seconds: 300
+  policies:
+    required-terms-version: terms-2026-06-01
+    required-privacy-version: privacy-2026-06-01

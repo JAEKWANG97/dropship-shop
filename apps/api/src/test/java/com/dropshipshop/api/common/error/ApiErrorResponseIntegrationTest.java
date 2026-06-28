@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +19,8 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.dropshipshop.api.account.domain.UserPolicyAgreement;
+import com.dropshipshop.api.account.repository.UserPolicyAgreementRepository;
 import com.dropshipshop.api.auth.security.TestAuthentication;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -34,6 +38,9 @@ class ApiErrorResponseIntegrationTest {
 
 	@Autowired
 	private UserAccountRepository userAccountRepository;
+
+	@Autowired
+	private UserPolicyAgreementRepository userPolicyAgreementRepository;
 
 	@Test
 	void returnsStandardAuthenticationAndAuthorizationErrors() throws Exception {
@@ -101,6 +108,12 @@ class ApiErrorResponseIntegrationTest {
 			"api-error-customer@example.com",
 			"Api Error Customer",
 			UserRole.CUSTOMER
+		));
+		userPolicyAgreementRepository.save(new UserPolicyAgreement(
+			customer,
+			"terms-2026-06-01",
+			"privacy-2026-06-01",
+			Instant.now()
 		));
 
 		mockMvc.perform(post("/api/checkouts")

@@ -90,7 +90,7 @@ Status: Confirmed
 - 고객 메뉴와 푸터에 정책 페이지 링크가 필요하다.
 - 사업자 정보와 통신판매업 신고 정보를 관리하는 설정 모델이 필요하다.
 - 상품 상세에는 품목별 상품 정보 제공 고시 블록이 필요하다.
-- 첫 로그인 시 약관/개인정보 동의 화면 또는 모달이 필요하다.
+- 첫 로그인 시 약관/개인정보 동의 화면 또는 모달이 필요하다. Backend exposes `/api/me/agreements` and blocks checkout creation until current required versions are accepted by DS-31.
 - 주문서에는 통합 확인 체크박스가 필요하다.
 - 결제 요청 API는 결제 그룹(PaymentGroup)의 주문서 확인 여부를 검증해야 한다.
 - 결제 그룹(PaymentGroup) 시점의 정책 버전과 확인 시각을 저장해야 한다.
