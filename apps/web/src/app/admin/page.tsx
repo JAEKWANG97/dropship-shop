@@ -14,7 +14,7 @@ export default async function AdminDashboardPage() {
       <div className="admin-heading">
         <div>
           <h1>관리자 대시보드</h1>
-          <p>오늘 주문, 배송, 상품 상태를 한 화면에서 확인하세요.</p>
+          <p>주문, 배송, 상품 상태를 한 화면에서 확인하세요.</p>
         </div>
         <Link className="button primary" href="/admin/products/new">
           상품 등록
@@ -22,8 +22,8 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="admin-metrics">
-        <Metric label="오늘 주문" value={`${orders.length}건`} sub={formatPrice(revenue)} />
-        <Metric label="오늘 매출" value={formatPrice(revenue)} sub="배송비 포함 가격" />
+        <Metric label="주문" value={`${orders.length}건`} sub={formatPrice(revenue)} />
+        <Metric label="매출" value={formatPrice(revenue)} sub="배송비 포함 가격" />
         <Metric label="배송 대기" value={`${pendingOrders.length}건`} sub="발주 시작 필요" />
         <Metric label="재고 확인" value={`${lowStockProducts.length}건`} sub="판매 상태 확인" />
       </div>
@@ -31,13 +31,22 @@ export default async function AdminDashboardPage() {
       <div className="admin-dashboard-grid">
         <section className="admin-panel">
           <div className="admin-panel-head">
-            <h2>매출 흐름</h2>
-            <span>최근 7일</span>
+            <h2>운영 집계</h2>
+            <span>현재 데이터</span>
           </div>
-          <div className="admin-bars" aria-label="최근 7일 매출">
-            {[48, 64, 42, 78, 56, 88, 72].map((height, index) => (
-              <span key={index} style={{ height: `${height}%` }} />
-            ))}
+          <div className="admin-status-list">
+            <div>
+              <span>주문</span>
+              <strong>{orders.length}건</strong>
+            </div>
+            <div>
+              <span>매출</span>
+              <strong>{formatPrice(revenue)}</strong>
+            </div>
+            <div>
+              <span>상품</span>
+              <strong>{products.length}개</strong>
+            </div>
           </div>
         </section>
 
@@ -92,7 +101,7 @@ export default async function AdminDashboardPage() {
             <Link href="/admin/products">상품 관리</Link>
           </div>
           <div className="admin-list">
-            {lowStockProducts.concat(products).slice(0, 4).map((product) => (
+            {lowStockProducts.slice(0, 4).map((product) => (
               <div key={product.id}>
                 <strong>{product.name}</strong>
                 <span>{product.supplierName}</span>
@@ -101,10 +110,10 @@ export default async function AdminDashboardPage() {
                 </span>
               </div>
             ))}
-            {products.length === 0 ? (
+            {lowStockProducts.length === 0 ? (
               <div className="admin-empty compact">
-                <strong>등록된 상품이 없습니다</strong>
-                <span>상품 등록 후 판매 상태를 관리할 수 있습니다.</span>
+                <strong>확인이 필요한 상품이 없습니다</strong>
+                <span>품절 상품이 생기면 이 영역에 표시됩니다.</span>
               </div>
             ) : null}
           </div>

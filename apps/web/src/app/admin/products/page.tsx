@@ -3,17 +3,20 @@ import { adminStatusLabel, getAdminProducts } from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
 
 type AdminProductsPageProps = {
-  searchParams: Promise<{ message?: string; q?: string }>;
+  searchParams: Promise<{ message?: string; q?: string; status?: string }>;
 };
 
 export default async function AdminProductsPage({ searchParams }: AdminProductsPageProps) {
   const [products, params] = await Promise.all([getAdminProducts(), searchParams]);
   const keyword = params.q?.trim().toLowerCase();
-  const filteredProducts = keyword
-    ? products.filter((product) =>
-        `${product.name} ${product.summary} ${product.supplierName}`.toLowerCase().includes(keyword),
-      )
-    : products;
+  const status = params.status?.trim();
+  const filteredProducts = products.filter((product) => {
+    const matchesKeyword =
+      !keyword || `${product.name} ${product.summary} ${product.supplierName}`.toLowerCase().includes(keyword);
+    const matchesStatus = !status || product.status === status;
+
+    return matchesKeyword && matchesStatus;
+  });
 
   return (
     <div className="admin-page">
@@ -36,7 +39,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
 
       <form action="/admin/products" className="admin-filters">
         <input name="q" placeholder="상품명, 공급처 검색" defaultValue={params.q ?? ""} />
-        <select name="status" defaultValue="">
+        <select name="status" defaultValue={params.status ?? ""}>
           <option value="">전체 상태</option>
           <option value="ACTIVE">판매중</option>
           <option value="SOLD_OUT">품절</option>
@@ -77,13 +80,6 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
               <span>검색어를 바꾸거나 상품을 먼저 등록하세요.</span>
             </div>
           ) : null}
-        </div>
-        <div className="admin-pagination" aria-label="pagination">
-          <span>1</span>
-          <span>2</span>
-          <span>3</span>
-          <span>...</span>
-          <span>13</span>
         </div>
       </section>
     </div>

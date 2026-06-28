@@ -1440,24 +1440,6 @@ textarea {
   padding: 18px;
 }
 
-.admin-bars {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  align-items: end;
-  gap: 10px;
-  height: 180px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-soft);
-}
-
-.admin-bars span {
-  min-height: 18px;
-  border-radius: 4px 4px 0 0;
-  background: var(--navy);
-}
-
 .admin-status-list,
 .admin-list {
   display: grid;
@@ -1574,23 +1556,6 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-soft);
-}
-
-.admin-pagination {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.admin-pagination span {
-  display: grid;
-  place-items: center;
-  min-width: 34px;
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--navy);
-  font-weight: 800;
 }
 
 .admin-form {
