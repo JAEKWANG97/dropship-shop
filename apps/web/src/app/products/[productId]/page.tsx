@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { addCartItem } from "@/app/cart/actions";
 import { ApiError, apiUrl } from "@/lib/api";
 import { formatPrice, getProduct, type ProductDetail } from "@/lib/catalog";
+import { getCurrentUser } from "@/lib/session";
 import { ProductImage } from "../product-image";
 
 type ProductPageProps = {
@@ -20,7 +23,10 @@ async function loadProduct(productId: string) {
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
   const { productId } = await params;
-  const { product, error } = await loadProduct(productId);
+  const [{ product, error }, session] = await Promise.all([
+    loadProduct(productId),
+    getCurrentUser(),
+  ]);
 
   if (error || !product) {
     return (
@@ -51,6 +57,37 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <span className={purchasable ? "status-pill success" : "status-pill"}>
             {purchasable ? "구매 가능" : "구매 불가"}
           </span>
+          {purchasable ? (
+            session ? (
+              <form action={addCartItem} className="cart-add-form">
+                <label>
+                  옵션
+                  <select name="productOptionId" required>
+                    {activeOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name} {formatOptionPrice(option.additionalPrice)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  수량
+                  <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
+                </label>
+                <button className="button primary" type="submit">
+                  장바구니 담기
+                </button>
+              </form>
+            ) : (
+              <div className="notice">
+                <strong>로그인이 필요합니다</strong>
+                <span>장바구니와 주문은 소셜 로그인 후 이용할 수 있습니다.</span>
+                <Link className="button primary" href="/login">
+                  로그인
+                </Link>
+              </div>
+            )
+          ) : null}
         </div>
       </section>
 

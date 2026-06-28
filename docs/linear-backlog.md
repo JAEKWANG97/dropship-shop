@@ -1083,3 +1083,54 @@ Acceptance criteria:
 - Product image, option, detail block, notice, and policy link fields are displayed.
 - Unavailable purchase states are visible to customers.
 - Frontend lint/build checks cover the catalog pages.
+
+### DS-49: Implement customer cart UI
+
+Status: Implemented
+
+Description:
+
+Implement customer cart entry points and cart management UI.
+
+Acceptance criteria:
+
+- Product detail includes add-to-cart UI for active options.
+- `/cart` reads `GET /api/cart` for authenticated customers.
+- Cart item add, quantity update, delete, and validation actions call the backend cart APIs.
+- Anonymous users see login guidance instead of cart controls.
+- Cart items show quantity, amount, checkout availability, and unavailable reasons.
+- Frontend lint/build checks cover the cart pages.
+
+### DS-50: Implement checkout payment UI
+
+Status: Planned
+
+Description:
+
+Implement checkout creation, policy confirmation, and Toss payment confirmation UI.
+
+Acceptance criteria:
+
+- Cart checkout entry creates a checkout through `POST /api/checkouts`.
+- Checkout detail reads `GET /api/checkouts/{checkoutNumber}`.
+- Shipping address update and checkout policy confirmation forms call the backend APIs.
+- Toss payment success/failure/exception routes exist.
+- Login, agreement, empty cart, and checkout unavailable states are handled.
+- Frontend lint/build checks cover checkout pages.
+
+### DS-51: Implement customer order UI
+
+Status: Planned
+
+Description:
+
+Implement customer order history, order detail, shipment display, and claim submission UI.
+
+Acceptance criteria:
+
+- `/orders` reads `GET /api/orders`.
+- `/orders/{orderId}` reads `GET /api/orders/{orderId}`.
+- Customer display statuses, shipment, payment, fulfillment, refund, and item summaries are shown.
+- Customer cancel and return/exchange claim forms call the implemented backend APIs.
+- Only customer-facing order data is shown.
+- Frontend lint/build checks cover order pages.

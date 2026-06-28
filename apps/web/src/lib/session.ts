@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { apiUrl } from "./api";
+import { ApiError, apiGetWithCookie } from "./api";
 
 export type UserSession = {
   userId: string;
@@ -7,16 +7,14 @@ export type UserSession = {
 
 async function getSession(path: string): Promise<UserSession | null> {
   const cookieHeader = (await cookies()).toString();
-  const response = await fetch(apiUrl(path), {
-    headers: cookieHeader ? { Cookie: cookieHeader } : {},
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    return null;
+  try {
+    return await apiGetWithCookie<UserSession>(path, cookieHeader);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return null;
+    }
+    throw error;
   }
-
-  return response.json() as Promise<UserSession>;
 }
 
 export function getCurrentUser() {
