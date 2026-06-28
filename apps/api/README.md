@@ -35,7 +35,7 @@ The local profile reads the values above from environment variables and falls ba
 
 - Production runs with `SPRING_PROFILES_ACTIVE=prod`.
 - Required production variables are documented in [Production Readiness](../../docs/production-readiness.md).
-- The `prod` profile requires `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `PAYMENTS_TOSS_SECRET_KEY`, and `APP_CORS_ALLOWED_ORIGINS`.
+- The `prod` profile requires `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_JWT_SECRET`, `APP_AUTH_SUCCESS_REDIRECT_URI`, and OAuth provider credentials.
 - Flyway is enabled and Hibernate uses `ddl-auto=validate` in production.
 
 ## Health Checks
@@ -54,7 +54,13 @@ curl http://localhost:8080/actuator/health/liveness
 - Supported roles start with `CUSTOMER` and `ADMIN`.
 - `/api/admin/**` requires `ADMIN`.
 - Customer APIs read the authenticated user id through `CurrentUser`.
-- Basic login and form login are disabled; social OAuth/JWT integration is added in later auth work.
+- Basic login and form login are disabled.
+- Social OAuth endpoints are available at `/api/auth/oauth2/{provider}/authorize` and `/api/auth/oauth2/{provider}/callback`.
+- Supported providers are Kakao, Google, and Naver.
+- OAuth callback creates or finds a user, then issues a stateless JWT access token in the `ACCESS_TOKEN` HttpOnly cookie.
+- `POST /api/auth/logout` clears the access token cookie.
+- Admin users use the same OAuth flow; admin access depends on the current DB role.
+- Local OAuth settings are read from `OAUTH_GOOGLE_*`, `OAUTH_KAKAO_*`, and `OAUTH_NAVER_*` environment variables.
 
 ## Catalog Foundation
 

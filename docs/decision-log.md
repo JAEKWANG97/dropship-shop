@@ -609,3 +609,23 @@ Consequences:
 - Account merge is deferred.
 - Admin authorization is controlled by DB role or an admin allowlist.
 - A social account without DB admin permission cannot access admin features.
+
+## 2026-06-28: Cookie-Based JWT Authentication
+
+Decision:
+
+Use provider OAuth login with a stateless JWT access token stored in an HttpOnly cookie for MVP backend authentication.
+
+Context:
+
+The MVP needs browser-friendly authentication for Kakao, Google, and Naver social login without adding email/password accounts or server-side sessions. The frontend should not need to manually store bearer tokens.
+
+Consequences:
+
+- OAuth start/callback endpoints are public.
+- Successful OAuth callback creates or finds the user by provider and provider user id.
+- The API sets `ACCESS_TOKEN` as an HttpOnly cookie with `SameSite=Lax`.
+- Production must set the access token cookie as `Secure` and run behind HTTPS.
+- API authorization remains stateless; each request verifies the JWT and reloads the current active user role from the database.
+- Logout clears the access token cookie.
+- Refresh token rotation, long-lived sessions, and account linking are deferred from DS-30.

@@ -1,0 +1,212 @@
+package com.dropshipshop.api.auth;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.EnumMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpHeaders;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.dropshipshop.api.user.domain.SocialProvider;
+import com.dropshipshop.api.user.domain.UserAccount;
+import com.dropshipshop.api.user.domain.UserRole;
+import com.dropshipshop.api.user.repository.UserAccountRepository;
+
+import jakarta.servlet.http.Cookie;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class OAuthLoginApiIntegrationTest {
+
+	@Autowired
+	private MockMvc mockMvc;
+
+	@Autowired
+	private FakeOAuthProviderClient fakeOAuthProviderClient;
+
+	@Autowired
+	private UserAccountRepository userAccountRepository;
+
+	@BeforeEach
+	void resetFakeClient() {
+		fakeOAuthProviderClient.reset();
+	}
+
+	@Test
+	void redirectsToProviderAuthorizeUrlWithStateCookie() throws Exception {
+		mockMvc.perform(get("/api/auth/oauth2/google/authorize"))
+			.andExpect(status().isFound())
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("https://accounts.google.com/o/oauth2/v2/auth")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("client_id=test-google-client")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("response_type=code")))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("OAUTH2_STATE=")))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")));
+	}
+
+	@Test
+	void createsCustomerAndAuthenticatesWithJwtCookieAfterCallback() throws Exception {
+		fakeOAuthProviderClient.profile(
+			SocialProvider.GOOGLE,
+			"new-customer-code",
+			new OAuthProfile("google-user-1", "customer@example.com", "Customer")
+		);
+
+		Cookie stateCookie = stateCookie();
+
+		MvcResult callbackResult = mockMvc.perform(get("/api/auth/oauth2/google/callback")
+				.param("code", "new-customer-code")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie))
+			.andExpect(status().isFound())
+			.andExpect(header().string(HttpHeaders.LOCATION, is("http://localhost:3000/auth/callback/success")))
+			.andExpect(cookie().exists("ACCESS_TOKEN"))
+			.andReturn();
+
+		UserAccount saved = userAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, "google-user-1")
+			.orElseThrow();
+		assertThat(saved.getRole()).isEqualTo(UserRole.CUSTOMER);
+		assertThat(saved.getEmail()).isEqualTo("customer@example.com");
+
+		mockMvc.perform(get("/api/me")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId", is(saved.getId().toString())));
+	}
+
+	@Test
+	void preservesAdminRoleFromDatabaseAfterSocialLogin() throws Exception {
+		UserAccount admin = userAccountRepository.save(new UserAccount(
+			SocialProvider.NAVER,
+			"naver-admin-1",
+			"admin@example.com",
+			"Admin",
+			UserRole.ADMIN
+		));
+		fakeOAuthProviderClient.profile(
+			SocialProvider.NAVER,
+			"admin-code",
+			new OAuthProfile("naver-admin-1", "admin@example.com", "Admin")
+		);
+
+		Cookie stateCookie = stateCookie();
+
+		MvcResult callbackResult = mockMvc.perform(get("/api/auth/oauth2/naver/callback")
+				.param("code", "admin-code")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie))
+			.andExpect(status().isFound())
+			.andExpect(cookie().exists("ACCESS_TOKEN"))
+			.andReturn();
+
+		mockMvc.perform(get("/api/admin/me")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId", is(admin.getId().toString())));
+	}
+
+	@Test
+	void rejectsInvalidCallbackStateAndProviderErrors() throws Exception {
+		mockMvc.perform(get("/api/auth/oauth2/kakao/callback")
+				.param("code", "code")
+				.param("state", "bad-state"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code", is("BUSINESS_RULE_VIOLATION")))
+			.andExpect(jsonPath("$.message", is("OAuth state is invalid")));
+
+		Cookie stateCookie = stateCookie();
+
+		mockMvc.perform(get("/api/auth/oauth2/kakao/callback")
+				.param("error", "access_denied")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code", is("BUSINESS_RULE_VIOLATION")))
+			.andExpect(jsonPath("$.message", is("OAuth provider returned error")));
+	}
+
+	@Test
+	void logsOutByClearingAccessTokenCookie() throws Exception {
+		fakeOAuthProviderClient.profile(
+			SocialProvider.KAKAO,
+			"logout-code",
+			new OAuthProfile("kakao-user-1", "logout@example.com", "Logout")
+		);
+
+		Cookie stateCookie = stateCookie();
+		MvcResult callbackResult = mockMvc.perform(get("/api/auth/oauth2/kakao/callback")
+				.param("code", "logout-code")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie))
+			.andExpect(status().isFound())
+			.andReturn();
+
+		mockMvc.perform(post("/api/auth/logout")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isNoContent())
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("ACCESS_TOKEN=;")))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+	}
+
+	private Cookie stateCookie() throws Exception {
+		MvcResult result = mockMvc.perform(get("/api/auth/oauth2/google/authorize"))
+			.andExpect(status().isFound())
+			.andExpect(cookie().exists("OAUTH2_STATE"))
+			.andReturn();
+		return result.getResponse().getCookie("OAUTH2_STATE");
+	}
+
+	@TestConfiguration
+	static class FakeOAuthProviderConfiguration {
+
+		@Bean
+		@Primary
+		FakeOAuthProviderClient fakeOAuthProviderClient() {
+			return new FakeOAuthProviderClient();
+		}
+	}
+
+	static class FakeOAuthProviderClient implements OAuthProviderClient {
+
+		private final Map<SocialProvider, Map<String, OAuthProfile>> profiles = new EnumMap<>(SocialProvider.class);
+
+		@Override
+		public OAuthProfile fetchProfile(SocialProvider provider, String code) {
+			OAuthProfile profile = profiles.getOrDefault(provider, Map.of()).get(code);
+			if (profile == null) {
+				throw new OAuthProviderException("No fake OAuth profile");
+			}
+			return profile;
+		}
+
+		void profile(SocialProvider provider, String code, OAuthProfile profile) {
+			profiles.computeIfAbsent(provider, ignored -> new java.util.HashMap<>()).put(code, profile);
+		}
+
+		void reset() {
+			profiles.clear();
+		}
+	}
+}

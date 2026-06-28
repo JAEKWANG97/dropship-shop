@@ -31,8 +31,19 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `PAYMENTS_TOSS_SECRET_KEY` | Toss Payments secret key. 서버에서만 사용 |
 | `PAYMENTS_TOSS_BASE_URL` | Toss Payments API URL. 기본값은 `https://api.tosspayments.com` |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
+| `APP_AUTH_JWT_SECRET` | JWT access token 서명 secret. 충분히 긴 랜덤 값 사용 |
+| `APP_AUTH_SUCCESS_REDIRECT_URI` | OAuth callback 성공 후 frontend로 보낼 URI |
+| `OAUTH_GOOGLE_CLIENT_ID` | Google OAuth client id |
+| `OAUTH_GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `OAUTH_GOOGLE_REDIRECT_URI` | Google OAuth redirect URI |
+| `OAUTH_KAKAO_CLIENT_ID` | Kakao REST API key/client id |
+| `OAUTH_KAKAO_CLIENT_SECRET` | Kakao client secret. Kakao 설정에서 사용하지 않으면 빈 값 가능 |
+| `OAUTH_KAKAO_REDIRECT_URI` | Kakao OAuth redirect URI |
+| `OAUTH_NAVER_CLIENT_ID` | Naver OAuth client id |
+| `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
+| `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
 
-Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. `PAYMENTS_TOSS_SECRET_KEY`, DB password, Linear/GitHub token은 커밋하지 않는다.
+Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. `PAYMENTS_TOSS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
 
 ## Health And Readiness
 
@@ -62,8 +73,11 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `APP_CORS_ALLOWED_ORIGINS`에는 실제 customer/admin frontend origin만 넣는다.
 - 여러 origin은 쉼표로 구분한다. 예: `https://shop.example.com,https://admin.example.com`
 - `/api/products`, `/api/policies`, `/api/health`, actuator health/info만 public이다.
+- `/api/auth/oauth2/**`는 OAuth 시작/콜백을 위해 public이다.
 - `/api/admin/**`는 `ADMIN` role만 접근할 수 있다.
-- session, form login, basic login은 사용하지 않는다.
+- Session, form login, basic login은 사용하지 않는다.
+- 인증은 `ACCESS_TOKEN` HttpOnly cookie의 stateless JWT로 처리한다.
+- 운영에서는 `app.auth.cookie-secure=true`를 유지하고 HTTPS에서만 cookie가 전송되게 한다.
 - 운영에서는 HTTPS 앞단 proxy 또는 load balancer를 사용한다.
 
 ## Logging And Error Monitoring
@@ -99,6 +113,6 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `cd apps/api && ./gradlew test --rerun-tasks`
 - `git diff --check`
 - staging 또는 운영 동일 profile에서 `/api/health`, `/actuator/health/readiness`, `/actuator/health/liveness` 확인
-- `DATABASE_*`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS` 설정 확인
+- `DATABASE_*`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
 - Flyway migration 적용 순서 확인
 - PostgreSQL backup/snapshot 상태 확인

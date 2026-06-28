@@ -14,7 +14,7 @@
 - Customer APIs must use the authenticated user id from the security context.
 - Admin APIs require `ADMIN`.
 - Non-user-authenticated access is allowed for public product pages, public policy/business/legal pages, health checks, OAuth start/callback, verified provider webhooks, and internal scheduler endpoints.
-- Basic login and form login are disabled. Social OAuth/JWT integration is planned.
+- Basic login and form login are disabled. Social OAuth issues a stateless JWT access token in an HttpOnly cookie.
 - Server calculates all order, payment, refund, and shipping amounts.
 - Client-submitted totals are never trusted.
 - Mutating admin actions that affect order, refund, shipment, claim, or product status should record audit history.
@@ -96,9 +96,9 @@ Initial error codes:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/auth/oauth2/{provider}/authorize` | Public | Planned | Start Kakao, Google, or Naver social login |
-| `GET` | `/api/auth/oauth2/{provider}/callback` | Public | Planned | Handle provider callback |
-| `POST` | `/api/auth/logout` | Authenticated user | Planned | Logout current session/token |
+| `GET` | `/api/auth/oauth2/{provider}/authorize` | Public | Implemented | Start Kakao, Google, or Naver social login |
+| `GET` | `/api/auth/oauth2/{provider}/callback` | Public | Implemented | Handle provider callback, create or find user, and set access token cookie |
+| `POST` | `/api/auth/logout` | Authenticated user | Implemented | Clear current access token cookie |
 | `GET` | `/api/me` | Authenticated user | Implemented | Current user identity |
 | `GET` | `/api/me/agreements` | Authenticated user | Planned | Current user policy agreement state |
 | `POST` | `/api/me/agreements` | Authenticated user | Planned | Agree to required terms/privacy policies |
@@ -114,7 +114,9 @@ Notes:
 - Email/password signup and login are excluded.
 - Guest checkout is excluded.
 - Admin users use the same social login flow, but admin access comes only from DB role.
-- Current code proves security boundaries but does not implement real OAuth callback/token parsing yet.
+- OAuth login uses provider authorization-code callbacks, provider token/userinfo requests, and social identity lookup by provider plus provider user id.
+- Successful login sets `ACCESS_TOKEN` as an HttpOnly cookie with `SameSite=Lax`; production must use `Secure`.
+- Access tokens are stateless JWTs signed by the API. Refresh tokens are deferred from MVP auth foundation.
 
 ## Catalog APIs
 
@@ -580,5 +582,5 @@ DS-6 should keep request/response DTOs separate from JPA entities.
 
 - Pagination format is not defined.
 - Image upload binary flow is not defined; DS-6 can start with image URL/object key metadata.
-- OAuth token/session format is not defined.
+- OAuth token/session format is implemented as a stateless JWT access token stored in an HttpOnly cookie.
 - Public product APIs are public, but checkout/cart/order APIs require authentication.

@@ -16,3 +16,11 @@ management:
     health:
       probes:
         enabled: true
+
+app:
+  auth:
+    jwt-issuer: dropship-shop-api
+    access-token-cookie-name: ACCESS_TOKEN
+    access-token-ttl-seconds: 7200
+    oauth-state-cookie-name: OAUTH2_STATE
+    oauth-state-ttl-seconds: 300

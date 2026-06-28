@@ -9,3 +9,22 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+app:
+  auth:
+    jwt-secret: test-jwt-secret-for-cookie-authentication
+    cookie-secure: false
+    success-redirect-uri: http://localhost:3000/auth/callback/success
+  oauth:
+    google:
+      client-id: test-google-client
+      client-secret: test-google-secret
+      redirect-uri: http://localhost/api/auth/oauth2/google/callback
+    kakao:
+      client-id: test-kakao-client
+      client-secret: test-kakao-secret
+      redirect-uri: http://localhost/api/auth/oauth2/kakao/callback
+    naver:
+      client-id: test-naver-client
+      client-secret: test-naver-secret
+      redirect-uri: http://localhost/api/auth/oauth2/naver/callback

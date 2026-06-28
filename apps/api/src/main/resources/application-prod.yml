@@ -17,6 +17,23 @@ payments:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET}
+    cookie-secure: true
+    success-redirect-uri: ${APP_AUTH_SUCCESS_REDIRECT_URI}
+  oauth:
+    google:
+      client-id: ${OAUTH_GOOGLE_CLIENT_ID}
+      client-secret: ${OAUTH_GOOGLE_CLIENT_SECRET}
+      redirect-uri: ${OAUTH_GOOGLE_REDIRECT_URI}
+    kakao:
+      client-id: ${OAUTH_KAKAO_CLIENT_ID}
+      client-secret: ${OAUTH_KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${OAUTH_KAKAO_REDIRECT_URI}
+    naver:
+      client-id: ${OAUTH_NAVER_CLIENT_ID}
+      client-secret: ${OAUTH_NAVER_CLIENT_SECRET}
+      redirect-uri: ${OAUTH_NAVER_REDIRECT_URI}
 
 logging:
   level:

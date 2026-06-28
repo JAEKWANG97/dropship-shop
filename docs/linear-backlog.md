@@ -454,7 +454,7 @@ Resolved decisions:
 - `GET /api/admin/me` proves admin API protection with `ADMIN` role.
 - `GET /api/me` proves customer API scoping through authenticated user id.
 - Basic login and form login are disabled to preserve the social-login-only policy.
-- Actual Kakao, Google, and Naver OAuth callback/token integration remains a later auth implementation step.
+- Actual Kakao, Google, and Naver OAuth callback/token integration is implemented by DS-30.
 
 ### DS-29: Create MVP ERD and API specification docs
 
@@ -775,8 +775,27 @@ Track backend API, policy, state transition, notification, and audit work remain
 
 Child issues:
 
-- DS-30 through DS-44 remain tracked in Linear.
+- DS-31 through DS-44 remain tracked in Linear.
+- DS-30 is implemented.
 - DS-45 is implemented.
+
+### DS-30: Implement social OAuth login and cookie JWT auth
+
+Status: Implemented
+
+Description:
+
+Implement Kakao, Google, and Naver social OAuth login with stateless API authentication.
+
+Acceptance criteria:
+
+- OAuth authorize and callback endpoints exist for Kakao, Google, and Naver.
+- Callback exchanges provider code for profile data and creates or finds `UserAccount` by provider and provider user id.
+- Login issues a JWT access token in the `ACCESS_TOKEN` HttpOnly cookie.
+- Cookie auth reloads the active user and current role from the database for protected APIs.
+- Logout clears the access token cookie.
+- Basic login, form login, guest checkout, and refresh token rotation remain excluded from DS-30.
+- API spec, account policy, decision log, and production readiness docs describe the implemented auth model.
 
 ### DS-45: Standardize API error response
 

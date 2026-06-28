@@ -44,6 +44,8 @@ Status: Confirmed
 - 같은 이메일이더라도 제공자가 다르면 별도 계정으로 시작한다.
 - 관리자 로그인도 별도 비밀번호 로그인 없이 소셜 로그인만 사용한다.
 - 관리자 권한은 DB에 등록된 계정에만 부여한다.
+- 로그인 성공 후 API는 JWT access token을 HttpOnly cookie로 내려준다.
+- MVP 인증은 stateless access token 방식으로 시작하고, refresh token은 MVP 이후로 미룬다.
 
 ## System Impact
 
@@ -54,7 +56,9 @@ Status: Confirmed
 - 주문 조회에서 이메일/전화번호 기반 비회원 주문 조회 기능은 MVP에 필요하지 않다.
 - 비밀번호 저장, 이메일 인증, 비밀번호 재설정 기능은 MVP에 필요하지 않다.
 - 사용자 테이블은 소셜 로그인 제공자와 제공자별 식별자를 저장해야 한다.
-- OAuth callback, redirect URI, provider token 검증 로직이 필요하다.
+- OAuth callback, redirect URI, provider token/userinfo 요청 로직이 필요하며 DS-30에서 기반 구현을 제공한다.
+- API 인증은 `ACCESS_TOKEN` HttpOnly cookie를 읽어 user id를 검증하고, 현재 DB의 사용자 상태와 role을 기준으로 권한을 판단한다.
+- 운영에서는 인증 cookie에 `Secure`를 적용하고 HTTPS 환경에서만 사용한다.
 - 첫 가입 또는 첫 소셜 로그인 완료 후 약관 동의 상태를 검증해야 한다.
 - 약관 동의 기록에는 정책 버전과 동의 시각이 필요하다.
 - 계정 병합은 MVP에서 제공하지 않는다.

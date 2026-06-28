@@ -1,0 +1,184 @@
+package com.dropshipshop.api.auth;
+
+import java.net.URI;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Locale;
+import java.util.Optional;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.dropshipshop.api.user.domain.SocialProvider;
+import com.dropshipshop.api.user.domain.UserAccount;
+import com.dropshipshop.api.user.domain.UserRole;
+import com.dropshipshop.api.user.repository.UserAccountRepository;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+
+@Service
+class OAuthLoginService {
+
+	private static final SecureRandom RANDOM = new SecureRandom();
+
+	private final OAuthProviderProperties oauthProviderProperties;
+	private final OAuthProviderClient oauthProviderClient;
+	private final UserAccountRepository userAccountRepository;
+	private final JwtAccessTokenService jwtAccessTokenService;
+	private final AuthProperties authProperties;
+
+	OAuthLoginService(
+		OAuthProviderProperties oauthProviderProperties,
+		OAuthProviderClient oauthProviderClient,
+		UserAccountRepository userAccountRepository,
+		JwtAccessTokenService jwtAccessTokenService,
+		AuthProperties authProperties
+	) {
+		this.oauthProviderProperties = oauthProviderProperties;
+		this.oauthProviderClient = oauthProviderClient;
+		this.userAccountRepository = userAccountRepository;
+		this.jwtAccessTokenService = jwtAccessTokenService;
+		this.authProperties = authProperties;
+	}
+
+	ResponseEntity<Void> authorize(String providerValue) {
+		SocialProvider provider = provider(providerValue);
+		OAuthProviderProperties.ProviderSettings settings = configuredSettings(provider);
+		String state = newState();
+		URI location = UriComponentsBuilder
+			.fromUriString(settings.authorizationUri())
+			.queryParam("response_type", "code")
+			.queryParam("client_id", settings.clientId())
+			.queryParam("redirect_uri", settings.redirectUri())
+			.queryParam("state", state)
+			.queryParamIfPresent("scope", optional(settings.scope()))
+			.build()
+			.encode()
+			.toUri();
+
+		return ResponseEntity.status(HttpStatus.FOUND)
+			.location(location)
+			.header(HttpHeaders.SET_COOKIE, cookie(authProperties.stateCookieName(), state, authProperties.stateTtl()).toString())
+			.build();
+	}
+
+	ResponseEntity<Void> callback(
+		String providerValue,
+		String code,
+		String state,
+		String error,
+		HttpServletRequest request
+	) {
+		if (!isBlank(error)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth provider returned error");
+		}
+		if (isBlank(code)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth authorization code is required");
+		}
+		validateState(request, state);
+
+		SocialProvider provider = provider(providerValue);
+		configuredSettings(provider);
+		OAuthProfile profile = fetchProfile(provider, code);
+		UserAccount user = userAccountRepository.findByProviderAndProviderUserId(provider, profile.providerUserId())
+			.orElseGet(() -> userAccountRepository.save(new UserAccount(
+				provider,
+				profile.providerUserId(),
+				profile.email(),
+				profile.displayName(),
+				UserRole.CUSTOMER
+			)));
+
+		String token = jwtAccessTokenService.issue(user);
+		return ResponseEntity.status(HttpStatus.FOUND)
+			.location(URI.create(authProperties.successRedirectUri()))
+			.header(HttpHeaders.SET_COOKIE, cookie(authProperties.accessTokenCookieName(), token, authProperties.accessTokenTtl()).toString())
+			.header(HttpHeaders.SET_COOKIE, deleteCookie(authProperties.stateCookieName()).toString())
+			.build();
+	}
+
+	ResponseEntity<Void> logout() {
+		return ResponseEntity.noContent()
+			.header(HttpHeaders.SET_COOKIE, deleteCookie(authProperties.accessTokenCookieName()).toString())
+			.build();
+	}
+
+	private OAuthProfile fetchProfile(SocialProvider provider, String code) {
+		try {
+			return oauthProviderClient.fetchProfile(provider, code);
+		} catch (RuntimeException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "OAuth provider profile request failed");
+		}
+	}
+
+	private void validateState(HttpServletRequest request, String state) {
+		if (isBlank(state) || cookieValue(request, authProperties.stateCookieName())
+			.filter(state::equals)
+			.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth state is invalid");
+		}
+	}
+
+	private OAuthProviderProperties.ProviderSettings configuredSettings(SocialProvider provider) {
+		OAuthProviderProperties.ProviderSettings settings = oauthProviderProperties.get(provider);
+		if (settings == null || !settings.configured()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth provider is not configured");
+		}
+		return settings;
+	}
+
+	private SocialProvider provider(String value) {
+		try {
+			return SocialProvider.valueOf(value.toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported OAuth provider");
+		}
+	}
+
+	private Optional<String> cookieValue(HttpServletRequest request, String name) {
+		Cookie[] cookies = request.getCookies();
+		if (cookies == null) {
+			return Optional.empty();
+		}
+		return Arrays.stream(cookies)
+			.filter(cookie -> name.equals(cookie.getName()))
+			.map(Cookie::getValue)
+			.findFirst();
+	}
+
+	private ResponseCookie cookie(String name, String value, Duration maxAge) {
+		return ResponseCookie.from(name, value)
+			.httpOnly(true)
+			.secure(authProperties.cookieSecure())
+			.sameSite("Lax")
+			.path("/")
+			.maxAge(maxAge)
+			.build();
+	}
+
+	private ResponseCookie deleteCookie(String name) {
+		return cookie(name, "", Duration.ZERO);
+	}
+
+	private String newState() {
+		byte[] bytes = new byte[32];
+		RANDOM.nextBytes(bytes);
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+	}
+
+	private Optional<String> optional(String value) {
+		return isBlank(value) ? Optional.empty() : Optional.of(value);
+	}
+
+	private boolean isBlank(String value) {
+		return value == null || value.isBlank();
+	}
+}
