@@ -77,6 +77,12 @@ export default async function AdminDashboardPage() {
                 </span>
               </div>
             ))}
+            {orders.length === 0 ? (
+              <div className="admin-empty">
+                <strong>처리할 주문이 없습니다</strong>
+                <span>새 주문이 들어오면 이 영역에 표시됩니다.</span>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -95,6 +101,12 @@ export default async function AdminDashboardPage() {
                 </span>
               </div>
             ))}
+            {products.length === 0 ? (
+              <div className="admin-empty compact">
+                <strong>등록된 상품이 없습니다</strong>
+                <span>상품 등록 후 판매 상태를 관리할 수 있습니다.</span>
+              </div>
+            ) : null}
           </div>
         </section>
       </div>

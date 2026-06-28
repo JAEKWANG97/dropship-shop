@@ -71,6 +71,12 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
               <span>v{product.detailVersion}</span>
             </div>
           ))}
+          {filteredProducts.length === 0 ? (
+            <div className="admin-empty">
+              <strong>표시할 상품이 없습니다</strong>
+              <span>검색어를 바꾸거나 상품을 먼저 등록하세요.</span>
+            </div>
+          ) : null}
         </div>
         <div className="admin-pagination" aria-label="pagination">
           <span>1</span>

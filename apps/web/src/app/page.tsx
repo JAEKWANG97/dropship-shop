@@ -22,8 +22,8 @@ export default async function Home() {
         <div className="home-copy">
           <p className="eyebrow">건설현장의 안전, 빠르게 확실하게!</p>
           <h1>
-            건설안전용품 도매 쇼핑몰
-            <span>바로 구매, 즉시 결제!</span>
+            현장 안전용품
+            <span>오늘 필요한 만큼 바로 주문</span>
           </h1>
           <p>
             사업자 전용가로 합리적으로, 빠른 배송으로 현장에서 바로 사용할 수 있게
@@ -45,12 +45,15 @@ export default async function Home() {
         </div>
         <div className="hero-visual" aria-label="대표 안전용품">
           {products.slice(0, 4).map((product) => (
-            <ProductImage
-              alt={product.name}
-              className="hero-product-image"
-              key={product.id}
-              src={product.thumbnailImageUrl}
-            />
+            <Link className="hero-product-tile" href={`/products/${product.id}`} key={product.id}>
+              <ProductImage
+                alt={product.name}
+                className="hero-product-image"
+                src={product.thumbnailImageUrl}
+              />
+              <span>{product.name}</span>
+              <strong>{formatPrice(product.basePrice)}</strong>
+            </Link>
           ))}
         </div>
       </section>
@@ -87,7 +90,7 @@ export default async function Home() {
                     {product.status === "ACTIVE" ? "주문 가능" : "상태 확인 필요"}
                   </span>
                 </div>
-                <span className="product-card-cta">바로구매</span>
+                <span className="product-card-cta">상세 보고 구매</span>
               </Link>
             ))}
           </div>

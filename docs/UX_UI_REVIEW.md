@@ -159,12 +159,18 @@ Avoid:
 
 ## Next Design Tasks
 
-1. Replace seed/demo SVG images with realistic product image fixtures.
-2. Update header to match the reference commerce affordances: icons, cart/order/account, primary buy CTA.
-3. Tighten product cards: product image, name, model/SKU, price, MOQ, cart, buy.
-4. Add professional empty states for admin orders and customer cart/orders.
-5. Add footer business/trust information closer to the reference mockup.
-6. After the above, run mobile viewport review for header wrapping, card density, and checkout forms.
+Implemented on 2026-06-29:
+- Header now includes a primary commerce CTA while preserving login-state rules.
+- Home hero now presents product tiles with name and price instead of image-only placeholders.
+- Product card hierarchy now prioritizes name, price, summary, availability, and purchase actions.
+- Admin order/product empty states now explain the current state instead of showing blank tables.
+- Coupang-style benchmarking is applied as structure only: utility links, logo/search/account actions, category bar, product-first content, and policy-rich footer.
+
+Remaining:
+1. Replace seed/demo SVG images with realistic product image fixtures stored through the same DB image URL path used by production data.
+2. Add SKU/model/MOQ when the product API exposes those fields.
+3. Add footer business/trust information after real business registration/customer-center values are available.
+4. Run mobile viewport review for header wrapping, card density, and checkout forms.
 
 ## Bottom Line
 
