@@ -132,7 +132,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 			  <text x="240" y="352" text-anchor="middle" font-family="Arial" font-size="24" font-weight="700" fill="#fff">%s</text>
 			</svg>
 			""".formatted(color, label);
-		return "data:image/svg+xml," + URLEncoder.encode(svg, StandardCharsets.UTF_8);
+		return "data:image/svg+xml," + URLEncoder.encode(svg, StandardCharsets.UTF_8).replace("+", "%20");
 	}
 
 	private record SeedProduct(

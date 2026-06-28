@@ -62,5 +62,9 @@ class LocalCatalogSeedDataTest {
 		assertThat(productRepository.findAll())
 			.extracting(product -> product.getStatus())
 			.contains(ProductStatus.ACTIVE, ProductStatus.SOLD_OUT, ProductStatus.HIDDEN);
+		assertThat(productImageRepository.findAll())
+			.allSatisfy(image -> assertThat(image.getImageUrl())
+				.startsWith("data:image/svg+xml,%3Csvg%20")
+				.doesNotContain("%3Csvg+"));
 	}
 }
