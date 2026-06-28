@@ -412,12 +412,12 @@ Rules:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Implemented | Self-service cancel when eligible |
-| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Implemented | Create cancellation claim after supplier work starts |
+| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Implemented | Create cancellation, return, or exchange claim |
 | `GET` | `/api/orders/{orderId}/claims` | Authenticated user | Planned | Customer claim list for an order |
 | `GET` | `/api/claims/{claimId}` | Authenticated user | Planned | Customer claim detail |
-| `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin cancellation claim queue |
-| `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve cancellation claim |
-| `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject cancellation claim |
+| `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin claim queue |
+| `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve claim |
+| `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject claim |
 | `POST` | `/api/admin/claims/{claimId}/request-evidence` | `ADMIN` | Planned | Request evidence |
 | `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Planned | Mark return received |
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
@@ -432,7 +432,10 @@ Rules:
 - Customer self-service cancel is allowed only while `SUPPLIER_ORDER_PENDING` and supplier work has not started.
 - Self-service cancellation creates an approved cancellation claim, refund record, and moves the order to `REFUND_REQUESTED`.
 - After supplier work starts, cancellation becomes a `CANCEL` claim that admin can approve or reject.
-- Return and exchange claims remain planned.
+- After delivery, customers can submit `RETURN` or `EXCHANGE` claims.
+- Simple change-of-mind return/exchange claims require delivery within 7 days.
+- Seller-fault return/exchange claims require delivery within 90 days in the DS-37 baseline; discovery-date and evidence file capture remain planned.
+- Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
 - Refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
 - PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.

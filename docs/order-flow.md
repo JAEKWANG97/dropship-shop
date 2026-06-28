@@ -301,11 +301,11 @@ Seller fault claim
 
 Admin approves claim
 -> If return is needed, customer sends product back
--> Claim status: RETURN_WAITING
+-> Claim status: RETURN_WAITING (implemented by DS-37 for return approval)
 -> Admin receives and inspects returned product
 -> Claim status: RETURN_RECEIVED
 -> Refund request starts within 3 business days if refund is needed
--> Exchange proceeds if exchange is approved
+-> Exchange proceeds if exchange is approved (approval implemented by DS-37; exchange shipment remains planned)
 
 Admin rejects claim
 -> Claim status: REJECTED

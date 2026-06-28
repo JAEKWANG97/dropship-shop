@@ -785,6 +785,7 @@ Child issues:
 - DS-34 is implemented.
 - DS-35 is implemented.
 - DS-36 is implemented.
+- DS-37 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -820,6 +821,25 @@ Acceptance criteria:
 - Manual correction records admin action history.
 - Order status changes from shipment creation, tracking delivery completion, and manual correction are recorded in `order_status_histories`.
 - API spec, ERD, domain model, fulfillment/admin policy docs, and integration tests are updated.
+
+### DS-37: Implement return and exchange claim flow
+
+Status: Implemented
+
+Description:
+
+Implement customer return/exchange claim creation after delivery and admin approve/reject review.
+
+Acceptance criteria:
+
+- `POST /api/orders/{orderId}/claims` accepts `RETURN` and `EXCHANGE` for delivered orders.
+- `RETURN` creates requested action `REFUND`; `EXCHANGE` creates requested action `EXCHANGE`.
+- Simple change-of-mind return/exchange claims are rejected after 7 days from delivery.
+- Seller-fault return/exchange claims use a delivered-at baseline in DS-37; discovery-date/evidence capture remains planned.
+- `GET /api/admin/claims` includes cancellation, return, and exchange claims.
+- Admin can approve or reject return/exchange claims without changing the order from `DELIVERED`.
+- Return approval moves the claim to `RETURN_WAITING`; exchange approval remains `APPROVED` until exchange shipment handling is implemented.
+- API spec, ERD, domain model, cancellation/refund policy, admin policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

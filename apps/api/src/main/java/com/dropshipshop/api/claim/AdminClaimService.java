@@ -32,9 +32,9 @@ class AdminClaimService {
 	}
 
 	@Transactional(readOnly = true)
-	ClaimDtos.AdminClaimListResponse listCancellationClaims() {
+	ClaimDtos.AdminClaimListResponse listClaims() {
 		return new ClaimDtos.AdminClaimListResponse(
-			claimRepository.findAllByClaimTypeOrderByCreatedAtAsc(ClaimType.CANCEL)
+			claimRepository.findAllByOrderByCreatedAtAsc()
 				.stream()
 				.map(customerClaimService::toResponse)
 				.toList()
@@ -47,11 +47,17 @@ class AdminClaimService {
 		UUID adminUserId,
 		ClaimDtos.AdminClaimReviewRequest request
 	) {
-		Claim claim = findCancellationClaim(claimId);
+		Claim claim = findReviewableClaim(claimId);
 		try {
-			claim.approve(adminUserId, request.reason(), Instant.now());
-			claim.getOrder().markRefundRequested();
-			refundService.createCustomerCancelRefund(claim.getOrder());
+			if (claim.getClaimType() == ClaimType.RETURN) {
+				claim.approveReturn(adminUserId, request.reason(), Instant.now());
+			} else {
+				claim.approve(adminUserId, request.reason(), Instant.now());
+			}
+			if (claim.getClaimType() == ClaimType.CANCEL) {
+				claim.getOrder().markRefundRequested();
+				refundService.createCustomerCancelRefund(claim.getOrder());
+			}
 			return customerClaimService.toResponse(claim);
 		} catch (IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
@@ -64,7 +70,7 @@ class AdminClaimService {
 		UUID adminUserId,
 		ClaimDtos.AdminClaimReviewRequest request
 	) {
-		Claim claim = findCancellationClaim(claimId);
+		Claim claim = findReviewableClaim(claimId);
 		try {
 			claim.reject(adminUserId, request.reason(), Instant.now());
 			return customerClaimService.toResponse(claim);
@@ -73,12 +79,9 @@ class AdminClaimService {
 		}
 	}
 
-	private Claim findCancellationClaim(UUID claimId) {
+	private Claim findReviewableClaim(UUID claimId) {
 		Claim claim = claimRepository.findById(claimId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
-		if (claim.getClaimType() != ClaimType.CANCEL) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only cancellation claims are supported");
-		}
 		if (claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Claim has already been reviewed");
 		}

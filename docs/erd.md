@@ -676,7 +676,8 @@ Implemented DS-14 scope:
 
 - Self-service eligible cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
 - Post-supplier-work cancellation creates a requested `CANCEL` claim for admin review.
-- Return and exchange claim processing details remain planned.
+- Post-delivery return/exchange claims create requested `RETURN` or `EXCHANGE` claims. Implemented by DS-37.
+- Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps `APPROVED` until exchange shipment handling.
 
 Rule:
 

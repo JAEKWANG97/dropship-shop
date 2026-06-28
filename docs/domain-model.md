@@ -567,9 +567,13 @@ Planned fields:
 Rules:
 
 - DS-14 implements `CANCEL` claim creation and admin review.
+- DS-37 implements `RETURN` and `EXCHANGE` claim creation after delivery and admin approve/reject review.
 - Customer self-service cancellation is allowed only for `SUPPLIER_ORDER_PENDING` orders whose supplier work and address lock fields are empty.
 - Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
 - After supplier work starts or after `SUPPLIER_ORDERED`, the customer can submit a `CANCEL` claim for admin review before shipment.
+- After delivery, the customer can submit a `RETURN` claim with requested action `REFUND` or an `EXCHANGE` claim with requested action `EXCHANGE`.
+- Simple change-of-mind return/exchange claims are accepted only within 7 days from `deliveredAt`.
+- Seller-fault return/exchange claims use a 90-day delivered-at baseline in DS-37; discovery date and evidence URLs remain planned fields.
 - Admin approval moves the order to `REFUND_REQUESTED`; admin rejection keeps the order status unchanged.
 - requestedAt
 - deliveredAtAtRequest
