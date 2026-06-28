@@ -275,7 +275,7 @@ Rules:
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
 - Customer order list and detail are scoped to the authenticated customer.
-- Customer order APIs expose customer display statuses instead of internal order statuses.
+- Customer order APIs expose stable status codes. Customer-facing display labels are owned by the frontend.
 - Customer order detail includes payment group summary, payment summary, shipping address, order items, and placeholder fulfillment/shipment/refund summaries.
 - Checkout shipping address changes are allowed only while the payment group and its orders are still `PAYMENT_PENDING`.
 - Checkout shipping address changes are rejected after checkout policy confirmation because the confirmation text includes shipping address.
@@ -468,10 +468,11 @@ Rules:
 Rules:
 
 - Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
-- Implemented policy pages are static backend responses based on confirmed policy docs; admin policy management remains planned.
-- Business profile and privacy processing item APIs are static backend responses in DS-40; admin management remains planned.
+- Implemented policy pages are backed by active `policy_documents` rows.
+- Business profile and privacy processing item APIs are backed by DB tables; admin management remains planned.
 - Managed policy documents support draft creation, draft update, activation, current public lookup, and version public lookup in DS-41.
-- Product detail and checkout responses include links to the implemented policy page endpoints.
+- Public policy document types include `SHIPPING_POLICY`, `CANCELLATION_REFUND_POLICY`, and `OUT_OF_STOCK_NOTICE`.
+- Product detail and checkout responses include links to the implemented policy page endpoints; link labels use active policy document titles when configured.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.
 - Checkout stores policy versions per payment group.

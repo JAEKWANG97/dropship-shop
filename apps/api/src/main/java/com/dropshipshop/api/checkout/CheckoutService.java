@@ -36,6 +36,7 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderPolicyAgreementRepository;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
+import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
@@ -44,11 +45,6 @@ public class CheckoutService {
 
 	private static final SecureRandom RANDOM = new SecureRandom();
 	private static final int CHECKOUT_EXPIRATION_MINUTES = 30;
-	private static final List<CheckoutDtos.PolicyLinkResponse> CHECKOUT_POLICY_LINKS = List.of(
-		new CheckoutDtos.PolicyLinkResponse("배송 정책", "/api/policies/shipping", "SHIPPING_POLICY"),
-		new CheckoutDtos.PolicyLinkResponse("취소/환불 정책", "/api/policies/cancellation-refund", "CANCELLATION_REFUND_POLICY"),
-		new CheckoutDtos.PolicyLinkResponse("결제 후 품절 안내", "/api/policies/stock-risk", "OUT_OF_STOCK_NOTICE")
-	);
 
 	private final CartItemRepository cartItemRepository;
 	private final ProductNoticeRepository productNoticeRepository;
@@ -58,6 +54,7 @@ public class CheckoutService {
 	private final OrderPolicyAgreementRepository orderPolicyAgreementRepository;
 	private final UserAccountRepository userAccountRepository;
 	private final AccountAgreementService accountAgreementService;
+	private final CustomerPolicyLinkService customerPolicyLinkService;
 	private final Clock clock;
 
 	public CheckoutService(
@@ -68,7 +65,8 @@ public class CheckoutService {
 		OrderItemRepository orderItemRepository,
 		OrderPolicyAgreementRepository orderPolicyAgreementRepository,
 		UserAccountRepository userAccountRepository,
-		AccountAgreementService accountAgreementService
+		AccountAgreementService accountAgreementService,
+		CustomerPolicyLinkService customerPolicyLinkService
 	) {
 		this.cartItemRepository = cartItemRepository;
 		this.productNoticeRepository = productNoticeRepository;
@@ -78,6 +76,7 @@ public class CheckoutService {
 		this.orderPolicyAgreementRepository = orderPolicyAgreementRepository;
 		this.userAccountRepository = userAccountRepository;
 		this.accountAgreementService = accountAgreementService;
+		this.customerPolicyLinkService = customerPolicyLinkService;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -249,9 +248,15 @@ public class CheckoutService {
 			paymentGroup.getRefundableAmount(),
 			paymentGroup.getExpiresAt(),
 			paymentGroup.getPolicyConfirmedAt(),
-			CHECKOUT_POLICY_LINKS,
+			policyLinks(),
 			orders
 		);
+	}
+
+	private List<CheckoutDtos.PolicyLinkResponse> policyLinks() {
+		return customerPolicyLinkService.links().stream()
+			.map(link -> new CheckoutDtos.PolicyLinkResponse(link.label(), link.href(), link.policyType()))
+			.toList();
 	}
 
 	private CheckoutDtos.OrderResponse toOrderResponse(CustomerOrder order) {

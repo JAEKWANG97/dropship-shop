@@ -59,8 +59,8 @@ Status: Confirmed
 - 개인정보처리방침에는 개인정보 처리 목적, 수집 항목, 보유 기간, 제3자 제공, 처리 위탁, 파기 절차, 정보주체 권리 행사 방법, 개인정보 보호책임자 정보를 표시한다.
 - 개인정보 처리표는 수집 항목, 처리 목적, 보유 기간, 처리 위탁처, 제3자 제공 여부를 행 단위로 관리한다.
 - MVP 개인정보 처리표는 다음 범위로 시작한다.
-  - 소셜 로그인: 제공자, 제공자 user id, 이메일, 표시 이름. 목적은 회원 식별과 로그인이고 보유 기간은 회원 탈퇴 시까지로 둔다.
-  - 회원/주문 연락: 이름, 전화번호, 이메일. 목적은 주문, 배송, 클레임 안내이고 보유 기간은 회원 탈퇴 시까지 또는 법정 보존 기간까지로 둔다.
+  - 소셜 로그인: 제공자, 제공자 user id, 표시 이름, 제공자가 제공한 이메일. 목적은 회원 식별과 로그인이고 보유 기간은 회원 탈퇴 시까지로 둔다. 이메일은 제공자가 내려주는 경우에만 저장하며 필수 수집 항목으로 두지 않는다.
+  - 회원/주문 연락: 이름, 전화번호, 이메일. 목적은 주문, 배송, 클레임 안내이고 보유 기간은 회원 탈퇴 시까지 또는 법정 보존 기간까지로 둔다. 이 정보는 소셜 로그인 정보와 분리해 필요한 시점에 서비스 화면에서 수집한다.
   - 배송지: 수령인, 전화번호, 주소. 목적은 상품 배송이고 보유 기간은 주문 처리 완료 후 법정 보존 기간까지로 둔다.
   - 주문/결제: 주문 상품, 결제 금액, 결제 수단, PG 거래 식별자. 목적은 계약 이행, 결제, 환불, 분쟁 대응이고 보유 기간은 법정 보존 기간까지로 둔다.
   - 클레임/증빙: 클레임 사유, 사진, 운송장, 고객 메모, 관리자 처리 이력. 목적은 취소, 반품, 교환, 분쟁 대응이고 보유 기간은 법정 보존 기간까지로 둔다.
@@ -89,14 +89,14 @@ Status: Confirmed
 - 상품 상세와 체크아웃 화면에 정책 링크가 필요하다. Backend API responses include policy links by DS-16.
 - 정책 페이지 라우트가 필요하다. Backend public policy APIs are implemented by DS-16; frontend menu/footer routes remain for `apps/web`.
 - 고객 메뉴와 푸터에 정책 페이지 링크가 필요하다.
-- 사업자 정보와 통신판매업 신고 정보를 고객에게 공개하는 API가 필요하다. Implemented by DS-40 as static backend response; admin-managed settings remain planned.
+- 사업자 정보와 통신판매업 신고 정보를 고객에게 공개하는 API가 필요하다. Implemented by DS-40, DB-backed by DS-68; admin-managed settings remain planned.
 - 상품 상세에는 품목별 상품 정보 제공 고시 블록이 필요하다.
 - 첫 로그인 시 약관/개인정보 동의 화면 또는 모달이 필요하다. Backend exposes `/api/me/agreements` and blocks checkout creation until current required versions are accepted by DS-31.
 - 주문서에는 통합 확인 체크박스가 필요하다.
 - 결제 요청 API는 결제 그룹(PaymentGroup)의 주문서 확인 여부를 검증해야 한다.
 - 결제 그룹(PaymentGroup) 시점의 정책 버전과 확인 시각을 저장해야 한다.
 - 클레임 접수 화면에는 접수 가능 기간, 증빙 필요 여부, 배송비 부담 기준을 안내해야 한다.
-- 개인정보 처리표와 처리 위탁/제3자 제공 정보를 고객에게 공개하는 API가 필요하다. Implemented by DS-40 as static backend response; admin-managed settings remain planned.
+- 개인정보 처리표와 처리 위탁/제3자 제공 정보를 고객에게 공개하는 API가 필요하다. Implemented by DS-40, DB-backed by DS-68; admin-managed settings remain planned.
 - 회원 탈퇴는 사용자 프로필 비식별화와 법정 보존 기록 분리 보관을 함께 처리해야 한다.
 - 법정 보존 기록은 보존 사유와 보존 만료일을 저장해야 한다.
 - 마케팅 동의는 거래 알림 동의와 분리된 선택 동의 모델로 관리해야 한다.

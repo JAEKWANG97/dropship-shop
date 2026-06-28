@@ -75,9 +75,10 @@ class RestOAuthProviderClient implements OAuthProviderClient {
 	private OAuthProfile kakaoProfile(Map<String, Object> response) {
 		Map<String, Object> account = map(response.get("kakao_account"));
 		Map<String, Object> profile = map(account.get("profile"));
+		String providerUserId = string(response.get("id"));
 		return profile(
-			string(response.get("id")),
-			string(account.get("email")),
+			providerUserId,
+			firstNonBlank(string(account.get("email")), "kakao-" + providerUserId + "@oauth.local"),
 			string(profile.get("nickname"))
 		);
 	}

@@ -384,13 +384,14 @@ class AdminOrderApiIntegrationTest {
 		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-CUSTOMER-1", "ADM-SHIP-CUSTOMER-CO-1", 35000);
 		createShipment(order, "롯데택배", "9988776655");
 
-		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
-				.with(authentication(TestAuthentication.customer(customer.getId()))))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.displayStatus", is("배송 중")))
-			.andExpect(jsonPath("$.shipment.displayStatus", is("배송 중")))
-			.andExpect(jsonPath("$.shipment.carrier", is("롯데택배")))
-			.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")));
+			mockMvc.perform(get("/api/orders/{orderId}", order.getId())
+					.with(authentication(TestAuthentication.customer(customer.getId()))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status", is("SHIPPED")))
+				.andExpect(jsonPath("$.displayStatus").doesNotExist())
+				.andExpect(jsonPath("$.shipment.status", is("SHIPPED")))
+				.andExpect(jsonPath("$.shipment.carrier", is("롯데택배")))
+				.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")));
 	}
 
 	@Test

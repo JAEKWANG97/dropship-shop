@@ -465,7 +465,7 @@ Product detail pages must include product information notice fields, shipping in
 
 The privacy policy must include processing purpose, collected items, retention period, third-party provision, processing consignment, destruction procedure, data subject rights, and privacy officer. A privacy processing table stores collection item, purpose, retention period, processor/consignee, and third-party sharing fields.
 
-Social login stores provider, provider user id, email, and display name as the baseline. Phone number is not required for social login and is collected only when needed for order, shipping, or claim handling.
+Social login stores provider, provider user id, and display name as the baseline. Provider email is stored only when the provider supplies it, and it is not required for login. Customer contact email or phone number is collected separately when needed for order, shipping, or claim handling.
 
 Transactional notifications for order, shipping, payment, refund, and claim handling are separated from optional marketing consent. Marketing notifications require separate channel-level opt-in and store agreement time, withdrawal time, and policy version.
 

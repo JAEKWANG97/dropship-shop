@@ -360,7 +360,7 @@ Resolved decisions:
 - Business/operator disclosure includes company name, representative, business registration number, mail-order sales registration number, mail-order sales registration authority, address, customer center phone/email/hours, privacy officer, and hosting provider.
 - Commerce notice scope includes customer center, business registration, mail-order sales registration, product information notice, shipping, AS, return, exchange, and claim information.
 - Privacy processing table includes collection item, purpose, retention period, processor/consignee, and third-party sharing fields.
-- Social login stores provider, provider user id, email, and display name; phone is collected only when needed for order, shipping, or claim.
+- Social login stores provider, provider user id, and display name; provider email is optional, and customer contact email/phone is collected only when needed for order, shipping, or claim.
 - Transactional notifications for order, shipping, payment, refund, and claim are separated from optional marketing consent.
 - Optional marketing consent is stored per channel with agreement, withdrawal, and policy version.
 - Account deletion anonymizes or deletes profile and social account linkage while legally retained records are separated.
@@ -1032,3 +1032,153 @@ Acceptance criteria:
 - Authentication and authorization errors use the same JSON response shape.
 - `docs/api-spec.md` and `docs/production-readiness.md` describe the implemented format.
 - `ApiErrorResponseIntegrationTest` covers 401, 403, validation, malformed request, not found, and business rule errors.
+
+## Milestone 7: Frontend MVP
+
+### DS-46: Scaffold Next.js frontend
+
+Status: Implemented
+
+Description:
+
+Create the customer/admin web app foundation.
+
+Acceptance criteria:
+
+- `apps/web` contains a Next.js App Router frontend with TypeScript.
+- The app uses basic CSS instead of Tailwind or a component library.
+- API base URL configuration is documented through `.env.example`.
+- Root layout includes the MVP navigation shell.
+- Lint/build checks run for the scaffold.
+
+### DS-47: Implement auth session UI
+
+Status: Implemented
+
+Description:
+
+Implement social login entry points and minimum session-aware route structure.
+
+Acceptance criteria:
+
+- Kakao, Google, and Naver login buttons link to the backend OAuth authorize endpoints.
+- Current user session is fetched from `/api/me`.
+- Admin access is checked through `/api/admin/me`.
+- Customer and admin route guards have a minimum UI fallback.
+- Logout is available when the backend session exists.
+- Frontend docs and checks are updated.
+
+### DS-48: Implement customer catalog UI
+
+Status: Implemented
+
+Description:
+
+Implement customer product list and detail pages.
+
+Acceptance criteria:
+
+- Product list reads `GET /api/products`.
+- Product detail reads `GET /api/products/{productId}`.
+- Product image, option, detail block, notice, and policy link fields are displayed.
+- Unavailable purchase states are visible to customers.
+- Frontend lint/build checks cover the catalog pages.
+
+### DS-49: Implement customer cart UI
+
+Status: Implemented
+
+Description:
+
+Implement customer cart entry points and cart management UI.
+
+Acceptance criteria:
+
+- Product detail includes add-to-cart UI for active options.
+- `/cart` reads `GET /api/cart` for authenticated customers.
+- Cart item add, quantity update, delete, and validation actions call the backend cart APIs.
+- Anonymous users see login guidance instead of cart controls.
+- Cart items show quantity, amount, checkout availability, and unavailable reasons.
+- Frontend lint/build checks cover the cart pages.
+
+### DS-50: Implement checkout payment UI
+
+Status: Implemented
+
+Description:
+
+Implement checkout creation, policy confirmation, and Toss payment confirmation UI.
+
+Acceptance criteria:
+
+- Cart checkout entry creates a checkout through `POST /api/checkouts`.
+- Checkout detail reads `GET /api/checkouts/{checkoutNumber}`.
+- Shipping address update and checkout policy confirmation forms call the backend APIs.
+- Toss payment success/failure/exception routes exist.
+- Toss confirmation UI calls the backend confirm API; Toss widget SDK wiring remains a deployment/client-key follow-up.
+- Login, agreement, empty cart, and checkout unavailable states are handled.
+- Frontend lint/build checks cover checkout pages.
+
+### DS-51: Implement customer order UI
+
+Status: Implemented
+
+Description:
+
+Implement customer order history, order detail, shipment display, and claim submission UI.
+
+Acceptance criteria:
+
+- `/orders` reads `GET /api/orders`.
+- `/orders/{orderId}` reads `GET /api/orders/{orderId}`.
+- Customer display statuses, shipment, payment, fulfillment, refund, and item summaries are shown.
+- Customer cancel and return/exchange claim forms call the implemented backend APIs.
+- Paid-order shipping address changes call the implemented customer API.
+- Only customer-facing order data is shown.
+- Frontend lint/build checks cover order pages.
+
+### DS-58: Collect customer contact information separately from social login
+
+Status: Planned
+
+Description:
+
+Separate social login identity from commerce contact information.
+
+Acceptance criteria:
+
+- Social login requires provider, provider user id, and display name only.
+- Provider email remains optional and is not treated as the customer contact address.
+- Checkout collects the customer contact email or phone needed for order, delivery, and claim handling.
+- Order/contact API, ERD, and privacy policy docs reflect the separate collection point.
+- Transactional notification logic does not send to internal placeholder OAuth emails.
+
+### DS-59: Add local catalog seed data for smoke tests
+
+Status: Planned
+
+Description:
+
+Add local-only product data needed to verify the customer flow end to end.
+
+Acceptance criteria:
+
+- Local seed or documented admin script creates one supplier, active product, active option, product notice, and visible detail content.
+- Seed data is not enabled unexpectedly in production.
+- Development docs show how to reset and load local smoke-test data.
+- Customer flow can reach product detail, add to cart, and start checkout with seeded data.
+
+### DS-60: Document OAuth provider setup and local login smoke test
+
+Status: Planned
+
+Description:
+
+Document the provider console setup and local login verification path.
+
+Acceptance criteria:
+
+- Docs list local callback URLs for Google, Kakao, and Naver.
+- Docs list required provider consent/scope settings, including Kakao `profile_nickname` only.
+- Docs show required local env variables without committing secrets.
+- Docs include smoke-test steps for `/login`, provider redirect, callback success, and `/api/me`.

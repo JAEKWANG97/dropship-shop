@@ -64,6 +64,11 @@ Status: Confirmed
 - 운영 정책 고지는 상품 설명 콘텐츠와 분리해 재사용 가능한 정책 영역으로 관리해야 한다. Product detail responses include reusable policy links by DS-16.
 - 이미지 업로드는 파일 개수, 파일 크기, 확장자를 검증해야 한다. Implemented by DS-42 for local image storage.
 - 업로드된 이미지는 object storage에 저장하고 DB에는 URL 또는 storage key를 저장한다.
+- 상품명, 요약, 가격, 옵션, 판매 상태, 상품 고시, 상세 HTML/이미지 블록 메타데이터는 PostgreSQL에 저장한다.
+- 이미지 바이너리는 PostgreSQL에 저장하지 않는다. 로컬 개발은 파일 시스템 저장소를 사용할 수 있지만 운영은 S3-compatible object storage를 사용한다.
+- `product_images.image_url`과 `products.thumbnail_image_url`은 이미지 바이너리 자체가 아니라 고객 화면에서 접근 가능한 URL 또는 object storage key에서 파생된 URL만 저장한다.
+- 프론트엔드는 별도 mock catalog를 장기 보관하지 않고 백엔드 API 응답을 기준으로 렌더링한다.
+- 로컬 화면 검증용 샘플 상품은 백엔드 `local` profile seed 또는 관리자 등록 스크립트로 실제 DB에 생성한다.
 - 주문 상품에는 가격과 상세 변경의 영향을 받지 않도록 주문 시점의 상품명, 옵션명, 단가, 수량, 금액, 상품 요약, 상품 상세 버전, 상품 정보 제공 고시 버전 참조를 스냅샷으로 저장한다.
 
 ## Open Questions

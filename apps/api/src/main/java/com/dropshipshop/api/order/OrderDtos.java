@@ -4,6 +4,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
+import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
+import com.dropshipshop.api.payment.domain.PaymentStatus;
+import com.dropshipshop.api.refund.domain.RefundStatus;
+import com.dropshipshop.api.shipment.domain.ShipmentStatus;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -22,7 +29,7 @@ final class OrderDtos {
 		String orderNumber,
 		UUID paymentGroupId,
 		String checkoutNumber,
-		String displayStatus,
+		OrderStatus status,
 		long totalAmount,
 		Instant createdAt
 	) {
@@ -31,7 +38,7 @@ final class OrderDtos {
 	record OrderDetailResponse(
 		UUID orderId,
 		String orderNumber,
-		String displayStatus,
+		OrderStatus status,
 		long subtotalAmount,
 		long shippingFee,
 		long discountAmount,
@@ -50,7 +57,7 @@ final class OrderDtos {
 	record PaymentGroupSummaryResponse(
 		UUID paymentGroupId,
 		String checkoutNumber,
-		String displayStatus,
+		PaymentGroupStatus status,
 		long totalAmount,
 		Long approvedAmount,
 		Instant approvedAt
@@ -59,7 +66,7 @@ final class OrderDtos {
 
 	record PaymentSummaryResponse(
 		UUID paymentId,
-		String displayStatus,
+		PaymentStatus status,
 		Long approvedAmount,
 		Instant approvedAt
 	) {
@@ -97,19 +104,19 @@ final class OrderDtos {
 	}
 
 	record FulfillmentSummaryResponse(
-		String displayStatus
+		FulfillmentStatus status
 	) {
 	}
 
 	record ShipmentSummaryResponse(
-		String displayStatus,
+		ShipmentStatus status,
 		String carrier,
 		String trackingNumber
 	) {
 	}
 
 	record RefundSummaryResponse(
-		String displayStatus,
+		RefundStatus status,
 		Long amount
 	) {
 	}
