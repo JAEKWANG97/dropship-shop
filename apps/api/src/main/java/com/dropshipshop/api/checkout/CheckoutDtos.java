@@ -25,6 +25,15 @@ final class CheckoutDtos {
 	) {
 	}
 
+	record UpdateShippingAddressRequest(
+		@NotBlank @Size(max = 100) String recipientName,
+		@NotBlank @Size(max = 30) String recipientPhone,
+		@NotBlank @Size(max = 20) String postalCode,
+		@NotBlank @Size(max = 300) String address1,
+		@Size(max = 300) String address2
+	) {
+	}
+
 	record PolicyConfirmationRequest(
 		@NotBlank @Size(max = 50) String termsVersion,
 		@NotBlank @Size(max = 50) String privacyVersion,

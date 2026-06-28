@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,6 +41,15 @@ class CheckoutController {
 	@GetMapping("/{checkoutNumber}")
 	CheckoutDtos.CheckoutResponse getCheckout(@PathVariable String checkoutNumber, Authentication authentication) {
 		return checkoutService.getCheckout(currentUser.id(authentication), checkoutNumber);
+	}
+
+	@PatchMapping("/{checkoutNumber}/shipping-address")
+	CheckoutDtos.CheckoutResponse updateShippingAddress(
+		@PathVariable String checkoutNumber,
+		@Valid @RequestBody CheckoutDtos.UpdateShippingAddressRequest request,
+		Authentication authentication
+	) {
+		return checkoutService.updateShippingAddress(currentUser.id(authentication), checkoutNumber, request);
 	}
 
 	@PostMapping("/{checkoutNumber}/policy-confirmation")

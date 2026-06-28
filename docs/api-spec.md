@@ -102,10 +102,10 @@ Initial error codes:
 | `GET` | `/api/me` | Authenticated user | Implemented | Current user identity |
 | `GET` | `/api/me/agreements` | Authenticated user | Implemented | Current user policy agreement state |
 | `POST` | `/api/me/agreements` | Authenticated user | Implemented | Agree to required terms/privacy policies |
-| `GET` | `/api/me/addresses` | Authenticated user | Planned | List saved shipping addresses |
-| `POST` | `/api/me/addresses` | Authenticated user | Planned | Create shipping address |
-| `PATCH` | `/api/me/addresses/{addressId}` | Authenticated user | Planned | Update shipping address |
-| `DELETE` | `/api/me/addresses/{addressId}` | Authenticated user | Planned | Delete shipping address |
+| `GET` | `/api/me/addresses` | `CUSTOMER` | Implemented | List saved shipping addresses |
+| `POST` | `/api/me/addresses` | `CUSTOMER` | Implemented | Create shipping address |
+| `PATCH` | `/api/me/addresses/{addressId}` | `CUSTOMER` | Implemented | Update shipping address |
+| `DELETE` | `/api/me/addresses/{addressId}` | `CUSTOMER` | Implemented | Delete shipping address |
 | `POST` | `/api/me/deletion-request` | Authenticated user | Planned | Request account deletion |
 
 Notes:
@@ -121,6 +121,10 @@ Notes:
 - `POST /api/me/agreements` requires both `termsAgreed=true` and `privacyAgreed=true` with current required versions.
 - Reposting the same current versions is idempotent and returns the existing agreement record.
 - `POST /api/checkouts` requires current account terms/privacy agreement before order creation.
+- Saved shipping addresses belong to the authenticated customer only.
+- The first saved address becomes the default address automatically.
+- Creating or updating an address with `defaultAddress=true` clears the previous default address.
+- Deleting the current default address promotes the most recently created remaining address to default.
 
 Implemented request bodies:
 
@@ -131,6 +135,17 @@ POST /api/me/agreements
   "privacyAgreed": true,
   "termsVersion": "terms-2026-06-01",
   "privacyVersion": "privacy-2026-06-01"
+}
+
+POST /api/me/addresses
+PATCH /api/me/addresses/{addressId}
+{
+  "recipientName": "Receiver",
+  "recipientPhone": "010-1111-2222",
+  "postalCode": "12345",
+  "address1": "Base address",
+  "address2": "Detail address",
+  "defaultAddress": true
 }
 ```
 
@@ -236,11 +251,11 @@ PATCH /api/cart/items/{cartItemId}
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/checkouts` | `CUSTOMER` | Implemented | Create payment group and delivery-group orders from cart |
 | `GET` | `/api/checkouts/{checkoutNumber}` | `CUSTOMER` | Implemented | Read checkout/payment group state |
-| `PATCH` | `/api/checkouts/{checkoutNumber}/shipping-address` | Authenticated user | Planned | Update checkout shipping address before payment confirmation |
+| `PATCH` | `/api/checkouts/{checkoutNumber}/shipping-address` | `CUSTOMER` | Implemented | Update checkout shipping address before payment confirmation and before checkout policy confirmation |
 | `POST` | `/api/checkouts/{checkoutNumber}/policy-confirmation` | `CUSTOMER` | Implemented | Store order policy confirmation |
 | `GET` | `/api/orders` | `CUSTOMER` | Implemented | Customer order history |
 | `GET` | `/api/orders/{orderId}` | `CUSTOMER` | Implemented | Customer order detail |
-| `PATCH` | `/api/orders/{orderId}/shipping-address` | Authenticated user | Planned | Change address before supplier work starts |
+| `PATCH` | `/api/orders/{orderId}/shipping-address` | `CUSTOMER` | Implemented | Change address before supplier work starts |
 | `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Planned | Self-service cancel when allowed |
 
 Rules:
@@ -260,6 +275,9 @@ Rules:
 - Customer order list and detail are scoped to the authenticated customer.
 - Customer order APIs expose customer display statuses instead of internal order statuses.
 - Customer order detail includes payment group summary, payment summary, shipping address, order items, and placeholder fulfillment/shipment/refund summaries.
+- Checkout shipping address changes are allowed only while the payment group and its orders are still `PAYMENT_PENDING`.
+- Checkout shipping address changes are rejected after checkout policy confirmation because the confirmation text includes shipping address.
+- Paid order shipping address changes are allowed only while the order is `SUPPLIER_ORDER_PENDING` and both `supplierOrderStartedAt` and `addressLockedAt` are empty.
 - Address changes are rejected after `address_locked_at` or supplier order completion.
 
 Implemented request bodies:
@@ -273,6 +291,16 @@ POST /api/checkouts
   "address1": "Base address",
   "address2": "Detail address",
   "clientSubmittedTotalAmount": 1
+}
+
+PATCH /api/checkouts/{checkoutNumber}/shipping-address
+PATCH /api/orders/{orderId}/shipping-address
+{
+  "recipientName": "Receiver",
+  "recipientPhone": "010-1111-2222",
+  "postalCode": "12345",
+  "address1": "Base address",
+  "address2": "Detail address"
 }
 
 POST /api/checkouts/{checkoutNumber}/policy-confirmation

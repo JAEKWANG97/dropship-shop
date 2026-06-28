@@ -648,3 +648,22 @@ Consequences:
 - Product browsing and cart management can happen before agreement.
 - `POST /api/checkouts` rejects users without current required terms/privacy agreement.
 - Marketing consent remains separate and is not included in DS-31.
+
+## 2026-06-28: Address Book And Address Change Window
+
+Decision:
+
+Implement a customer address book separately from order shipping address snapshots, and allow direct customer address changes only before operational lock points.
+
+Context:
+
+Customers need reusable shipping addresses, but orders must preserve the shipping address used for fulfillment and disputes. Checkout policy confirmation includes shipping address, so changing checkout address after confirmation would make the confirmation stale.
+
+Consequences:
+
+- `user_addresses` stores reusable customer-owned addresses.
+- Orders keep independent shipping address snapshots.
+- The first saved address becomes default, and default address changes are managed server-side.
+- Checkout shipping address can change only while payment is pending and before checkout policy confirmation.
+- Paid order shipping address can change only while the order is `SUPPLIER_ORDER_PENDING` and supplier work/address lock has not started.
+- After `addressLockedAt` or `SUPPLIER_ORDERED`, customer direct address change is rejected.

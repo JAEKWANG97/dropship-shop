@@ -17,6 +17,7 @@
 - Claim table: implemented in `apps/api/src/main/resources/db/migration/V8__create_claim.sql`.
 - Refund table: implemented in `apps/api/src/main/resources/db/migration/V9__create_refund.sql`.
 - User policy agreement table: implemented in `apps/api/src/main/resources/db/migration/V10__create_user_policy_agreements.sql`.
+- User address table: implemented in `apps/api/src/main/resources/db/migration/V11__create_user_addresses.sql`.
 - Policy and remaining audit tables: planned.
 
 ## Modeling Rules
@@ -58,7 +59,21 @@ erDiagram
         timestamptz created_at
     }
 
+    USER_ADDRESSES {
+        uuid id PK
+        uuid user_id FK
+        varchar recipient_name
+        varchar recipient_phone
+        varchar postal_code
+        varchar address1
+        varchar address2
+        boolean default_address
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     USERS ||--o{ USER_POLICY_AGREEMENTS : agrees
+    USERS ||--o{ USER_ADDRESSES : saves
 ```
 
 Current implementation intentionally stores social identity directly on `users`.
@@ -67,7 +82,7 @@ Conceptually, `User` and `SocialAccount` are separate in `docs/domain-model.md`,
 
 Additional implemented table groups:
 
-- Account: `users`, `user_policy_agreements`
+- Account: `users`, `user_policy_agreements`, `user_addresses`
 - Catalog: `suppliers`, `products`, `product_options`, `product_images`, `product_detail_blocks`, `product_notices`, `product_change_histories`
 - Cart: `carts`, `cart_items`
 - Checkout/order: `payment_groups`, `orders`, `order_items`, `order_policy_agreements`
@@ -193,9 +208,12 @@ Constraints:
 
 ### user_addresses
 
-Planned.
+Implemented by DS-32.
 
-Requirements include saved delivery addresses, but `docs/domain-model.md` does not yet define a dedicated address entity. Add this table before implementing saved address APIs.
+Purpose:
+
+- Customer saved shipping address book.
+- Order creation still stores shipping address snapshots on orders.
 
 Key fields:
 
@@ -209,6 +227,12 @@ Key fields:
 - `default_address`
 - `created_at`
 - `updated_at`
+
+Rules:
+
+- Rows are scoped by `user_id`.
+- First saved address becomes default automatically.
+- Service logic keeps one default address when addresses remain.
 
 ### social_accounts
 

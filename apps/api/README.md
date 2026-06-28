@@ -63,6 +63,7 @@ curl http://localhost:8080/actuator/health/liveness
 - Local OAuth settings are read from `OAUTH_GOOGLE_*`, `OAUTH_KAKAO_*`, and `OAUTH_NAVER_*` environment variables.
 - Account agreement APIs are available at `/api/me/agreements`.
 - Checkout creation requires current required terms/privacy agreement.
+- Customer address book APIs are available at `/api/me/addresses`.
 
 ## Catalog Foundation
 
@@ -94,6 +95,8 @@ curl http://localhost:8080/actuator/health/liveness
 - Checkout creation empties the cart after successful order creation.
 - Checkout responses include customer policy links for shipping, cancellation/refund, and payment-after-stockout notices.
 - Policy confirmation is stored through `/api/checkouts/{checkoutNumber}/policy-confirmation`.
+- Checkout shipping address can be changed before payment and before policy confirmation.
+- Paid order shipping address can be changed only before supplier work starts and before address lock.
 
 ## Policy Page Foundation
 

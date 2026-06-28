@@ -42,6 +42,7 @@ Status: Confirmed
 - `PAYMENT_PENDING` 주문은 생성 후 30분이 지나면 만료 처리한다.
 - 만료된 결제 대기 주문은 결제 재시도 대상이 아니며, 고객은 새 주문을 생성해야 한다.
 - `PAYMENT_PENDING` 상태에서는 결제 전 주문서 수정으로 배송지를 변경할 수 있다.
+- 단, 주문서 통합 확인에는 배송지가 포함되므로 checkout 정책 확인이 완료된 뒤에는 checkout 배송지 변경을 거절한다.
 - 결제 완료 후에는 `SUPPLIER_ORDER_PENDING` 상태까지만 고객이 배송지를 직접 변경할 수 있다.
 - 단, 관리자가 공급처 발주 작업을 시작해 `addressLockedAt`이 기록된 주문은 `SUPPLIER_ORDER_PENDING` 상태라도 고객 직접 배송지 변경을 거절한다.
 - 주소 잠금은 별도 주문 상태를 추가하지 않고 `addressLockedAt`과 `supplierOrderStartedAt`으로 판단한다.
@@ -66,6 +67,7 @@ Status: Confirmed
 - 결제 대기 주문 만료 처리를 위한 스케줄러 또는 만료 검증 로직이 필요하다.
 - 만료 이후 들어온 결제 승인 검증 요청은 주문 확정으로 처리하지 않아야 한다.
 - 배송지 변경 가능 여부는 주문 상태와 `addressLockedAt`을 함께 기준으로 판단해야 한다.
+- checkout 배송지 변경 가능 여부는 결제 그룹/주문 상태가 `PAYMENT_PENDING`이고 정책 확인 전인지 함께 판단해야 한다.
 - `SUPPLIER_ORDERED` 이후 고객 배송지 변경 API는 거절해야 한다.
 - `addressLockedAt`이 있는 주문의 고객 배송지 변경 API는 거절해야 한다.
 - 고객용 주문 상태 매핑 계층이 필요하다.

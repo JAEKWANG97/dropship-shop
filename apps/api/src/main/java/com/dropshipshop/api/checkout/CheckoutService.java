@@ -27,8 +27,10 @@ import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
+import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.domain.OrderPolicyAgreement;
 import com.dropshipshop.api.order.domain.ShippingAddressSnapshot;
+import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderPolicyAgreementRepository;
@@ -125,6 +127,34 @@ public class CheckoutService {
 	@Transactional(readOnly = true)
 	public CheckoutDtos.CheckoutResponse getCheckout(UUID userId, String checkoutNumber) {
 		return toCheckoutResponse(findPaymentGroup(userId, checkoutNumber));
+	}
+
+	@Transactional
+	public CheckoutDtos.CheckoutResponse updateShippingAddress(
+		UUID userId,
+		String checkoutNumber,
+		CheckoutDtos.UpdateShippingAddressRequest request
+	) {
+		PaymentGroup paymentGroup = findPaymentGroup(userId, checkoutNumber);
+		if (paymentGroup.getStatus() != PaymentGroupStatus.PAYMENT_PENDING) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout address can be changed only before payment confirmation");
+		}
+		if (paymentGroup.getPolicyConfirmedAt() != null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout policy confirmation is already completed");
+		}
+		ShippingAddressSnapshot address = new ShippingAddressSnapshot(
+			request.recipientName(),
+			request.recipientPhone(),
+			request.postalCode(),
+			request.address1(),
+			request.address2()
+		);
+		List<CustomerOrder> orders = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId());
+		if (orders.isEmpty() || orders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAYMENT_PENDING)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout address can be changed only while payment is pending");
+		}
+		orders.forEach(order -> order.updatePaymentPendingAddress(address));
+		return toCheckoutResponse(paymentGroup);
 	}
 
 	@Transactional

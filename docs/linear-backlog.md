@@ -775,9 +775,10 @@ Track backend API, policy, state transition, notification, and audit work remain
 
 Child issues:
 
-- DS-32 through DS-44 remain tracked in Linear.
+- DS-33 through DS-44 remain tracked in Linear.
 - DS-30 is implemented.
 - DS-31 is implemented.
+- DS-32 is implemented.
 - DS-45 is implemented.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
@@ -814,6 +815,24 @@ Acceptance criteria:
 - `POST /api/checkouts` requires current account agreement before order creation.
 - `user_policy_agreements` is added through Flyway and reflected in ERD/API/policy docs.
 - Integration tests cover agreement state, agreement creation, duplicate agreement, invalid consent/version, and checkout access before/after agreement.
+
+### DS-32: Implement customer address book and address change
+
+Status: Implemented
+
+Description:
+
+Implement customer saved shipping addresses and allowed checkout/order shipping address changes.
+
+Acceptance criteria:
+
+- `GET /api/me/addresses`, `POST /api/me/addresses`, `PATCH /api/me/addresses/{addressId}`, and `DELETE /api/me/addresses/{addressId}` are implemented.
+- Address ownership is scoped to the authenticated customer.
+- Default address management is handled server-side.
+- `PATCH /api/checkouts/{checkoutNumber}/shipping-address` updates payment-pending checkout order snapshots before policy confirmation.
+- `PATCH /api/orders/{orderId}/shipping-address` updates paid order shipping address before supplier work starts.
+- Address changes are rejected after policy confirmation, supplier work start, address lock, or supplier order completion.
+- Flyway, ERD, API spec, policy docs, and integration tests are updated.
 
 ### DS-45: Standardize API error response
 

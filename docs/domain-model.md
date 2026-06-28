@@ -54,6 +54,14 @@ Implemented fields:
 - createdAt
 - updatedAt
 
+DS-32 implementation notes:
+
+- `user_addresses` stores the customer's reusable address book.
+- Order rows keep shipping address snapshots and do not reference `user_addresses`.
+- The first saved address becomes default automatically.
+- Only one default address is kept per customer through service logic.
+- If the current default address is deleted and other addresses remain, the most recently created address becomes default.
+
 ## SocialAccount
 
 카카오, 구글, 네이버 소셜 로그인 식별 정보를 나타낸다.

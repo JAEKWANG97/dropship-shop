@@ -204,6 +204,28 @@ public class CustomerOrder {
 		this.status = OrderStatus.EXPIRED;
 	}
 
+	public void updatePaymentPendingAddress(ShippingAddressSnapshot address) {
+		if (status != OrderStatus.PAYMENT_PENDING) {
+			throw new IllegalStateException("Checkout address can be changed only before payment confirmation");
+		}
+		updateAddress(address);
+	}
+
+	public void updateCustomerAddressBeforeSupplierWork(ShippingAddressSnapshot address) {
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING || supplierOrderStartedAt != null || addressLockedAt != null) {
+			throw new IllegalStateException("Order address can be changed only before supplier work starts");
+		}
+		updateAddress(address);
+	}
+
+	private void updateAddress(ShippingAddressSnapshot address) {
+		this.recipientName = address.recipientName();
+		this.recipientPhone = address.recipientPhone();
+		this.postalCode = address.postalCode();
+		this.address1 = address.address1();
+		this.address2 = address.address2();
+	}
+
 	public UUID getId() {
 		return id;
 	}
