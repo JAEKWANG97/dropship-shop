@@ -2,7 +2,11 @@ package com.dropshipshop.api.dev;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -22,7 +26,8 @@ import com.dropshipshop.api.catalog.repository.SupplierRepository;
 	"spring.datasource.username=sa",
 	"spring.datasource.password=",
 	"spring.flyway.enabled=false",
-	"spring.jpa.hibernate.ddl-auto=create-drop"
+	"spring.jpa.hibernate.ddl-auto=create-drop",
+	"app.catalog.image-storage-path=build/test-product-images"
 })
 @ActiveProfiles("local")
 class LocalCatalogSeedDataTest {
@@ -33,6 +38,7 @@ class LocalCatalogSeedDataTest {
 	private final ProductImageRepository productImageRepository;
 	private final ProductDetailBlockRepository productDetailBlockRepository;
 	private final ProductNoticeRepository productNoticeRepository;
+	private final Path imageStoragePath;
 
 	@Autowired
 	LocalCatalogSeedDataTest(
@@ -41,7 +47,8 @@ class LocalCatalogSeedDataTest {
 		ProductOptionRepository productOptionRepository,
 		ProductImageRepository productImageRepository,
 		ProductDetailBlockRepository productDetailBlockRepository,
-		ProductNoticeRepository productNoticeRepository
+		ProductNoticeRepository productNoticeRepository,
+		@Value("${app.catalog.image-storage-path}") String imageStoragePath
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -49,6 +56,7 @@ class LocalCatalogSeedDataTest {
 		this.productImageRepository = productImageRepository;
 		this.productDetailBlockRepository = productDetailBlockRepository;
 		this.productNoticeRepository = productNoticeRepository;
+		this.imageStoragePath = Path.of(imageStoragePath);
 	}
 
 	@Test
@@ -63,8 +71,12 @@ class LocalCatalogSeedDataTest {
 			.extracting(product -> product.getStatus())
 			.contains(ProductStatus.ACTIVE, ProductStatus.SOLD_OUT, ProductStatus.HIDDEN);
 		assertThat(productImageRepository.findAll())
-			.allSatisfy(image -> assertThat(image.getImageUrl())
-				.startsWith("data:image/svg+xml,%3Csvg%20")
-				.doesNotContain("%3Csvg+"));
+			.allSatisfy(image -> {
+				assertThat(image.getImageUrl())
+					.startsWith("/uploads/products/local-seed/")
+					.endsWith(".png");
+				String objectKey = image.getImageUrl().substring("/uploads/products/".length());
+				assertThat(Files.exists(imageStoragePath.resolve(objectKey))).isTrue();
+			});
 	}
 }

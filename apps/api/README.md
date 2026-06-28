@@ -72,7 +72,9 @@ curl http://localhost:8080/actuator/health/liveness
 - Admin catalog APIs are available under `/api/admin`.
 - Catalog tables include suppliers, products, options, images, detail blocks, notices, and product change histories.
 - Product and option sellability uses status fields, not stock quantity.
-- Product images and detail images store URL/object-key metadata; binary upload is separate future work.
+- Product images and detail images store URL/object-key metadata.
+- Admin image upload stores files under `app.catalog.image-storage-path` and serves them at `/uploads/products/**`.
+- Local seed catalog images are generated as PNG files under `/uploads/products/local-seed/**`; reset the local DB or delete existing seed supplier rows before reseeding product image URLs.
 - Product notice versions support later order item snapshot references.
 
 ## Cart Foundation
