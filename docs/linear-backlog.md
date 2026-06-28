@@ -1137,7 +1137,7 @@ Acceptance criteria:
 - Only customer-facing order data is shown.
 - Frontend lint/build checks cover order pages.
 
-### DS-52: Collect customer contact information separately from social login
+### DS-58: Collect customer contact information separately from social login
 
 Status: Planned
 
@@ -1152,3 +1152,33 @@ Acceptance criteria:
 - Checkout collects the customer contact email or phone needed for order, delivery, and claim handling.
 - Order/contact API, ERD, and privacy policy docs reflect the separate collection point.
 - Transactional notification logic does not send to internal placeholder OAuth emails.
+
+### DS-59: Add local catalog seed data for smoke tests
+
+Status: Planned
+
+Description:
+
+Add local-only product data needed to verify the customer flow end to end.
+
+Acceptance criteria:
+
+- Local seed or documented admin script creates one supplier, active product, active option, product notice, and visible detail content.
+- Seed data is not enabled unexpectedly in production.
+- Development docs show how to reset and load local smoke-test data.
+- Customer flow can reach product detail, add to cart, and start checkout with seeded data.
+
+### DS-60: Document OAuth provider setup and local login smoke test
+
+Status: Planned
+
+Description:
+
+Document the provider console setup and local login verification path.
+
+Acceptance criteria:
+
+- Docs list local callback URLs for Google, Kakao, and Naver.
+- Docs list required provider consent/scope settings, including Kakao `profile_nickname` only.
+- Docs show required local env variables without committing secrets.
+- Docs include smoke-test steps for `/login`, provider redirect, callback success, and `/api/me`.
