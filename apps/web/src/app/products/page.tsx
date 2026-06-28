@@ -86,8 +86,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 />
                 <div className="product-card-copy">
                   <span className="product-card-name">{product.name}</span>
-                  <span className="product-card-summary">{product.summary}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
+                  <span className="product-card-summary">{product.summary}</span>
                   <span className="product-card-status">
                     {product.status === "ACTIVE" ? "구매 가능" : "상태 확인 필요"}
                   </span>

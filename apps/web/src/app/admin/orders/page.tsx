@@ -62,6 +62,12 @@ export default async function AdminOrdersPage() {
                 </span>
               </div>
             ))}
+            {orders.length === 0 ? (
+              <div className="admin-empty">
+                <strong>조회된 주문이 없습니다</strong>
+                <span>검색 조건을 바꾸거나 새 주문이 들어온 뒤 다시 확인하세요.</span>
+              </div>
+            ) : null}
           </div>
         </section>
 

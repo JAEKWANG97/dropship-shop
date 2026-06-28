@@ -1182,3 +1182,21 @@ Acceptance criteria:
 - Docs list required provider consent/scope settings, including Kakao `profile_nickname` only.
 - Docs show required local env variables without committing secrets.
 - Docs include smoke-test steps for `/login`, provider redirect, callback success, and `/api/me`.
+
+## Beta UX Readiness Track
+
+Linear is authoritative for this track. This section records the issue map only.
+
+### DS-71: Beta-ready B2B commerce UX
+
+Status: In Progress
+
+Parent issue for bringing the current MVP to a beta-ready B2B commerce UX while preserving SafeHub Pro policy and API/DB boundaries.
+
+Children:
+
+- DS-72: Commerce shell and storefront polish
+- DS-73: Realistic product and image fixtures
+- DS-74: Customer flow UX QA
+- DS-75: Admin flow UX QA
+- DS-76: OAuth and checkout readiness
