@@ -469,13 +469,13 @@ Suggested fields:
 - shippedAt
 - deliveredAt
 - trackingSyncedAt
+- trackingSyncFailureReason
 - createdAt
 - updatedAt
 
 Planned fields:
 
 - trackingStatus
-- trackingSyncFailureReason
 - manualOverride
 - manualCorrectedByAdminId
 - manualCorrectedAt
@@ -485,6 +485,9 @@ Rules:
 - DS-13 creates one shipment per order when admin enters carrier and tracking number.
 - Shipment creation is allowed only from `SUPPLIER_ORDERED` and moves the order to `SHIPPED`.
 - Duplicate shipment creation for the same order is rejected.
+- DS-35 syncs tracking results by shipment id or carrier/tracking number.
+- Delivered tracking moves shipment and order to `DELIVERED`; non-delivered tracking does not move state backward.
+- Tracking sync failure records `trackingSyncFailureReason` and keeps current order/shipment state.
 - Customer order detail exposes shipment display status, carrier, and tracking number.
 
 ## Refund

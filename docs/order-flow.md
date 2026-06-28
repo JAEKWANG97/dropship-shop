@@ -267,7 +267,7 @@ Order status: SHIPPED
 
 Tracking sync failure
 -> Keep current shipment/order status
--> Record sync failure
+-> Record `trackingSyncFailureReason`
 -> Retry later or allow admin manual correction
 
 Admin manual correction

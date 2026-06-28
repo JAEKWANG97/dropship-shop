@@ -135,6 +135,7 @@ final class AdminOrderDtos {
 		Instant shippedAt,
 		Instant deliveredAt,
 		Instant trackingSyncedAt,
+		String trackingSyncFailureReason,
 		String manualCorrectionReason
 	) {
 	}

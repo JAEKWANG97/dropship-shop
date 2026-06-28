@@ -166,6 +166,13 @@ public class CustomerOrder {
 		this.status = OrderStatus.SHIPPED;
 	}
 
+	public void markDeliveredByTracking() {
+		if (status != OrderStatus.SHIPPED) {
+			throw new IllegalStateException("Order can be delivered only after shipment");
+		}
+		this.status = OrderStatus.DELIVERED;
+	}
+
 	public boolean isSelfServiceCancellable() {
 		return status == OrderStatus.SUPPLIER_ORDER_PENDING
 			&& supplierOrderStartedAt == null

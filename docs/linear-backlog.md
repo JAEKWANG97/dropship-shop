@@ -783,7 +783,25 @@ Child issues:
 - DS-32 is implemented.
 - DS-33 is implemented.
 - DS-34 is implemented.
+- DS-35 is implemented.
 - DS-45 is implemented.
+
+### DS-35: Implement shipment tracking auto sync
+
+Status: Implemented
+
+Description:
+
+Implement shipment tracking sync endpoints and forward-only delivery completion handling.
+
+Acceptance criteria:
+
+- `POST /api/internal/shipments/tracking-sync` syncs tracking results by carrier and tracking number.
+- `POST /api/admin/shipments/{shipmentId}/tracking-sync` retries sync for one shipment.
+- Delivered tracking moves shipment and order to `DELIVERED`.
+- Non-delivered tracking does not move delivered shipments backward.
+- Tracking sync failure records `trackingSyncFailureReason` without changing shipment/order state.
+- API spec, ERD, domain model, fulfillment policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

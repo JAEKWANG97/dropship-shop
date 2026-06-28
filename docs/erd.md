@@ -598,6 +598,7 @@ Constraints and indexes:
 - `shipped_at`
 - `delivered_at`
 - `tracking_synced_at`
+- `tracking_sync_failure_reason`
 - `manual_correction_reason`
 - `created_at`
 - `updated_at`

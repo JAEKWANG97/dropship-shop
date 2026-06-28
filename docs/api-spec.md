@@ -392,8 +392,8 @@ Rules:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/orders/{orderId}/shipment` | Authenticated user | Planned | Customer shipment detail |
-| `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler | Planned | Sync tracking status |
-| `POST` | `/api/admin/shipments/{shipmentId}/tracking-sync` | `ADMIN` | Planned | Manual retry tracking sync |
+| `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler | Implemented | Sync tracking status batch by carrier/tracking number |
+| `POST` | `/api/admin/shipments/{shipmentId}/tracking-sync` | `ADMIN` | Implemented | Manual retry tracking sync |
 
 Rules:
 
@@ -401,6 +401,8 @@ Rules:
 - Shipment creation requires carrier and tracking number.
 - MVP supports one shipment per order.
 - Automatic tracking moves shipment forward only.
+- `DELIVERED` tracking status moves shipment and order to `DELIVERED`; other tracking statuses keep the current state.
+- Sync failure stores `trackingSyncFailureReason` and keeps current shipment/order state.
 - Tracking failure must not block order, payment, or refund operations.
 - Manual correction requires reason and history.
 

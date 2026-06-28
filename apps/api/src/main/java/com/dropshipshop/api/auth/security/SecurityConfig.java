@@ -63,6 +63,7 @@ public class SecurityConfig {
 				.requestMatchers("/api/health", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
 				.requestMatchers("/api/auth/oauth2/**").permitAll()
 				.requestMatchers("/api/payments/toss/webhook").permitAll()
+				.requestMatchers("/api/internal/**").permitAll()
 				.requestMatchers("/api/products", "/api/products/**").permitAll()
 				.requestMatchers("/api/policies", "/api/policies/**").permitAll()
 				.requestMatchers("/api/admin/**").hasRole("ADMIN")

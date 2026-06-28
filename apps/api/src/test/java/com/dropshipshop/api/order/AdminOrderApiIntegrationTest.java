@@ -42,6 +42,8 @@ import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -378,6 +380,93 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.shipment.displayStatus", is("배송 중")))
 			.andExpect(jsonPath("$.shipment.carrier", is("롯데택배")))
 			.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")));
+	}
+
+	@Test
+	void syncsDeliveredShipmentAndDoesNotMoveBackward() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-12");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-SYNC-1", "ADM-SHIP-SYNC-CO-1", 36000);
+		createShipment(order, "CJ대한통운", "SYNC-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "trackingStatus": "DELIVERED"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipmentStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.trackingSyncedAt").exists());
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "trackingStatus": "IN_TRANSIT"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipmentStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")));
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(shipmentRepository.findById(shipment.getId()).orElseThrow().getStatus()).isEqualTo(ShipmentStatus.DELIVERED);
+	}
+
+	@Test
+	void recordsInternalTrackingSyncFailureWithoutChangingOrder() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-13");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-FAIL-1", "ADM-SHIP-FAIL-CO-1", 37000);
+		createShipment(order, "한진택배", "FAIL-123");
+
+		mockMvc.perform(post("/api/internal/shipments/tracking-sync")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "shipments": [
+					    {
+					      "carrier": "한진택배",
+					      "trackingNumber": "FAIL-123",
+					      "failureReason": "Carrier timeout"
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.received", is(1)))
+			.andExpect(jsonPath("$.matched", is(1)))
+			.andExpect(jsonPath("$.delivered", is(0)))
+			.andExpect(jsonPath("$.failed", is(1)))
+			.andExpect(jsonPath("$.notFound", is(0)));
+
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
+		assertThat(shipment.getStatus()).isEqualTo(ShipmentStatus.SHIPPED);
+		assertThat(shipment.getTrackingSyncFailureReason()).isEqualTo("Carrier timeout");
+		assertThat(shipment.getTrackingSyncedAt()).isNotNull();
+	}
+
+	@Test
+	void rejectsCustomerShipmentTrackingSyncAccess() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-14");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-SYNC-AUTH-1", "ADM-SHIP-SYNC-AUTH-CO-1", 38000);
+		createShipment(order, "CJ대한통운", "SYNC-AUTH-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "trackingStatus": "DELIVERED"
+					}
+					"""))
+			.andExpect(status().isForbidden());
 	}
 
 	private UserAccount createCustomer(String providerUserId) {

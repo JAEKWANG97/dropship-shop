@@ -49,6 +49,9 @@ public class Shipment {
 	@Column(name = "tracking_synced_at")
 	private Instant trackingSyncedAt;
 
+	@Column(name = "tracking_sync_failure_reason", columnDefinition = "TEXT")
+	private String trackingSyncFailureReason;
+
 	@Column(name = "manual_correction_reason", columnDefinition = "TEXT")
 	private String manualCorrectionReason;
 
@@ -84,6 +87,10 @@ public class Shipment {
 		return id;
 	}
 
+	public CustomerOrder getOrder() {
+		return order;
+	}
+
 	public String getCarrier() {
 		return carrier;
 	}
@@ -110,5 +117,33 @@ public class Shipment {
 
 	public String getManualCorrectionReason() {
 		return manualCorrectionReason;
+	}
+
+	public String getTrackingSyncFailureReason() {
+		return trackingSyncFailureReason;
+	}
+
+	public boolean markDeliveredByTracking(Instant syncedAt) {
+		this.trackingSyncedAt = syncedAt;
+		this.trackingSyncFailureReason = null;
+		if (status == ShipmentStatus.DELIVERED) {
+			return false;
+		}
+		if (status != ShipmentStatus.SHIPPED) {
+			return false;
+		}
+		this.status = ShipmentStatus.DELIVERED;
+		this.deliveredAt = syncedAt;
+		return true;
+	}
+
+	public void markTrackingSynced(Instant syncedAt) {
+		this.trackingSyncedAt = syncedAt;
+		this.trackingSyncFailureReason = null;
+	}
+
+	public void recordTrackingSyncFailure(Instant syncedAt, String failureReason) {
+		this.trackingSyncedAt = syncedAt;
+		this.trackingSyncFailureReason = failureReason;
 	}
 }

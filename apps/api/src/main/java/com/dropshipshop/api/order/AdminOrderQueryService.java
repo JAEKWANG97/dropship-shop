@@ -170,6 +170,7 @@ class AdminOrderQueryService {
 			shipment.getShippedAt(),
 			shipment.getDeliveredAt(),
 			shipment.getTrackingSyncedAt(),
+			shipment.getTrackingSyncFailureReason(),
 			shipment.getManualCorrectionReason()
 		);
 	}
