@@ -65,6 +65,9 @@ export default async function CheckoutDetailPage({
     );
   }
 
+  const paymentPending = checkout.status === "PAYMENT_PENDING";
+  const policyConfirmed = Boolean(checkout.policyConfirmedAt);
+
   return (
     <section className="checkout-page">
       <div className="section-heading">
@@ -80,9 +83,11 @@ export default async function CheckoutDetailPage({
       ) : null}
 
       <CheckoutSummary checkout={checkout} />
-      <ShippingAddressForm checkout={checkout} />
-      <PolicyConfirmationForm agreement={agreement} checkout={checkout} />
-      <TossPaymentForm checkout={checkout} />
+      {paymentPending ? <ShippingAddressForm checkout={checkout} /> : <CheckoutLockedNotice />}
+      {paymentPending && !policyConfirmed ? (
+        <PolicyConfirmationForm agreement={agreement} checkout={checkout} />
+      ) : null}
+      {paymentPending && policyConfirmed ? <TossPaymentForm checkout={checkout} /> : null}
     </section>
   );
 }
@@ -193,6 +198,15 @@ function ShippingAddressForm({ checkout }: { checkout: Checkout }) {
         배송지 변경
       </button>
     </form>
+  );
+}
+
+function CheckoutLockedNotice() {
+  return (
+    <div className="notice">
+      <strong>주문서 수정이 제한됩니다</strong>
+      <span>결제 대기 상태가 아니므로 배송지 변경이나 결제 승인 재시도를 진행하지 않습니다.</span>
+    </div>
   );
 }
 
