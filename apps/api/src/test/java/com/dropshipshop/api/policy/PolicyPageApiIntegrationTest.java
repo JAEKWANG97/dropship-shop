@@ -203,6 +203,7 @@ class PolicyPageApiIntegrationTest {
 		mockMvc.perform(get("/api/products/{productId}", option.getProduct().getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.policyLinks", hasSize(3)))
+			.andExpect(jsonPath("$.policyLinks[0].label", is("배송 정책")))
 			.andExpect(jsonPath("$.policyLinks[0].href", is("/api/policies/shipping")))
 			.andExpect(jsonPath("$.policyLinks[1].href", is("/api/policies/cancellation-refund")))
 			.andExpect(jsonPath("$.policyLinks[2].href", is("/api/policies/stock-risk")));
@@ -224,6 +225,7 @@ class PolicyPageApiIntegrationTest {
 					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.policyLinks", hasSize(3)))
+			.andExpect(jsonPath("$.policyLinks[0].label", is("배송 정책")))
 			.andExpect(jsonPath("$.policyLinks[0].policyType", is("SHIPPING_POLICY")))
 			.andExpect(jsonPath("$.policyLinks[1].policyType", is("CANCELLATION_REFUND_POLICY")))
 			.andExpect(jsonPath("$.policyLinks[2].policyType", is("OUT_OF_STOCK_NOTICE")));

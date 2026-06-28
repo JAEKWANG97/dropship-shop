@@ -472,7 +472,7 @@ Rules:
 - Business profile and privacy processing item APIs are backed by DB tables; admin management remains planned.
 - Managed policy documents support draft creation, draft update, activation, current public lookup, and version public lookup in DS-41.
 - Public policy document types include `SHIPPING_POLICY`, `CANCELLATION_REFUND_POLICY`, and `OUT_OF_STOCK_NOTICE`.
-- Product detail and checkout responses include links to the implemented policy page endpoints.
+- Product detail and checkout responses include links to the implemented policy page endpoints; link labels use active policy document titles when configured.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.
 - Checkout stores policy versions per payment group.

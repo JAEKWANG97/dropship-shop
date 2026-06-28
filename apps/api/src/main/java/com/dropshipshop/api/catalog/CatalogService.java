@@ -36,6 +36,7 @@ import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 
 @Service
 public class CatalogService {
@@ -45,11 +46,6 @@ public class CatalogService {
 	private static final Pattern JAVASCRIPT_URL = Pattern.compile("(?i)javascript:");
 	private static final List<String> ALLOWED_IMAGE_EXTENSIONS = List.of(".jpg", ".jpeg", ".png", ".webp");
 	private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-	private static final List<CatalogDtos.PolicyLinkResponse> PRODUCT_POLICY_LINKS = List.of(
-		new CatalogDtos.PolicyLinkResponse("배송 정책", "/api/policies/shipping", "SHIPPING_POLICY"),
-		new CatalogDtos.PolicyLinkResponse("취소/환불 정책", "/api/policies/cancellation-refund", "CANCELLATION_REFUND_POLICY"),
-		new CatalogDtos.PolicyLinkResponse("결제 후 품절 안내", "/api/policies/stock-risk", "OUT_OF_STOCK_NOTICE")
-	);
 
 	private final SupplierRepository supplierRepository;
 	private final ProductRepository productRepository;
@@ -58,6 +54,7 @@ public class CatalogService {
 	private final ProductDetailBlockRepository productDetailBlockRepository;
 	private final ProductNoticeRepository productNoticeRepository;
 	private final ProductChangeHistoryRepository productChangeHistoryRepository;
+	private final CustomerPolicyLinkService customerPolicyLinkService;
 	private final Path imageStoragePath;
 
 	public CatalogService(
@@ -68,6 +65,7 @@ public class CatalogService {
 		ProductDetailBlockRepository productDetailBlockRepository,
 		ProductNoticeRepository productNoticeRepository,
 		ProductChangeHistoryRepository productChangeHistoryRepository,
+		CustomerPolicyLinkService customerPolicyLinkService,
 		@Value("${app.catalog.image-storage-path:build/product-images}") String imageStoragePath
 	) {
 		this.supplierRepository = supplierRepository;
@@ -77,6 +75,7 @@ public class CatalogService {
 		this.productDetailBlockRepository = productDetailBlockRepository;
 		this.productNoticeRepository = productNoticeRepository;
 		this.productChangeHistoryRepository = productChangeHistoryRepository;
+		this.customerPolicyLinkService = customerPolicyLinkService;
 		this.imageStoragePath = Path.of(imageStoragePath);
 	}
 
@@ -540,7 +539,7 @@ public class CatalogService {
 			options,
 			blocks,
 			notice,
-			PRODUCT_POLICY_LINKS
+			policyLinks()
 		);
 	}
 
@@ -551,6 +550,12 @@ public class CatalogService {
 			option.getAdditionalPrice(),
 			option.getStatus()
 		);
+	}
+
+	private List<CatalogDtos.PolicyLinkResponse> policyLinks() {
+		return customerPolicyLinkService.links().stream()
+			.map(link -> new CatalogDtos.PolicyLinkResponse(link.label(), link.href(), link.policyType()))
+			.toList();
 	}
 
 	private CatalogDtos.ProductImageResponse toImageResponse(ProductImage image) {

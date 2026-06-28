@@ -16,31 +16,27 @@ import com.dropshipshop.api.policy.domain.PrivacyProcessingItem;
 @Service
 class PolicyPageService {
 
-	private static final List<PolicyDocumentType> PUBLIC_POLICY_TYPES = List.of(
-		PolicyDocumentType.SHIPPING_POLICY,
-		PolicyDocumentType.CANCELLATION_REFUND_POLICY,
-		PolicyDocumentType.OUT_OF_STOCK_NOTICE
-	);
-
 	private final PolicyDocumentRepository policyDocumentRepository;
 	private final BusinessProfileRepository businessProfileRepository;
 	private final PrivacyProcessingItemRepository privacyProcessingItemRepository;
+	private final CustomerPolicyLinkService customerPolicyLinkService;
 
 	PolicyPageService(
 		PolicyDocumentRepository policyDocumentRepository,
 		BusinessProfileRepository businessProfileRepository,
-		PrivacyProcessingItemRepository privacyProcessingItemRepository
+		PrivacyProcessingItemRepository privacyProcessingItemRepository,
+		CustomerPolicyLinkService customerPolicyLinkService
 	) {
 		this.policyDocumentRepository = policyDocumentRepository;
 		this.businessProfileRepository = businessProfileRepository;
 		this.privacyProcessingItemRepository = privacyProcessingItemRepository;
+		this.customerPolicyLinkService = customerPolicyLinkService;
 	}
 
 	@Transactional(readOnly = true)
 	PolicyDtos.PolicyIndexResponse listPolicies() {
-		return new PolicyDtos.PolicyIndexResponse(PUBLIC_POLICY_TYPES.stream()
-			.map(this::activePolicy)
-			.map(this::toLink)
+		return new PolicyDtos.PolicyIndexResponse(customerPolicyLinkService.links().stream()
+			.map(link -> new PolicyDtos.PolicyLinkResponse(link.policyType(), link.label(), link.href()))
 			.toList());
 	}
 
@@ -93,25 +89,12 @@ class PolicyPageService {
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Active policy document not found"));
 	}
 
-	private PolicyDtos.PolicyLinkResponse toLink(PolicyDocument policy) {
-		return new PolicyDtos.PolicyLinkResponse(policy.getType().name(), policy.getTitle(), href(policy.getType()));
-	}
-
 	private PolicyDocumentType typeFromSlug(String slug) {
 		return switch (slug) {
 			case "shipping" -> PolicyDocumentType.SHIPPING_POLICY;
 			case "cancellation-refund" -> PolicyDocumentType.CANCELLATION_REFUND_POLICY;
 			case "stock-risk" -> PolicyDocumentType.OUT_OF_STOCK_NOTICE;
 			default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Policy not found");
-		};
-	}
-
-	private String href(PolicyDocumentType type) {
-		return switch (type) {
-			case SHIPPING_POLICY -> "/api/policies/shipping";
-			case CANCELLATION_REFUND_POLICY -> "/api/policies/cancellation-refund";
-			case OUT_OF_STOCK_NOTICE -> "/api/policies/stock-risk";
-			default -> throw new IllegalArgumentException("Unsupported public policy type: " + type);
 		};
 	}
 
