@@ -787,6 +787,7 @@ Child issues:
 - DS-36 is implemented.
 - DS-37 is implemented.
 - DS-38 is implemented.
+- DS-39 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -859,6 +860,23 @@ Acceptance criteria:
 - `POST /api/admin/refunds/{refundId}/manual-review` can approve or reject manual-review refunds with reason.
 - Refund review fields are stored in DB and exposed in admin refund responses.
 - API spec, ERD, domain model, cancellation/refund policy, admin policy, and integration tests are updated.
+
+### DS-39: Implement notification log and email baseline
+
+Status: Implemented
+
+Description:
+
+Implement transactional notification logs and MVP email baseline without adding an external email provider dependency.
+
+Acceptance criteria:
+
+- `notification_logs` table and JPA domain are implemented.
+- `GET /api/admin/notifications` lists notification logs for admins.
+- Transactional email logs are recorded with `SENT` status for payment completed, payment exception, out-of-stock, shipment started, delivery completed, claim status changed, and refund completed.
+- Transactional notification logging remains separate from marketing consent.
+- Retry of failed notifications and real SMTP/provider integration remain planned.
+- API spec, ERD, domain model, legal/customer notice policy, order policy, admin policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

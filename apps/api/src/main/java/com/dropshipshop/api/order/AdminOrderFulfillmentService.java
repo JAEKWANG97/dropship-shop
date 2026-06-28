@@ -10,6 +10,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
@@ -29,6 +31,7 @@ class AdminOrderFulfillmentService {
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final RefundService refundService;
+	private final NotificationService notificationService;
 
 	AdminOrderFulfillmentService(
 		CustomerOrderRepository orderRepository,
@@ -36,7 +39,8 @@ class AdminOrderFulfillmentService {
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
-		RefundService refundService
+		RefundService refundService,
+		NotificationService notificationService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
@@ -44,6 +48,7 @@ class AdminOrderFulfillmentService {
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.refundService = refundService;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -109,6 +114,7 @@ class AdminOrderFulfillmentService {
 			fulfillment.markOutOfStock(request.reason());
 			fulfillmentRepository.save(fulfillment);
 			refundService.createOutOfStockRefund(order);
+			notificationService.email(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.OUT_OF_STOCK);
 			recordHistory(order, adminUserId, AdminOrderActionType.OUT_OF_STOCK, beforeStatus, request.reason());
 			return actionResponse(order, fulfillment);
 		} catch (IllegalStateException ex) {

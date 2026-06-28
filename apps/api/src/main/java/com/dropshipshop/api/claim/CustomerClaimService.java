@@ -16,6 +16,8 @@ import com.dropshipshop.api.claim.domain.ClaimStatus;
 import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
@@ -41,17 +43,20 @@ class CustomerClaimService {
 	private final ClaimRepository claimRepository;
 	private final RefundService refundService;
 	private final ShipmentRepository shipmentRepository;
+	private final NotificationService notificationService;
 
 	CustomerClaimService(
 		CustomerOrderRepository orderRepository,
 		ClaimRepository claimRepository,
 		RefundService refundService,
-		ShipmentRepository shipmentRepository
+		ShipmentRepository shipmentRepository,
+		NotificationService notificationService
 	) {
 		this.orderRepository = orderRepository;
 		this.claimRepository = claimRepository;
 		this.refundService = refundService;
 		this.shipmentRepository = shipmentRepository;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -76,6 +81,7 @@ class CustomerClaimService {
 			request.reason()
 		));
 		refundService.createCustomerCancelRefund(order);
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 
@@ -102,6 +108,7 @@ class CustomerClaimService {
 			RequestedAction.REFUND,
 			request.customerMemo()
 		));
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 
@@ -122,6 +129,7 @@ class CustomerClaimService {
 			request.claimType() == ClaimType.RETURN ? RequestedAction.REFUND : RequestedAction.EXCHANGE,
 			request.customerMemo()
 		));
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 

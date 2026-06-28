@@ -154,6 +154,11 @@ class RefundApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.refund.status", is("COMPLETED")))
 			.andExpect(jsonPath("$.refund.refundAmount", is(22000)));
+
+		mockMvc.perform(get("/api/admin/notifications")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notifications[?(@.orderId == '%s')].type".formatted(order.getId()), hasItem("REFUND_COMPLETED")));
 	}
 
 	@Test

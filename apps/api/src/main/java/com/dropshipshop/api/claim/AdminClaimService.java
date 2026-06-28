@@ -12,6 +12,8 @@ import com.dropshipshop.api.claim.domain.Claim;
 import com.dropshipshop.api.claim.domain.ClaimStatus;
 import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.refund.RefundService;
 
 @Service
@@ -20,15 +22,18 @@ class AdminClaimService {
 	private final ClaimRepository claimRepository;
 	private final CustomerClaimService customerClaimService;
 	private final RefundService refundService;
+	private final NotificationService notificationService;
 
 	AdminClaimService(
 		ClaimRepository claimRepository,
 		CustomerClaimService customerClaimService,
-		RefundService refundService
+		RefundService refundService,
+		NotificationService notificationService
 	) {
 		this.claimRepository = claimRepository;
 		this.customerClaimService = customerClaimService;
 		this.refundService = refundService;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional(readOnly = true)
@@ -58,6 +63,14 @@ class AdminClaimService {
 				claim.getOrder().markRefundRequested();
 				refundService.createCustomerCancelRefund(claim.getOrder());
 			}
+			notificationService.email(
+				claim.getUser(),
+				claim.getOrder(),
+				claim.getOrder().getPaymentGroup(),
+				claim,
+				null,
+				NotificationType.CLAIM_STATUS_CHANGED
+			);
 			return customerClaimService.toResponse(claim);
 		} catch (IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
@@ -73,6 +86,14 @@ class AdminClaimService {
 		Claim claim = findReviewableClaim(claimId);
 		try {
 			claim.reject(adminUserId, request.reason(), Instant.now());
+			notificationService.email(
+				claim.getUser(),
+				claim.getOrder(),
+				claim.getOrder().getPaymentGroup(),
+				claim,
+				null,
+				NotificationType.CLAIM_STATUS_CHANGED
+			);
 			return customerClaimService.toResponse(claim);
 		} catch (IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());

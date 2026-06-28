@@ -15,6 +15,8 @@ import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.InternalTrackingSyncItem;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.InternalTrackingSyncRequest;
 import com.dropshipshop.api.shipment.ShipmentTrackingDtos.InternalTrackingSyncResponse;
@@ -31,15 +33,18 @@ class ShipmentTrackingService {
 	private final ShipmentRepository shipmentRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
+	private final NotificationService notificationService;
 
 	ShipmentTrackingService(
 		ShipmentRepository shipmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
-		OrderStatusHistoryRepository statusHistoryRepository
+		OrderStatusHistoryRepository statusHistoryRepository,
+		NotificationService notificationService
 	) {
 		this.shipmentRepository = shipmentRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -62,6 +67,7 @@ class ShipmentTrackingService {
 			boolean delivered = shipment.markDeliveredByManualCorrection(Instant.now(), adminUserId, request.reason());
 			if (delivered) {
 				shipment.getOrder().markDeliveredByAdminCorrection();
+				notifyDelivered(shipment);
 			}
 		} catch (IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
@@ -126,6 +132,7 @@ class ShipmentTrackingService {
 				OrderStatus beforeStatus = shipment.getOrder().getStatus();
 				shipment.getOrder().markDeliveredByTracking();
 				recordStatusHistory(shipment, null, "SHIPMENT_TRACKING_SYNC", beforeStatus, "Tracking status delivered", null);
+				notifyDelivered(shipment);
 			}
 			return new SyncResult(delivered, false);
 		}
@@ -169,6 +176,19 @@ class ShipmentTrackingService {
 
 	private boolean isBlank(String value) {
 		return value == null || value.isBlank();
+	}
+
+	private void notifyDelivered(Shipment shipment) {
+		if (!notificationService.exists(shipment.getOrder(), NotificationType.DELIVERY_COMPLETED)) {
+			notificationService.email(
+				shipment.getOrder().getUser(),
+				shipment.getOrder(),
+				shipment.getOrder().getPaymentGroup(),
+				null,
+				null,
+				NotificationType.DELIVERY_COMPLETED
+			);
+		}
 	}
 
 	private record SyncResult(boolean delivered, boolean failed) {

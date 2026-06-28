@@ -10,6 +10,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
@@ -30,6 +32,7 @@ class AdminOrderShipmentService {
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
+	private final NotificationService notificationService;
 
 	AdminOrderShipmentService(
 		CustomerOrderRepository orderRepository,
@@ -37,7 +40,8 @@ class AdminOrderShipmentService {
 		ShipmentRepository shipmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
-		AdminOrderQueryService adminOrderQueryService
+		AdminOrderQueryService adminOrderQueryService,
+		NotificationService notificationService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
@@ -45,6 +49,7 @@ class AdminOrderShipmentService {
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -66,6 +71,7 @@ class AdminOrderShipmentService {
 		}
 
 		Shipment shipment = shipmentRepository.save(new Shipment(order, request.carrier(), request.trackingNumber(), Instant.now()));
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.SHIPMENT_STARTED);
 		actionHistoryRepository.save(new AdminOrderActionHistory(
 			order,
 			adminUserId,

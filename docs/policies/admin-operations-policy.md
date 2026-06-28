@@ -75,7 +75,7 @@ Status: Confirmed
 - 주문 상태 변경 API는 현재 상태와 요청 액션의 유효한 전이 여부를 검증해야 한다.
 - 주문 상태 변경 API는 fromStatus, actor, action, guard, sideEffect, toStatus 전이표를 기준으로 검증해야 한다.
 - 관리자 수동 정정은 금지 전이를 우회하는 기능이 아니며, 허용된 정정 액션과 사유, 이력을 남겨야 한다.
-- 주요 고객 알림은 `NotificationLog`에 발송 대상, 채널, 템플릿, 결과를 기록해야 한다.
+- 주요 고객 알림은 `NotificationLog`에 발송 대상, 채널, 템플릿, 결과를 기록해야 한다. Implemented by DS-39.
 
 ## Open Questions
 

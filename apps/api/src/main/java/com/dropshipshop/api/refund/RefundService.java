@@ -11,6 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentEvent;
 import com.dropshipshop.api.payment.domain.PaymentEventType;
@@ -33,19 +35,22 @@ public class RefundService {
 	private final PaymentEventRepository paymentEventRepository;
 	private final CustomerOrderRepository orderRepository;
 	private final TossPaymentsClient tossPaymentsClient;
+	private final NotificationService notificationService;
 
 	RefundService(
 		RefundRepository refundRepository,
 		PaymentRepository paymentRepository,
 		PaymentEventRepository paymentEventRepository,
 		CustomerOrderRepository orderRepository,
-		TossPaymentsClient tossPaymentsClient
+		TossPaymentsClient tossPaymentsClient,
+		NotificationService notificationService
 	) {
 		this.refundRepository = refundRepository;
 		this.paymentRepository = paymentRepository;
 		this.paymentEventRepository = paymentEventRepository;
 		this.orderRepository = orderRepository;
 		this.tossPaymentsClient = tossPaymentsClient;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -196,6 +201,14 @@ public class RefundService {
 				"Refund completed for order " + refund.getOrder().getOrderNumber(),
 				completedAt
 			));
+			notificationService.email(
+				refund.getOrder().getUser(),
+				refund.getOrder(),
+				refund.getPaymentGroup(),
+				null,
+				refund,
+				NotificationType.REFUND_COMPLETED
+			);
 			return toAdminResponse(refund);
 		} catch (IllegalStateException | IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());

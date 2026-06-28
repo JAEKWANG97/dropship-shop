@@ -704,6 +704,26 @@ Audit/notification tables:
 - `product_change_histories`
 - `notification_logs`
 
+### notification_logs
+
+- `id`
+- `user_id`
+- `order_id`
+- `payment_group_id`
+- `claim_id`
+- `refund_id`
+- `type`: `PAYMENT_COMPLETED` / `PAYMENT_EXCEPTION` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `DELIVERY_COMPLETED` / `DELAY_NOTICE` / `CLAIM_STATUS_CHANGED` / `REFUND_COMPLETED` / `MARKETING`
+- `channel`: `EMAIL` / `ORDER_DETAIL` / `SMS` / `KAKAO_ALIMTALK` / `PUSH`
+- `transactional`
+- `status`: `PENDING` / `SENT` / `FAILED` / `SKIPPED`
+- `recipient`
+- `template_key`
+- `payload_snapshot`
+- `failure_reason`
+- `sent_at`
+- `created_at`
+- `updated_at`
+
 Rules:
 
 - Transactional notifications are not marketing notifications.

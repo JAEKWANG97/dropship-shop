@@ -602,7 +602,7 @@ Rules:
 
 주문, 결제, 배송, 환불, 클레임 처리 알림 발송 이력. 거래 알림과 마케팅 알림을 구분해서 기록한다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - userId
@@ -621,6 +621,13 @@ Suggested fields:
 - sentAt
 - createdAt
 - updatedAt
+
+Implemented DS-39 scope:
+
+- `notification_logs` persists transactional email notification records.
+- MVP email baseline records `SENT` logs without adding an external SMTP/provider dependency.
+- Implemented triggers include payment completed, payment exception, out-of-stock, shipment started, delivery completed, claim status changed, and refund completed.
+- Admin can list notification logs with `GET /api/admin/notifications`.
 
 ## OrderStatusHistory
 

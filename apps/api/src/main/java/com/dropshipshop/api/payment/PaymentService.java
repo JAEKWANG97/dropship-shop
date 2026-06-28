@@ -17,6 +17,8 @@ import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentEvent;
 import com.dropshipshop.api.payment.domain.PaymentEventType;
@@ -41,6 +43,7 @@ public class PaymentService {
 	private final OrderItemRepository orderItemRepository;
 	private final TossPaymentsClient tossPaymentsClient;
 	private final PaymentExceptionService paymentExceptionService;
+	private final NotificationService notificationService;
 	private final Clock clock;
 
 	public PaymentService(
@@ -50,7 +53,8 @@ public class PaymentService {
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		TossPaymentsClient tossPaymentsClient,
-		PaymentExceptionService paymentExceptionService
+		PaymentExceptionService paymentExceptionService,
+		NotificationService notificationService
 	) {
 		this.paymentGroupRepository = paymentGroupRepository;
 		this.paymentRepository = paymentRepository;
@@ -59,6 +63,7 @@ public class PaymentService {
 		this.orderItemRepository = orderItemRepository;
 		this.tossPaymentsClient = tossPaymentsClient;
 		this.paymentExceptionService = paymentExceptionService;
+		this.notificationService = notificationService;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -112,6 +117,14 @@ public class PaymentService {
 				exception.getMessage(),
 				now
 			));
+			orders(paymentGroup).forEach(order -> notificationService.email(
+				order.getUser(),
+				order,
+				paymentGroup,
+				null,
+				null,
+				NotificationType.PAYMENT_EXCEPTION
+			));
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Toss Payments confirm failed");
 		}
 
@@ -134,6 +147,14 @@ public class PaymentService {
 				PaymentEventType.PAYMENT_EXCEPTION,
 				"Approved amount mismatch",
 				now
+			));
+			orders(paymentGroup).forEach(order -> notificationService.email(
+				order.getUser(),
+				order,
+				paymentGroup,
+				null,
+				null,
+				NotificationType.PAYMENT_EXCEPTION
 			));
 			paymentExceptionService.executeExceptionCancel(payment);
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved amount does not match checkout amount");
@@ -159,6 +180,14 @@ public class PaymentService {
 			PaymentEventType.CONFIRM_APPROVED,
 			"Confirm approved",
 			now
+		));
+		orders.forEach(order -> notificationService.email(
+			order.getUser(),
+			order,
+			paymentGroup,
+			null,
+			null,
+			NotificationType.PAYMENT_COMPLETED
 		));
 		return toResponse(paymentGroup, payment, orders);
 	}

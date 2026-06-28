@@ -370,6 +370,11 @@ class AdminOrderApiIntegrationTest {
 
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
 		assertThat(shipmentRepository.findByOrder_Id(order.getId()).orElseThrow().getTrackingNumber()).isEqualTo("1234567890");
+
+		mockMvc.perform(get("/api/admin/notifications")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notifications[?(@.orderId == '%s')].type".formatted(order.getId()), hasItem("SHIPMENT_STARTED")));
 	}
 
 	@Test
@@ -423,6 +428,11 @@ class AdminOrderApiIntegrationTest {
 		assertThat(shipmentRepository.findById(shipment.getId()).orElseThrow().getStatus()).isEqualTo(ShipmentStatus.DELIVERED);
 		var histories = orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId());
 		assertThat(histories.get(histories.size() - 1).getActionType()).isEqualTo("SHIPMENT_TRACKING_SYNC");
+
+		mockMvc.perform(get("/api/admin/notifications")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notifications[?(@.orderId == '%s')].type".formatted(order.getId()), hasItem("DELIVERY_COMPLETED")));
 	}
 
 	@Test

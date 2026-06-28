@@ -167,3 +167,5 @@ Initial transaction notification triggers:
 | Delay notice | Email, order detail status | `NotificationLog` |
 | Claim status changed | Email, order detail status | `NotificationLog` |
 | Refund completed | Email, order detail status | `NotificationLog` |
+
+DS-39 implements transactional email notification logs for payment completed, payment exception, supplier out-of-stock, shipment started, delivery completed, claim status changed, and refund completed. Delay notice remains a trigger without automated sender logic.
