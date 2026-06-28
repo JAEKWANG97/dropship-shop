@@ -27,6 +27,7 @@ export default async function AccountPage() {
       </div>
       <div className="link-list">
         <Link href="/products">상품 보기</Link>
+        <Link href="/orders">주문 내역</Link>
       </div>
       <form action="/auth/logout" method="post">
         <button className="button" type="submit">

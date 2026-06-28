@@ -1121,7 +1121,7 @@ Acceptance criteria:
 
 ### DS-51: Implement customer order UI
 
-Status: Planned
+Status: Implemented
 
 Description:
 
@@ -1133,5 +1133,6 @@ Acceptance criteria:
 - `/orders/{orderId}` reads `GET /api/orders/{orderId}`.
 - Customer display statuses, shipment, payment, fulfillment, refund, and item summaries are shown.
 - Customer cancel and return/exchange claim forms call the implemented backend APIs.
+- Paid-order shipping address changes call the implemented customer API.
 - Only customer-facing order data is shown.
 - Frontend lint/build checks cover order pages.
