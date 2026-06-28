@@ -3,6 +3,7 @@ package com.dropshipshop.api.payment;
 import java.time.Instant;
 import java.util.Locale;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -48,7 +49,7 @@ public class PaymentWebhookService {
 		TossPaymentSnapshot verifiedPayment = tossPaymentsClient.getPayment(paymentKey);
 		if (webhookStatus != null && !webhookStatus.equals(verifiedPayment.rawStatus())) {
 			throw new ResponseStatusException(
-				org.springframework.http.HttpStatus.BAD_REQUEST,
+				HttpStatus.BAD_REQUEST,
 				"Toss webhook payload does not match verified payment status"
 			);
 		}
@@ -64,6 +65,8 @@ public class PaymentWebhookService {
 		TossPaymentSnapshot verifiedPayment,
 		String idempotencyKey
 	) {
+		Instant now = Instant.now();
+		String rawPayload = payload.toString();
 		String resultMessage = "eventType=" + eventType + ", status=" + verifiedPayment.rawStatus();
 		paymentEventRepository.save(new PaymentEvent(
 			payment,
@@ -71,9 +74,9 @@ public class PaymentWebhookService {
 			payment.getProviderPaymentKey(),
 			PaymentEventType.TOSS_WEBHOOK_RECEIVED,
 			idempotencyKey,
-			payload.toString(),
+			rawPayload,
 			resultMessage,
-			Instant.now()
+			now
 		));
 
 		if (conflictsWithLocalState(payment.getStatus(), verifiedPayment.rawStatus())) {
@@ -87,9 +90,9 @@ public class PaymentWebhookService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.PAYMENT_REVIEW_REQUIRED,
 				null,
-				payload.toString(),
+				rawPayload,
 				"Webhook status conflict requires admin review",
-				Instant.now()
+				now
 			));
 		}
 	}
@@ -107,7 +110,7 @@ public class PaymentWebhookService {
 	private String paymentKey(JsonNode payload) {
 		String paymentKey = text(payload.path("data").path("paymentKey"));
 		if (paymentKey == null) {
-			throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Toss webhook paymentKey is required");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Toss webhook paymentKey is required");
 		}
 		return paymentKey;
 	}
