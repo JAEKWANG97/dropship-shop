@@ -20,7 +20,7 @@ class OAuthProviderProperties {
 		@Value("${app.oauth.kakao.client-id:}") String kakaoClientId,
 		@Value("${app.oauth.kakao.client-secret:}") String kakaoClientSecret,
 		@Value("${app.oauth.kakao.redirect-uri:}") String kakaoRedirectUri,
-		@Value("${app.oauth.kakao.scope:account_email profile_nickname}") String kakaoScope,
+		@Value("${app.oauth.kakao.scope:profile_nickname}") String kakaoScope,
 		@Value("${app.oauth.naver.client-id:}") String naverClientId,
 		@Value("${app.oauth.naver.client-secret:}") String naverClientSecret,
 		@Value("${app.oauth.naver.redirect-uri:}") String naverRedirectUri,

@@ -3,6 +3,7 @@ package com.dropshipshop.api.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -64,6 +65,15 @@ class OAuthLoginApiIntegrationTest {
 			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("OAUTH2_STATE=")))
 			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
 			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")));
+	}
+
+	@Test
+	void kakaoAuthorizeRequestsNicknameOnlyByDefault() throws Exception {
+		mockMvc.perform(get("/api/auth/oauth2/kakao/authorize"))
+			.andExpect(status().isFound())
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("https://kauth.kakao.com/oauth/authorize")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("scope=profile_nickname")))
+			.andExpect(header().string(HttpHeaders.LOCATION, not(containsString("account_email"))));
 	}
 
 	@Test
