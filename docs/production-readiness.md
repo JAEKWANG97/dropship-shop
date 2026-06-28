@@ -116,3 +116,19 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `DATABASE_*`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
 - Flyway migration 적용 순서 확인
 - PostgreSQL backup/snapshot 상태 확인
+
+## Beta OAuth And Payment Readiness
+
+DS-76 local verification on 2026-06-29:
+
+- Google, Kakao, and Naver OAuth authorize endpoints returned `302` redirects to their provider domains.
+- Cookie-based customer login was verified with `/api/me`.
+- Checkout preflight was verified through required account agreement, cart item add, checkout creation, and checkout policy confirmation.
+- Local Toss confirmation with a fake key reached the payment exception path.
+
+Remaining beta gates:
+
+- Complete real browser OAuth login and callback for Google, Kakao, and Naver with provider accounts.
+- Configure Toss Payments sandbox secret key on the API and public client key on the web app.
+- Verify real Toss sandbox success redirect, server confirmation, and order transition to `SUPPLIER_ORDER_PENDING`.
+- Verify Toss failure/cancel redirect and payment exception monitoring before production payment opening.
