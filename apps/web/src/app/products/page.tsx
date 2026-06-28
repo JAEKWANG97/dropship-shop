@@ -15,9 +15,13 @@ export default async function ProductsPage() {
 
   return (
     <section className="catalog-page">
-      <div className="section-heading">
-        <p className="eyebrow">Catalog</p>
-        <h1>상품</h1>
+      <div className="catalog-heading">
+        <div className="section-heading">
+          <p className="eyebrow">Catalog</p>
+          <h1>안전장비 상품 목록</h1>
+          <p>현장에서 필요한 안전장비를 확인하고 장바구니에 담아 주문하세요.</p>
+        </div>
+        <span>총 {products.length}개 상품</span>
       </div>
 
       {error ? (
@@ -42,9 +46,12 @@ export default async function ProductsPage() {
               className="product-card-image"
               src={product.thumbnailImageUrl}
             />
-            <span className="product-card-name">{product.name}</span>
-            <span className="product-card-summary">{product.summary}</span>
-            <strong>{formatPrice(product.basePrice)}</strong>
+            <div className="product-card-copy">
+              <span className="product-card-name">{product.name}</span>
+              <span className="product-card-summary">{product.summary}</span>
+              <strong>{formatPrice(product.basePrice)}</strong>
+            </div>
+            <span className="product-card-cta">상품 보기</span>
           </Link>
         ))}
       </div>

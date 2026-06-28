@@ -3,8 +3,8 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Dropship Shop",
-  description: "Single-operator supplier fulfillment shop",
+  title: "SafeHub Pro",
+  description: "Business safety gear commerce",
 };
 
 export default function RootLayout({
@@ -16,11 +16,12 @@ export default function RootLayout({
     <html lang="ko">
       <body>
         <header className="site-header">
-          <Link href="/" className="brand" aria-label="Dropship Shop home">
-            Dropship Shop
+          <Link href="/" className="brand" aria-label="SafeHub Pro home">
+            <span>SafeHub</span>
+            <em>Pro</em>
           </Link>
           <nav className="site-nav" aria-label="Primary navigation">
-            <Link href="/products">상품</Link>
+            <Link href="/products">상품목록</Link>
             <Link href="/cart">장바구니</Link>
             <Link href="/orders">주문</Link>
             <Link href="/policies">정책</Link>
@@ -31,8 +32,10 @@ export default function RootLayout({
         </header>
         <main className="page-shell">{children}</main>
         <footer className="site-footer">
+          <strong>SafeHub Pro</strong>
+          <span>건설 안전장비 B2B 전문몰</span>
           <span>배송비는 상품 가격에 포함됩니다.</span>
-          <span>주문 후 공급처 품절 시 배송 그룹 주문 단위로 환불됩니다.</span>
+          <span>공급처 품절 시 배송 그룹 주문 단위로 환불됩니다.</span>
         </footer>
       </body>
     </html>
