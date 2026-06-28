@@ -69,6 +69,17 @@ public class RefundService {
 	}
 
 	@Transactional
+	RefundDtos.AdminRefundResponse approve(UUID refundId, UUID adminUserId, RefundDtos.RefundApprovalRequest request) {
+		Refund refund = findRefund(refundId);
+		try {
+			refund.approve(adminUserId, request.reason(), Instant.now());
+			return toAdminResponse(refund);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
+	@Transactional
 	RefundDtos.AdminRefundResponse requestPgCancel(UUID refundId) {
 		Refund refund = findRefund(refundId);
 		return executePgCancel(refund, false);
@@ -78,6 +89,27 @@ public class RefundService {
 	RefundDtos.AdminRefundResponse retryPgCancel(UUID refundId) {
 		Refund refund = findRefund(refundId);
 		return executePgCancel(refund, true);
+	}
+
+	@Transactional
+	RefundDtos.AdminRefundResponse markManualReview(
+		UUID refundId,
+		UUID adminUserId,
+		RefundDtos.RefundManualReviewRequest request
+	) {
+		Refund refund = findRefund(refundId);
+		try {
+			if (request.status() == RefundStatus.APPROVED) {
+				refund.approve(adminUserId, request.reason(), Instant.now());
+			} else if (request.status() == RefundStatus.REJECTED) {
+				refund.reject(adminUserId, request.reason(), Instant.now());
+			} else {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manual review status must be APPROVED or REJECTED");
+			}
+			return toAdminResponse(refund);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -102,6 +134,9 @@ public class RefundService {
 			refund.getFailureCode(),
 			refund.getFailureMessage(),
 			refund.getRawProviderStatus(),
+			refund.getReviewedByAdminId(),
+			refund.getAdminReviewReason(),
+			refund.getReviewedAt(),
 			refund.getRequestedAt(),
 			refund.getCompletedAt(),
 			refund.getFailedAt(),
@@ -140,7 +175,7 @@ public class RefundService {
 			: "refund-" + refund.getId();
 		try {
 			refund.getOrder().markRefundRequested();
-			refund.requestPgCancel(payment, idempotencyKey, now);
+			refund.requestPgCancel(payment, idempotencyKey, now, retry);
 			TossCancelledPayment cancelledPayment = tossPaymentsClient.cancel(
 				payment.getProviderPaymentKey(),
 				refund.getReason().name(),
@@ -166,7 +201,11 @@ public class RefundService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
 		} catch (TossPaymentException exception) {
 			Instant failedAt = Instant.now();
-			refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
+			if (retry) {
+				refund.markManualReviewRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
+			} else {
+				refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
+			}
 			payment.markRefundFailed("TOSS_CANCEL_FAILED", exception.getMessage());
 			paymentEventRepository.save(new PaymentEvent(
 				payment,

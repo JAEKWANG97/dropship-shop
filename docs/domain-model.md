@@ -511,11 +511,21 @@ Suggested fields:
 - failureCode
 - failureMessage
 - rawProviderStatus
+- reviewedByAdminId
+- adminReviewReason
+- reviewedAt
 - requestedAt
 - completedAt
 - failedAt
 - createdAt
 - updatedAt
+
+Implemented DS-38 scope:
+
+- Refunds are created as `REQUESTED`.
+- Admin approval moves a refund to `APPROVED`; PG cancel/refund request is allowed only after approval.
+- First PG cancel failure moves to `RETRY_REQUIRED`; retry failure moves to `MANUAL_REVIEW_REQUIRED`.
+- Manual review can move the refund back to `APPROVED` or to `REJECTED`.
 
 Planned fields:
 

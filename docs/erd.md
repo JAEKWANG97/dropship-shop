@@ -644,6 +644,9 @@ Constraints and indexes:
 - `failure_code`
 - `failure_message`
 - `raw_provider_status`
+- `reviewed_by_admin_id`
+- `admin_review_reason`
+- `reviewed_at`
 - `requested_at`
 - `completed_at`
 - `failed_at`

@@ -73,6 +73,8 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Order status: OUT_OF_STOCK
 -> Customer is notified
 -> Refund is requested for this order amount
+-> Admin approves refund
+-> Refund status: APPROVED
 -> Refund status: PG_CANCEL_REQUESTED
 -> PG full cancel/refund succeeds because the payment group contains only this order
 -> Refund status: COMPLETED
@@ -94,6 +96,8 @@ Order A supplier order succeeds
 Order B supplier says out of stock
 -> Order B status: OUT_OF_STOCK
 -> Refund is requested for Order B amount only
+-> Admin approves refund
+-> Refund status: APPROVED
 -> Refund status: PG_CANCEL_REQUESTED
 -> PG partial cancel/refund succeeds for 40,000
 -> Order B status: REFUNDED
@@ -189,6 +193,8 @@ supplierOrderStartedAt is empty
 -> Claim status: APPROVED
 -> Refund status: REQUESTED
 -> Refund is requested for the cancelled order amount
+-> Admin approves refund
+-> Refund status: APPROVED
 -> Refund status: PG_CANCEL_REQUESTED
 -> If the payment group has no other active orders, PG full cancel/refund succeeds
 -> If the payment group has other active orders, PG partial cancel/refund succeeds
@@ -199,7 +205,10 @@ supplierOrderStartedAt is empty
 PG cancel/refund fails
 -> Refund status: RETRY_REQUIRED
 -> Order remains REFUND_REQUESTED
--> Admin retry or manual review is required
+-> Admin retries PG cancel/refund
+-> Retry fails again
+-> Refund status: MANUAL_REVIEW_REQUIRED
+-> Admin manual review approves or rejects the refund
 ```
 
 ## Customer Cancellation Claim After Supplier Order Work Starts

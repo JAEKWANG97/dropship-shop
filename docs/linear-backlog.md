@@ -786,6 +786,7 @@ Child issues:
 - DS-35 is implemented.
 - DS-36 is implemented.
 - DS-37 is implemented.
+- DS-38 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -839,6 +840,24 @@ Acceptance criteria:
 - `GET /api/admin/claims` includes cancellation, return, and exchange claims.
 - Admin can approve or reject return/exchange claims without changing the order from `DELIVERED`.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval remains `APPROVED` until exchange shipment handling is implemented.
+- API spec, ERD, domain model, cancellation/refund policy, admin policy, and integration tests are updated.
+
+### DS-38: Harden refund approval and manual review
+
+Status: Implemented
+
+Description:
+
+Require admin approval before PG refund execution and add manual review result handling.
+
+Acceptance criteria:
+
+- `POST /api/admin/refunds/{refundId}/approve` moves `REQUESTED` refunds to `APPROVED` with admin id, reason, and review time.
+- `POST /api/admin/refunds/{refundId}/request-pg-cancel` rejects unapproved refunds.
+- First PG cancel failure moves refund to `RETRY_REQUIRED`.
+- Retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
+- `POST /api/admin/refunds/{refundId}/manual-review` can approve or reject manual-review refunds with reason.
+- Refund review fields are stored in DB and exposed in admin refund responses.
 - API spec, ERD, domain model, cancellation/refund policy, admin policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth

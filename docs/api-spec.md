@@ -422,10 +422,10 @@ Rules:
 | `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Planned | Mark return received |
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
 | `GET` | `/api/admin/refunds` | `ADMIN` | Implemented | Refund queue |
-| `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Planned | Approve refund execution |
+| `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Implemented | Approve refund execution |
 | `POST` | `/api/admin/refunds/{refundId}/request-pg-cancel` | `ADMIN` | Implemented | Request PG cancel/refund |
 | `POST` | `/api/admin/refunds/{refundId}/retry` | `ADMIN` | Implemented | Retry failed refund |
-| `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Planned | Mark manual review result |
+| `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Implemented | Mark manual review result |
 
 Rules:
 
@@ -436,6 +436,9 @@ Rules:
 - Simple change-of-mind return/exchange claims require delivery within 7 days.
 - Seller-fault return/exchange claims require delivery within 90 days in the DS-37 baseline; discovery-date and evidence file capture remain planned.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
+- Refund execution requires admin approval before PG cancel/refund request.
+- First PG cancel failure moves refund to `RETRY_REQUIRED`; retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
+- Manual review can approve the refund again or reject it with reason.
 - Refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
 - PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
