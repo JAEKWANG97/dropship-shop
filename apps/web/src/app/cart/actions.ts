@@ -18,6 +18,7 @@ function messagePath(message: string) {
 export async function addCartItem(formData: FormData) {
   const productOptionId = value(formData, "productOptionId");
   const quantity = Number(value(formData, "quantity") || "1");
+  const intent = value(formData, "intent");
 
   try {
     await apiSendWithCookie<Cart>("/api/cart/items", (await cookies()).toString(), {
@@ -29,6 +30,9 @@ export async function addCartItem(formData: FormData) {
   }
 
   revalidatePath("/cart");
+  if (intent === "checkout") {
+    redirect("/checkout");
+  }
   redirect("/cart?message=" + encodeURIComponent("장바구니에 담았습니다."));
 }
 

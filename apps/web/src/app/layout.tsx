@@ -20,6 +20,16 @@ export default function RootLayout({
             <span>SafeHub</span>
             <em>Pro</em>
           </Link>
+          <form action="/products" className="site-search">
+            <input
+              aria-label="상품 검색"
+              name="q"
+              placeholder="상품명, 브랜드, 키워드로 검색하세요"
+            />
+            <button aria-label="검색" type="submit">
+              검색
+            </button>
+          </form>
           <nav className="site-nav" aria-label="Primary navigation">
             <Link href="/products">상품목록</Link>
             <Link href="/cart">장바구니</Link>

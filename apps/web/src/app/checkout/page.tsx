@@ -62,7 +62,8 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
     <section className="checkout-page">
       <div className="section-heading">
         <p className="eyebrow">Checkout</p>
-        <h1>주문서 작성</h1>
+        <h1>주문 결제</h1>
+        <p>주문 정보를 확인하고 결제를 완료해 주세요.</p>
       </div>
 
       {params.message ? (
@@ -79,8 +80,6 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
         />
       ) : null}
 
-      <CheckoutCartSummary cart={data.cart} />
-
       {data.cart.items.length === 0 ? (
         <div className="notice">
           <strong>장바구니가 비어 있습니다</strong>
@@ -89,11 +88,14 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
           </Link>
         </div>
       ) : (
-        <CreateCheckoutForm
-          cart={data.cart}
-          defaultAddress={defaultAddress}
-          disabled={!data.agreement.requiredAgreed || !data.cart.checkoutAvailable}
-        />
+        <div className="checkout-layout">
+          <CreateCheckoutForm
+            cart={data.cart}
+            defaultAddress={defaultAddress}
+            disabled={!data.agreement.requiredAgreed || !data.cart.checkoutAvailable}
+          />
+          <CheckoutCartSummary cart={data.cart} />
+        </div>
       )}
     </section>
   );
@@ -128,7 +130,7 @@ function RequiredAgreementForm({
 
 function CheckoutCartSummary({ cart }: { cart: Cart }) {
   return (
-    <section className="detail-section">
+    <aside className="checkout-summary-card">
       <h2>주문 상품</h2>
       <div className="summary-list">
         {cart.items.map((item) => (
@@ -156,7 +158,7 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
           ))}
         </div>
       ) : null}
-    </section>
+    </aside>
   );
 }
 
@@ -170,7 +172,7 @@ function CreateCheckoutForm({
   disabled: boolean;
 }) {
   return (
-    <form action={createCheckout} className="checkout-form">
+    <form action={createCheckout} className="checkout-form checkout-main-form">
       <h2>배송지</h2>
       <input name="clientSubmittedTotalAmount" type="hidden" value={cart.subtotalAmount} />
       <label>

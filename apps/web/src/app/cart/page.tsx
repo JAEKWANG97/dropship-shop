@@ -56,6 +56,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
       <div className="section-heading">
         <p className="eyebrow">Cart</p>
         <h1>장바구니</h1>
+        <p>선택하신 상품의 수량을 확인하고 주문 결제를 진행하세요.</p>
       </div>
 
       {params.message ? (
@@ -84,62 +85,70 @@ function EmptyCart() {
 
 function CartContents({ cart }: { cart: Cart }) {
   return (
-    <>
-      <div className="cart-list">
-        {cart.items.map((item) => (
-          <article className="cart-item" key={item.id}>
-            <ProductImage
-              alt={item.productName}
-              className="cart-item-image"
-              src={item.thumbnailImageUrl}
-            />
-            <div className="cart-item-main">
-              <Link href={`/products/${item.productId}`}>{item.productName}</Link>
-              <span>{item.optionName}</span>
-              <span>{formatPrice(item.unitPrice)}</span>
-              {!item.sellable ? (
-                <strong className="danger-text">
-                  {item.unavailableReason ?? "현재 주문할 수 없습니다."}
-                </strong>
-              ) : null}
-            </div>
-            <div className="cart-item-actions">
-              <form action={updateCartItem} className="quantity-form">
-                <input name="cartItemId" type="hidden" value={item.id} />
-                <input
-                  aria-label={`${item.productName} quantity`}
-                  max="99"
-                  min="1"
-                  name="quantity"
-                  type="number"
-                  defaultValue={item.quantity}
-                />
-                <button className="button" type="submit">
-                  변경
-                </button>
-              </form>
-              <form action={removeCartItem}>
-                <input name="cartItemId" type="hidden" value={item.id} />
-                <button className="button" type="submit">
-                  삭제
-                </button>
-              </form>
-              <strong>{formatPrice(item.lineAmount)}</strong>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {cart.issues.length > 0 ? (
-        <div className="notice">
-          <strong>주문 불가 항목</strong>
-          {cart.issues.map((issue) => (
-            <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
+    <div className="cart-layout">
+      <div>
+        <div className="cart-list">
+          <div className="cart-list-head">
+            <span>상품 정보</span>
+            <span>수량</span>
+            <span>금액</span>
+          </div>
+          {cart.items.map((item) => (
+            <article className="cart-item" key={item.id}>
+              <ProductImage
+                alt={item.productName}
+                className="cart-item-image"
+                src={item.thumbnailImageUrl}
+              />
+              <div className="cart-item-main">
+                <Link href={`/products/${item.productId}`}>{item.productName}</Link>
+                <span>{item.optionName}</span>
+                <span>단가 {formatPrice(item.unitPrice)}</span>
+                {!item.sellable ? (
+                  <strong className="danger-text">
+                    {item.unavailableReason ?? "현재 주문할 수 없습니다."}
+                  </strong>
+                ) : null}
+              </div>
+              <div className="cart-item-actions">
+                <form action={updateCartItem} className="quantity-form">
+                  <input name="cartItemId" type="hidden" value={item.id} />
+                  <input
+                    aria-label={`${item.productName} quantity`}
+                    max="99"
+                    min="1"
+                    name="quantity"
+                    type="number"
+                    defaultValue={item.quantity}
+                  />
+                  <button className="button" type="submit">
+                    변경
+                  </button>
+                </form>
+                <form action={removeCartItem}>
+                  <input name="cartItemId" type="hidden" value={item.id} />
+                  <button className="button" type="submit">
+                    삭제
+                  </button>
+                </form>
+                <strong>{formatPrice(item.lineAmount)}</strong>
+              </div>
+            </article>
           ))}
         </div>
-      ) : null}
+
+        {cart.issues.length > 0 ? (
+          <div className="notice">
+            <strong>주문 불가 항목</strong>
+            {cart.issues.map((issue) => (
+              <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       <aside className="cart-summary">
+        <h2>주문요약</h2>
         <div>
           <span>상품 금액</span>
           <strong>{formatPrice(cart.subtotalAmount)}</strong>
@@ -163,6 +172,6 @@ function CartContents({ cart }: { cart: Cart }) {
           </Link>
         ) : null}
       </aside>
-    </>
+    </div>
   );
 }

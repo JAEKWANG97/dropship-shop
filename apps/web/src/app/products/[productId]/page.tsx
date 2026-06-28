@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { addCartItem } from "@/app/cart/actions";
 import { ApiError, apiUrl } from "@/lib/api";
-import { formatPrice, getProduct, type ProductDetail } from "@/lib/catalog";
+import {
+  formatPrice,
+  getProduct,
+  getProducts,
+  type ProductDetail,
+  type ProductSummary,
+} from "@/lib/catalog";
 import { getCurrentUser } from "@/lib/session";
 import { ProductImage } from "../product-image";
 
@@ -21,11 +27,20 @@ async function loadProduct(productId: string) {
   }
 }
 
+async function loadRelatedProducts(productId: string) {
+  try {
+    return (await getProducts()).filter((product) => product.id !== productId).slice(0, 5);
+  } catch {
+    return [] as ProductSummary[];
+  }
+}
+
 export default async function ProductDetailPage({ params }: ProductPageProps) {
   const { productId } = await params;
-  const [{ product, error }, session] = await Promise.all([
+  const [{ product, error }, session, relatedProducts] = await Promise.all([
     loadProduct(productId),
     getCurrentUser(),
+    loadRelatedProducts(productId),
   ]);
 
   if (error || !product) {
@@ -40,23 +55,52 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
   const activeOptions = product.options.filter((option) => option.status === "ACTIVE");
   const purchasable = product.status === "ACTIVE" && activeOptions.length > 0;
+  const galleryImages = product.images.filter((image) => image.type === "GALLERY");
 
   return (
     <article className="product-detail">
       <section className="product-hero">
-        <ProductImage
-          alt={product.name}
-          className="product-hero-image"
-          src={product.thumbnailImageUrl}
-        />
+        <div className="product-gallery">
+          <ProductImage
+            alt={product.name}
+            className="product-hero-image"
+            src={product.thumbnailImageUrl}
+          />
+          <div className="product-thumbnails">
+            <ProductImage
+              alt={product.name}
+              className="product-thumbnail-image"
+              src={product.thumbnailImageUrl}
+            />
+            {galleryImages.slice(0, 5).map((image) => (
+              <ProductImage
+                alt={image.altText ?? product.name}
+                className="product-thumbnail-image"
+                key={image.id}
+                src={image.imageUrl}
+              />
+            ))}
+          </div>
+        </div>
         <div className="product-hero-copy">
-          <p className="eyebrow">{purchasable ? "Available" : "Unavailable"}</p>
+          <div className="product-badges">
+            <span>사업자 전용가</span>
+            <span>배송비 포함</span>
+            {purchasable ? <strong>재고 있음</strong> : null}
+          </div>
           <h1>{product.name}</h1>
           <p>{product.summary}</p>
           <strong className="product-price">{formatPrice(product.basePrice)}</strong>
-          <span className={purchasable ? "status-pill success" : "status-pill"}>
-            {purchasable ? "구매 가능" : "구매 불가"}
-          </span>
+          <div className="product-buy-info">
+            <span>주문 방식</span>
+            <strong>옵션 선택 후 구매</strong>
+            <span>판매 상태</span>
+            <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
+            <span>배송 정보</span>
+            <strong>결제 완료 후 공급처 출고</strong>
+            <span>세금계산서</span>
+            <strong>발행 가능</strong>
+          </div>
           {purchasable ? (
             session ? (
               <form action={addCartItem} className="cart-add-form">
@@ -74,9 +118,14 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                   수량
                   <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
                 </label>
-                <button className="button primary" type="submit">
-                  장바구니 담기
-                </button>
+                <div className="product-action-row">
+                  <button className="button" name="intent" value="cart" type="submit">
+                    장바구니
+                  </button>
+                  <button className="button primary" name="intent" value="checkout" type="submit">
+                    바로구매
+                  </button>
+                </div>
               </form>
             ) : (
               <div className="notice">
@@ -91,8 +140,34 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </div>
       </section>
 
+      {relatedProducts.length > 0 ? (
+        <section className="detail-section">
+          <div className="catalog-heading">
+            <h2>관련 제품</h2>
+            <Link href="/products">더보기</Link>
+          </div>
+          <div className="related-product-row">
+            {relatedProducts.map((relatedProduct) => (
+              <Link
+                className="related-product-card"
+                href={`/products/${relatedProduct.id}`}
+                key={relatedProduct.id}
+              >
+                <ProductImage
+                  alt={relatedProduct.name}
+                  className="related-product-image"
+                  src={relatedProduct.thumbnailImageUrl}
+                />
+                <span>{relatedProduct.name}</span>
+                <strong>{formatPrice(relatedProduct.basePrice)}</strong>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="detail-section">
-        <h2>옵션</h2>
+        <h2>제품 사양</h2>
         <div className="option-list">
           {product.options.map((option) => (
             <div className="option-row" key={option.id}>
