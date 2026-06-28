@@ -135,6 +135,14 @@ final class CatalogDtos {
 	) {
 	}
 
+	record ProductImageUploadResponse(
+		String imageUrl,
+		String objectKey,
+		long size,
+		String contentType
+	) {
+	}
+
 	record ProductDetailBlockResponse(
 		UUID id,
 		ProductDetailBlockType type,

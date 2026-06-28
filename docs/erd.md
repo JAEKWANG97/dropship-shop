@@ -306,6 +306,7 @@ Constraints:
 
 - One thumbnail image per product.
 - Up to ten gallery images per product.
+- DS-42 stores uploaded binary files in local product image storage and keeps URL/object-key metadata in `product_images`.
 
 ### product_detail_blocks
 

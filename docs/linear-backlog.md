@@ -790,6 +790,7 @@ Child issues:
 - DS-39 is implemented.
 - DS-40 is implemented.
 - DS-41 is implemented.
+- DS-42 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -913,6 +914,23 @@ Acceptance criteria:
 - Activating a policy archives the previous active policy of the same type.
 - Public APIs expose active current policy and specific policy versions.
 - API spec, ERD, domain model, legal/customer notice policy, and integration tests are updated.
+
+### DS-42: Implement product image storage
+
+Status: Implemented
+
+Description:
+
+Implement admin product image binary upload with local file storage.
+
+Acceptance criteria:
+
+- `POST /api/admin/products/{productId}/images/upload` accepts multipart image file upload for admins.
+- Upload validates non-empty file, max 5MB size, and allowed extensions `jpg`, `jpeg`, `png`, `webp`.
+- Uploaded files are stored under local product image storage and exposed through `/uploads/products/**`.
+- Upload response returns `imageUrl`, `objectKey`, size, and content type.
+- Existing product image metadata API can use the uploaded `imageUrl`.
+- API spec, ERD, domain model, catalog policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

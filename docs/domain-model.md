@@ -149,6 +149,7 @@ Modeling notes:
 - One product can have one `THUMBNAIL` image.
 - One product can have up to ten `GALLERY` images.
 - If `Product.thumbnailImageUrl` is kept, it must be updated from the canonical thumbnail image.
+- DS-42 adds admin binary upload that stores the file and returns URL/object-key metadata.
 
 ## ProductOption
 

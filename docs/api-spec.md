@@ -182,6 +182,7 @@ Customer visibility rules:
 | `PATCH` | `/api/admin/products/{productId}/options/{optionId}` | `ADMIN` | Implemented | Update product option |
 | `PATCH` | `/api/admin/products/{productId}/options/{optionId}/status` | `ADMIN` | Implemented | Change option sales status |
 | `PUT` | `/api/admin/products/{productId}/images` | `ADMIN` | Implemented | Replace thumbnail/gallery image metadata |
+| `POST` | `/api/admin/products/{productId}/images/upload` | `ADMIN` | Implemented | Upload product image file to local storage |
 | `PUT` | `/api/admin/products/{productId}/detail-blocks` | `ADMIN` | Implemented | Replace ordered IMAGE/HTML detail blocks |
 | `PUT` | `/api/admin/products/{productId}/notice` | `ADMIN` | Implemented | Create next active product notice version |
 | `GET` | `/api/admin/products/{productId}/change-history` | `ADMIN` | Planned | Product change audit history |
@@ -192,6 +193,7 @@ DS-6 minimum:
 - Product model and admin create/update API.
 - Product option model and admin create/update API.
 - Product image metadata API with one thumbnail and up to ten gallery images.
+- Product image upload stores files under local product image storage and returns `imageUrl` and `objectKey`.
 - Product detail block API with ordered `IMAGE` and sanitized `HTML` blocks.
 - Product notice/version source for product information notice, shipping, AS, return, and exchange information.
 - Product change history writes for price, product status, option status, and supplier changes.
@@ -650,6 +652,6 @@ DS-6 should keep request/response DTOs separate from JPA entities.
 ## Open API Notes
 
 - Pagination format is not defined.
-- Image upload binary flow is not defined; DS-6 can start with image URL/object key metadata.
+- Binary image upload is implemented by DS-42 with local storage. External object storage can replace it later without changing image metadata rules.
 - OAuth token/session format is implemented as a stateless JWT access token stored in an HttpOnly cookie.
 - Public product APIs are public, but checkout/cart/order APIs require authentication.
