@@ -1,9 +1,26 @@
 import { adminStatusLabel, getAdminOrders } from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
 
-export default async function AdminOrdersPage() {
-  const orders = await getAdminOrders();
-  const selectedOrder = orders[0];
+type AdminOrdersPageProps = {
+  searchParams: Promise<{ from?: string; q?: string; status?: string; to?: string }>;
+};
+
+export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
+  const [orders, params] = await Promise.all([getAdminOrders(), searchParams]);
+  const keyword = params.q?.trim().toLowerCase();
+  const fromTime = params.from ? new Date(params.from).getTime() : undefined;
+  const toTime = params.to ? new Date(`${params.to}T23:59:59`).getTime() : undefined;
+  const filteredOrders = orders.filter((order) => {
+    const createdAt = new Date(order.createdAt).getTime();
+    const matchesKeyword =
+      !keyword || `${order.orderNumber} ${order.customerEmail}`.toLowerCase().includes(keyword);
+    const matchesStatus = !params.status || order.status === params.status;
+    const matchesFrom = fromTime === undefined || createdAt >= fromTime;
+    const matchesTo = toTime === undefined || createdAt <= toTime;
+
+    return matchesKeyword && matchesStatus && matchesFrom && matchesTo;
+  });
+  const selectedOrder = filteredOrders[0];
 
   return (
     <div className="admin-page">
@@ -14,34 +31,36 @@ export default async function AdminOrdersPage() {
         </div>
       </div>
 
-      <form className="admin-filters">
-        <input type="date" defaultValue="2024-05-01" aria-label="시작일" />
-        <input type="date" defaultValue="2024-05-22" aria-label="종료일" />
-        <select defaultValue="">
+      <form action="/admin/orders" className="admin-filters">
+        <input type="date" name="from" defaultValue={params.from ?? ""} aria-label="시작일" />
+        <input type="date" name="to" defaultValue={params.to ?? ""} aria-label="종료일" />
+        <select name="status" defaultValue={params.status ?? ""}>
           <option value="">전체 주문상태</option>
-          <option>결제완료</option>
-          <option>배송준비</option>
-          <option>배송중</option>
-          <option>취소/환불</option>
+          <option value="SUPPLIER_ORDER_PENDING">발주대기</option>
+          <option value="SUPPLIER_ORDERED">발주완료</option>
+          <option value="SHIPPED">배송중</option>
+          <option value="REFUND_REQUESTED">환불요청</option>
+          <option value="REFUNDED">환불완료</option>
+          <option value="OUT_OF_STOCK">품절</option>
         </select>
-        <input placeholder="주문번호 또는 고객사 검색" />
+        <input name="q" placeholder="주문번호 또는 고객사 검색" defaultValue={params.q ?? ""} />
         <button className="button" type="submit">
           검색
         </button>
       </form>
 
       <div className="admin-metrics">
-        <Metric label="결제완료" value={orders.filter((order) => order.status === "SUPPLIER_ORDER_PENDING").length} />
-        <Metric label="배송중" value={orders.filter((order) => order.status === "SHIPPED").length} />
-        <Metric label="취소/환불" value={orders.filter((order) => order.status.includes("REFUND")).length} />
-        <Metric label="품절" value={orders.filter((order) => order.status === "OUT_OF_STOCK").length} />
+        <Metric label="발주대기" value={filteredOrders.filter((order) => order.status === "SUPPLIER_ORDER_PENDING").length} />
+        <Metric label="배송중" value={filteredOrders.filter((order) => order.status === "SHIPPED").length} />
+        <Metric label="취소/환불" value={filteredOrders.filter((order) => order.status.includes("REFUND")).length} />
+        <Metric label="품절" value={filteredOrders.filter((order) => order.status === "OUT_OF_STOCK").length} />
       </div>
 
       <div className="admin-orders-layout">
         <section className="admin-panel">
           <div className="admin-panel-head">
             <h2>주문 목록</h2>
-            <span>총 {orders.length}건</span>
+            <span>총 {filteredOrders.length}건</span>
           </div>
           <div className="admin-table orders">
             <div className="admin-table-row admin-table-head">
@@ -51,7 +70,7 @@ export default async function AdminOrdersPage() {
               <span>결제금액</span>
               <span>주문상태</span>
             </div>
-            {orders.map((order) => (
+            {filteredOrders.map((order) => (
               <div className="admin-table-row" key={order.orderId}>
                 <strong>{order.orderNumber}</strong>
                 <span>{order.customerEmail}</span>
@@ -62,7 +81,7 @@ export default async function AdminOrdersPage() {
                 </span>
               </div>
             ))}
-            {orders.length === 0 ? (
+            {filteredOrders.length === 0 ? (
               <div className="admin-empty">
                 <strong>조회된 주문이 없습니다</strong>
                 <span>검색 조건을 바꾸거나 새 주문이 들어온 뒤 다시 확인하세요.</span>

@@ -164,6 +164,7 @@ Implemented on 2026-06-29:
 - Home hero now presents product tiles with name and price instead of image-only placeholders.
 - Product card hierarchy now prioritizes name, price, summary, availability, and purchase actions.
 - Admin order/product empty states now explain the current state instead of showing blank tables.
+- Admin dashboard now uses current counts instead of mock-looking sales charts.
 - Coupang-style benchmarking is applied as structure only: utility links, logo/search/account actions, category bar, product-first content, and policy-rich footer.
 - Local seed product images use generated PNG files served through `/uploads/products/local-seed/**` instead of data URI SVG label placeholders.
 

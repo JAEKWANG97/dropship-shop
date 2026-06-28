@@ -7,12 +7,12 @@ Scope: storefront, auth-aware navigation, checkout entry, admin dashboard/list p
 
 Status: REVISE
 
-The service is usable for catalog browsing and auth-gated page entry, but QA found state-dependent UI defects that would confuse real users and operators. Three small defects were fixed during this pass. Full OAuth provider completion still needs manual account-login verification in Chrome.
+The service is usable for catalog browsing and auth-gated page entry, but QA found state-dependent UI defects that would confuse real users and operators. Admin mock-looking operational data was removed during DS-75. Full OAuth provider completion still needs manual account-login verification in Chrome.
 
 ## Environment
 
-- Branch: `main`
-- Base commit: `4a411c5`
+- Branch: `feature/ds-75-admin-flow-ux-qa`
+- Base commit: `cf82b21`
 - Node: `v25.9.0`
 - API: `http://localhost:8080`
 - Web: `http://localhost:3000`
@@ -132,6 +132,35 @@ Changed files:
 - `apps/api/src/main/java/com/dropshipshop/api/auth/security/SecurityConfig.java`
 - `apps/api/src/test/java/com/dropshipshop/api/dev/LocalCatalogSeedDataTest.java`
 
+### QA-006: Admin Dashboard And Filters Showed Mock-Looking Operational Data
+
+Severity: Medium
+Status: Fixed in DS-75 working tree
+
+Repro:
+1. Log in as admin with an empty order list.
+2. Open `/admin`, `/admin/products`, and `/admin/orders`.
+
+Expected:
+- Admin dashboard and filters reflect current API data only.
+- Empty order state does not show fake sales trends or dated search criteria.
+
+Actual:
+- Dashboard showed a hardcoded seven-day revenue bar chart while orders were `0건`.
+- Product management showed hardcoded pagination `1 2 3 ... 13`.
+- Order management prefilled 2024 date filters.
+
+Fix:
+- Dashboard now shows current real counts instead of fake sales bars.
+- Product status/search filters now filter the server-rendered list.
+- Order filters now submit real query params without default dates.
+- Hardcoded pagination was removed until real pagination exists.
+
+Verification:
+- `npm run lint`: passed
+- `npm run build`: passed
+- Admin route smoke passed for anonymous, customer, admin, product filter, product empty search, order empty state, and order status filter.
+
 ## Remaining Risks
 
 ### QA-004: Real OAuth Completion Still Needs Manual Browser Verification
@@ -154,12 +183,12 @@ Reason:
 
 ## Current Working Tree Changes
 
-- `apps/api/src/main/java/com/dropshipshop/api/auth/security/SecurityConfig.java`
-- `apps/api/src/test/java/com/dropshipshop/api/dev/LocalCatalogSeedDataTest.java`
 - `apps/web/src/app/globals.css`
-- `apps/web/src/app/layout.tsx`
-- `apps/web/src/app/products/product-image.tsx`
+- `apps/web/src/app/admin/orders/page.tsx`
+- `apps/web/src/app/admin/page.tsx`
+- `apps/web/src/app/admin/products/page.tsx`
+- `docs/QA_REPORT.md`
 
 ## Recommendation
 
-Commit the DS-74 customer-flow fixes after frontend lint/build, targeted API image-serving test, route smoke, and desktop/mobile screenshot review.
+Commit the DS-75 admin-flow fixes after route smoke and keep DS-76 focused on OAuth/checkout readiness.
