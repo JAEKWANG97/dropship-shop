@@ -105,6 +105,33 @@ Fix:
 Changed file:
 - `apps/web/src/app/checkout/page.tsx`
 
+### QA-005: Product Images Broke After Moving Seed Fixtures To Upload URLs
+
+Severity: High
+Status: Fixed in DS-74 working tree
+
+Repro:
+1. Use local seed product image URLs such as `/uploads/products/local-seed/helmet-thumb.png`.
+2. Open the storefront home, product list, or cart.
+
+Expected:
+- Product images render from the API upload-serving path.
+
+Actual:
+- Browser image requests either targeted the web origin or received API `401`.
+- Cart item images rendered at their original 640px size once the image URL became a real PNG.
+
+Fix:
+- Shared `ProductImage` now resolves `/uploads/**` paths through the API base URL.
+- API security permits public reads for `/uploads/products/**`.
+- Cart item images are constrained to the cart grid size.
+
+Changed files:
+- `apps/web/src/app/products/product-image.tsx`
+- `apps/web/src/app/globals.css`
+- `apps/api/src/main/java/com/dropshipshop/api/auth/security/SecurityConfig.java`
+- `apps/api/src/test/java/com/dropshipshop/api/dev/LocalCatalogSeedDataTest.java`
+
 ## Remaining Risks
 
 ### QA-004: Real OAuth Completion Still Needs Manual Browser Verification
@@ -127,11 +154,12 @@ Reason:
 
 ## Current Working Tree Changes
 
-- `apps/web/src/app/layout.tsx`
+- `apps/api/src/main/java/com/dropshipshop/api/auth/security/SecurityConfig.java`
+- `apps/api/src/test/java/com/dropshipshop/api/dev/LocalCatalogSeedDataTest.java`
 - `apps/web/src/app/globals.css`
-- `apps/web/src/lib/admin.ts`
-- `apps/web/src/app/checkout/page.tsx`
+- `apps/web/src/app/layout.tsx`
+- `apps/web/src/app/products/product-image.tsx`
 
 ## Recommendation
 
-Commit the fixed QA defects as one frontend bugfix commit after a quick browser refresh check. Then continue manual OAuth verification provider by provider.
+Commit the DS-74 customer-flow fixes after frontend lint/build, targeted API image-serving test, route smoke, and desktop/mobile screenshot review.
