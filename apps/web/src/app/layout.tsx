@@ -87,7 +87,7 @@ export default async function RootLayout({
           <div>
             <strong>고객 지원</strong>
             <span>주문/배송 문의는 주문조회에서 확인</span>
-            <span>관리자 승인 계정 기준 운영</span>
+            <span>운영 권한 계정 기준 관리</span>
           </div>
           <div>
             <strong>거래 정책</strong>

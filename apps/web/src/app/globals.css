@@ -1190,7 +1190,11 @@ textarea {
 
 .cart-item-image,
 .image-placeholder.cart-item-image {
+  width: 120px;
   aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--surface-soft);
 }
 
 .cart-item-main,
