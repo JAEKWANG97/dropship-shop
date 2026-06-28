@@ -75,4 +75,36 @@ public class ProductChangeHistory {
 	void prePersist() {
 		createdAt = Instant.now();
 	}
+
+	public UUID getId() {
+		return id;
+	}
+
+	public ProductOption getProductOption() {
+		return productOption;
+	}
+
+	public UUID getAdminUserId() {
+		return adminUserId;
+	}
+
+	public ProductChangeType getChangeType() {
+		return changeType;
+	}
+
+	public String getBeforeValue() {
+		return beforeValue;
+	}
+
+	public String getAfterValue() {
+		return afterValue;
+	}
+
+	public String getReason() {
+		return reason;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
+	}
 }

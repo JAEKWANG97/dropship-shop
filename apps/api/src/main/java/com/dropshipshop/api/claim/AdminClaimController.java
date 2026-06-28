@@ -29,8 +29,8 @@ class AdminClaimController {
 	}
 
 	@GetMapping
-	ClaimDtos.AdminClaimListResponse listCancellationClaims() {
-		return adminClaimService.listCancellationClaims();
+	ClaimDtos.AdminClaimListResponse listClaims() {
+		return adminClaimService.listClaims();
 	}
 
 	@PostMapping("/{claimId}/approve")

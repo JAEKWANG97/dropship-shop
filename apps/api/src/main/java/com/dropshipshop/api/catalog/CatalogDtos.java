@@ -1,8 +1,10 @@
 package com.dropshipshop.api.catalog;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.dropshipshop.api.catalog.domain.ProductChangeType;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
@@ -135,6 +137,14 @@ final class CatalogDtos {
 	) {
 	}
 
+	record ProductImageUploadResponse(
+		String imageUrl,
+		String objectKey,
+		long size,
+		String contentType
+	) {
+	}
+
 	record ProductDetailBlockResponse(
 		UUID id,
 		ProductDetailBlockType type,
@@ -199,6 +209,23 @@ final class CatalogDtos {
 		String label,
 		String href,
 		String policyType
+	) {
+	}
+
+	record ProductChangeHistoryListResponse(
+		List<ProductChangeHistoryResponse> changes
+	) {
+	}
+
+	record ProductChangeHistoryResponse(
+		UUID changeId,
+		UUID productOptionId,
+		UUID adminUserId,
+		ProductChangeType changeType,
+		String beforeValue,
+		String afterValue,
+		String reason,
+		Instant createdAt
 	) {
 	}
 }

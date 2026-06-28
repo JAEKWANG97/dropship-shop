@@ -104,7 +104,7 @@ public class Claim {
 
 	public void approve(UUID adminUserId, String reason, Instant reviewedAt) {
 		if (status != ClaimStatus.REQUESTED && status != ClaimStatus.UNDER_REVIEW) {
-			throw new IllegalStateException("Only requested cancellation claims can be approved");
+			throw new IllegalStateException("Only requested claims can be approved");
 		}
 		this.status = ClaimStatus.APPROVED;
 		this.reviewedByAdminId = adminUserId;
@@ -112,9 +112,19 @@ public class Claim {
 		this.reviewedAt = reviewedAt;
 	}
 
+	public void approveReturn(UUID adminUserId, String reason, Instant reviewedAt) {
+		if (status != ClaimStatus.REQUESTED && status != ClaimStatus.UNDER_REVIEW) {
+			throw new IllegalStateException("Only requested return claims can be approved");
+		}
+		this.status = ClaimStatus.RETURN_WAITING;
+		this.reviewedByAdminId = adminUserId;
+		this.adminReviewReason = reason;
+		this.reviewedAt = reviewedAt;
+	}
+
 	public void reject(UUID adminUserId, String reason, Instant reviewedAt) {
 		if (status != ClaimStatus.REQUESTED && status != ClaimStatus.UNDER_REVIEW) {
-			throw new IllegalStateException("Only requested cancellation claims can be rejected");
+			throw new IllegalStateException("Only requested claims can be rejected");
 		}
 		this.status = ClaimStatus.REJECTED;
 		this.reviewedByAdminId = adminUserId;

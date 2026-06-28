@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.dropshipshop.api.auth.security.CurrentUser;
 
@@ -73,6 +75,11 @@ class AdminCatalogController {
 		return catalogService.getAdminProduct(productId);
 	}
 
+	@GetMapping("/products/{productId}/changes")
+	CatalogDtos.ProductChangeHistoryListResponse listProductChanges(@PathVariable UUID productId) {
+		return catalogService.listProductChanges(productId);
+	}
+
 	@PatchMapping("/products/{productId}")
 	CatalogDtos.AdminProductResponse updateProduct(
 		@PathVariable UUID productId,
@@ -127,6 +134,14 @@ class AdminCatalogController {
 		Authentication authentication
 	) {
 		return catalogService.replaceImages(productId, request, currentUser.id(authentication));
+	}
+
+	@PostMapping("/products/{productId}/images/upload")
+	CatalogDtos.ProductImageUploadResponse uploadImage(
+		@PathVariable UUID productId,
+		@RequestPart("file") MultipartFile file
+	) {
+		return catalogService.uploadImage(productId, file);
 	}
 
 	@PutMapping("/products/{productId}/detail-blocks")

@@ -75,4 +75,32 @@ public class AdminOrderActionHistory {
 	public UUID getId() {
 		return id;
 	}
+
+	public CustomerOrder getOrder() {
+		return order;
+	}
+
+	public UUID getAdminUserId() {
+		return adminUserId;
+	}
+
+	public AdminOrderActionType getActionType() {
+		return actionType;
+	}
+
+	public OrderStatus getBeforeStatus() {
+		return beforeStatus;
+	}
+
+	public OrderStatus getAfterStatus() {
+		return afterStatus;
+	}
+
+	public String getReason() {
+		return reason;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
+	}
 }

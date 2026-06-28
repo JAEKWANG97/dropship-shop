@@ -149,6 +149,7 @@ Modeling notes:
 - One product can have one `THUMBNAIL` image.
 - One product can have up to ten `GALLERY` images.
 - If `Product.thumbnailImageUrl` is kept, it must be updated from the canonical thumbnail image.
+- DS-42 adds admin binary upload that stores the file and returns URL/object-key metadata.
 
 ## ProductOption
 
@@ -197,6 +198,11 @@ Suggested fields:
 - effectiveFrom
 - createdAt
 - updatedAt
+
+Implemented DS-40 scope:
+
+- Public `GET /api/business-profile` exposes the customer-facing business disclosure baseline.
+- The initial implementation is a static backend response; admin update remains planned.
 
 ## Cart
 
@@ -374,6 +380,9 @@ Implemented fields:
 - idempotencyKey
 - failureCode
 - failureMessage
+- providerCancelTransactionKey
+- cancelRequestedAt
+- cancelledAt
 - rawProviderStatus
 - lastSyncedAt
 - createdAt
@@ -386,6 +395,9 @@ Rules:
 - Same `providerPaymentKey` for another checkout is rejected.
 - `APPROVED` moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
 - `CANCEL_REQUIRED` is used for payment exception paths that need PG cancel/admin follow-up.
+- Payment exception cancel requests use a stable idempotency key.
+- Successful payment exception cancel moves `Payment`, `PaymentGroup`, and linked orders to `CANCELLED`.
+- Failed payment exception cancel moves `Payment` and `PaymentGroup` to `CANCEL_FAILED` and leaves the case in the admin payment exception queue.
 
 ## PaymentEvent
 
@@ -398,7 +410,7 @@ Implemented fields:
 - paymentGroupId
 - orderId
 - providerPaymentKey
-- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION
+- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION / PAYMENT_EXCEPTION_CANCEL_REQUESTED / PAYMENT_EXCEPTION_CANCEL_COMPLETED / PAYMENT_EXCEPTION_CANCEL_FAILED / TOSS_WEBHOOK_RECEIVED / PAYMENT_REVIEW_REQUIRED / REFUND_REQUESTED / REFUND_COMPLETED / REFUND_FAILED
 - idempotencyKey
 - rawPayload
 - resultMessage
@@ -406,9 +418,11 @@ Implemented fields:
 - processedAt
 - createdAt
 
-Deferred event types:
+Rules:
 
-- Cancel, refund, and webhook event types are added when the corresponding APIs are implemented.
+- Toss webhook events store the webhook raw payload and an idempotency key.
+- Duplicate webhook deliveries with the same idempotency key are ignored.
+- Server confirm and webhook status conflicts create a `PAYMENT_REVIEW_REQUIRED` event and move the payment to `REVIEW_REQUIRED`.
 
 ## Fulfillment
 
@@ -461,22 +475,26 @@ Suggested fields:
 - shippedAt
 - deliveredAt
 - trackingSyncedAt
+- trackingSyncFailureReason
+- manualOverride
+- manualCorrectedByAdminId
+- manualCorrectedAt
 - createdAt
 - updatedAt
 
 Planned fields:
 
 - trackingStatus
-- trackingSyncFailureReason
-- manualOverride
-- manualCorrectedByAdminId
-- manualCorrectedAt
 
 Rules:
 
 - DS-13 creates one shipment per order when admin enters carrier and tracking number.
 - Shipment creation is allowed only from `SUPPLIER_ORDERED` and moves the order to `SHIPPED`.
 - Duplicate shipment creation for the same order is rejected.
+- DS-35 syncs tracking results by shipment id or carrier/tracking number.
+- Delivered tracking moves shipment and order to `DELIVERED`; non-delivered tracking does not move state backward.
+- Tracking sync failure records `trackingSyncFailureReason` and keeps current order/shipment state.
+- DS-36 supports admin manual correction to `DELIVERED` with reason, admin id, correction time, admin action history, and order status history.
 - Customer order detail exposes shipment display status, carrier, and tracking number.
 
 ## Refund
@@ -499,11 +517,21 @@ Suggested fields:
 - failureCode
 - failureMessage
 - rawProviderStatus
+- reviewedByAdminId
+- adminReviewReason
+- reviewedAt
 - requestedAt
 - completedAt
 - failedAt
 - createdAt
 - updatedAt
+
+Implemented DS-38 scope:
+
+- Refunds are created as `REQUESTED`.
+- Admin approval moves a refund to `APPROVED`; PG cancel/refund request is allowed only after approval.
+- First PG cancel failure moves to `RETRY_REQUIRED`; retry failure moves to `MANUAL_REVIEW_REQUIRED`.
+- Manual review can move the refund back to `APPROVED` or to `REJECTED`.
 
 Planned fields:
 
@@ -555,9 +583,13 @@ Planned fields:
 Rules:
 
 - DS-14 implements `CANCEL` claim creation and admin review.
+- DS-37 implements `RETURN` and `EXCHANGE` claim creation after delivery and admin approve/reject review.
 - Customer self-service cancellation is allowed only for `SUPPLIER_ORDER_PENDING` orders whose supplier work and address lock fields are empty.
 - Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
 - After supplier work starts or after `SUPPLIER_ORDERED`, the customer can submit a `CANCEL` claim for admin review before shipment.
+- After delivery, the customer can submit a `RETURN` claim with requested action `REFUND` or an `EXCHANGE` claim with requested action `EXCHANGE`.
+- Simple change-of-mind return/exchange claims are accepted only within 7 days from `deliveredAt`.
+- Seller-fault return/exchange claims use a 90-day delivered-at baseline in DS-37; discovery date and evidence URLs remain planned fields.
 - Admin approval moves the order to `REFUND_REQUESTED`; admin rejection keeps the order status unchanged.
 - requestedAt
 - deliveredAtAtRequest
@@ -576,7 +608,7 @@ Rules:
 
 주문, 결제, 배송, 환불, 클레임 처리 알림 발송 이력. 거래 알림과 마케팅 알림을 구분해서 기록한다.
 
-Suggested fields:
+Implemented fields:
 
 - id
 - userId
@@ -596,6 +628,13 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+Implemented DS-39 scope:
+
+- `notification_logs` persists transactional email notification records.
+- MVP email baseline records `SENT` logs without adding an external SMTP/provider dependency.
+- Implemented triggers include payment completed, payment exception, out-of-stock, shipment started, delivery completed, claim status changed, and refund completed.
+- Admin can list notification logs with `GET /api/admin/notifications`.
+
 ## OrderStatusHistory
 
 주문 상태 변경 이력. 주문 상태는 임의 되돌리기 없이 허용된 액션을 통해서만 변경한다.
@@ -613,6 +652,13 @@ Suggested fields:
 - reason
 - createdAt
 
+Implemented DS-36 scope:
+
+- Status history is persisted in `order_status_histories`.
+- Admin fulfillment/shipment actions and shipment tracking/manual correction delivery completion record order status history.
+- System tracking sync uses a null actor; admin correction stores the admin user id.
+- DS-44 exposes admin order status history reads at `GET /api/admin/orders/{orderId}/status-history`.
+
 ## AdminActionHistory
 
 관리자 주요 작업 이력. 상태 변경 외에도 환불, 품절, 배송 수동 보정, 정정 처리 같은 운영 액션을 기록한다.
@@ -629,6 +675,11 @@ Suggested fields:
 - afterValue
 - createdAt
 
+Implemented DS-44 scope:
+
+- Admin order action history is read from `admin_order_action_histories`.
+- `GET /api/admin/actions` returns order id, admin user id, action type, before/after status, reason, and created time.
+
 ## ProductChangeHistory
 
 상품 주요 변경 이력. MVP에서는 운영 영향이 큰 변경부터 기록한다.
@@ -639,7 +690,7 @@ Suggested fields:
 - productId
 - productOptionId
 - adminUserId
-- changeType: PRICE / PRODUCT_STATUS / OPTION_STATUS / SUPPLIER
+- changeType: PRICE / PRODUCT_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE
 - beforeValue
 - afterValue
 - reason
@@ -659,6 +710,13 @@ Suggested fields:
 - effectiveFrom
 - status: DRAFT / ACTIVE / ARCHIVED
 - createdAt
+
+Implemented DS-41 scope:
+
+- `policy_documents` persists managed policy versions.
+- Admin can create and update drafts, then activate a draft.
+- Activating a policy archives the previous active policy of the same type.
+- Public APIs expose the current active policy and specific versions.
 - updatedAt
 
 ## BusinessProfile
@@ -701,6 +759,11 @@ Suggested fields:
 - processorPurpose
 - thirdPartyRecipient
 - thirdPartyPurpose
+
+Implemented DS-40 scope:
+
+- Public `GET /api/privacy-processing-items` exposes the MVP privacy processing table.
+- The initial implementation is a static backend response; admin replacement remains planned.
 - thirdPartyItems
 - thirdPartyRetentionPeriod
 - status: ACTIVE / ARCHIVED
@@ -903,8 +966,8 @@ Suggested fields:
 - 관리자 주문 액션은 현재 상태에서 허용된 다음 액션으로만 실행한다.
 - 자동 상태 되돌리기 버튼은 MVP에서 제공하지 않고, 잘못된 상태 변경은 관리자 정정 액션과 이력으로 처리한다.
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유를 필수로 기록한다.
-- 상품 변경 이력은 가격, 상품/옵션 판매 상태, 공급처 변경부터 MVP에서 기록한다.
-- 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff는 MVP 이후로 미룬다.
+- 상품 변경 이력은 가격, 상품/옵션 판매 상태, 공급처, 상품/옵션 기본 정보, 이미지, 상세 블록, 고시 변경을 MVP에서 기록한다.
+- 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff처럼 필드별 상세 diff는 MVP 이후로 미룬다.
 - 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책은 버전과 시행일을 가진다.
 - 첫 가입 또는 첫 소셜 로그인 완료 시 이용약관과 개인정보처리방침 동의 이력을 저장한다.
 - 소셜 로그인 필수 저장 항목은 제공자, 제공자 user id, 이메일, 표시 이름으로 시작한다.

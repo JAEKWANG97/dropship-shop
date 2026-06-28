@@ -44,6 +44,8 @@ import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
@@ -84,6 +86,9 @@ class CustomerCancellationApiIntegrationTest {
 
 	@Autowired
 	private ClaimRepository claimRepository;
+
+	@Autowired
+	private ShipmentRepository shipmentRepository;
 
 	@Test
 	void rejectsAnonymousAndAdminCustomerCancelAccess() throws Exception {
@@ -298,6 +303,126 @@ class CustomerCancellationApiIntegrationTest {
 		assertThat(claimRepository.findById(UUID.fromString(claimId)).orElseThrow().getStatus().name()).isEqualTo("REJECTED");
 	}
 
+	@Test
+	void createsReturnAndExchangeClaimsAfterDelivery() throws Exception {
+		UserAccount customer = createCustomer("return-customer-1");
+		CustomerOrder returnOrder = createDeliveredOrder(customer, "RETURN-CLAIM-1", "RETURN-CLAIM-CO-1", 26000, Instant.now());
+		CustomerOrder exchangeOrder = createDeliveredOrder(customer, "EXCHANGE-CLAIM-1", "EXCHANGE-CLAIM-CO-1", 27000, Instant.now());
+
+		MvcResult returnResult = mockMvc.perform(post("/api/orders/{orderId}/claims", returnOrder.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "RETURN",
+					  "claimReason": "SIMPLE_CHANGE_OF_MIND",
+					  "customerMemo": "I want to return it"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.claimType", is("RETURN")))
+			.andExpect(jsonPath("$.status", is("REQUESTED")))
+			.andExpect(jsonPath("$.requestedAction", is("REFUND")))
+			.andReturn();
+		String returnClaimId = fieldFrom(returnResult, "claimId");
+
+		mockMvc.perform(post("/api/orders/{orderId}/claims", exchangeOrder.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "EXCHANGE",
+					  "claimReason": "DEFECT",
+					  "customerMemo": "Please exchange defective item"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.claimType", is("EXCHANGE")))
+			.andExpect(jsonPath("$.status", is("REQUESTED")))
+			.andExpect(jsonPath("$.requestedAction", is("EXCHANGE")));
+
+		mockMvc.perform(get("/api/admin/claims")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.claims[?(@.claimId == '%s')]".formatted(returnClaimId), hasSize(1)))
+			.andExpect(jsonPath("$.claims[?(@.claimId == '%s')].claimType".formatted(returnClaimId), hasItem("RETURN")));
+	}
+
+	@Test
+	void adminReviewsReturnAndExchangeClaimsWithoutChangingOrderStatus() throws Exception {
+		UserAccount customer = createCustomer("return-customer-2");
+		CustomerOrder returnOrder = createDeliveredOrder(customer, "RETURN-REVIEW-1", "RETURN-REVIEW-CO-1", 28000, Instant.now());
+		CustomerOrder exchangeOrder = createDeliveredOrder(customer, "EXCHANGE-REVIEW-1", "EXCHANGE-REVIEW-CO-1", 29000, Instant.now());
+		String returnClaimId = createClaim(customer, returnOrder, "RETURN", "DEFECT", "Broken item");
+		String exchangeClaimId = createClaim(customer, exchangeOrder, "EXCHANGE", "WRONG_DELIVERY", "Wrong item delivered");
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", returnClaimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Return approved after review"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETURN_WAITING")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")));
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/reject", exchangeClaimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Exchange rejected after review"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("REJECTED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")));
+
+		assertThat(orderRepository.findById(returnOrder.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(orderRepository.findById(exchangeOrder.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+	}
+
+	@Test
+	void rejectsReturnExchangeClaimsBeforeDeliveryAndAfterSimpleChangeWindow() throws Exception {
+		UserAccount customer = createCustomer("return-customer-3");
+		CustomerOrder supplierOrdered = createSupplierOrderedOrder(customer, "RETURN-NOT-DELIVERED-1", "RETURN-NOT-DELIVERED-CO-1", 30000);
+		CustomerOrder oldDelivered = createDeliveredOrder(
+			customer,
+			"RETURN-OLD-1",
+			"RETURN-OLD-CO-1",
+			31000,
+			Instant.now().minusSeconds(8 * 24 * 60 * 60)
+		);
+
+		mockMvc.perform(post("/api/orders/{orderId}/claims", supplierOrdered.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "RETURN",
+					  "claimReason": "SIMPLE_CHANGE_OF_MIND",
+					  "customerMemo": "Not delivered yet"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/orders/{orderId}/claims", oldDelivered.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "RETURN",
+					  "claimReason": "SIMPLE_CHANGE_OF_MIND",
+					  "customerMemo": "Too late"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		return userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,
@@ -336,6 +461,45 @@ class CustomerCancellationApiIntegrationTest {
 		order.startSupplierOrderWork(TestAuthentication.ADMIN_ID, Instant.now());
 		order.markSupplierOrdered();
 		return orderRepository.saveAndFlush(order);
+	}
+
+	private CustomerOrder createDeliveredOrder(
+		UserAccount customer,
+		String orderNumber,
+		String checkoutNumber,
+		long amount,
+		Instant deliveredAt
+	) {
+		CustomerOrder order = createSupplierOrderedOrder(customer, orderNumber, checkoutNumber, amount);
+		order.markShipped();
+		order.markDeliveredByTracking();
+		Shipment shipment = new Shipment(order, "CJ대한통운", "TRACK-" + orderNumber, deliveredAt.minusSeconds(3600));
+		shipment.markDeliveredByTracking(deliveredAt);
+		orderRepository.saveAndFlush(order);
+		shipmentRepository.saveAndFlush(shipment);
+		return order;
+	}
+
+	private String createClaim(
+		UserAccount customer,
+		CustomerOrder order,
+		String claimType,
+		String claimReason,
+		String customerMemo
+	) throws Exception {
+		MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/claims", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "%s",
+					  "claimReason": "%s",
+					  "customerMemo": "%s"
+					}
+					""".formatted(claimType, claimReason, customerMemo)))
+			.andExpect(status().isCreated())
+			.andReturn();
+		return fieldFrom(result, "claimId");
 	}
 
 	private CustomerOrder createPaymentPendingOrder(

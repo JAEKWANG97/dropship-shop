@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.payment.domain.PaymentExceptionReason;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 
@@ -38,6 +39,32 @@ final class PaymentDtos {
 		UUID orderId,
 		String orderNumber,
 		OrderStatus status
+	) {
+	}
+
+	record AdminPaymentExceptionListResponse(
+		List<AdminPaymentExceptionResponse> exceptions
+	) {
+	}
+
+	record AdminPaymentExceptionResponse(
+		UUID paymentId,
+		UUID paymentGroupId,
+		String checkoutNumber,
+		String customerEmail,
+		PaymentStatus paymentStatus,
+		PaymentGroupStatus paymentGroupStatus,
+		PaymentExceptionReason exceptionReason,
+		long requestedAmount,
+		Long approvedAmount,
+		String providerPaymentKey,
+		String providerCancelTransactionKey,
+		String idempotencyKey,
+		String failureCode,
+		String failureMessage,
+		Instant cancelRequestedAt,
+		Instant cancelledAt,
+		Instant createdAt
 	) {
 	}
 }

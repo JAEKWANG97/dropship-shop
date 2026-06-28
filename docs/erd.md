@@ -306,6 +306,7 @@ Constraints:
 
 - One thumbnail image per product.
 - Up to ten gallery images per product.
+- DS-42 stores uploaded binary files in local product image storage and keeps URL/object-key metadata in `product_images`.
 
 ### product_detail_blocks
 
@@ -524,6 +525,9 @@ Implemented by DS-9.
 - `idempotency_key`
 - `failure_code`
 - `failure_message`
+- `provider_cancel_transaction_key`
+- `cancel_requested_at`
+- `cancelled_at`
 - `raw_provider_status`
 - `last_synced_at`
 - `created_at`
@@ -579,9 +583,22 @@ Constraints and indexes:
 - `id`
 - `order_id`
 - `admin_user_id`
-- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED`
+- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `SHIPMENT_MANUAL_CORRECTION`
 - `before_status`
 - `after_status`
+- `reason`
+- `created_at`
+
+### order_status_histories
+
+- `id`
+- `order_id`
+- `actor_user_id`
+- `action_type`
+- `from_status`
+- `to_status`
+- `guard_result`
+- `side_effect_summary`
 - `reason`
 - `created_at`
 
@@ -595,7 +612,11 @@ Constraints and indexes:
 - `shipped_at`
 - `delivered_at`
 - `tracking_synced_at`
+- `tracking_sync_failure_reason`
+- `manual_override`
 - `manual_correction_reason`
+- `manual_corrected_by_admin_id`
+- `manual_corrected_at`
 - `created_at`
 - `updated_at`
 
@@ -624,6 +645,9 @@ Constraints and indexes:
 - `failure_code`
 - `failure_message`
 - `raw_provider_status`
+- `reviewed_by_admin_id`
+- `admin_review_reason`
+- `reviewed_at`
 - `requested_at`
 - `completed_at`
 - `failed_at`
@@ -656,7 +680,8 @@ Implemented DS-14 scope:
 
 - Self-service eligible cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
 - Post-supplier-work cancellation creates a requested `CANCEL` claim for admin review.
-- Return and exchange claim processing details remain planned.
+- Post-delivery return/exchange claims create requested `RETURN` or `EXCHANGE` claims. Implemented by DS-37.
+- Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps `APPROVED` until exchange shipment handling.
 
 Rule:
 
@@ -673,18 +698,55 @@ Policy/legal tables:
 - `marketing_consents`
 - `legal_retention_records`
 
+DS-40 exposes business profile and privacy processing item public APIs as static backend responses; persisted admin-managed policy/legal tables remain planned.
+
+### policy_documents
+
+- `id`
+- `type`: `TERMS_OF_SERVICE` / `PRIVACY_POLICY` / `SHIPPING_POLICY` / `CANCELLATION_REFUND_POLICY`
+- `version`
+- `title`
+- `content`
+- `effective_from`
+- `status`: `DRAFT` / `ACTIVE` / `ARCHIVED`
+- `created_at`
+- `updated_at`
+
+DS-41 implements persisted managed policy versions. Unique `(type, version)` prevents duplicate versions, and activation archives the previous active policy of the same type.
+
 Audit/notification tables:
 
 - `order_status_histories`
-- `admin_action_histories`
+- `admin_order_action_histories`
 - `product_change_histories`
 - `notification_logs`
+
+### notification_logs
+
+- `id`
+- `user_id`
+- `order_id`
+- `payment_group_id`
+- `claim_id`
+- `refund_id`
+- `type`: `PAYMENT_COMPLETED` / `PAYMENT_EXCEPTION` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `DELIVERY_COMPLETED` / `DELAY_NOTICE` / `CLAIM_STATUS_CHANGED` / `REFUND_COMPLETED` / `MARKETING`
+- `channel`: `EMAIL` / `ORDER_DETAIL` / `SMS` / `KAKAO_ALIMTALK` / `PUSH`
+- `transactional`
+- `status`: `PENDING` / `SENT` / `FAILED` / `SKIPPED`
+- `recipient`
+- `template_key`
+- `payload_snapshot`
+- `failure_reason`
+- `sent_at`
+- `created_at`
+- `updated_at`
 
 Rules:
 
 - Transactional notifications are not marketing notifications.
 - Admin order actions must be action-based, not arbitrary status mutation.
-- Product change history starts with price, product status, option status, and supplier changes.
+- DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
+- Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
 ## Implemented Catalog Table Notes
 
@@ -697,6 +759,8 @@ DS-6 implemented:
 - `product_detail_blocks`
 - `product_change_histories`
 - `product_notices`
+
+DS-43 implements admin product change history reads from `product_change_histories`.
 
 Implemented catalog must not add:
 

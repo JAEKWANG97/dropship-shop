@@ -10,12 +10,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
@@ -26,20 +30,26 @@ class AdminOrderShipmentService {
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
+	private final NotificationService notificationService;
 
 	AdminOrderShipmentService(
 		CustomerOrderRepository orderRepository,
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
-		AdminOrderQueryService adminOrderQueryService
+		OrderStatusHistoryRepository statusHistoryRepository,
+		AdminOrderQueryService adminOrderQueryService,
+		NotificationService notificationService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -61,12 +71,23 @@ class AdminOrderShipmentService {
 		}
 
 		Shipment shipment = shipmentRepository.save(new Shipment(order, request.carrier(), request.trackingNumber(), Instant.now()));
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.SHIPMENT_STARTED);
 		actionHistoryRepository.save(new AdminOrderActionHistory(
 			order,
 			adminUserId,
 			AdminOrderActionType.SHIPMENT_STARTED,
 			beforeStatus,
 			order.getStatus(),
+			"Shipment tracking entered"
+		));
+		statusHistoryRepository.save(new OrderStatusHistory(
+			order,
+			adminUserId,
+			AdminOrderActionType.SHIPMENT_STARTED.name(),
+			beforeStatus,
+			order.getStatus(),
+			"ALLOWED",
+			"Shipment tracking entered",
 			"Shipment tracking entered"
 		));
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);

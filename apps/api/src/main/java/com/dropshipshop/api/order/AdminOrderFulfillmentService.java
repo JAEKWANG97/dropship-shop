@@ -10,12 +10,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.refund.RefundService;
 
 @Service
@@ -24,21 +28,27 @@ class AdminOrderFulfillmentService {
 	private final CustomerOrderRepository orderRepository;
 	private final FulfillmentRepository fulfillmentRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final RefundService refundService;
+	private final NotificationService notificationService;
 
 	AdminOrderFulfillmentService(
 		CustomerOrderRepository orderRepository,
 		FulfillmentRepository fulfillmentRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
+		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
-		RefundService refundService
+		RefundService refundService,
+		NotificationService notificationService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.refundService = refundService;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -104,6 +114,7 @@ class AdminOrderFulfillmentService {
 			fulfillment.markOutOfStock(request.reason());
 			fulfillmentRepository.save(fulfillment);
 			refundService.createOutOfStockRefund(order);
+			notificationService.email(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.OUT_OF_STOCK);
 			recordHistory(order, adminUserId, AdminOrderActionType.OUT_OF_STOCK, beforeStatus, request.reason());
 			return actionResponse(order, fulfillment);
 		} catch (IllegalStateException ex) {
@@ -136,6 +147,18 @@ class AdminOrderFulfillmentService {
 			order.getStatus(),
 			reason
 		));
+		if (beforeStatus != order.getStatus()) {
+			statusHistoryRepository.save(new OrderStatusHistory(
+				order,
+				adminUserId,
+				actionType.name(),
+				beforeStatus,
+				order.getStatus(),
+				"ALLOWED",
+				"Admin fulfillment action",
+				reason
+			));
+		}
 	}
 
 	private AdminOrderDtos.AdminOrderActionResponse actionResponse(CustomerOrder order, Fulfillment fulfillment) {

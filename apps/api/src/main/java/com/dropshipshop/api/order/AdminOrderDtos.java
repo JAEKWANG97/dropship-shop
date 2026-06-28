@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
+import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
@@ -127,6 +128,41 @@ final class AdminOrderDtos {
 	) {
 	}
 
+	record OrderStatusHistoryListResponse(
+		List<OrderStatusHistoryResponse> histories
+	) {
+	}
+
+	record OrderStatusHistoryResponse(
+		UUID historyId,
+		UUID actorUserId,
+		String actionType,
+		OrderStatus fromStatus,
+		OrderStatus toStatus,
+		String guardResult,
+		String sideEffectSummary,
+		String reason,
+		Instant createdAt
+	) {
+	}
+
+	record AdminActionHistoryListResponse(
+		List<AdminActionHistoryResponse> actions
+	) {
+	}
+
+	record AdminActionHistoryResponse(
+		UUID actionHistoryId,
+		UUID orderId,
+		UUID adminUserId,
+		AdminOrderActionType actionType,
+		OrderStatus beforeStatus,
+		OrderStatus afterStatus,
+		String reason,
+		Instant createdAt
+	) {
+	}
+
 	record AdminShipmentResponse(
 		UUID shipmentId,
 		ShipmentStatus status,
@@ -135,6 +171,10 @@ final class AdminOrderDtos {
 		Instant shippedAt,
 		Instant deliveredAt,
 		Instant trackingSyncedAt,
+		String trackingSyncFailureReason,
+		boolean manualOverride,
+		UUID manualCorrectedByAdminId,
+		Instant manualCorrectedAt,
 		String manualCorrectionReason
 	) {
 	}

@@ -508,7 +508,7 @@ Acceptance criteria:
 - Product image metadata model exists.
 - Product detail block model exists.
 - Product notice/version source exists for product information notice, shipping, AS, return, and exchange information.
-- Product change history writes exist for price, product status, option status, and supplier changes.
+- Product change history writes exist for product, option, image, detail, notice, and supplier changes.
 - Product and option support sales status instead of real stock quantity.
 - Admin can create and update catalog data through APIs.
 - Customer can read public product list and detail APIs.
@@ -522,7 +522,7 @@ Resolved decisions:
 - Admin supplier and product APIs are implemented under `/api/admin`.
 - Product image and detail block APIs manage URL/object-key metadata; binary upload remains future work.
 - Product notice version source is implemented through `product_notices`.
-- Product mutations write `product_change_histories`; read API for change history remains planned.
+- Product mutations write `product_change_histories`; DS-43 implements the admin read API.
 - `SecurityConfig` permits public product APIs and keeps `/api/admin/**` protected by `ADMIN`.
 
 ### DS-7: Implement cart domain
@@ -606,7 +606,9 @@ Resolved decisions:
 - Duplicate confirmation with the same payment key and checkout returns the existing payment result.
 - Same payment key on a different checkout is rejected as conflict.
 - Toss-approved amount mismatch creates a payment exception path with `Payment(CANCEL_REQUIRED)`, `PaymentGroup(PAYMENT_EXCEPTION)`, and `Order(PAYMENT_EXCEPTION)`.
-- Automatic PG cancel execution, Toss webhook handling, payment detail API, and admin payment exception retry APIs remain planned.
+- Automatic PG cancel execution and admin payment exception queue/retry APIs are implemented by DS-33.
+- Toss webhook handling is implemented by DS-34.
+- Payment detail API remains planned.
 
 ### DS-10: Implement customer order history
 
@@ -775,11 +777,191 @@ Track backend API, policy, state transition, notification, and audit work remain
 
 Child issues:
 
-- DS-33 through DS-44 remain tracked in Linear.
+- DS-35 through DS-44 remain tracked in Linear.
 - DS-30 is implemented.
 - DS-31 is implemented.
 - DS-32 is implemented.
+- DS-33 is implemented.
+- DS-34 is implemented.
+- DS-35 is implemented.
+- DS-36 is implemented.
+- DS-37 is implemented.
+- DS-38 is implemented.
+- DS-39 is implemented.
+- DS-40 is implemented.
+- DS-41 is implemented.
+- DS-42 is implemented.
 - DS-45 is implemented.
+
+### DS-35: Implement shipment tracking auto sync
+
+Status: Implemented
+
+Description:
+
+Implement shipment tracking sync endpoints and forward-only delivery completion handling.
+
+Acceptance criteria:
+
+- `POST /api/internal/shipments/tracking-sync` syncs tracking results by carrier and tracking number.
+- `POST /api/admin/shipments/{shipmentId}/tracking-sync` retries sync for one shipment.
+- Delivered tracking moves shipment and order to `DELIVERED`.
+- Non-delivered tracking does not move delivered shipments backward.
+- Tracking sync failure records `trackingSyncFailureReason` without changing shipment/order state.
+- API spec, ERD, domain model, fulfillment policy, and integration tests are updated.
+
+### DS-36: Implement shipment manual correction and status history
+
+Status: Implemented
+
+Description:
+
+Implement admin shipment manual correction and order status history persistence.
+
+Acceptance criteria:
+
+- `POST /api/admin/shipments/{shipmentId}/manual-correction` requires admin auth and reason.
+- Manual correction supports forward correction to `DELIVERED`; backward correction is rejected.
+- Shipment stores `manualOverride`, `manualCorrectionReason`, `manualCorrectedByAdminId`, and `manualCorrectedAt`.
+- Manual correction records admin action history.
+- Order status changes from shipment creation, tracking delivery completion, and manual correction are recorded in `order_status_histories`.
+- API spec, ERD, domain model, fulfillment/admin policy docs, and integration tests are updated.
+
+### DS-37: Implement return and exchange claim flow
+
+Status: Implemented
+
+Description:
+
+Implement customer return/exchange claim creation after delivery and admin approve/reject review.
+
+Acceptance criteria:
+
+- `POST /api/orders/{orderId}/claims` accepts `RETURN` and `EXCHANGE` for delivered orders.
+- `RETURN` creates requested action `REFUND`; `EXCHANGE` creates requested action `EXCHANGE`.
+- Simple change-of-mind return/exchange claims are rejected after 7 days from delivery.
+- Seller-fault return/exchange claims use a delivered-at baseline in DS-37; discovery-date/evidence capture remains planned.
+- `GET /api/admin/claims` includes cancellation, return, and exchange claims.
+- Admin can approve or reject return/exchange claims without changing the order from `DELIVERED`.
+- Return approval moves the claim to `RETURN_WAITING`; exchange approval remains `APPROVED` until exchange shipment handling is implemented.
+- API spec, ERD, domain model, cancellation/refund policy, admin policy, and integration tests are updated.
+
+### DS-38: Harden refund approval and manual review
+
+Status: Implemented
+
+Description:
+
+Require admin approval before PG refund execution and add manual review result handling.
+
+Acceptance criteria:
+
+- `POST /api/admin/refunds/{refundId}/approve` moves `REQUESTED` refunds to `APPROVED` with admin id, reason, and review time.
+- `POST /api/admin/refunds/{refundId}/request-pg-cancel` rejects unapproved refunds.
+- First PG cancel failure moves refund to `RETRY_REQUIRED`.
+- Retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
+- `POST /api/admin/refunds/{refundId}/manual-review` can approve or reject manual-review refunds with reason.
+- Refund review fields are stored in DB and exposed in admin refund responses.
+- API spec, ERD, domain model, cancellation/refund policy, admin policy, and integration tests are updated.
+
+### DS-39: Implement notification log and email baseline
+
+Status: Implemented
+
+Description:
+
+Implement transactional notification logs and MVP email baseline without adding an external email provider dependency.
+
+Acceptance criteria:
+
+- `notification_logs` table and JPA domain are implemented.
+- `GET /api/admin/notifications` lists notification logs for admins.
+- Transactional email logs are recorded with `SENT` status for payment completed, payment exception, out-of-stock, shipment started, delivery completed, claim status changed, and refund completed.
+- Transactional notification logging remains separate from marketing consent.
+- Retry of failed notifications and real SMTP/provider integration remain planned.
+- API spec, ERD, domain model, legal/customer notice policy, order policy, admin policy, and integration tests are updated.
+
+### DS-40: Implement legal disclosure APIs
+
+Status: Implemented
+
+Description:
+
+Implement public business disclosure and privacy processing item APIs.
+
+Acceptance criteria:
+
+- `GET /api/business-profile` is public and returns business/operator disclosure fields.
+- `GET /api/privacy-processing-items` is public and returns the MVP privacy processing table.
+- APIs include customer center, privacy officer, hosting provider, processing purpose, retention period, processor, and third-party fields.
+- Initial implementation uses static backend responses; admin-managed replacement remains planned.
+- API spec, domain model, ERD, legal/customer notice policy, and integration tests are updated.
+
+### DS-41: Implement policy version APIs
+
+Status: Implemented
+
+Description:
+
+Implement managed policy document draft, activation, and version lookup APIs.
+
+Acceptance criteria:
+
+- `policy_documents` table and JPA domain are implemented with unique `(type, version)`.
+- Admin can list policy documents.
+- Admin can create and update draft policy documents.
+- Admin can activate a draft policy document.
+- Activating a policy archives the previous active policy of the same type.
+- Public APIs expose active current policy and specific policy versions.
+- API spec, ERD, domain model, legal/customer notice policy, and integration tests are updated.
+
+### DS-42: Implement product image storage
+
+Status: Implemented
+
+Description:
+
+Implement admin product image binary upload with local file storage.
+
+Acceptance criteria:
+
+- `POST /api/admin/products/{productId}/images/upload` accepts multipart image file upload for admins.
+- Upload validates non-empty file, max 5MB size, and allowed extensions `jpg`, `jpeg`, `png`, `webp`.
+- Uploaded files are stored under local product image storage and exposed through `/uploads/products/**`.
+- Upload response returns `imageUrl`, `objectKey`, size, and content type.
+- Existing product image metadata API can use the uploaded `imageUrl`.
+- API spec, ERD, domain model, catalog policy, and integration tests are updated.
+
+### DS-43: Implement product change history read API
+
+Status: Implemented
+
+Description:
+
+Implement admin read API for product change history.
+
+Acceptance criteria:
+
+- `GET /api/admin/products/{productId}/changes` returns ordered product change histories.
+- Response includes change id, product option id, admin user id, change type, before/after values, reason, and created time.
+- API is admin-only and returns 404 for missing products.
+- API spec, domain model, ERD, admin policy, and integration tests are updated.
+
+### DS-44: Implement admin audit APIs
+
+Status: Implemented
+
+Description:
+
+Implement admin read APIs for order status history and admin action history.
+
+Acceptance criteria:
+
+- `GET /api/admin/orders/{orderId}/status-history` returns order status history for one order.
+- `GET /api/admin/actions` lists admin order action histories.
+- Responses expose actor, target, action, before/after values, reason, and created time.
+- APIs are admin-only.
+- API spec, ERD, domain model, admin policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

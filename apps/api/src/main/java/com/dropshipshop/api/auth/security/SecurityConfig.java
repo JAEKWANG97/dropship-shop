@@ -62,8 +62,11 @@ public class SecurityConfig {
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/api/health", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
 				.requestMatchers("/api/auth/oauth2/**").permitAll()
+				.requestMatchers("/api/payments/toss/webhook").permitAll()
+				.requestMatchers("/api/internal/**").permitAll()
 				.requestMatchers("/api/products", "/api/products/**").permitAll()
 				.requestMatchers("/api/policies", "/api/policies/**").permitAll()
+				.requestMatchers("/api/business-profile", "/api/privacy-processing-items").permitAll()
 				.requestMatchers("/api/admin/**").hasRole("ADMIN")
 				.anyRequest().authenticated()
 			)

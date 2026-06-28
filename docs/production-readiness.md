@@ -87,7 +87,7 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 결제 secret, 개인정보, raw PG payload는 로그에 남기지 않는다.
 - MVP error monitoring은 배포 플랫폼 로그 수집과 알림으로 시작한다.
 - 운영 전 Sentry, OpenTelemetry collector, 또는 cloud provider error alert 중 하나를 선택해 uncaught exception과 5xx rate alert를 연결한다.
-- 5xx 급증, payment exception 증가, refund retry 증가, DB connection failure는 운영 알림 대상으로 둔다.
+- 5xx 급증, payment exception 증가, payment webhook 검증 실패, `REVIEW_REQUIRED` 증가, refund retry 증가, DB connection failure는 운영 알림 대상으로 둔다.
 
 ## Error Response Baseline
 

@@ -1,9 +1,9 @@
 package com.dropshipshop.api.order;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,14 +35,18 @@ import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.domain.ShippingAddressSnapshot;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -80,6 +85,9 @@ class AdminOrderApiIntegrationTest {
 
 	@Autowired
 	private OrderItemRepository orderItemRepository;
+
+	@Autowired
+	private OrderStatusHistoryRepository orderStatusHistoryRepository;
 
 	@Autowired
 	private FulfillmentRepository fulfillmentRepository;
@@ -363,6 +371,11 @@ class AdminOrderApiIntegrationTest {
 
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
 		assertThat(shipmentRepository.findByOrder_Id(order.getId()).orElseThrow().getTrackingNumber()).isEqualTo("1234567890");
+
+		mockMvc.perform(get("/api/admin/notifications")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notifications[?(@.orderId == '%s')].type".formatted(order.getId()), hasItem("SHIPMENT_STARTED")));
 	}
 
 	@Test
@@ -378,6 +391,192 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.shipment.displayStatus", is("배송 중")))
 			.andExpect(jsonPath("$.shipment.carrier", is("롯데택배")))
 			.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")));
+	}
+
+	@Test
+	void syncsDeliveredShipmentAndDoesNotMoveBackward() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-12");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-SYNC-1", "ADM-SHIP-SYNC-CO-1", 36000);
+		createShipment(order, "CJ대한통운", "SYNC-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "trackingStatus": "DELIVERED"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipmentStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.trackingSyncedAt").exists());
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "trackingStatus": "IN_TRANSIT"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipmentStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")));
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(shipmentRepository.findById(shipment.getId()).orElseThrow().getStatus()).isEqualTo(ShipmentStatus.DELIVERED);
+		var histories = orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId());
+		assertThat(histories.get(histories.size() - 1).getActionType()).isEqualTo("SHIPMENT_TRACKING_SYNC");
+
+		mockMvc.perform(get("/api/admin/notifications")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notifications[?(@.orderId == '%s')].type".formatted(order.getId()), hasItem("DELIVERY_COMPLETED")));
+	}
+
+	@Test
+	void recordsInternalTrackingSyncFailureWithoutChangingOrder() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-13");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-FAIL-1", "ADM-SHIP-FAIL-CO-1", 37000);
+		createShipment(order, "한진택배", "FAIL-123");
+
+		mockMvc.perform(post("/api/internal/shipments/tracking-sync")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "shipments": [
+					    {
+					      "carrier": "한진택배",
+					      "trackingNumber": "FAIL-123",
+					      "failureReason": "Carrier timeout"
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.received", is(1)))
+			.andExpect(jsonPath("$.matched", is(1)))
+			.andExpect(jsonPath("$.delivered", is(0)))
+			.andExpect(jsonPath("$.failed", is(1)))
+			.andExpect(jsonPath("$.notFound", is(0)));
+
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
+		assertThat(shipment.getStatus()).isEqualTo(ShipmentStatus.SHIPPED);
+		assertThat(shipment.getTrackingSyncFailureReason()).isEqualTo("Carrier timeout");
+		assertThat(shipment.getTrackingSyncedAt()).isNotNull();
+	}
+
+	@Test
+	void rejectsCustomerShipmentTrackingSyncAccess() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-14");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-SYNC-AUTH-1", "ADM-SHIP-SYNC-AUTH-CO-1", 38000);
+		createShipment(order, "CJ대한통운", "SYNC-AUTH-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "trackingStatus": "DELIVERED"
+					}
+					"""))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void manuallyCorrectsShipmentToDeliveredWithStatusHistory() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-15");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-MANUAL-1", "ADM-SHIP-MANUAL-CO-1", 39000);
+		createShipment(order, "우체국택배", "MANUAL-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/manual-correction", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "DELIVERED",
+					  "reason": "Carrier site shows delivered"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipmentStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.manualCorrectionReason", is("Carrier site shows delivered")));
+
+		Shipment savedShipment = shipmentRepository.findById(shipment.getId()).orElseThrow();
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(savedShipment.isManualOverride()).isTrue();
+		assertThat(savedShipment.getManualCorrectionReason()).isEqualTo("Carrier site shows delivered");
+		assertThat(savedShipment.getManualCorrectedByAdminId()).isEqualTo(TestAuthentication.ADMIN_ID);
+		assertThat(savedShipment.getManualCorrectedAt()).isNotNull();
+
+		var histories = orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId());
+		OrderStatusHistory history = histories.get(histories.size() - 1);
+		assertThat(history.getActionType()).isEqualTo("SHIPMENT_MANUAL_CORRECTION");
+		assertThat(history.getFromStatus()).isEqualTo(OrderStatus.SHIPPED);
+		assertThat(history.getToStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(history.getReason()).isEqualTo("Carrier site shows delivered");
+	}
+
+	@Test
+	void exposesOrderStatusAndAdminActionHistories() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-17");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-AUDIT-1", "ADM-AUDIT-CO-1", 41000);
+		createShipment(order, "CJ대한통운", "AUDIT-123");
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}/status-history", order.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.histories", hasSize(2)))
+			.andExpect(jsonPath("$.histories[*].actorUserId", hasItem(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.histories[*].actionType", hasItem("SUPPLIER_ORDER_COMPLETED")))
+			.andExpect(jsonPath("$.histories[*].actionType", hasItem("SHIPMENT_STARTED")))
+			.andExpect(jsonPath("$.histories[*].toStatus", hasItem("SHIPPED")))
+			.andExpect(jsonPath("$.histories[*].guardResult", hasItem("ALLOWED")));
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}/status-history", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}/status-history", UUID.randomUUID())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isNotFound());
+
+		mockMvc.perform(get("/api/admin/actions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].adminUserId".formatted(order.getId()), hasItem(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("SUPPLIER_WORK_START")))
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("SUPPLIER_ORDER_COMPLETED")))
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("SHIPMENT_STARTED")));
+
+		mockMvc.perform(get("/api/admin/actions")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void rejectsUnsupportedShipmentManualCorrectionStatus() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-16");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-MANUAL-INVALID-1", "ADM-SHIP-MANUAL-INVALID-CO-1", 40000);
+		createShipment(order, "우체국택배", "MANUAL-INVALID-123");
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+
+		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/manual-correction", shipment.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "SHIPPED",
+					  "reason": "Do not move backward"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
 	}
 
 	private UserAccount createCustomer(String providerUserId) {

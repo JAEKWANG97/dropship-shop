@@ -74,6 +74,15 @@ public class Refund {
 	@Column(name = "raw_provider_status", length = 100)
 	private String rawProviderStatus;
 
+	@Column(name = "reviewed_by_admin_id")
+	private UUID reviewedByAdminId;
+
+	@Column(name = "admin_review_reason", columnDefinition = "TEXT")
+	private String adminReviewReason;
+
+	@Column(name = "reviewed_at")
+	private Instant reviewedAt;
+
 	@Column(name = "requested_at")
 	private Instant requestedAt;
 
@@ -112,8 +121,32 @@ public class Refund {
 		updatedAt = Instant.now();
 	}
 
-	public void requestPgCancel(Payment payment, String idempotencyKey, Instant requestedAt) {
-		if (status != RefundStatus.REQUESTED && status != RefundStatus.RETRY_REQUIRED && status != RefundStatus.FAILED) {
+	public void approve(UUID adminUserId, String reason, Instant reviewedAt) {
+		if (status != RefundStatus.REQUESTED && status != RefundStatus.MANUAL_REVIEW_REQUIRED) {
+			throw new IllegalStateException("Refund can be approved only from requested or manual review required");
+		}
+		this.status = RefundStatus.APPROVED;
+		this.reviewedByAdminId = adminUserId;
+		this.adminReviewReason = reason;
+		this.reviewedAt = reviewedAt;
+	}
+
+	public void reject(UUID adminUserId, String reason, Instant reviewedAt) {
+		if (status != RefundStatus.REQUESTED && status != RefundStatus.MANUAL_REVIEW_REQUIRED) {
+			throw new IllegalStateException("Refund can be rejected only from requested or manual review required");
+		}
+		this.status = RefundStatus.REJECTED;
+		this.reviewedByAdminId = adminUserId;
+		this.adminReviewReason = reason;
+		this.reviewedAt = reviewedAt;
+	}
+
+	public void requestPgCancel(Payment payment, String idempotencyKey, Instant requestedAt, boolean retry) {
+		if (retry) {
+			if (status != RefundStatus.RETRY_REQUIRED && status != RefundStatus.FAILED) {
+				throw new IllegalStateException("Refund is not retryable");
+			}
+		} else if (status != RefundStatus.APPROVED) {
 			throw new IllegalStateException("Refund is not ready for PG cancel request");
 		}
 		this.payment = payment;
@@ -138,6 +171,13 @@ public class Refund {
 
 	public void markRetryRequired(String failureCode, String failureMessage, Instant failedAt) {
 		this.status = RefundStatus.RETRY_REQUIRED;
+		this.failureCode = failureCode;
+		this.failureMessage = failureMessage;
+		this.failedAt = failedAt;
+	}
+
+	public void markManualReviewRequired(String failureCode, String failureMessage, Instant failedAt) {
+		this.status = RefundStatus.MANUAL_REVIEW_REQUIRED;
 		this.failureCode = failureCode;
 		this.failureMessage = failureMessage;
 		this.failedAt = failedAt;
@@ -197,6 +237,18 @@ public class Refund {
 
 	public String getRawProviderStatus() {
 		return rawProviderStatus;
+	}
+
+	public UUID getReviewedByAdminId() {
+		return reviewedByAdminId;
+	}
+
+	public String getAdminReviewReason() {
+		return adminReviewReason;
+	}
+
+	public Instant getReviewedAt() {
+		return reviewedAt;
 	}
 
 	public Instant getRequestedAt() {

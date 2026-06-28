@@ -11,6 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentEvent;
 import com.dropshipshop.api.payment.domain.PaymentEventType;
@@ -33,19 +35,22 @@ public class RefundService {
 	private final PaymentEventRepository paymentEventRepository;
 	private final CustomerOrderRepository orderRepository;
 	private final TossPaymentsClient tossPaymentsClient;
+	private final NotificationService notificationService;
 
 	RefundService(
 		RefundRepository refundRepository,
 		PaymentRepository paymentRepository,
 		PaymentEventRepository paymentEventRepository,
 		CustomerOrderRepository orderRepository,
-		TossPaymentsClient tossPaymentsClient
+		TossPaymentsClient tossPaymentsClient,
+		NotificationService notificationService
 	) {
 		this.refundRepository = refundRepository;
 		this.paymentRepository = paymentRepository;
 		this.paymentEventRepository = paymentEventRepository;
 		this.orderRepository = orderRepository;
 		this.tossPaymentsClient = tossPaymentsClient;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -69,6 +74,17 @@ public class RefundService {
 	}
 
 	@Transactional
+	RefundDtos.AdminRefundResponse approve(UUID refundId, UUID adminUserId, RefundDtos.RefundApprovalRequest request) {
+		Refund refund = findRefund(refundId);
+		try {
+			refund.approve(adminUserId, request.reason(), Instant.now());
+			return toAdminResponse(refund);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
+	@Transactional
 	RefundDtos.AdminRefundResponse requestPgCancel(UUID refundId) {
 		Refund refund = findRefund(refundId);
 		return executePgCancel(refund, false);
@@ -78,6 +94,27 @@ public class RefundService {
 	RefundDtos.AdminRefundResponse retryPgCancel(UUID refundId) {
 		Refund refund = findRefund(refundId);
 		return executePgCancel(refund, true);
+	}
+
+	@Transactional
+	RefundDtos.AdminRefundResponse markManualReview(
+		UUID refundId,
+		UUID adminUserId,
+		RefundDtos.RefundManualReviewRequest request
+	) {
+		Refund refund = findRefund(refundId);
+		try {
+			if (request.status() == RefundStatus.APPROVED) {
+				refund.approve(adminUserId, request.reason(), Instant.now());
+			} else if (request.status() == RefundStatus.REJECTED) {
+				refund.reject(adminUserId, request.reason(), Instant.now());
+			} else {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manual review status must be APPROVED or REJECTED");
+			}
+			return toAdminResponse(refund);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -102,6 +139,9 @@ public class RefundService {
 			refund.getFailureCode(),
 			refund.getFailureMessage(),
 			refund.getRawProviderStatus(),
+			refund.getReviewedByAdminId(),
+			refund.getAdminReviewReason(),
+			refund.getReviewedAt(),
 			refund.getRequestedAt(),
 			refund.getCompletedAt(),
 			refund.getFailedAt(),
@@ -140,14 +180,15 @@ public class RefundService {
 			: "refund-" + refund.getId();
 		try {
 			refund.getOrder().markRefundRequested();
-			refund.requestPgCancel(payment, idempotencyKey, now);
+			refund.requestPgCancel(payment, idempotencyKey, now, retry);
 			TossCancelledPayment cancelledPayment = tossPaymentsClient.cancel(
 				payment.getProviderPaymentKey(),
 				refund.getReason().name(),
 				refund.getRefundAmount(),
 				idempotencyKey
 			);
-			refund.complete(cancelledPayment.cancelTransactionKey(), cancelledPayment.rawStatus(), Instant.now());
+			Instant completedAt = Instant.now();
+			refund.complete(cancelledPayment.cancelTransactionKey(), cancelledPayment.rawStatus(), completedAt);
 			refund.getPaymentGroup().applyRefund(refund.getRefundAmount());
 			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
 			payment.markRefundCompleted(fullyRefunded);
@@ -158,13 +199,26 @@ public class RefundService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.REFUND_COMPLETED,
 				"Refund completed for order " + refund.getOrder().getOrderNumber(),
-				Instant.now()
+				completedAt
 			));
+			notificationService.email(
+				refund.getOrder().getUser(),
+				refund.getOrder(),
+				refund.getPaymentGroup(),
+				null,
+				refund,
+				NotificationType.REFUND_COMPLETED
+			);
 			return toAdminResponse(refund);
 		} catch (IllegalStateException | IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
 		} catch (TossPaymentException exception) {
-			refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), Instant.now());
+			Instant failedAt = Instant.now();
+			if (retry) {
+				refund.markManualReviewRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
+			} else {
+				refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
+			}
 			payment.markRefundFailed("TOSS_CANCEL_FAILED", exception.getMessage());
 			paymentEventRepository.save(new PaymentEvent(
 				payment,
@@ -172,7 +226,7 @@ public class RefundService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.REFUND_FAILED,
 				exception.getMessage(),
-				Instant.now()
+				failedAt
 			));
 			return toAdminResponse(refund);
 		}

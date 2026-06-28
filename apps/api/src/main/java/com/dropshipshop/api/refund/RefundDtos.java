@@ -11,6 +11,10 @@ import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 public final class RefundDtos {
 
 	private RefundDtos() {
@@ -40,10 +44,30 @@ public final class RefundDtos {
 		String failureCode,
 		String failureMessage,
 		String rawProviderStatus,
+		UUID reviewedByAdminId,
+		String adminReviewReason,
+		Instant reviewedAt,
 		Instant requestedAt,
 		Instant completedAt,
 		Instant failedAt,
 		Instant createdAt
+	) {
+	}
+
+	public record RefundApprovalRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
+	public record RefundManualReviewRequest(
+		@NotNull
+		RefundStatus status,
+
+		@NotBlank
+		@Size(max = 1000)
+		String reason
 	) {
 	}
 }

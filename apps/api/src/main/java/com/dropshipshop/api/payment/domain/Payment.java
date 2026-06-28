@@ -65,6 +65,15 @@ public class Payment {
 	@Column(name = "failure_message", length = 1000)
 	private String failureMessage;
 
+	@Column(name = "provider_cancel_transaction_key", length = 200)
+	private String providerCancelTransactionKey;
+
+	@Column(name = "cancel_requested_at")
+	private Instant cancelRequestedAt;
+
+	@Column(name = "cancelled_at")
+	private Instant cancelledAt;
+
 	@Column(name = "raw_provider_status", length = 100)
 	private String rawProviderStatus;
 
@@ -144,6 +153,47 @@ public class Payment {
 		this.failureMessage = failureMessage;
 	}
 
+	public void requestExceptionCancel(String idempotencyKey, Instant requestedAt) {
+		if (status == PaymentStatus.CANCELLED) {
+			return;
+		}
+		if (status != PaymentStatus.CANCEL_REQUIRED && status != PaymentStatus.CANCEL_FAILED) {
+			throw new IllegalStateException("Payment exception cancel can be requested only when cancel is required");
+		}
+		this.status = PaymentStatus.CANCEL_REQUESTED;
+		this.idempotencyKey = idempotencyKey;
+		this.cancelRequestedAt = requestedAt;
+		this.failureCode = null;
+		this.failureMessage = null;
+	}
+
+	public void completeExceptionCancel(String providerCancelTransactionKey, String rawProviderStatus, Instant cancelledAt) {
+		if (status == PaymentStatus.CANCELLED) {
+			return;
+		}
+		if (status != PaymentStatus.CANCEL_REQUESTED && status != PaymentStatus.CANCEL_FAILED) {
+			throw new IllegalStateException("Payment exception cancel has not been requested");
+		}
+		this.status = PaymentStatus.CANCELLED;
+		this.providerCancelTransactionKey = providerCancelTransactionKey;
+		this.rawProviderStatus = rawProviderStatus;
+		this.cancelledAt = cancelledAt;
+		this.failureCode = null;
+		this.failureMessage = null;
+	}
+
+	public void failExceptionCancel(String failureCode, String failureMessage) {
+		this.status = PaymentStatus.CANCEL_FAILED;
+		this.failureCode = failureCode;
+		this.failureMessage = failureMessage;
+	}
+
+	public void markReviewRequired(String failureCode, String failureMessage) {
+		this.status = PaymentStatus.REVIEW_REQUIRED;
+		this.failureCode = failureCode;
+		this.failureMessage = failureMessage;
+	}
+
 	public UUID getId() {
 		return id;
 	}
@@ -178,6 +228,38 @@ public class Payment {
 
 	public PaymentExceptionReason getExceptionReason() {
 		return exceptionReason;
+	}
+
+	public String getIdempotencyKey() {
+		return idempotencyKey;
+	}
+
+	public String getFailureCode() {
+		return failureCode;
+	}
+
+	public String getFailureMessage() {
+		return failureMessage;
+	}
+
+	public String getProviderCancelTransactionKey() {
+		return providerCancelTransactionKey;
+	}
+
+	public Instant getCancelRequestedAt() {
+		return cancelRequestedAt;
+	}
+
+	public Instant getCancelledAt() {
+		return cancelledAt;
+	}
+
+	public String getRawProviderStatus() {
+		return rawProviderStatus;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
 	}
 
 	@PrePersist

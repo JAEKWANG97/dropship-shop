@@ -1,5 +1,7 @@
 package com.dropshipshop.api.claim;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.UUID;
 
@@ -14,9 +16,14 @@ import com.dropshipshop.api.claim.domain.ClaimStatus;
 import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.refund.RefundService;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
 @Service
 class CustomerClaimService {
@@ -25,21 +32,31 @@ class CustomerClaimService {
 		ClaimStatus.REQUESTED,
 		ClaimStatus.UNDER_REVIEW,
 		ClaimStatus.APPROVED,
+		ClaimStatus.EVIDENCE_REQUESTED,
+		ClaimStatus.RETURN_WAITING,
+		ClaimStatus.RETURN_RECEIVED,
+		ClaimStatus.EXCHANGE_SHIPPING,
 		ClaimStatus.REFUND_PROCESSING
 	);
 
 	private final CustomerOrderRepository orderRepository;
 	private final ClaimRepository claimRepository;
 	private final RefundService refundService;
+	private final ShipmentRepository shipmentRepository;
+	private final NotificationService notificationService;
 
 	CustomerClaimService(
 		CustomerOrderRepository orderRepository,
 		ClaimRepository claimRepository,
-		RefundService refundService
+		RefundService refundService,
+		ShipmentRepository shipmentRepository,
+		NotificationService notificationService
 	) {
 		this.orderRepository = orderRepository;
 		this.claimRepository = claimRepository;
 		this.refundService = refundService;
+		this.shipmentRepository = shipmentRepository;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -64,19 +81,24 @@ class CustomerClaimService {
 			request.reason()
 		));
 		refundService.createCustomerCancelRefund(order);
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 
 	@Transactional
 	ClaimDtos.ClaimResponse createClaim(UUID userId, UUID orderId, ClaimDtos.CustomerClaimRequest request) {
 		CustomerOrder order = findCustomerOrder(userId, orderId);
-		if (request.claimType() != ClaimType.CANCEL) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only cancellation claims are supported in MVP");
+		if (request.claimType() == ClaimType.CANCEL) {
+			return createCancellationClaim(order, request);
 		}
+		return createReturnExchangeClaim(order, request);
+	}
+
+	private ClaimDtos.ClaimResponse createCancellationClaim(CustomerOrder order, ClaimDtos.CustomerClaimRequest request) {
 		if (!order.canRequestCancellationClaim()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order is not eligible for cancellation claim");
 		}
-		rejectDuplicateCancellation(order);
+		rejectDuplicateClaim(order, ClaimType.CANCEL);
 		Claim claim = claimRepository.save(new Claim(
 			order,
 			order.getUser(),
@@ -86,6 +108,28 @@ class CustomerClaimService {
 			RequestedAction.REFUND,
 			request.customerMemo()
 		));
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
+		return toResponse(claim);
+	}
+
+	private ClaimDtos.ClaimResponse createReturnExchangeClaim(CustomerOrder order, ClaimDtos.CustomerClaimRequest request) {
+		if (order.getStatus() != OrderStatus.DELIVERED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return or exchange claim is allowed only after delivery");
+		}
+		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId())
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Delivered shipment not found"));
+		validateReturnExchangeWindow(request.claimReason(), shipment.getDeliveredAt());
+		rejectDuplicateClaim(order, request.claimType());
+		Claim claim = claimRepository.save(new Claim(
+			order,
+			order.getUser(),
+			request.claimType(),
+			request.claimReason(),
+			ClaimStatus.REQUESTED,
+			request.claimType() == ClaimType.RETURN ? RequestedAction.REFUND : RequestedAction.EXCHANGE,
+			request.customerMemo()
+		));
+		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 
@@ -113,12 +157,29 @@ class CustomerClaimService {
 	}
 
 	private void rejectDuplicateCancellation(CustomerOrder order) {
+		rejectDuplicateClaim(order, ClaimType.CANCEL);
+	}
+
+	private void rejectDuplicateClaim(CustomerOrder order, ClaimType claimType) {
 		if (claimRepository.existsByOrder_IdAndClaimTypeAndStatusIn(
 			order.getId(),
-			ClaimType.CANCEL,
+			claimType,
 			ACTIVE_CLAIM_STATUSES
 		)) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancellation request already exists");
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Active claim already exists");
+		}
+	}
+
+	private void validateReturnExchangeWindow(ClaimReason reason, Instant deliveredAt) {
+		if (deliveredAt == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Delivered time is required for return or exchange claim");
+		}
+		Instant now = Instant.now();
+		if (reason == ClaimReason.SIMPLE_CHANGE_OF_MIND && deliveredAt.isBefore(now.minus(7, ChronoUnit.DAYS))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Simple change-of-mind claim period has expired");
+		}
+		if (reason != ClaimReason.SIMPLE_CHANGE_OF_MIND && deliveredAt.isBefore(now.minus(90, ChronoUnit.DAYS))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seller-fault claim period has expired");
 		}
 	}
 }

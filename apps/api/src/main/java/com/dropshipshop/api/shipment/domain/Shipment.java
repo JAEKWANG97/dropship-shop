@@ -49,8 +49,20 @@ public class Shipment {
 	@Column(name = "tracking_synced_at")
 	private Instant trackingSyncedAt;
 
+	@Column(name = "tracking_sync_failure_reason", columnDefinition = "TEXT")
+	private String trackingSyncFailureReason;
+
+	@Column(name = "manual_override", nullable = false)
+	private boolean manualOverride = false;
+
 	@Column(name = "manual_correction_reason", columnDefinition = "TEXT")
 	private String manualCorrectionReason;
+
+	@Column(name = "manual_corrected_by_admin_id")
+	private UUID manualCorrectedByAdminId;
+
+	@Column(name = "manual_corrected_at")
+	private Instant manualCorrectedAt;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
@@ -84,6 +96,10 @@ public class Shipment {
 		return id;
 	}
 
+	public CustomerOrder getOrder() {
+		return order;
+	}
+
 	public String getCarrier() {
 		return carrier;
 	}
@@ -110,5 +126,62 @@ public class Shipment {
 
 	public String getManualCorrectionReason() {
 		return manualCorrectionReason;
+	}
+
+	public String getTrackingSyncFailureReason() {
+		return trackingSyncFailureReason;
+	}
+
+	public boolean isManualOverride() {
+		return manualOverride;
+	}
+
+	public UUID getManualCorrectedByAdminId() {
+		return manualCorrectedByAdminId;
+	}
+
+	public Instant getManualCorrectedAt() {
+		return manualCorrectedAt;
+	}
+
+	public boolean markDeliveredByTracking(Instant syncedAt) {
+		this.trackingSyncedAt = syncedAt;
+		this.trackingSyncFailureReason = null;
+		if (status == ShipmentStatus.DELIVERED) {
+			return false;
+		}
+		if (status != ShipmentStatus.SHIPPED) {
+			return false;
+		}
+		this.status = ShipmentStatus.DELIVERED;
+		this.deliveredAt = syncedAt;
+		return true;
+	}
+
+	public void markTrackingSynced(Instant syncedAt) {
+		this.trackingSyncedAt = syncedAt;
+		this.trackingSyncFailureReason = null;
+	}
+
+	public void recordTrackingSyncFailure(Instant syncedAt, String failureReason) {
+		this.trackingSyncedAt = syncedAt;
+		this.trackingSyncFailureReason = failureReason;
+	}
+
+	public boolean markDeliveredByManualCorrection(Instant correctedAt, UUID adminUserId, String reason) {
+		if (status != ShipmentStatus.SHIPPED && status != ShipmentStatus.DELIVERED) {
+			throw new IllegalStateException("Shipment can be manually delivered only after shipment");
+		}
+		this.manualOverride = true;
+		this.manualCorrectionReason = reason;
+		this.manualCorrectedByAdminId = adminUserId;
+		this.manualCorrectedAt = correctedAt;
+		this.trackingSyncFailureReason = null;
+		if (status == ShipmentStatus.DELIVERED) {
+			return false;
+		}
+		this.status = ShipmentStatus.DELIVERED;
+		this.deliveredAt = correctedAt;
+		return true;
 	}
 }

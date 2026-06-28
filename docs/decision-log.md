@@ -667,3 +667,43 @@ Consequences:
 - Checkout shipping address can change only while payment is pending and before checkout policy confirmation.
 - Paid order shipping address can change only while the order is `SUPPLIER_ORDER_PENDING` and supplier work/address lock has not started.
 - After `addressLockedAt` or `SUPPLIER_ORDERED`, customer direct address change is rejected.
+
+## 2026-06-28: DB State-Based Payment Exception Queue
+
+Decision:
+
+Use database payment/order states as the MVP admin queue for payment exceptions instead of introducing a separate queue broker.
+
+Context:
+
+Payment exception handling needs an operator-visible follow-up queue when an approved PG payment cannot become a confirmed order and automatic PG cancel fails. The MVP does not need Kafka, RabbitMQ, or a background worker queue for this. What the admin needs is a durable list of records whose current state requires action.
+
+Consequences:
+
+- `payments.status` is the queue source for payment exceptions.
+- `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, and `REVIEW_REQUIRED` are admin payment exception queue candidates.
+- Automatic payment exception cancel uses a stable idempotency key derived from the payment id.
+- Successful automatic cancel moves `Payment` and `PaymentGroup` to `CANCELLED` and removes the item from the admin queue.
+- Failed automatic cancel moves `Payment` and `PaymentGroup` to `CANCEL_FAILED`, keeps failure code/message, and exposes the item through the admin queue.
+- Admin retry reuses the same idempotency key so duplicate cancel requests do not double-cancel at the PG.
+- A separate broker-based queue can be added later for scheduled retries or alerting, but the state table remains the source of truth.
+
+## 2026-06-28: Toss Webhook Verification And Reconciliation
+
+Decision:
+
+Verify Toss payment webhooks by re-fetching the payment from Toss Payments with `paymentKey`, then reconcile the verified PG status with the local payment state.
+
+Context:
+
+The MVP already treats the server-side Toss confirmation result as the primary order confirmation path. Webhooks should improve reconciliation and operational visibility without becoming a second independent order-confirmation path.
+
+Consequences:
+
+- `POST /api/payments/toss/webhook` is public but must verify the payment through the Toss secret-key-backed payment lookup API.
+- Webhook payload status must match the verified Toss payment lookup status.
+- Webhook idempotency uses `TossPayments-Webhook-Transmission-Id` when present.
+- Duplicate webhook deliveries are ignored after the first saved event.
+- Unknown local `paymentKey` webhooks are accepted after Toss lookup verification but do not create local payment events.
+- If webhook status conflicts with the local server-confirmed state, the payment moves to `REVIEW_REQUIRED` instead of auto-mutating orders or refunds.
+- `REVIEW_REQUIRED` appears in the admin payment exception queue.

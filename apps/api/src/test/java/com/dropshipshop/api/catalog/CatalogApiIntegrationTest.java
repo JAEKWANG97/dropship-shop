@@ -1,11 +1,13 @@
 package com.dropshipshop.api.catalog;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -19,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -52,6 +55,21 @@ class CatalogApiIntegrationTest {
 
 		UUID supplierId = createSupplier();
 		UUID productId = createProduct(supplierId);
+		MockMultipartFile imageFile = new MockMultipartFile(
+			"file",
+			"thumbnail.webp",
+			"image/webp",
+			"fake-image".getBytes()
+		);
+		MvcResult uploadResult = mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
+				.file(imageFile)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.imageUrl", containsString("/uploads/products/" + productId)))
+			.andExpect(jsonPath("$.objectKey", containsString(productId.toString())))
+			.andExpect(jsonPath("$.size", is(10)))
+			.andReturn();
+		String uploadedImageUrl = fieldFrom(uploadResult, "imageUrl");
 
 		mockMvc.perform(post("/api/admin/products/{productId}/options", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -75,7 +93,7 @@ class CatalogApiIntegrationTest {
 					  "images": [
 					    {
 					      "type": "THUMBNAIL",
-					      "imageUrl": "https://cdn.example.com/thumb.webp",
+					      "imageUrl": "%s",
 					      "sortOrder": 0,
 					      "altText": "Thumbnail"
 					    },
@@ -87,9 +105,9 @@ class CatalogApiIntegrationTest {
 					    }
 					  ]
 					}
-					"""))
+					""".formatted(uploadedImageUrl)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.thumbnailImageUrl", is("https://cdn.example.com/thumb.webp")))
+			.andExpect(jsonPath("$.thumbnailImageUrl", is(uploadedImageUrl)))
 			.andExpect(jsonPath("$.images", hasSize(2)));
 
 		mockMvc.perform(put("/api/admin/products/{productId}/detail-blocks", productId)
@@ -151,6 +169,23 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status", is("HIDDEN")));
 
+		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.changes", hasSize(4)))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'IMAGES')]", hasSize(1)))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeValue", hasItem("ACTIVE")))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].afterValue", hasItem("HIDDEN")))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].adminUserId", hasItem(TestAuthentication.ADMIN_ID.toString())));
+
+		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
+				.with(authentication(TestAuthentication.customer())))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/admin/products/{productId}/changes", UUID.randomUUID())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isNotFound());
+
 		mockMvc.perform(get("/api/products/{productId}", productId))
 			.andExpect(status().isNotFound());
 
@@ -196,10 +231,15 @@ class CatalogApiIntegrationTest {
 	}
 
 	private UUID idFrom(MvcResult result) throws Exception {
+		return UUID.fromString(fieldFrom(result, "id"));
+	}
+
+	private String fieldFrom(MvcResult result, String fieldName) throws Exception {
 		String json = result.getResponse().getContentAsString();
-		int idKeyIndex = json.indexOf("\"id\":\"");
-		int idStart = idKeyIndex + "\"id\":\"".length();
+		String marker = "\"" + fieldName + "\":\"";
+		int idKeyIndex = json.indexOf(marker);
+		int idStart = idKeyIndex + marker.length();
 		int idEnd = json.indexOf('"', idStart);
-		return UUID.fromString(json.substring(idStart, idEnd));
+		return json.substring(idStart, idEnd);
 	}
 }

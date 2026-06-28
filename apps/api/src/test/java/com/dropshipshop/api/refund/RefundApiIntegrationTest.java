@@ -54,6 +54,7 @@ import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.payment.toss.TossApprovedPayment;
 import com.dropshipshop.api.payment.toss.TossCancelledPayment;
 import com.dropshipshop.api.payment.toss.TossPaymentException;
+import com.dropshipshop.api.payment.toss.TossPaymentSnapshot;
 import com.dropshipshop.api.payment.toss.TossPaymentsClient;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.refund.repository.RefundRepository;
@@ -130,6 +131,8 @@ class RefundApiIntegrationTest {
 			.andExpect(jsonPath("$.refunds[?(@.refundId == '%s')].status".formatted(refundId), hasItem("REQUESTED")))
 			.andExpect(jsonPath("$.refunds[?(@.refundId == '%s')].refundAmount".formatted(refundId), hasItem(22000)));
 
+		approveRefund(refundId, "Customer cancel approved");
+
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
@@ -151,6 +154,11 @@ class RefundApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.refund.status", is("COMPLETED")))
 			.andExpect(jsonPath("$.refund.refundAmount", is(22000)));
+
+		mockMvc.perform(get("/api/admin/notifications")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notifications[?(@.orderId == '%s')].type".formatted(order.getId()), hasItem("REFUND_COMPLETED")));
 	}
 
 	@Test
@@ -173,6 +181,7 @@ class RefundApiIntegrationTest {
 			.andExpect(jsonPath("$.status", is("OUT_OF_STOCK")));
 
 		UUID refundId = refundRepository.findByOrder_Id(stockoutOrder.getId()).orElseThrow().getId();
+		approveRefund(refundId, "Out of stock refund approved");
 
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
 				.with(authentication(TestAuthentication.admin())))
@@ -205,6 +214,7 @@ class RefundApiIntegrationTest {
 					"""))
 			.andExpect(status().isCreated());
 		UUID refundId = refundRepository.findByOrder_Id(order.getId()).orElseThrow().getId();
+		approveRefund(refundId, "Customer cancel approved");
 		fakeTossPaymentsClient.failNextCancel = true;
 
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
@@ -218,7 +228,28 @@ class RefundApiIntegrationTest {
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUND_REQUESTED);
 		assertThat(refundRepository.findById(refundId).orElseThrow().getStatus()).isEqualTo(RefundStatus.RETRY_REQUIRED);
 
+		fakeTossPaymentsClient.failNextCancel = true;
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/retry", refundId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("MANUAL_REVIEW_REQUIRED")))
+			.andExpect(jsonPath("$.failureCode", is("TOSS_CANCEL_FAILED")));
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-review", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "APPROVED",
+					  "reason": "Manual review approved retry"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("APPROVED")))
+			.andExpect(jsonPath("$.reviewedByAdminId", is(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.adminReviewReason", is("Manual review approved retry")));
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status", is("COMPLETED")))
@@ -254,12 +285,69 @@ class RefundApiIntegrationTest {
 
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
 				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isBadRequest());
+
+		approveRefund(refundId, "Customer cancel approved");
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
+				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status", is("COMPLETED")));
 
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void rejectsRefundManualReviewToUnsupportedStatus() throws Exception {
+		UserAccount customer = createCustomer("refund-customer-5");
+		CustomerOrder order = createApprovedOrder(customer, "REFUND-MANUAL-REJECT-1", "REFUND-MANUAL-REJECT-CO-1", 28000);
+		mockMvc.perform(post("/api/orders/{orderId}/cancel", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Changed mind"
+					}
+					"""))
+			.andExpect(status().isCreated());
+		UUID refundId = refundRepository.findByOrder_Id(order.getId()).orElseThrow().getId();
+		approveRefund(refundId, "Customer cancel approved");
+		fakeTossPaymentsClient.failNextCancel = true;
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETRY_REQUIRED")));
+		fakeTossPaymentsClient.failNextCancel = true;
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/retry", refundId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("MANUAL_REVIEW_REQUIRED")));
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-review", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "COMPLETED",
+					  "reason": "Invalid manual review state"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-review", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "REJECTED",
+					  "reason": "Manual review rejected"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("REJECTED")))
+			.andExpect(jsonPath("$.adminReviewReason", is("Manual review rejected")));
 	}
 
 	private UserAccount createCustomer(String providerUserId) {
@@ -270,6 +358,21 @@ class RefundApiIntegrationTest {
 			providerUserId,
 			UserRole.CUSTOMER
 		));
+	}
+
+	private void approveRefund(UUID refundId, String reason) throws Exception {
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/approve", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "%s"
+					}
+					""".formatted(reason)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("APPROVED")))
+			.andExpect(jsonPath("$.reviewedByAdminId", is(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.adminReviewReason", is(reason)));
 	}
 
 	private CustomerOrder createApprovedOrder(UserAccount customer, String orderNumber, String checkoutNumber, long amount) {
@@ -380,6 +483,11 @@ class RefundApiIntegrationTest {
 				"cancel-" + paymentKey,
 				"CANCELED"
 			);
+		}
+
+		@Override
+		public TossPaymentSnapshot getPayment(String paymentKey) {
+			return new TossPaymentSnapshot(paymentKey, "order-" + paymentKey, 0, "DONE");
 		}
 
 		void reset() {

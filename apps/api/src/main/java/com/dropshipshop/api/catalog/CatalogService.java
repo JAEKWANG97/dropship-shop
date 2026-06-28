@@ -5,10 +5,14 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.catalog.domain.Product;
@@ -40,6 +44,7 @@ public class CatalogService {
 	private static final Pattern EVENT_ATTRIBUTE = Pattern.compile("(?i)\\son[a-z]+\\s*=\\s*(['\"]).*?\\1");
 	private static final Pattern JAVASCRIPT_URL = Pattern.compile("(?i)javascript:");
 	private static final List<String> ALLOWED_IMAGE_EXTENSIONS = List.of(".jpg", ".jpeg", ".png", ".webp");
+	private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 	private static final List<CatalogDtos.PolicyLinkResponse> PRODUCT_POLICY_LINKS = List.of(
 		new CatalogDtos.PolicyLinkResponse("배송 정책", "/api/policies/shipping", "SHIPPING_POLICY"),
 		new CatalogDtos.PolicyLinkResponse("취소/환불 정책", "/api/policies/cancellation-refund", "CANCELLATION_REFUND_POLICY"),
@@ -53,6 +58,7 @@ public class CatalogService {
 	private final ProductDetailBlockRepository productDetailBlockRepository;
 	private final ProductNoticeRepository productNoticeRepository;
 	private final ProductChangeHistoryRepository productChangeHistoryRepository;
+	private final Path imageStoragePath;
 
 	public CatalogService(
 		SupplierRepository supplierRepository,
@@ -61,7 +67,8 @@ public class CatalogService {
 		ProductImageRepository productImageRepository,
 		ProductDetailBlockRepository productDetailBlockRepository,
 		ProductNoticeRepository productNoticeRepository,
-		ProductChangeHistoryRepository productChangeHistoryRepository
+		ProductChangeHistoryRepository productChangeHistoryRepository,
+		@Value("${app.catalog.image-storage-path:build/product-images}") String imageStoragePath
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -70,6 +77,7 @@ public class CatalogService {
 		this.productDetailBlockRepository = productDetailBlockRepository;
 		this.productNoticeRepository = productNoticeRepository;
 		this.productChangeHistoryRepository = productChangeHistoryRepository;
+		this.imageStoragePath = Path.of(imageStoragePath);
 	}
 
 	@Transactional(readOnly = true)
@@ -118,6 +126,17 @@ public class CatalogService {
 	@Transactional(readOnly = true)
 	public CatalogDtos.ProductDetailResponse getAdminProduct(UUID productId) {
 		return toProductDetailResponse(findProduct(productId));
+	}
+
+	@Transactional(readOnly = true)
+	public CatalogDtos.ProductChangeHistoryListResponse listProductChanges(UUID productId) {
+		findProduct(productId);
+		return new CatalogDtos.ProductChangeHistoryListResponse(
+			productChangeHistoryRepository.findAllByProduct_IdOrderByCreatedAtAsc(productId)
+				.stream()
+				.map(this::toChangeHistoryResponse)
+				.toList()
+		);
 	}
 
 	@Transactional
@@ -213,6 +232,35 @@ public class CatalogService {
 		product.updateThumbnailImageUrl(thumbnailUrl(images));
 		recordChange(product, null, adminUserId, ProductChangeType.IMAGES, null, "replaced", request.reason());
 		return toProductDetailResponse(product);
+	}
+
+	@Transactional
+	public CatalogDtos.ProductImageUploadResponse uploadImage(UUID productId, MultipartFile file) {
+		findProduct(productId);
+		if (file == null || file.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is required");
+		}
+		if (file.getSize() > MAX_IMAGE_SIZE) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is too large");
+		}
+		String extension = extension(file.getOriginalFilename());
+		if (!ALLOWED_IMAGE_EXTENSIONS.contains(extension)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported image extension");
+		}
+		String objectKey = productId + "/" + UUID.randomUUID() + extension;
+		Path target = imageStoragePath.resolve(objectKey).normalize();
+		try {
+			Files.createDirectories(target.getParent());
+			file.transferTo(target);
+		} catch (Exception exception) {
+			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Image upload failed");
+		}
+		return new CatalogDtos.ProductImageUploadResponse(
+			"/uploads/products/" + objectKey,
+			objectKey,
+			file.getSize(),
+			file.getContentType()
+		);
 	}
 
 	@Transactional
@@ -384,6 +432,17 @@ public class CatalogService {
 		}
 	}
 
+	private String extension(String filename) {
+		if (filename == null) {
+			return "";
+		}
+		int dotIndex = filename.lastIndexOf('.');
+		if (dotIndex < 0) {
+			return "";
+		}
+		return filename.substring(dotIndex).toLowerCase(Locale.ROOT);
+	}
+
 	private String sanitizeHtml(String html) {
 		if (html == null) {
 			return null;
@@ -501,6 +560,19 @@ public class CatalogService {
 			image.getImageUrl(),
 			image.getSortOrder(),
 			image.getAltText()
+		);
+	}
+
+	private CatalogDtos.ProductChangeHistoryResponse toChangeHistoryResponse(ProductChangeHistory history) {
+		return new CatalogDtos.ProductChangeHistoryResponse(
+			history.getId(),
+			history.getProductOption() == null ? null : history.getProductOption().getId(),
+			history.getAdminUserId(),
+			history.getChangeType(),
+			history.getBeforeValue(),
+			history.getAfterValue(),
+			history.getReason(),
+			history.getCreatedAt()
 		);
 	}
 

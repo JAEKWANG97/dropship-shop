@@ -73,6 +73,8 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Order status: OUT_OF_STOCK
 -> Customer is notified
 -> Refund is requested for this order amount
+-> Admin approves refund
+-> Refund status: APPROVED
 -> Refund status: PG_CANCEL_REQUESTED
 -> PG full cancel/refund succeeds because the payment group contains only this order
 -> Refund status: COMPLETED
@@ -94,6 +96,8 @@ Order A supplier order succeeds
 Order B supplier says out of stock
 -> Order B status: OUT_OF_STOCK
 -> Refund is requested for Order B amount only
+-> Admin approves refund
+-> Refund status: APPROVED
 -> Refund status: PG_CANCEL_REQUESTED
 -> PG partial cancel/refund succeeds for 40,000
 -> Order B status: REFUNDED
@@ -143,6 +147,7 @@ Order status: PAYMENT_PENDING
 -> System attempts immediate full PG cancel
 -> If PG cancel succeeds, payment status becomes CANCELLED and customer sees payment cancel completed
 -> If PG cancel fails, payment status becomes CANCEL_FAILED and admin emergency review is required
+-> Admin emergency review queue is derived from DB payment status, not a separate broker queue
 ```
 
 ## Payment Exception
@@ -166,7 +171,7 @@ PG cancel succeeds
 
 PG cancel fails
 -> Payment status: CANCEL_FAILED
--> Admin emergency payment queue item is created
+-> Payment remains visible in the DB state-based admin emergency payment queue
 -> Customer sees payment review or cancel processing status
 ```
 
@@ -188,6 +193,8 @@ supplierOrderStartedAt is empty
 -> Claim status: APPROVED
 -> Refund status: REQUESTED
 -> Refund is requested for the cancelled order amount
+-> Admin approves refund
+-> Refund status: APPROVED
 -> Refund status: PG_CANCEL_REQUESTED
 -> If the payment group has no other active orders, PG full cancel/refund succeeds
 -> If the payment group has other active orders, PG partial cancel/refund succeeds
@@ -198,7 +205,10 @@ supplierOrderStartedAt is empty
 PG cancel/refund fails
 -> Refund status: RETRY_REQUIRED
 -> Order remains REFUND_REQUESTED
--> Admin retry or manual review is required
+-> Admin retries PG cancel/refund
+-> Retry fails again
+-> Refund status: MANUAL_REVIEW_REQUIRED
+-> Admin manual review approves or rejects the refund
 ```
 
 ## Customer Cancellation Claim After Supplier Order Work Starts
@@ -266,13 +276,14 @@ Order status: SHIPPED
 
 Tracking sync failure
 -> Keep current shipment/order status
--> Record sync failure
+-> Record `trackingSyncFailureReason`
 -> Retry later or allow admin manual correction
 
 Admin manual correction
 -> Admin enters correction reason
 -> Manual correction is recorded
 -> Later automatic tracking sync cannot move the shipment backward or overwrite the admin correction without a valid forward transition
+-> DS-36 records admin action history and order status history
 ```
 
 ## Return Or Exchange Claim After Delivery
@@ -299,11 +310,11 @@ Seller fault claim
 
 Admin approves claim
 -> If return is needed, customer sends product back
--> Claim status: RETURN_WAITING
+-> Claim status: RETURN_WAITING (implemented by DS-37 for return approval)
 -> Admin receives and inspects returned product
 -> Claim status: RETURN_RECEIVED
 -> Refund request starts within 3 business days if refund is needed
--> Exchange proceeds if exchange is approved
+-> Exchange proceeds if exchange is approved (approval implemented by DS-37; exchange shipment remains planned)
 
 Admin rejects claim
 -> Claim status: REJECTED

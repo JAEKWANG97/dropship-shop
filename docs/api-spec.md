@@ -182,9 +182,10 @@ Customer visibility rules:
 | `PATCH` | `/api/admin/products/{productId}/options/{optionId}` | `ADMIN` | Implemented | Update product option |
 | `PATCH` | `/api/admin/products/{productId}/options/{optionId}/status` | `ADMIN` | Implemented | Change option sales status |
 | `PUT` | `/api/admin/products/{productId}/images` | `ADMIN` | Implemented | Replace thumbnail/gallery image metadata |
+| `POST` | `/api/admin/products/{productId}/images/upload` | `ADMIN` | Implemented | Upload product image file to local storage |
 | `PUT` | `/api/admin/products/{productId}/detail-blocks` | `ADMIN` | Implemented | Replace ordered IMAGE/HTML detail blocks |
 | `PUT` | `/api/admin/products/{productId}/notice` | `ADMIN` | Implemented | Create next active product notice version |
-| `GET` | `/api/admin/products/{productId}/change-history` | `ADMIN` | Planned | Product change audit history |
+| `GET` | `/api/admin/products/{productId}/changes` | `ADMIN` | Implemented | Product change audit history |
 
 DS-6 minimum:
 
@@ -192,9 +193,10 @@ DS-6 minimum:
 - Product model and admin create/update API.
 - Product option model and admin create/update API.
 - Product image metadata API with one thumbnail and up to ten gallery images.
+- Product image upload stores files under local product image storage and returns `imageUrl` and `objectKey`.
 - Product detail block API with ordered `IMAGE` and sanitized `HTML` blocks.
 - Product notice/version source for product information notice, shipping, AS, return, and exchange information.
-- Product change history writes for price, product status, option status, and supplier changes.
+- Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
 - Customer product list/detail read APIs.
 
@@ -202,7 +204,7 @@ DS-6 implementation notes:
 
 - Public `/api/products/**` must be permitted by `SecurityConfig`.
 - `/api/admin/**` remains `ADMIN` only.
-- Product change history read API can remain planned, but DS-6 mutations must write history.
+- DS-43 implements the admin product change history read API at `GET /api/admin/products/{productId}/changes`.
 - Image binary upload can remain planned; DS-6 may store URL or object key metadata.
 - Product detail and notice version sources must exist before DS-8 order creation can safely snapshot order items.
 
@@ -319,10 +321,10 @@ POST /api/checkouts/{checkoutNumber}/policy-confirmation
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented | Confirm Toss Payments approved payment server-side |
-| `POST` | `/api/payments/toss/webhook` | Provider verification | Planned | Receive Toss Payments webhook if enabled |
+| `POST` | `/api/payments/toss/webhook` | Provider verification | Implemented | Receive Toss Payments webhook and reconcile payment state |
 | `GET` | `/api/payments/{paymentId}` | Authenticated user | Planned | Customer-visible payment state |
-| `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Planned | Retry failed payment exception cancel |
-| `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Planned | List payment exception queue |
+| `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Implemented | Retry failed payment exception cancel |
+| `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Implemented | List payment exception queue |
 
 Rules:
 
@@ -335,7 +337,18 @@ Rules:
 - A payment key already attached to a different checkout is rejected as a conflict.
 - DS-9 stores payment events for confirm requested, approved, rejected, and payment exception paths.
 - Toss secret key is read from environment/config as `payments.toss.secret-key` and must not be committed.
-- Automatic PG cancel execution and admin retry APIs remain planned.
+- PG-approved amount mismatch creates a payment exception and immediately attempts full PG cancel.
+- Payment exception cancel uses a stable idempotency key derived from the payment id.
+- Successful payment exception cancel moves the payment group and orders to `CANCELLED`.
+- Failed payment exception cancel moves the payment and payment group to `CANCEL_FAILED`.
+- The admin payment exception queue is DB state based; it lists payments in `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, or `REVIEW_REQUIRED`.
+- Admin retry reuses the stored idempotency key.
+- Toss webhook verification re-fetches the payment from Toss by `paymentKey` and compares the verified status with the webhook payload status.
+- Toss webhook idempotency uses `TossPayments-Webhook-Transmission-Id` when present, with event type, payment key, and created time as fallback.
+- Duplicate Toss webhook deliveries do not create duplicate `PaymentEvent` rows.
+- Unknown local `paymentKey` webhooks are accepted after Toss lookup verification but do not create local payment events.
+- Webhook status conflicts with the local server-confirmed payment state move the payment to `REVIEW_REQUIRED` for admin review.
+- Payment detail API remains planned.
 
 Implemented request body:
 
@@ -381,8 +394,9 @@ Rules:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/orders/{orderId}/shipment` | Authenticated user | Planned | Customer shipment detail |
-| `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler | Planned | Sync tracking status |
-| `POST` | `/api/admin/shipments/{shipmentId}/tracking-sync` | `ADMIN` | Planned | Manual retry tracking sync |
+| `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler | Implemented | Sync tracking status batch by carrier/tracking number |
+| `POST` | `/api/admin/shipments/{shipmentId}/tracking-sync` | `ADMIN` | Implemented | Manual retry tracking sync |
+| `POST` | `/api/admin/shipments/{shipmentId}/manual-correction` | `ADMIN` | Implemented | Manually correct shipment status to delivered |
 
 Rules:
 
@@ -390,35 +404,43 @@ Rules:
 - Shipment creation requires carrier and tracking number.
 - MVP supports one shipment per order.
 - Automatic tracking moves shipment forward only.
+- `DELIVERED` tracking status moves shipment and order to `DELIVERED`; other tracking statuses keep the current state.
+- Sync failure stores `trackingSyncFailureReason` and keeps current shipment/order state.
 - Tracking failure must not block order, payment, or refund operations.
-- Manual correction requires reason and history.
+- Manual correction supports `DELIVERED` only, requires reason, records admin action history, and records order status history when the order state changes.
 
 ## Refund And Claim APIs
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Implemented | Self-service cancel when eligible |
-| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Implemented | Create cancellation claim after supplier work starts |
+| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Implemented | Create cancellation, return, or exchange claim |
 | `GET` | `/api/orders/{orderId}/claims` | Authenticated user | Planned | Customer claim list for an order |
 | `GET` | `/api/claims/{claimId}` | Authenticated user | Planned | Customer claim detail |
-| `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin cancellation claim queue |
-| `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve cancellation claim |
-| `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject cancellation claim |
+| `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin claim queue |
+| `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve claim |
+| `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject claim |
 | `POST` | `/api/admin/claims/{claimId}/request-evidence` | `ADMIN` | Planned | Request evidence |
 | `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Planned | Mark return received |
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
 | `GET` | `/api/admin/refunds` | `ADMIN` | Implemented | Refund queue |
-| `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Planned | Approve refund execution |
+| `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Implemented | Approve refund execution |
 | `POST` | `/api/admin/refunds/{refundId}/request-pg-cancel` | `ADMIN` | Implemented | Request PG cancel/refund |
 | `POST` | `/api/admin/refunds/{refundId}/retry` | `ADMIN` | Implemented | Retry failed refund |
-| `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Planned | Mark manual review result |
+| `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Implemented | Mark manual review result |
 
 Rules:
 
 - Customer self-service cancel is allowed only while `SUPPLIER_ORDER_PENDING` and supplier work has not started.
 - Self-service cancellation creates an approved cancellation claim, refund record, and moves the order to `REFUND_REQUESTED`.
 - After supplier work starts, cancellation becomes a `CANCEL` claim that admin can approve or reject.
-- Return and exchange claims remain planned.
+- After delivery, customers can submit `RETURN` or `EXCHANGE` claims.
+- Simple change-of-mind return/exchange claims require delivery within 7 days.
+- Seller-fault return/exchange claims require delivery within 90 days in the DS-37 baseline; discovery-date and evidence file capture remain planned.
+- Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
+- Refund execution requires admin approval before PG cancel/refund request.
+- First PG cancel failure moves refund to `RETRY_REQUIRED`; retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
+- Manual review can approve the refund again or reject it with reason.
 - Refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
 - PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
@@ -432,14 +454,14 @@ Rules:
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/policies` | Public | Implemented | List customer-facing MVP policy pages |
 | `GET` | `/api/policies/{slug}` | Public | Implemented | Customer-facing policy page by slug |
-| `GET` | `/api/policies/{type}/current` | Public | Planned | Active managed policy document by type |
-| `GET` | `/api/policies/{type}/versions/{version}` | Public | Planned | Specific policy version |
-| `GET` | `/api/business-profile` | Public | Planned | Active business disclosure |
-| `GET` | `/api/privacy-processing-items` | Public | Planned | Active privacy processing table |
-| `GET` | `/api/admin/policies` | `ADMIN` | Planned | Admin policy document list |
-| `POST` | `/api/admin/policies` | `ADMIN` | Planned | Create policy draft |
-| `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Planned | Update policy draft |
-| `POST` | `/api/admin/policies/{policyId}/activate` | `ADMIN` | Planned | Activate policy version |
+| `GET` | `/api/policies/{type}/current` | Public | Implemented | Active managed policy document by type |
+| `GET` | `/api/policies/{type}/versions/{version}` | Public | Implemented | Specific policy version |
+| `GET` | `/api/business-profile` | Public | Implemented | Active business disclosure |
+| `GET` | `/api/privacy-processing-items` | Public | Implemented | Active privacy processing table |
+| `GET` | `/api/admin/policies` | `ADMIN` | Implemented | Admin policy document list |
+| `POST` | `/api/admin/policies` | `ADMIN` | Implemented | Create policy draft |
+| `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Implemented | Update policy draft |
+| `POST` | `/api/admin/policies/{policyId}/activate` | `ADMIN` | Implemented | Activate policy version |
 | `PATCH` | `/api/admin/business-profile` | `ADMIN` | Planned | Update business disclosure |
 | `PUT` | `/api/admin/privacy-processing-items` | `ADMIN` | Planned | Replace privacy processing table |
 
@@ -447,6 +469,8 @@ Rules:
 
 - Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
 - Implemented policy pages are static backend responses based on confirmed policy docs; admin policy management remains planned.
+- Business profile and privacy processing item APIs are static backend responses in DS-40; admin management remains planned.
+- Managed policy documents support draft creation, draft update, activation, current public lookup, and version public lookup in DS-41.
 - Product detail and checkout responses include links to the implemented policy page endpoints.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.
@@ -457,15 +481,17 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Planned | Order status transition history |
-| `GET` | `/api/admin/actions` | `ADMIN` | Planned | Admin action history |
-| `GET` | `/api/admin/notifications` | `ADMIN` | Planned | Notification log search |
+| `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Implemented | Order status transition history |
+| `GET` | `/api/admin/actions` | `ADMIN` | Implemented | Admin order action history |
+| `GET` | `/api/admin/notifications` | `ADMIN` | Implemented | Notification log search |
 | `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Planned | Retry failed notification |
 
 Rules:
 
 - Transactional notifications are separate from marketing consent.
 - Payment completed, payment exception, out-of-stock, shipment started, delivered, delay notice, claim changed, and refund completed should create notification logs.
+- DS-39 records transactional email notification logs with `SENT` status as the MVP email baseline.
+- DS-44 exposes order status history and admin order action history read APIs.
 
 ## DS-6 Catalog Request And Response Expectations
 
@@ -627,6 +653,6 @@ DS-6 should keep request/response DTOs separate from JPA entities.
 ## Open API Notes
 
 - Pagination format is not defined.
-- Image upload binary flow is not defined; DS-6 can start with image URL/object key metadata.
+- Binary image upload is implemented by DS-42 with local storage. External object storage can replace it later without changing image metadata rules.
 - OAuth token/session format is implemented as a stateless JWT access token stored in an HttpOnly cookie.
 - Public product APIs are public, but checkout/cart/order APIs require authentication.

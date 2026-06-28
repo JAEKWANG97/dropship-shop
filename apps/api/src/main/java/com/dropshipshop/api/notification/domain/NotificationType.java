@@ -1,0 +1,13 @@
+package com.dropshipshop.api.notification.domain;
+
+public enum NotificationType {
+	PAYMENT_COMPLETED,
+	PAYMENT_EXCEPTION,
+	OUT_OF_STOCK,
+	SHIPMENT_STARTED,
+	DELIVERY_COMPLETED,
+	DELAY_NOTICE,
+	CLAIM_STATUS_CHANGED,
+	REFUND_COMPLETED,
+	MARKETING
+}

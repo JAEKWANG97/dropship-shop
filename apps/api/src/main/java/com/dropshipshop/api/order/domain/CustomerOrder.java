@@ -166,6 +166,20 @@ public class CustomerOrder {
 		this.status = OrderStatus.SHIPPED;
 	}
 
+	public void markDeliveredByTracking() {
+		if (status != OrderStatus.SHIPPED) {
+			throw new IllegalStateException("Order can be delivered only after shipment");
+		}
+		this.status = OrderStatus.DELIVERED;
+	}
+
+	public void markDeliveredByAdminCorrection() {
+		if (status != OrderStatus.SHIPPED) {
+			throw new IllegalStateException("Order can be manually delivered only after shipment");
+		}
+		this.status = OrderStatus.DELIVERED;
+	}
+
 	public boolean isSelfServiceCancellable() {
 		return status == OrderStatus.SUPPLIER_ORDER_PENDING
 			&& supplierOrderStartedAt == null
@@ -198,6 +212,13 @@ public class CustomerOrder {
 
 	public void markPaymentException() {
 		this.status = OrderStatus.PAYMENT_EXCEPTION;
+	}
+
+	public void markCancelledFromPaymentException() {
+		if (status != OrderStatus.PAYMENT_EXCEPTION) {
+			throw new IllegalStateException("Payment exception order can be cancelled only from payment exception");
+		}
+		this.status = OrderStatus.CANCELLED;
 	}
 
 	public void expire() {
