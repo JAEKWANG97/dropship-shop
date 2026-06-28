@@ -157,6 +157,11 @@ function CartContents({ cart }: { cart: Cart }) {
             주문 가능 상태 확인
           </button>
         </form>
+        {cart.checkoutAvailable ? (
+          <Link className="button primary" href="/checkout">
+            주문서 작성
+          </Link>
+        ) : null}
       </aside>
     </>
   );

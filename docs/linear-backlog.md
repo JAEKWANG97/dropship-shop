@@ -1103,7 +1103,7 @@ Acceptance criteria:
 
 ### DS-50: Implement checkout payment UI
 
-Status: Planned
+Status: Implemented
 
 Description:
 
@@ -1115,6 +1115,7 @@ Acceptance criteria:
 - Checkout detail reads `GET /api/checkouts/{checkoutNumber}`.
 - Shipping address update and checkout policy confirmation forms call the backend APIs.
 - Toss payment success/failure/exception routes exist.
+- Toss confirmation UI calls the backend confirm API; Toss widget SDK wiring remains a deployment/client-key follow-up.
 - Login, agreement, empty cart, and checkout unavailable states are handled.
 - Frontend lint/build checks cover checkout pages.
 

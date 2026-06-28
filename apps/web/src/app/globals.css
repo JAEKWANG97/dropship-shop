@@ -503,6 +503,84 @@ textarea {
   gap: 22px;
 }
 
+.checkout-page,
+.orders-page,
+.order-detail-page {
+  display: grid;
+  gap: 22px;
+}
+
+.checkout-form,
+.claim-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.checkbox-row {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: flex-start;
+  gap: 10px !important;
+}
+
+.checkbox-row input {
+  width: auto;
+  min-height: auto;
+  margin-top: 3px;
+}
+
+.summary-list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.summary-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.summary-list > div:last-child {
+  border-bottom: 0;
+}
+
+.summary-list span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.summary-list.compact {
+  border-radius: 6px;
+}
+
+.order-group-list {
+  display: grid;
+  gap: 12px;
+}
+
+.order-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.order-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .cart-list {
   display: grid;
   gap: 12px;
