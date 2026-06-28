@@ -172,7 +172,7 @@ Current fields:
 - `id`
 - `provider`: `KAKAO` / `GOOGLE` / `NAVER`
 - `provider_user_id`
-- `email`
+- `email`: provider email when supplied, otherwise an internal placeholder such as `kakao-{providerUserId}@oauth.local`; do not use placeholder email as a customer contact address.
 - `display_name`
 - `role`: `CUSTOMER` / `ADMIN`
 - `status`: `ACTIVE` / `DELETED`

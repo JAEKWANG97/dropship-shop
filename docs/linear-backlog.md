@@ -360,7 +360,7 @@ Resolved decisions:
 - Business/operator disclosure includes company name, representative, business registration number, mail-order sales registration number, mail-order sales registration authority, address, customer center phone/email/hours, privacy officer, and hosting provider.
 - Commerce notice scope includes customer center, business registration, mail-order sales registration, product information notice, shipping, AS, return, exchange, and claim information.
 - Privacy processing table includes collection item, purpose, retention period, processor/consignee, and third-party sharing fields.
-- Social login stores provider, provider user id, email, and display name; phone is collected only when needed for order, shipping, or claim.
+- Social login stores provider, provider user id, and display name; provider email is optional, and customer contact email/phone is collected only when needed for order, shipping, or claim.
 - Transactional notifications for order, shipping, payment, refund, and claim are separated from optional marketing consent.
 - Optional marketing consent is stored per channel with agreement, withdrawal, and policy version.
 - Account deletion anonymizes or deletes profile and social account linkage while legally retained records are separated.
@@ -1136,3 +1136,19 @@ Acceptance criteria:
 - Paid-order shipping address changes call the implemented customer API.
 - Only customer-facing order data is shown.
 - Frontend lint/build checks cover order pages.
+
+### DS-52: Collect customer contact information separately from social login
+
+Status: Planned
+
+Description:
+
+Separate social login identity from commerce contact information.
+
+Acceptance criteria:
+
+- Social login requires provider, provider user id, and display name only.
+- Provider email remains optional and is not treated as the customer contact address.
+- Checkout collects the customer contact email or phone needed for order, delivery, and claim handling.
+- Order/contact API, ERD, and privacy policy docs reflect the separate collection point.
+- Transactional notification logic does not send to internal placeholder OAuth emails.
