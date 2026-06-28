@@ -350,44 +350,18 @@ p {
 }
 
 .login-page {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 28px;
-  align-items: start;
-  max-width: 1040px;
+  display: flex;
+  justify-content: center;
 }
 
-.login-copy,
 .login-panel {
   display: grid;
   gap: 16px;
+  width: min(100%, 380px);
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
-}
-
-.login-copy h1 {
-  font-size: 42px;
-}
-
-.login-policy-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.login-policy-list span {
-  display: grid;
-  place-items: center;
-  min-height: 46px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 800;
-  text-align: center;
 }
 
 .button-stack {
@@ -1601,14 +1575,6 @@ textarea {
   .checkout-main-form,
   .cart-item {
     grid-template-columns: 1fr;
-  }
-
-  .login-policy-list {
-    grid-template-columns: 1fr;
-  }
-
-  .login-copy h1 {
-    font-size: 34px;
   }
 
   .cart-item > input[type="checkbox"] {

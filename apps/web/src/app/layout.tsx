@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getAdminUser } from "@/lib/session";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,11 +8,13 @@ export const metadata: Metadata = {
   description: "Business safety gear commerce",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const admin = await getAdminUser();
+
   return (
     <html lang="ko">
       <body>
@@ -40,7 +43,7 @@ export default function RootLayout({
             <Link href="/orders">주문조회</Link>
             <Link href="/account">사업자회원</Link>
             <Link href="/login">로그인</Link>
-            <Link href="/admin">관리자</Link>
+            {admin ? <Link href="/admin">관리자</Link> : null}
           </nav>
         </header>
         <main className="page-shell">{children}</main>
