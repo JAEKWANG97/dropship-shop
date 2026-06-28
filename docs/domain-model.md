@@ -703,6 +703,13 @@ Suggested fields:
 - effectiveFrom
 - status: DRAFT / ACTIVE / ARCHIVED
 - createdAt
+
+Implemented DS-41 scope:
+
+- `policy_documents` persists managed policy versions.
+- Admin can create and update drafts, then activate a draft.
+- Activating a policy archives the previous active policy of the same type.
+- Public APIs expose the current active policy and specific versions.
 - updatedAt
 
 ## BusinessProfile

@@ -789,6 +789,7 @@ Child issues:
 - DS-38 is implemented.
 - DS-39 is implemented.
 - DS-40 is implemented.
+- DS-41 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -894,6 +895,24 @@ Acceptance criteria:
 - APIs include customer center, privacy officer, hosting provider, processing purpose, retention period, processor, and third-party fields.
 - Initial implementation uses static backend responses; admin-managed replacement remains planned.
 - API spec, domain model, ERD, legal/customer notice policy, and integration tests are updated.
+
+### DS-41: Implement policy version APIs
+
+Status: Implemented
+
+Description:
+
+Implement managed policy document draft, activation, and version lookup APIs.
+
+Acceptance criteria:
+
+- `policy_documents` table and JPA domain are implemented with unique `(type, version)`.
+- Admin can list policy documents.
+- Admin can create and update draft policy documents.
+- Admin can activate a draft policy document.
+- Activating a policy archives the previous active policy of the same type.
+- Public APIs expose active current policy and specific policy versions.
+- API spec, ERD, domain model, legal/customer notice policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

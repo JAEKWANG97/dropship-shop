@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import com.dropshipshop.api.account.domain.UserPolicyAgreement;
 import com.dropshipshop.api.account.repository.UserPolicyAgreementRepository;
@@ -120,6 +122,59 @@ class PolicyPageApiIntegrationTest {
 	}
 
 	@Test
+	void managesPolicyDocumentVersions() throws Exception {
+		String policyId = fieldFrom(mockMvc.perform(post("/api/admin/policies")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "type": "TERMS_OF_SERVICE",
+					  "version": "terms-2026-07-01",
+					  "title": "Terms draft",
+					  "content": "Draft terms content",
+					  "effectiveFrom": "2026-07-01T00:00:00Z"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status", is("DRAFT")))
+			.andReturn(), "policyId");
+
+		mockMvc.perform(patch("/api/admin/policies/{policyId}", policyId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "type": "TERMS_OF_SERVICE",
+					  "version": "terms-2026-07-01",
+					  "title": "Terms updated",
+					  "content": "Updated terms content",
+					  "effectiveFrom": "2026-07-01T00:00:00Z"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.title", is("Terms updated")));
+
+		mockMvc.perform(post("/api/admin/policies/{policyId}/activate", policyId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("ACTIVE")));
+
+		mockMvc.perform(get("/api/policies/TERMS_OF_SERVICE/current"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.version", is("terms-2026-07-01")))
+			.andExpect(jsonPath("$.content", is("Updated terms content")));
+
+		mockMvc.perform(get("/api/policies/TERMS_OF_SERVICE/versions/terms-2026-07-01"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("ACTIVE")));
+
+		mockMvc.perform(get("/api/admin/policies")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.policies[?(@.policyId == '%s')]".formatted(policyId), hasSize(1)));
+	}
+
+	@Test
 	void exposesPolicyLinksOnProductDetailAndCheckout() throws Exception {
 		UserAccount customer = createCustomer("policy-link-customer");
 		ProductOption option = createOption("Policy Link Product", 32000);
@@ -199,5 +254,17 @@ class PolicyPageApiIntegrationTest {
 					}
 					""".formatted(productOptionId, quantity)))
 			.andExpect(status().isCreated());
+	}
+
+	private String fieldFrom(MvcResult result, String fieldName) throws Exception {
+		String body = result.getResponse().getContentAsString();
+		String marker = "\"" + fieldName + "\":\"";
+		int start = body.indexOf(marker);
+		if (start < 0) {
+			throw new IllegalStateException("Field not found: " + fieldName + " in " + body);
+		}
+		int valueStart = start + marker.length();
+		int valueEnd = body.indexOf("\"", valueStart);
+		return body.substring(valueStart, valueEnd);
 	}
 }

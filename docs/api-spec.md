@@ -452,14 +452,14 @@ Rules:
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/policies` | Public | Implemented | List customer-facing MVP policy pages |
 | `GET` | `/api/policies/{slug}` | Public | Implemented | Customer-facing policy page by slug |
-| `GET` | `/api/policies/{type}/current` | Public | Planned | Active managed policy document by type |
-| `GET` | `/api/policies/{type}/versions/{version}` | Public | Planned | Specific policy version |
+| `GET` | `/api/policies/{type}/current` | Public | Implemented | Active managed policy document by type |
+| `GET` | `/api/policies/{type}/versions/{version}` | Public | Implemented | Specific policy version |
 | `GET` | `/api/business-profile` | Public | Implemented | Active business disclosure |
 | `GET` | `/api/privacy-processing-items` | Public | Implemented | Active privacy processing table |
-| `GET` | `/api/admin/policies` | `ADMIN` | Planned | Admin policy document list |
-| `POST` | `/api/admin/policies` | `ADMIN` | Planned | Create policy draft |
-| `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Planned | Update policy draft |
-| `POST` | `/api/admin/policies/{policyId}/activate` | `ADMIN` | Planned | Activate policy version |
+| `GET` | `/api/admin/policies` | `ADMIN` | Implemented | Admin policy document list |
+| `POST` | `/api/admin/policies` | `ADMIN` | Implemented | Create policy draft |
+| `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Implemented | Update policy draft |
+| `POST` | `/api/admin/policies/{policyId}/activate` | `ADMIN` | Implemented | Activate policy version |
 | `PATCH` | `/api/admin/business-profile` | `ADMIN` | Planned | Update business disclosure |
 | `PUT` | `/api/admin/privacy-processing-items` | `ADMIN` | Planned | Replace privacy processing table |
 
@@ -468,6 +468,7 @@ Rules:
 - Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
 - Implemented policy pages are static backend responses based on confirmed policy docs; admin policy management remains planned.
 - Business profile and privacy processing item APIs are static backend responses in DS-40; admin management remains planned.
+- Managed policy documents support draft creation, draft update, activation, current public lookup, and version public lookup in DS-41.
 - Product detail and checkout responses include links to the implemented policy page endpoints.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.

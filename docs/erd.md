@@ -699,6 +699,20 @@ Policy/legal tables:
 
 DS-40 exposes business profile and privacy processing item public APIs as static backend responses; persisted admin-managed policy/legal tables remain planned.
 
+### policy_documents
+
+- `id`
+- `type`: `TERMS_OF_SERVICE` / `PRIVACY_POLICY` / `SHIPPING_POLICY` / `CANCELLATION_REFUND_POLICY`
+- `version`
+- `title`
+- `content`
+- `effective_from`
+- `status`: `DRAFT` / `ACTIVE` / `ARCHIVED`
+- `created_at`
+- `updated_at`
+
+DS-41 implements persisted managed policy versions. Unique `(type, version)` prevents duplicate versions, and activation archives the previous active policy of the same type.
+
 Audit/notification tables:
 
 - `order_status_histories`
