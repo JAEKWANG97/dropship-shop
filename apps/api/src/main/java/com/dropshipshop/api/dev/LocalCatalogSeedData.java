@@ -1,12 +1,23 @@
 package com.dropshipshop.api.dev;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.Polygon;
+import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
 import java.util.List;
+
+import javax.imageio.ImageIO;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +52,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 	private final ProductImageRepository productImageRepository;
 	private final ProductDetailBlockRepository productDetailBlockRepository;
 	private final ProductNoticeRepository productNoticeRepository;
+	private final Path imageStoragePath;
 
 	public LocalCatalogSeedData(
 		SupplierRepository supplierRepository,
@@ -48,7 +60,8 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		ProductOptionRepository productOptionRepository,
 		ProductImageRepository productImageRepository,
 		ProductDetailBlockRepository productDetailBlockRepository,
-		ProductNoticeRepository productNoticeRepository
+		ProductNoticeRepository productNoticeRepository,
+		@Value("${app.catalog.image-storage-path:build/product-images}") String imageStoragePath
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -56,21 +69,12 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		this.productImageRepository = productImageRepository;
 		this.productDetailBlockRepository = productDetailBlockRepository;
 		this.productNoticeRepository = productNoticeRepository;
+		this.imageStoragePath = Path.of(imageStoragePath).normalize();
 	}
 
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		if (supplierRepository.existsByName(SEED_SUPPLIER)) {
-			return;
-		}
-
-		List<Supplier> suppliers = supplierRepository.saveAll(List.of(
-			new Supplier(SEED_SUPPLIER, "홍길동", "02-1234-5678", "safety@safehubpro.co.kr", "local seed supplier"),
-			new Supplier("케이투 현장장비", "김현장", "02-2345-6789", "k2@safehubpro.co.kr", "local seed supplier"),
-			new Supplier("쓰리엠 보호구", "박보호", "02-3456-7890", "3m@safehubpro.co.kr", "local seed supplier")
-		));
-
 		List<SeedProduct> products = List.of(
 			new SeedProduct(0, "K2 안전모 K2-THINK 1", "가볍고 편한 기본형 안전모", 7200, ProductStatus.ACTIVE, "HELMET", "#ff4d00"),
 			new SeedProduct(1, "K2 안전화 K2-67S", "현장 작업용 미끄럼 방지 안전화", 48500, ProductStatus.ACTIVE, "BOOTS", "#061b49"),
@@ -84,13 +88,24 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 			new SeedProduct(0, "보안경 김서림 방지형", "습한 현장용 안티포그 보안경", 4200, ProductStatus.HIDDEN, "FOG", "#64748b")
 		);
 
+		products.forEach(this::ensureImages);
+		if (supplierRepository.existsByName(SEED_SUPPLIER)) {
+			return;
+		}
+
+		List<Supplier> suppliers = supplierRepository.saveAll(List.of(
+			new Supplier(SEED_SUPPLIER, "홍길동", "02-1234-5678", "safety@safehubpro.co.kr", "local seed supplier"),
+			new Supplier("케이투 현장장비", "김현장", "02-2345-6789", "k2@safehubpro.co.kr", "local seed supplier"),
+			new Supplier("쓰리엠 보호구", "박보호", "02-3456-7890", "3m@safehubpro.co.kr", "local seed supplier")
+		));
+
 		for (SeedProduct seed : products) {
 			seedProduct(suppliers.get(seed.supplierIndex()), seed);
 		}
 	}
 
 	private void seedProduct(Supplier supplier, SeedProduct seed) {
-		String imageUrl = image(seed.label(), seed.color());
+		String imageUrl = image(seed, "thumb", seed.color());
 		Product product = productRepository.save(new Product(
 			supplier,
 			seed.name(),
@@ -103,8 +118,8 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		productOptionRepository.save(new ProductOption(product, "기본", 0, ProductOptionStatus.ACTIVE));
 		productOptionRepository.save(new ProductOption(product, "대량 구매", 0, seed.status() == ProductStatus.SOLD_OUT ? ProductOptionStatus.SOLD_OUT : ProductOptionStatus.ACTIVE));
 		productImageRepository.save(new ProductImage(product, ProductImageType.THUMBNAIL, imageUrl, 0, seed.name()));
-		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed.label() + "-A", "#061b49"), 1, seed.name()));
-		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed.label() + "-B", seed.color()), 2, seed.name()));
+		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed, "dark", "#061b49"), 1, seed.name()));
+		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed, "accent", seed.color()), 2, seed.name()));
 		productDetailBlockRepository.save(new ProductDetailBlock(
 			product,
 			ProductDetailBlockType.HTML,
@@ -123,16 +138,117 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		));
 	}
 
-	private static String image(String label, String color) {
-		String svg = """
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480">
-			  <rect width="480" height="480" rx="28" fill="#f8fafc"/>
-			  <circle cx="240" cy="212" r="112" fill="#fff" stroke="#dbe2ee" stroke-width="8"/>
-			  <rect x="104" y="324" width="272" height="42" rx="21" fill="%s"/>
-			  <text x="240" y="352" text-anchor="middle" font-family="Arial" font-size="24" font-weight="700" fill="#fff">%s</text>
-			</svg>
-			""".formatted(color, label);
-		return "data:image/svg+xml," + URLEncoder.encode(svg, StandardCharsets.UTF_8).replace("+", "%20");
+	private void ensureImages(SeedProduct seed) {
+		image(seed, "thumb", seed.color());
+		image(seed, "dark", "#061b49");
+		image(seed, "accent", seed.color());
+	}
+
+	private String image(SeedProduct seed, String variant, String color) {
+		String objectKey = "local-seed/" + seed.label().toLowerCase(Locale.ROOT) + "-" + variant + ".png";
+		Path target = imageStoragePath.resolve(objectKey).normalize();
+		try {
+			Files.createDirectories(target.getParent());
+			if (Files.notExists(target)) {
+				ImageIO.write(productImage(seed.label(), Color.decode(color)), "png", target.toFile());
+			}
+		} catch (Exception exception) {
+			throw new IllegalStateException("Failed to create local seed product image", exception);
+		}
+		return "/uploads/products/" + objectKey;
+	}
+
+	private static BufferedImage productImage(String label, Color accent) {
+		BufferedImage image = new BufferedImage(640, 640, BufferedImage.TYPE_INT_RGB);
+		Graphics2D graphics = image.createGraphics();
+		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		graphics.setColor(Color.decode("#f8fafc"));
+		graphics.fillRoundRect(0, 0, 640, 640, 40, 40);
+		graphics.setColor(Color.decode("#ffffff"));
+		graphics.fillRoundRect(88, 72, 464, 464, 36, 36);
+		graphics.setColor(Color.decode("#dbe2ee"));
+		graphics.setStroke(new BasicStroke(4));
+		graphics.drawRoundRect(88, 72, 464, 464, 36, 36);
+		graphics.setColor(new Color(6, 27, 73, 24));
+		graphics.fillOval(178, 456, 284, 38);
+		drawProduct(graphics, label, accent);
+		graphics.dispose();
+		return image;
+	}
+
+	private static void drawProduct(Graphics2D graphics, String label, Color accent) {
+		switch (label) {
+			case "BOOTS", "ZIBEN" -> drawBoots(graphics, accent);
+			case "VEST" -> drawVest(graphics, accent);
+			case "GLOVES", "TOWA" -> drawGloves(graphics, accent);
+			case "HARNESS" -> drawHarness(graphics, accent);
+			case "GOGGLES", "FOG" -> drawGoggles(graphics, accent);
+			default -> drawHelmet(graphics, accent);
+		}
+	}
+
+	private static void drawHelmet(Graphics2D graphics, Color accent) {
+		graphics.setColor(accent);
+		graphics.fillArc(170, 180, 300, 220, 0, 180);
+		graphics.fillRoundRect(144, 294, 352, 52, 26, 26);
+		graphics.setColor(Color.decode("#ffffff"));
+		graphics.setStroke(new BasicStroke(14));
+		graphics.drawArc(226, 204, 188, 136, 0, 180);
+		graphics.drawLine(320, 190, 320, 314);
+	}
+
+	private static void drawBoots(Graphics2D graphics, Color accent) {
+		graphics.setColor(accent);
+		Polygon left = new Polygon(new int[] {180, 284, 292, 338, 338, 170}, new int[] {190, 190, 350, 374, 416, 416}, 6);
+		graphics.fillPolygon(left);
+		Polygon right = new Polygon(new int[] {334, 438, 446, 492, 492, 324}, new int[] {190, 190, 350, 374, 416, 416}, 6);
+		graphics.fillPolygon(right);
+		graphics.setColor(Color.decode("#ffffff"));
+		graphics.fillRoundRect(176, 376, 166, 22, 11, 11);
+		graphics.fillRoundRect(330, 376, 166, 22, 11, 11);
+	}
+
+	private static void drawVest(Graphics2D graphics, Color accent) {
+		graphics.setColor(accent);
+		Polygon vest = new Polygon(new int[] {230, 410, 466, 392, 248, 174}, new int[] {160, 160, 440, 470, 470, 440}, 6);
+		graphics.fillPolygon(vest);
+		graphics.setColor(Color.decode("#ffffff"));
+		graphics.setStroke(new BasicStroke(18));
+		graphics.drawLine(270, 186, 238, 430);
+		graphics.drawLine(370, 186, 402, 430);
+		graphics.drawLine(198, 330, 442, 330);
+	}
+
+	private static void drawGloves(Graphics2D graphics, Color accent) {
+		graphics.setColor(accent);
+		graphics.fillRoundRect(194, 230, 118, 206, 58, 58);
+		graphics.fillRoundRect(328, 230, 118, 206, 58, 58);
+		for (int x = 178; x <= 414; x += 38) {
+			graphics.fillRoundRect(x, 174, 34, 138, 17, 17);
+		}
+		graphics.setColor(Color.decode("#ffffff"));
+		graphics.fillRoundRect(198, 386, 244, 24, 12, 12);
+	}
+
+	private static void drawHarness(Graphics2D graphics, Color accent) {
+		graphics.setColor(accent);
+		graphics.setStroke(new BasicStroke(34, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		graphics.drawLine(244, 168, 320, 444);
+		graphics.drawLine(396, 168, 320, 444);
+		graphics.drawLine(218, 294, 422, 294);
+		graphics.setStroke(new BasicStroke(18));
+		graphics.drawOval(280, 384, 80, 80);
+	}
+
+	private static void drawGoggles(Graphics2D graphics, Color accent) {
+		graphics.setColor(accent);
+		graphics.fillRoundRect(150, 246, 340, 130, 65, 65);
+		graphics.setColor(Color.decode("#e0f2fe"));
+		graphics.fill(new Ellipse2D.Double(190, 266, 110, 82));
+		graphics.fill(new Ellipse2D.Double(340, 266, 110, 82));
+		graphics.setColor(Color.decode("#ffffff"));
+		graphics.setStroke(new BasicStroke(14));
+		graphics.drawLine(300, 306, 340, 306);
 	}
 
 	private record SeedProduct(
