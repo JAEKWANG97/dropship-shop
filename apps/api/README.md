@@ -61,6 +61,7 @@ curl http://localhost:8080/actuator/health/liveness
 - `POST /api/auth/logout` clears the access token cookie.
 - Admin users use the same OAuth flow; admin access depends on the current DB role.
 - Local OAuth settings are read from `OAUTH_GOOGLE_*`, `OAUTH_KAKAO_*`, and `OAUTH_NAVER_*` environment variables.
+- Kakao uses the REST API key as `OAUTH_KAKAO_CLIENT_ID`; `OAUTH_KAKAO_CLIENT_SECRET` is optional unless enabled in Kakao Developers.
 - Account agreement APIs are available at `/api/me/agreements`.
 - Checkout creation requires current required terms/privacy agreement.
 - Customer address book APIs are available at `/api/me/addresses`.

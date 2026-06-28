@@ -77,6 +77,14 @@ class OAuthLoginApiIntegrationTest {
 	}
 
 	@Test
+	void naverAuthorizeRedirectsToProvider() throws Exception {
+		mockMvc.perform(get("/api/auth/oauth2/naver/authorize"))
+			.andExpect(status().isFound())
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("https://nid.naver.com/oauth2.0/authorize")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("client_id=test-naver-client")));
+	}
+
+	@Test
 	void createsCustomerAndAuthenticatesWithJwtCookieAfterCallback() throws Exception {
 		fakeOAuthProviderClient.profile(
 			SocialProvider.GOOGLE,
@@ -93,6 +101,9 @@ class OAuthLoginApiIntegrationTest {
 			.andExpect(status().isFound())
 			.andExpect(header().string(HttpHeaders.LOCATION, is("http://localhost:3000/auth/callback/success")))
 			.andExpect(cookie().exists("ACCESS_TOKEN"))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("ACCESS_TOKEN=")))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")))
 			.andReturn();
 
 		UserAccount saved = userAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, "google-user-1")
@@ -104,6 +115,10 @@ class OAuthLoginApiIntegrationTest {
 				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.userId", is(saved.getId().toString())));
+
+		mockMvc.perform(get("/api/admin/me")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isForbidden());
 	}
 
 	@Test
