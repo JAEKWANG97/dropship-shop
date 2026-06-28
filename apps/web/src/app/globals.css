@@ -517,9 +517,25 @@ p {
 }
 
 .product-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.product-card-meta span,
+.product-card-status {
+  width: fit-content;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.product-card-status {
+  border-color: #b7e4c7;
+  color: #047857;
 }
 
 .product-card-cta {

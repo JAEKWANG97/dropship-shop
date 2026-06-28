@@ -93,12 +93,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <div className="product-badges">
             <span>사업자 전용가</span>
             <span>배송비 포함</span>
+            <span>세금계산서 가능</span>
             {purchasable ? <strong>재고 있음</strong> : null}
           </div>
           <h1>{product.name}</h1>
           <p>{product.summary}</p>
           <strong className="product-price">{formatPrice(product.basePrice)}</strong>
-          <span className="product-tax-note">배송비 포함, VAT 정책은 결제 단계 기준으로 확인합니다.</span>
+          <span className="product-tax-note">배송비 포함 가격 · 세금계산서 발행 가능</span>
           <div className="product-buy-info">
             <span>최소 주문</span>
             <strong>옵션별 1개</strong>

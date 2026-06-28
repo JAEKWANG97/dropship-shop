@@ -146,7 +146,11 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
         ))}
         <div>
           <span>배송비</span>
-          <strong>0원</strong>
+          <strong>0원 (상품 가격에 포함)</strong>
+        </div>
+        <div>
+          <span>구매 조건</span>
+          <strong>세금계산서 가능 · 최소주문 상품별 확인</strong>
         </div>
         <div>
           <span>최종 결제금액</span>
