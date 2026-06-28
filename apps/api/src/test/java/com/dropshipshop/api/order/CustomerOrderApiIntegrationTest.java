@@ -99,10 +99,10 @@ class CustomerOrderApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.orders", hasSize(2)))
-			.andExpect(jsonPath("$.orders[0].displayStatus").exists())
-			.andExpect(jsonPath("$.orders[0].status").doesNotExist())
+			.andExpect(jsonPath("$.orders[0].status").exists())
+			.andExpect(jsonPath("$.orders[0].displayStatus").doesNotExist())
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')]".formatted(visible.getId()), hasSize(1)))
-			.andExpect(jsonPath("$.orders[?(@.displayStatus == '결제 확인 중')]", hasSize(1)));
+			.andExpect(jsonPath("$.orders[?(@.status == 'PAYMENT_EXCEPTION')]", hasSize(1)));
 	}
 
 	@Test
@@ -116,18 +116,18 @@ class CustomerOrderApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.orderId", is(order.getId().toString())))
-			.andExpect(jsonPath("$.displayStatus", is("결제 완료")))
-			.andExpect(jsonPath("$.status").doesNotExist())
+			.andExpect(jsonPath("$.status", is("SUPPLIER_ORDER_PENDING")))
+			.andExpect(jsonPath("$.displayStatus").doesNotExist())
 			.andExpect(jsonPath("$.paymentGroup.checkoutNumber", is("CO-DETAIL-1")))
-			.andExpect(jsonPath("$.paymentGroup.displayStatus", is("결제 완료")))
-			.andExpect(jsonPath("$.paymentGroup.status").doesNotExist())
-			.andExpect(jsonPath("$.payment.displayStatus", is("결제 완료")))
+			.andExpect(jsonPath("$.paymentGroup.status", is("APPROVED")))
+			.andExpect(jsonPath("$.paymentGroup.displayStatus").doesNotExist())
+			.andExpect(jsonPath("$.payment.status", is("APPROVED")))
 			.andExpect(jsonPath("$.shippingAddress.recipientName", is("Receiver")))
 			.andExpect(jsonPath("$.items", hasSize(1)))
 			.andExpect(jsonPath("$.items[0].productName", is("Order Product ORD-DETAIL-1")))
-			.andExpect(jsonPath("$.fulfillment.displayStatus", is("발주 대기")))
-			.andExpect(jsonPath("$.shipment.displayStatus", is("배송 전")))
-			.andExpect(jsonPath("$.refund.displayStatus", is("환불 없음")));
+			.andExpect(jsonPath("$.fulfillment.status", is("PENDING")))
+			.andExpect(jsonPath("$.shipment.status", is("READY")))
+			.andExpect(jsonPath("$.refund.status").doesNotExist());
 
 		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
 				.with(authentication(TestAuthentication.customer(other.getId()))))

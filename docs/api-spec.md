@@ -275,7 +275,7 @@ Rules:
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
 - Customer order list and detail are scoped to the authenticated customer.
-- Customer order APIs expose customer display statuses instead of internal order statuses.
+- Customer order APIs expose stable status codes. Customer-facing display labels are owned by the frontend.
 - Customer order detail includes payment group summary, payment summary, shipping address, order items, and placeholder fulfillment/shipment/refund summaries.
 - Checkout shipping address changes are allowed only while the payment group and its orders are still `PAYMENT_PENDING`.
 - Checkout shipping address changes are rejected after checkout policy confirmation because the confirmation text includes shipping address.

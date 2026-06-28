@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { formatPrice } from "@/lib/catalog";
-import { getCustomerOrders, type OrderSummary } from "@/lib/orders";
+import { getCustomerOrders, orderStatusLabel, type OrderSummary } from "@/lib/orders";
 import { getCurrentUser } from "@/lib/session";
 
 async function loadOrders() {
@@ -61,7 +61,7 @@ export default async function OrdersPage() {
             <Link className="order-card" href={`/orders/${order.orderId}`} key={order.orderId}>
               <div>
                 <strong>{order.orderNumber}</strong>
-                <span>{order.displayStatus}</span>
+                <span>{orderStatusLabel(order.status)}</span>
               </div>
               <div className="summary-list compact">
                 <div>

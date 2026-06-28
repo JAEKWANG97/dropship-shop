@@ -145,8 +145,9 @@ class RefundApiIntegrationTest {
 		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.displayStatus", is("환불 완료")))
-			.andExpect(jsonPath("$.refund.displayStatus", is("환불 완료")))
+			.andExpect(jsonPath("$.status", is("REFUNDED")))
+			.andExpect(jsonPath("$.displayStatus").doesNotExist())
+			.andExpect(jsonPath("$.refund.status", is("COMPLETED")))
 			.andExpect(jsonPath("$.refund.amount", is(22000)));
 
 		mockMvc.perform(get("/api/admin/orders/{orderId}", order.getId())

@@ -2,7 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { formatPrice } from "@/lib/catalog";
-import { getCustomerOrder, type OrderDetail } from "@/lib/orders";
+import {
+  fulfillmentStatusLabel,
+  getCustomerOrder,
+  orderStatusLabel,
+  paymentStatusLabel,
+  refundStatusLabel,
+  shipmentStatusLabel,
+  type OrderDetail,
+} from "@/lib/orders";
 import { getCurrentUser } from "@/lib/session";
 import { cancelOrder, createClaim, updateOrderShippingAddress } from "../actions";
 
@@ -56,7 +64,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
   return (
     <section className="order-detail-page">
       <div className="section-heading">
-        <p className="eyebrow">{order.displayStatus}</p>
+        <p className="eyebrow">{orderStatusLabel(order.status)}</p>
         <h1>주문 {order.orderNumber}</h1>
       </div>
 
@@ -86,15 +94,15 @@ function OrderSummaryPanel({ order }: { order: OrderDetail }) {
       <div className="summary-list">
         <div>
           <span>주문 상태</span>
-          <strong>{order.displayStatus}</strong>
+          <strong>{orderStatusLabel(order.status)}</strong>
         </div>
         <div>
           <span>발주</span>
-          <strong>{order.fulfillment.displayStatus}</strong>
+          <strong>{fulfillmentStatusLabel(order.fulfillment.status)}</strong>
         </div>
         <div>
           <span>배송</span>
-          <strong>{order.shipment.displayStatus}</strong>
+          <strong>{shipmentStatusLabel(order.shipment.status)}</strong>
         </div>
         <div>
           <span>운송장</span>
@@ -106,14 +114,14 @@ function OrderSummaryPanel({ order }: { order: OrderDetail }) {
         </div>
         <div>
           <span>결제</span>
-          <strong>{order.payment.displayStatus}</strong>
+          <strong>{paymentStatusLabel(order.payment.status)}</strong>
         </div>
         <div>
           <span>환불</span>
           <strong>
             {order.refund.amount === null
-              ? order.refund.displayStatus
-              : `${order.refund.displayStatus} ${formatPrice(order.refund.amount)}`}
+              ? refundStatusLabel(order.refund.status)
+              : `${refundStatusLabel(order.refund.status)} ${formatPrice(order.refund.amount)}`}
           </strong>
         </div>
         <div>
