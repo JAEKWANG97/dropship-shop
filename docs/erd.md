@@ -745,7 +745,7 @@ Rules:
 
 - Transactional notifications are not marketing notifications.
 - Admin order actions must be action-based, not arbitrary status mutation.
-- Product change history starts with price, product status, option status, and supplier changes.
+- Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
 ## Implemented Catalog Table Notes
 
@@ -758,6 +758,8 @@ DS-6 implemented:
 - `product_detail_blocks`
 - `product_change_histories`
 - `product_notices`
+
+DS-43 implements admin product change history reads from `product_change_histories`.
 
 Implemented catalog must not add:
 

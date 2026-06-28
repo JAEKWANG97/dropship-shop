@@ -684,7 +684,7 @@ Suggested fields:
 - productId
 - productOptionId
 - adminUserId
-- changeType: PRICE / PRODUCT_STATUS / OPTION_STATUS / SUPPLIER
+- changeType: PRICE / PRODUCT_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE
 - beforeValue
 - afterValue
 - reason
@@ -960,8 +960,8 @@ Suggested fields:
 - 관리자 주문 액션은 현재 상태에서 허용된 다음 액션으로만 실행한다.
 - 자동 상태 되돌리기 버튼은 MVP에서 제공하지 않고, 잘못된 상태 변경은 관리자 정정 액션과 이력으로 처리한다.
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유를 필수로 기록한다.
-- 상품 변경 이력은 가격, 상품/옵션 판매 상태, 공급처 변경부터 MVP에서 기록한다.
-- 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff는 MVP 이후로 미룬다.
+- 상품 변경 이력은 가격, 상품/옵션 판매 상태, 공급처, 상품/옵션 기본 정보, 이미지, 상세 블록, 고시 변경을 MVP에서 기록한다.
+- 상품 상세 HTML diff, 이미지 변경 diff, 상품명/요약문 상세 diff처럼 필드별 상세 diff는 MVP 이후로 미룬다.
 - 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책은 버전과 시행일을 가진다.
 - 첫 가입 또는 첫 소셜 로그인 완료 시 이용약관과 개인정보처리방침 동의 이력을 저장한다.
 - 소셜 로그인 필수 저장 항목은 제공자, 제공자 user id, 이메일, 표시 이름으로 시작한다.

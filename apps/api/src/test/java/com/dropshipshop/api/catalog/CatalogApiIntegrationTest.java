@@ -1,9 +1,10 @@
 package com.dropshipshop.api.catalog;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -167,6 +168,23 @@ class CatalogApiIntegrationTest {
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status", is("HIDDEN")));
+
+		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.changes", hasSize(4)))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'IMAGES')]", hasSize(1)))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeValue", hasItem("ACTIVE")))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].afterValue", hasItem("HIDDEN")))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].adminUserId", hasItem(TestAuthentication.ADMIN_ID.toString())));
+
+		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
+				.with(authentication(TestAuthentication.customer())))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/admin/products/{productId}/changes", UUID.randomUUID())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isNotFound());
 
 		mockMvc.perform(get("/api/products/{productId}", productId))
 			.andExpect(status().isNotFound());

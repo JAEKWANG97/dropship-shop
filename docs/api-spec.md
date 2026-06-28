@@ -185,7 +185,7 @@ Customer visibility rules:
 | `POST` | `/api/admin/products/{productId}/images/upload` | `ADMIN` | Implemented | Upload product image file to local storage |
 | `PUT` | `/api/admin/products/{productId}/detail-blocks` | `ADMIN` | Implemented | Replace ordered IMAGE/HTML detail blocks |
 | `PUT` | `/api/admin/products/{productId}/notice` | `ADMIN` | Implemented | Create next active product notice version |
-| `GET` | `/api/admin/products/{productId}/change-history` | `ADMIN` | Planned | Product change audit history |
+| `GET` | `/api/admin/products/{productId}/changes` | `ADMIN` | Implemented | Product change audit history |
 
 DS-6 minimum:
 
@@ -196,7 +196,7 @@ DS-6 minimum:
 - Product image upload stores files under local product image storage and returns `imageUrl` and `objectKey`.
 - Product detail block API with ordered `IMAGE` and sanitized `HTML` blocks.
 - Product notice/version source for product information notice, shipping, AS, return, and exchange information.
-- Product change history writes for price, product status, option status, and supplier changes.
+- Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
 - Customer product list/detail read APIs.
 
@@ -204,7 +204,7 @@ DS-6 implementation notes:
 
 - Public `/api/products/**` must be permitted by `SecurityConfig`.
 - `/api/admin/**` remains `ADMIN` only.
-- Product change history read API can remain planned, but DS-6 mutations must write history.
+- DS-43 implements the admin product change history read API at `GET /api/admin/products/{productId}/changes`.
 - Image binary upload can remain planned; DS-6 may store URL or object key metadata.
 - Product detail and notice version sources must exist before DS-8 order creation can safely snapshot order items.
 

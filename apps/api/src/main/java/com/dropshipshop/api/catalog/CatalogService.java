@@ -128,6 +128,17 @@ public class CatalogService {
 		return toProductDetailResponse(findProduct(productId));
 	}
 
+	@Transactional(readOnly = true)
+	public CatalogDtos.ProductChangeHistoryListResponse listProductChanges(UUID productId) {
+		findProduct(productId);
+		return new CatalogDtos.ProductChangeHistoryListResponse(
+			productChangeHistoryRepository.findAllByProduct_IdOrderByCreatedAtAsc(productId)
+				.stream()
+				.map(this::toChangeHistoryResponse)
+				.toList()
+		);
+	}
+
 	@Transactional
 	public CatalogDtos.AdminProductResponse updateProduct(
 		UUID productId,
@@ -549,6 +560,19 @@ public class CatalogService {
 			image.getImageUrl(),
 			image.getSortOrder(),
 			image.getAltText()
+		);
+	}
+
+	private CatalogDtos.ProductChangeHistoryResponse toChangeHistoryResponse(ProductChangeHistory history) {
+		return new CatalogDtos.ProductChangeHistoryResponse(
+			history.getId(),
+			history.getProductOption() == null ? null : history.getProductOption().getId(),
+			history.getAdminUserId(),
+			history.getChangeType(),
+			history.getBeforeValue(),
+			history.getAfterValue(),
+			history.getReason(),
+			history.getCreatedAt()
 		);
 	}
 

@@ -508,7 +508,7 @@ Acceptance criteria:
 - Product image metadata model exists.
 - Product detail block model exists.
 - Product notice/version source exists for product information notice, shipping, AS, return, and exchange information.
-- Product change history writes exist for price, product status, option status, and supplier changes.
+- Product change history writes exist for product, option, image, detail, notice, and supplier changes.
 - Product and option support sales status instead of real stock quantity.
 - Admin can create and update catalog data through APIs.
 - Customer can read public product list and detail APIs.
@@ -522,7 +522,7 @@ Resolved decisions:
 - Admin supplier and product APIs are implemented under `/api/admin`.
 - Product image and detail block APIs manage URL/object-key metadata; binary upload remains future work.
 - Product notice version source is implemented through `product_notices`.
-- Product mutations write `product_change_histories`; read API for change history remains planned.
+- Product mutations write `product_change_histories`; DS-43 implements the admin read API.
 - `SecurityConfig` permits public product APIs and keeps `/api/admin/**` protected by `ADMIN`.
 
 ### DS-7: Implement cart domain
@@ -931,6 +931,37 @@ Acceptance criteria:
 - Upload response returns `imageUrl`, `objectKey`, size, and content type.
 - Existing product image metadata API can use the uploaded `imageUrl`.
 - API spec, ERD, domain model, catalog policy, and integration tests are updated.
+
+### DS-43: Implement product change history read API
+
+Status: Implemented
+
+Description:
+
+Implement admin read API for product change history.
+
+Acceptance criteria:
+
+- `GET /api/admin/products/{productId}/changes` returns ordered product change histories.
+- Response includes change id, product option id, admin user id, change type, before/after values, reason, and created time.
+- API is admin-only and returns 404 for missing products.
+- API spec, domain model, ERD, admin policy, and integration tests are updated.
+
+### DS-44: Implement admin audit APIs
+
+Status: Planned
+
+Description:
+
+Implement admin read APIs for order status history and admin action history.
+
+Acceptance criteria:
+
+- Admin can read order status history for one order.
+- Admin can list admin action histories.
+- Responses expose actor, target, action, before/after values, reason, and created time.
+- APIs are admin-only.
+- API spec, ERD, domain model, admin policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

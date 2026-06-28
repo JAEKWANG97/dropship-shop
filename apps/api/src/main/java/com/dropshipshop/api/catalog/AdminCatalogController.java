@@ -75,6 +75,11 @@ class AdminCatalogController {
 		return catalogService.getAdminProduct(productId);
 	}
 
+	@GetMapping("/products/{productId}/changes")
+	CatalogDtos.ProductChangeHistoryListResponse listProductChanges(@PathVariable UUID productId) {
+		return catalogService.listProductChanges(productId);
+	}
+
 	@PatchMapping("/products/{productId}")
 	CatalogDtos.AdminProductResponse updateProduct(
 		@PathVariable UUID productId,
