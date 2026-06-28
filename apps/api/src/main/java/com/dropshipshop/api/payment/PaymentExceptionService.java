@@ -100,10 +100,11 @@ public class PaymentExceptionService {
 				cancelAmount(payment),
 				idempotencyKey
 			);
+			Instant cancelledAt = Instant.now();
 			payment.completeExceptionCancel(
 				cancelledPayment.cancelTransactionKey(),
 				cancelledPayment.rawStatus(),
-				Instant.now()
+				cancelledAt
 			);
 			paymentGroup.markCancelled();
 			orders(paymentGroup).forEach(CustomerOrder::markCancelledFromPaymentException);
@@ -113,9 +114,10 @@ public class PaymentExceptionService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.PAYMENT_EXCEPTION_CANCEL_COMPLETED,
 				"Payment exception cancel completed",
-				Instant.now()
+				cancelledAt
 			));
 		} catch (TossPaymentException exception) {
+			Instant failedAt = Instant.now();
 			payment.failExceptionCancel("TOSS_CANCEL_FAILED", exception.getMessage());
 			paymentGroup.markCancelFailed();
 			paymentEventRepository.save(new PaymentEvent(
@@ -124,7 +126,7 @@ public class PaymentExceptionService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.PAYMENT_EXCEPTION_CANCEL_FAILED,
 				exception.getMessage(),
-				Instant.now()
+				failedAt
 			));
 		}
 	}

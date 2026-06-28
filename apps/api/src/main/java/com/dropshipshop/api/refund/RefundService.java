@@ -147,7 +147,8 @@ public class RefundService {
 				refund.getRefundAmount(),
 				idempotencyKey
 			);
-			refund.complete(cancelledPayment.cancelTransactionKey(), cancelledPayment.rawStatus(), Instant.now());
+			Instant completedAt = Instant.now();
+			refund.complete(cancelledPayment.cancelTransactionKey(), cancelledPayment.rawStatus(), completedAt);
 			refund.getPaymentGroup().applyRefund(refund.getRefundAmount());
 			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
 			payment.markRefundCompleted(fullyRefunded);
@@ -158,13 +159,14 @@ public class RefundService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.REFUND_COMPLETED,
 				"Refund completed for order " + refund.getOrder().getOrderNumber(),
-				Instant.now()
+				completedAt
 			));
 			return toAdminResponse(refund);
 		} catch (IllegalStateException | IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
 		} catch (TossPaymentException exception) {
-			refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), Instant.now());
+			Instant failedAt = Instant.now();
+			refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
 			payment.markRefundFailed("TOSS_CANCEL_FAILED", exception.getMessage());
 			paymentEventRepository.save(new PaymentEvent(
 				payment,
@@ -172,7 +174,7 @@ public class RefundService {
 				payment.getProviderPaymentKey(),
 				PaymentEventType.REFUND_FAILED,
 				exception.getMessage(),
-				Instant.now()
+				failedAt
 			));
 			return toAdminResponse(refund);
 		}
