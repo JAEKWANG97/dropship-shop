@@ -34,4 +34,39 @@ final class PolicyDtos {
 		List<String> paragraphs
 	) {
 	}
+
+	record BusinessProfileResponse(
+		String companyName,
+		String representativeName,
+		String businessRegistrationNumber,
+		String mailOrderSalesRegistrationNumber,
+		String mailOrderSalesRegistrationAuthority,
+		String businessAddress,
+		String customerCenterPhone,
+		String customerCenterEmail,
+		String customerCenterHours,
+		String privacyOfficerName,
+		String privacyOfficerEmail,
+		String privacyOfficerPhone,
+		String hostingProvider,
+		String effectiveFrom
+	) {
+	}
+
+	record PrivacyProcessingItemListResponse(
+		List<PrivacyProcessingItemResponse> items
+	) {
+	}
+
+	record PrivacyProcessingItemResponse(
+		String category,
+		String collectedItems,
+		String purpose,
+		String retentionPeriod,
+		String processorName,
+		String processorPurpose,
+		String thirdPartyRecipient,
+		String thirdPartyPurpose
+	) {
+	}
 }

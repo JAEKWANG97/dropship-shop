@@ -697,6 +697,8 @@ Policy/legal tables:
 - `marketing_consents`
 - `legal_retention_records`
 
+DS-40 exposes business profile and privacy processing item public APIs as static backend responses; persisted admin-managed policy/legal tables remain planned.
+
 Audit/notification tables:
 
 - `order_status_histories`

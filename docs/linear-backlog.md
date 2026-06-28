@@ -788,6 +788,7 @@ Child issues:
 - DS-37 is implemented.
 - DS-38 is implemented.
 - DS-39 is implemented.
+- DS-40 is implemented.
 - DS-45 is implemented.
 
 ### DS-35: Implement shipment tracking auto sync
@@ -877,6 +878,22 @@ Acceptance criteria:
 - Transactional notification logging remains separate from marketing consent.
 - Retry of failed notifications and real SMTP/provider integration remain planned.
 - API spec, ERD, domain model, legal/customer notice policy, order policy, admin policy, and integration tests are updated.
+
+### DS-40: Implement legal disclosure APIs
+
+Status: Implemented
+
+Description:
+
+Implement public business disclosure and privacy processing item APIs.
+
+Acceptance criteria:
+
+- `GET /api/business-profile` is public and returns business/operator disclosure fields.
+- `GET /api/privacy-processing-items` is public and returns the MVP privacy processing table.
+- APIs include customer center, privacy officer, hosting provider, processing purpose, retention period, processor, and third-party fields.
+- Initial implementation uses static backend responses; admin-managed replacement remains planned.
+- API spec, domain model, ERD, legal/customer notice policy, and integration tests are updated.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth
 

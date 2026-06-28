@@ -1,6 +1,7 @@
 package com.dropshipshop.api.policy;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -96,6 +97,26 @@ class PolicyPageApiIntegrationTest {
 
 		mockMvc.perform(get("/api/policies/not-found"))
 			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void exposesBusinessProfileAndPrivacyProcessingItemsPublicly() throws Exception {
+		mockMvc.perform(get("/api/business-profile"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.companyName", is("Dropship Shop")))
+			.andExpect(jsonPath("$.representativeName").exists())
+			.andExpect(jsonPath("$.businessRegistrationNumber").exists())
+			.andExpect(jsonPath("$.mailOrderSalesRegistrationNumber").exists())
+			.andExpect(jsonPath("$.customerCenterEmail", is("support@dropship-shop.example")))
+			.andExpect(jsonPath("$.privacyOfficerEmail", is("privacy@dropship-shop.example")))
+			.andExpect(jsonPath("$.hostingProvider").exists());
+
+		mockMvc.perform(get("/api/privacy-processing-items"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items", hasSize(5)))
+			.andExpect(jsonPath("$.items[?(@.category == 'SOCIAL_LOGIN')]", hasSize(1)))
+			.andExpect(jsonPath("$.items[?(@.category == 'PAYMENT')].processorName").value(hasItem("Toss Payments")))
+			.andExpect(jsonPath("$.items[?(@.category == 'SHIPPING_ADDRESS')].purpose").value(hasItem("상품 배송")));
 	}
 
 	@Test

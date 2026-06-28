@@ -454,8 +454,8 @@ Rules:
 | `GET` | `/api/policies/{slug}` | Public | Implemented | Customer-facing policy page by slug |
 | `GET` | `/api/policies/{type}/current` | Public | Planned | Active managed policy document by type |
 | `GET` | `/api/policies/{type}/versions/{version}` | Public | Planned | Specific policy version |
-| `GET` | `/api/business-profile` | Public | Planned | Active business disclosure |
-| `GET` | `/api/privacy-processing-items` | Public | Planned | Active privacy processing table |
+| `GET` | `/api/business-profile` | Public | Implemented | Active business disclosure |
+| `GET` | `/api/privacy-processing-items` | Public | Implemented | Active privacy processing table |
 | `GET` | `/api/admin/policies` | `ADMIN` | Planned | Admin policy document list |
 | `POST` | `/api/admin/policies` | `ADMIN` | Planned | Create policy draft |
 | `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Planned | Update policy draft |
@@ -467,6 +467,7 @@ Rules:
 
 - Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
 - Implemented policy pages are static backend responses based on confirmed policy docs; admin policy management remains planned.
+- Business profile and privacy processing item APIs are static backend responses in DS-40; admin management remains planned.
 - Product detail and checkout responses include links to the implemented policy page endpoints.
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.

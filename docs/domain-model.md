@@ -198,6 +198,11 @@ Suggested fields:
 - createdAt
 - updatedAt
 
+Implemented DS-40 scope:
+
+- Public `GET /api/business-profile` exposes the customer-facing business disclosure baseline.
+- The initial implementation is a static backend response; admin update remains planned.
+
 ## Cart
 
 고객의 장바구니.
@@ -740,6 +745,11 @@ Suggested fields:
 - processorPurpose
 - thirdPartyRecipient
 - thirdPartyPurpose
+
+Implemented DS-40 scope:
+
+- Public `GET /api/privacy-processing-items` exposes the MVP privacy processing table.
+- The initial implementation is a static backend response; admin replacement remains planned.
 - thirdPartyItems
 - thirdPartyRetentionPeriod
 - status: ACTIVE / ARCHIVED

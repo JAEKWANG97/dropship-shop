@@ -88,14 +88,14 @@ Status: Confirmed
 - 상품 상세와 체크아웃 화면에 정책 링크가 필요하다. Backend API responses include policy links by DS-16.
 - 정책 페이지 라우트가 필요하다. Backend public policy APIs are implemented by DS-16; frontend menu/footer routes remain for `apps/web`.
 - 고객 메뉴와 푸터에 정책 페이지 링크가 필요하다.
-- 사업자 정보와 통신판매업 신고 정보를 관리하는 설정 모델이 필요하다.
+- 사업자 정보와 통신판매업 신고 정보를 고객에게 공개하는 API가 필요하다. Implemented by DS-40 as static backend response; admin-managed settings remain planned.
 - 상품 상세에는 품목별 상품 정보 제공 고시 블록이 필요하다.
 - 첫 로그인 시 약관/개인정보 동의 화면 또는 모달이 필요하다. Backend exposes `/api/me/agreements` and blocks checkout creation until current required versions are accepted by DS-31.
 - 주문서에는 통합 확인 체크박스가 필요하다.
 - 결제 요청 API는 결제 그룹(PaymentGroup)의 주문서 확인 여부를 검증해야 한다.
 - 결제 그룹(PaymentGroup) 시점의 정책 버전과 확인 시각을 저장해야 한다.
 - 클레임 접수 화면에는 접수 가능 기간, 증빙 필요 여부, 배송비 부담 기준을 안내해야 한다.
-- 개인정보 처리표와 처리 위탁/제3자 제공 설정 모델이 필요하다.
+- 개인정보 처리표와 처리 위탁/제3자 제공 정보를 고객에게 공개하는 API가 필요하다. Implemented by DS-40 as static backend response; admin-managed settings remain planned.
 - 회원 탈퇴는 사용자 프로필 비식별화와 법정 보존 기록 분리 보관을 함께 처리해야 한다.
 - 법정 보존 기록은 보존 사유와 보존 만료일을 저장해야 한다.
 - 마케팅 동의는 거래 알림 동의와 분리된 선택 동의 모델로 관리해야 한다.
