@@ -17,6 +17,8 @@ logging:
     org.hibernate.SQL: debug
 
 app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:local-dev-jwt-secret-change-before-production}
     cookie-secure: false

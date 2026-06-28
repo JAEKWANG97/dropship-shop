@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,8 +29,11 @@ import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
 
 @Component
-@Profile("local")
+@Profile({"local", "dev"})
+@ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true")
 public class LocalCatalogSeedData implements ApplicationRunner {
+
+	private static final String SEED_SUPPLIER = "세이프허브 산업안전";
 
 	private final SupplierRepository supplierRepository;
 	private final ProductRepository productRepository;
@@ -57,29 +61,31 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		if (productRepository.count() > 0) {
+		if (supplierRepository.existsByName(SEED_SUPPLIER)) {
 			return;
 		}
 
-		Supplier supplier = supplierRepository.save(new Supplier(
-			"세이프허브 공급처",
-			"홍길동",
-			"02-1234-5678",
-			"supplier@safehubpro.co.kr",
-			"local profile seed data"
+		List<Supplier> suppliers = supplierRepository.saveAll(List.of(
+			new Supplier(SEED_SUPPLIER, "홍길동", "02-1234-5678", "safety@safehubpro.co.kr", "local seed supplier"),
+			new Supplier("케이투 현장장비", "김현장", "02-2345-6789", "k2@safehubpro.co.kr", "local seed supplier"),
+			new Supplier("쓰리엠 보호구", "박보호", "02-3456-7890", "3m@safehubpro.co.kr", "local seed supplier")
 		));
 
 		List<SeedProduct> products = List.of(
-			new SeedProduct("K2 안전모", "가볍고 편한 기본형 안전모", 7200, "HELMET", "#ff4d00"),
-			new SeedProduct("K2 안전화", "현장 작업용 미끄럼 방지 안전화", 48500, "BOOTS", "#061b49"),
-			new SeedProduct("반사 형광조끼", "야간 작업용 고시인성 형광조끼", 5800, "VEST", "#f59e0b"),
-			new SeedProduct("3M 컴포트 그립 장갑", "정밀 작업용 코팅 안전장갑", 1650, "GLOVES", "#475569"),
-			new SeedProduct("포스탑 추락방지 세트", "고소 작업용 안전벨트 세트", 89000, "HARNESS", "#0f766e"),
-			new SeedProduct("3M 보안경", "분진과 비산물 차단 보안경", 3300, "GOGGLES", "#2563eb")
+			new SeedProduct(0, "K2 안전모 K2-THINK 1", "가볍고 편한 기본형 안전모", 7200, ProductStatus.ACTIVE, "HELMET", "#ff4d00"),
+			new SeedProduct(1, "K2 안전화 K2-67S", "현장 작업용 미끄럼 방지 안전화", 48500, ProductStatus.ACTIVE, "BOOTS", "#061b49"),
+			new SeedProduct(0, "반사 형광조끼 SV-1001", "야간 작업용 고시인성 형광조끼", 5800, ProductStatus.ACTIVE, "VEST", "#f59e0b"),
+			new SeedProduct(2, "3M 컴포트 그립 장갑 CG-100", "정밀 작업용 코팅 안전장갑", 1650, ProductStatus.ACTIVE, "GLOVES", "#475569"),
+			new SeedProduct(0, "포스탑 추락방지 세트 FS-2020", "고소 작업용 안전벨트 세트", 89000, ProductStatus.ACTIVE, "HARNESS", "#0f766e"),
+			new SeedProduct(2, "3M 보안경 SF401", "분진과 비산물 차단 보안경", 3300, ProductStatus.ACTIVE, "GOGGLES", "#2563eb"),
+			new SeedProduct(1, "세이프원 안전모 SW-200", "대량 구매에 적합한 보급형 안전모", 6900, ProductStatus.ACTIVE, "SAFE", "#1d4ed8"),
+			new SeedProduct(1, "지벤 안전화 ZB-186", "장시간 착용용 쿠션 안전화", 52000, ProductStatus.SOLD_OUT, "ZIBEN", "#111827"),
+			new SeedProduct(2, "토와 파워그랩 장갑", "미끄럼 방지 작업 장갑", 2200, ProductStatus.ACTIVE, "TOWA", "#2563eb"),
+			new SeedProduct(0, "보안경 김서림 방지형", "습한 현장용 안티포그 보안경", 4200, ProductStatus.HIDDEN, "FOG", "#64748b")
 		);
 
 		for (SeedProduct seed : products) {
-			seedProduct(supplier, seed);
+			seedProduct(suppliers.get(seed.supplierIndex()), seed);
 		}
 	}
 
@@ -90,11 +96,12 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 			seed.name(),
 			seed.summary(),
 			seed.basePrice(),
-			ProductStatus.ACTIVE
+			seed.status()
 		));
 		product.updateThumbnailImageUrl(imageUrl);
 
 		productOptionRepository.save(new ProductOption(product, "기본", 0, ProductOptionStatus.ACTIVE));
+		productOptionRepository.save(new ProductOption(product, "대량 구매", 0, seed.status() == ProductStatus.SOLD_OUT ? ProductOptionStatus.SOLD_OUT : ProductOptionStatus.ACTIVE));
 		productImageRepository.save(new ProductImage(product, ProductImageType.THUMBNAIL, imageUrl, 0, seed.name()));
 		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed.label() + "-A", "#061b49"), 1, seed.name()));
 		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed.label() + "-B", seed.color()), 2, seed.name()));
@@ -102,7 +109,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 			product,
 			ProductDetailBlockType.HTML,
 			null,
-			"<p>" + seed.summary() + "</p>",
+			"<h2>" + seed.name() + "</h2><p>" + seed.summary() + "</p><ul><li>배송비 포함 가격</li><li>세금계산서 발행 가능</li><li>최소주문 수량은 옵션별로 확인</li></ul>",
 			1,
 			null
 		));
@@ -128,6 +135,14 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		return "data:image/svg+xml," + URLEncoder.encode(svg, StandardCharsets.UTF_8);
 	}
 
-	private record SeedProduct(String name, String summary, long basePrice, String label, String color) {
+	private record SeedProduct(
+		int supplierIndex,
+		String name,
+		String summary,
+		long basePrice,
+		ProductStatus status,
+		String label,
+		String color
+	) {
 	}
 }
