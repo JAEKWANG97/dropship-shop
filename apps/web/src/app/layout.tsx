@@ -22,6 +22,7 @@ export default function RootLayout({
           <nav className="site-nav" aria-label="Primary navigation">
             <Link href="/products">상품</Link>
             <Link href="/policies">정책</Link>
+            <Link href="/account">내 계정</Link>
             <Link href="/login">로그인</Link>
             <Link href="/admin">관리자</Link>
           </nav>

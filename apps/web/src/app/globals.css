@@ -185,6 +185,76 @@ p {
   line-height: 1.5;
 }
 
+.narrow-page {
+  display: grid;
+  gap: 18px;
+  max-width: 640px;
+}
+
+.button-stack {
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+}
+
+.oauth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.oauth-button.kakao {
+  border-color: #f6d94d;
+  background: #fee500;
+  color: #191919;
+}
+
+.oauth-button.google {
+  background: #ffffff;
+}
+
+.oauth-button.naver {
+  border-color: #03c75a;
+  background: #03c75a;
+  color: #ffffff;
+}
+
+.notice {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.notice.success {
+  border-color: #9bc7aa;
+  background: #f1f8f3;
+}
+
+.notice span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.link-list a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 @media (max-width: 760px) {
   .site-header {
     align-items: flex-start;

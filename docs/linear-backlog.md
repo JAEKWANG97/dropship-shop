@@ -1053,7 +1053,7 @@ Acceptance criteria:
 
 ### DS-47: Implement auth session UI
 
-Status: Planned
+Status: Implemented
 
 Description:
 
@@ -1062,10 +1062,11 @@ Implement social login entry points and minimum session-aware route structure.
 Acceptance criteria:
 
 - Kakao, Google, and Naver login buttons link to the backend OAuth authorize endpoints.
-- Current user session can be fetched from the backend.
+- Current user session is fetched from `/api/me`.
+- Admin access is checked through `/api/admin/me`.
 - Customer and admin route guards have a minimum UI fallback.
 - Logout is available when the backend session exists.
-- Frontend docs and tests/checks are updated.
+- Frontend docs and checks are updated.
 
 ### DS-48: Implement customer catalog UI
 
