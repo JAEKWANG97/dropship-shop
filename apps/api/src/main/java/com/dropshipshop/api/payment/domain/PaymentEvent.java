@@ -73,10 +73,25 @@ public class PaymentEvent {
 		String resultMessage,
 		Instant now
 	) {
+		this(payment, paymentGroup, providerPaymentKey, eventType, null, null, resultMessage, now);
+	}
+
+	public PaymentEvent(
+		Payment payment,
+		PaymentGroup paymentGroup,
+		String providerPaymentKey,
+		PaymentEventType eventType,
+		String idempotencyKey,
+		String rawPayload,
+		String resultMessage,
+		Instant now
+	) {
 		this.payment = payment;
 		this.paymentGroup = paymentGroup;
 		this.providerPaymentKey = providerPaymentKey;
 		this.eventType = eventType;
+		this.idempotencyKey = idempotencyKey;
+		this.rawPayload = rawPayload;
 		this.resultMessage = resultMessage;
 		this.receivedAt = now;
 		this.processedAt = now;

@@ -687,3 +687,23 @@ Consequences:
 - Failed automatic cancel moves `Payment` and `PaymentGroup` to `CANCEL_FAILED`, keeps failure code/message, and exposes the item through the admin queue.
 - Admin retry reuses the same idempotency key so duplicate cancel requests do not double-cancel at the PG.
 - A separate broker-based queue can be added later for scheduled retries or alerting, but the state table remains the source of truth.
+
+## 2026-06-28: Toss Webhook Verification And Reconciliation
+
+Decision:
+
+Verify Toss payment webhooks by re-fetching the payment from Toss Payments with `paymentKey`, then reconcile the verified PG status with the local payment state.
+
+Context:
+
+The MVP already treats the server-side Toss confirmation result as the primary order confirmation path. Webhooks should improve reconciliation and operational visibility without becoming a second independent order-confirmation path.
+
+Consequences:
+
+- `POST /api/payments/toss/webhook` is public but must verify the payment through the Toss secret-key-backed payment lookup API.
+- Webhook payload status must match the verified Toss payment lookup status.
+- Webhook idempotency uses `TossPayments-Webhook-Transmission-Id` when present.
+- Duplicate webhook deliveries are ignored after the first saved event.
+- Unknown local `paymentKey` webhooks are accepted after Toss lookup verification but do not create local payment events.
+- If webhook status conflicts with the local server-confirmed state, the payment moves to `REVIEW_REQUIRED` instead of auto-mutating orders or refunds.
+- `REVIEW_REQUIRED` appears in the admin payment exception queue.

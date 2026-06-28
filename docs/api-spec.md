@@ -319,7 +319,7 @@ POST /api/checkouts/{checkoutNumber}/policy-confirmation
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented | Confirm Toss Payments approved payment server-side |
-| `POST` | `/api/payments/toss/webhook` | Provider verification | Planned | Receive Toss Payments webhook if enabled |
+| `POST` | `/api/payments/toss/webhook` | Provider verification | Implemented | Receive Toss Payments webhook and reconcile payment state |
 | `GET` | `/api/payments/{paymentId}` | Authenticated user | Planned | Customer-visible payment state |
 | `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Implemented | Retry failed payment exception cancel |
 | `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Implemented | List payment exception queue |
@@ -341,7 +341,12 @@ Rules:
 - Failed payment exception cancel moves the payment and payment group to `CANCEL_FAILED`.
 - The admin payment exception queue is DB state based; it lists payments in `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, or `REVIEW_REQUIRED`.
 - Admin retry reuses the stored idempotency key.
-- Toss webhook handling and payment detail API remain planned.
+- Toss webhook verification re-fetches the payment from Toss by `paymentKey` and compares the verified status with the webhook payload status.
+- Toss webhook idempotency uses `TossPayments-Webhook-Transmission-Id` when present, with event type, payment key, and created time as fallback.
+- Duplicate Toss webhook deliveries do not create duplicate `PaymentEvent` rows.
+- Unknown local `paymentKey` webhooks are accepted after Toss lookup verification but do not create local payment events.
+- Webhook status conflicts with the local server-confirmed payment state move the payment to `REVIEW_REQUIRED` for admin review.
+- Payment detail API remains planned.
 
 Implemented request body:
 

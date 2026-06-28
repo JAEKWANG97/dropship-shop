@@ -188,6 +188,12 @@ public class Payment {
 		this.failureMessage = failureMessage;
 	}
 
+	public void markReviewRequired(String failureCode, String failureMessage) {
+		this.status = PaymentStatus.REVIEW_REQUIRED;
+		this.failureCode = failureCode;
+		this.failureMessage = failureMessage;
+	}
+
 	public UUID getId() {
 		return id;
 	}

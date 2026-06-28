@@ -66,6 +66,9 @@ Status: Confirmed
 - MVP 결제 예외 큐는 별도 메시지 브로커가 아니라 DB 상태 기반 운영 큐로 관리한다.
 - 결제 예외 큐 대상은 `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, `REVIEW_REQUIRED` 결제 상태다.
 - 관리자 재시도는 저장된 동일 idempotency key를 재사용한다.
+- Toss webhook은 `paymentKey`로 Toss 결제조회 API를 다시 호출해 검증한다.
+- 중복 Toss webhook은 전송 ID 기반 idempotency key로 한 번만 처리한다.
+- 서버 confirm 결과와 Toss webhook 검증 결과가 충돌하면 자동 상태 보정하지 않고 `REVIEW_REQUIRED`로 분리해 운영 확인 대상으로 둔다.
 - 결제 완료 주문의 환불 완료 상태는 PG 취소/환불 성공 이후에만 확정한다.
 - PG 취소/환불 실패 시 고객에게 환불 완료로 노출하지 않는다.
 - MVP에서는 배송 그룹 주문 단위 부분 취소/부분 환불을 지원한다.
@@ -126,6 +129,7 @@ Production readiness:
 - 결제 예외 자동 취소는 idempotency key를 사용해야 한다. Implemented by DS-33.
 - 주문 확정 처리는 주문 단위 lock 또는 unique constraint로 한 번만 성공해야 한다.
 - 가상계좌/무통장입금성 결제를 제외하므로 MVP에서는 입금 대기, 입금 만료, 입금 webhook 상태를 구현하지 않는다.
+- Toss 결제 상태 webhook은 서버 confirm 결과와 PG 상태 대사를 위한 보조 입력으로 처리한다. Implemented by DS-34.
 - 환불 모델은 결제 그룹(PaymentGroup) 안의 배송 그룹 주문 단위 환불을 지원해야 한다.
 - 환불 금액은 환불 대상 배송 그룹 주문 금액의 합계와 일치해야 한다.
 - 배송 그룹 주문 단위 환불 성공 시 남은 환불 가능 금액에 따라 `PaymentGroup`과 `Payment`를 `REFUNDED` 또는 `PARTIALLY_REFUNDED`로 갱신한다. Implemented by DS-15.

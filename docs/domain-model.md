@@ -404,7 +404,7 @@ Implemented fields:
 - paymentGroupId
 - orderId
 - providerPaymentKey
-- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION / PAYMENT_EXCEPTION_CANCEL_REQUESTED / PAYMENT_EXCEPTION_CANCEL_COMPLETED / PAYMENT_EXCEPTION_CANCEL_FAILED / REFUND_REQUESTED / REFUND_COMPLETED / REFUND_FAILED
+- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION / PAYMENT_EXCEPTION_CANCEL_REQUESTED / PAYMENT_EXCEPTION_CANCEL_COMPLETED / PAYMENT_EXCEPTION_CANCEL_FAILED / TOSS_WEBHOOK_RECEIVED / PAYMENT_REVIEW_REQUIRED / REFUND_REQUESTED / REFUND_COMPLETED / REFUND_FAILED
 - idempotencyKey
 - rawPayload
 - resultMessage
@@ -412,9 +412,11 @@ Implemented fields:
 - processedAt
 - createdAt
 
-Deferred event types:
+Rules:
 
-- Webhook-specific event types are added when Toss webhook handling is implemented.
+- Toss webhook events store the webhook raw payload and an idempotency key.
+- Duplicate webhook deliveries with the same idempotency key are ignored.
+- Server confirm and webhook status conflicts create a `PAYMENT_REVIEW_REQUIRED` event and move the payment to `REVIEW_REQUIRED`.
 
 ## Fulfillment
 

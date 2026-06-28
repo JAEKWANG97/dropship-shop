@@ -607,7 +607,8 @@ Resolved decisions:
 - Same payment key on a different checkout is rejected as conflict.
 - Toss-approved amount mismatch creates a payment exception path with `Payment(CANCEL_REQUIRED)`, `PaymentGroup(PAYMENT_EXCEPTION)`, and `Order(PAYMENT_EXCEPTION)`.
 - Automatic PG cancel execution and admin payment exception queue/retry APIs are implemented by DS-33.
-- Toss webhook handling and payment detail API remain planned.
+- Toss webhook handling is implemented by DS-34.
+- Payment detail API remains planned.
 
 ### DS-10: Implement customer order history
 
@@ -776,11 +777,12 @@ Track backend API, policy, state transition, notification, and audit work remain
 
 Child issues:
 
-- DS-34 through DS-44 remain tracked in Linear.
+- DS-35 through DS-44 remain tracked in Linear.
 - DS-30 is implemented.
 - DS-31 is implemented.
 - DS-32 is implemented.
 - DS-33 is implemented.
+- DS-34 is implemented.
 - DS-45 is implemented.
 
 ### DS-30: Implement social OAuth login and cookie JWT auth

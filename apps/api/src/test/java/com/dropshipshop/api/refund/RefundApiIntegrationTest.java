@@ -54,6 +54,7 @@ import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.payment.toss.TossApprovedPayment;
 import com.dropshipshop.api.payment.toss.TossCancelledPayment;
 import com.dropshipshop.api.payment.toss.TossPaymentException;
+import com.dropshipshop.api.payment.toss.TossPaymentSnapshot;
 import com.dropshipshop.api.payment.toss.TossPaymentsClient;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.refund.repository.RefundRepository;
@@ -380,6 +381,11 @@ class RefundApiIntegrationTest {
 				"cancel-" + paymentKey,
 				"CANCELED"
 			);
+		}
+
+		@Override
+		public TossPaymentSnapshot getPayment(String paymentKey) {
+			return new TossPaymentSnapshot(paymentKey, "order-" + paymentKey, 0, "DONE");
 		}
 
 		void reset() {

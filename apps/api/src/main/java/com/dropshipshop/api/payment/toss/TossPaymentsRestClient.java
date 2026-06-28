@@ -90,6 +90,34 @@ class TossPaymentsRestClient implements TossPaymentsClient {
 		}
 	}
 
+	@Override
+	public TossPaymentSnapshot getPayment(String paymentKey) {
+		if (secretKey == null || secretKey.isBlank()) {
+			throw new TossPaymentException("Toss Payments secret key is not configured");
+		}
+		try {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> body = restClient.get()
+				.uri("/v1/payments/{paymentKey}", paymentKey)
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.retrieve()
+				.body(Map.class);
+			if (body == null) {
+				throw new TossPaymentException("Toss Payments payment response is empty");
+			}
+			return new TossPaymentSnapshot(
+				stringValue(body.get("paymentKey")),
+				stringValue(body.get("orderId")),
+				longValue(body.get("totalAmount")),
+				stringValue(body.get("status"))
+			);
+		} catch (TossPaymentException exception) {
+			throw exception;
+		} catch (RuntimeException exception) {
+			throw new TossPaymentException("Toss Payments payment lookup failed: " + exception.getMessage());
+		}
+	}
+
 	private String authorizationHeader() {
 		String credential = secretKey + ":";
 		String encoded = Base64.getEncoder().encodeToString(credential.getBytes(StandardCharsets.UTF_8));

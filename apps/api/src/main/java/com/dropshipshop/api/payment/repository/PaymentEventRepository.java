@@ -7,4 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.dropshipshop.api.payment.domain.PaymentEvent;
 
 public interface PaymentEventRepository extends JpaRepository<PaymentEvent, UUID> {
+
+	boolean existsByIdempotencyKey(String idempotencyKey);
+
+	long countByIdempotencyKey(String idempotencyKey);
 }

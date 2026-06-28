@@ -45,10 +45,12 @@ import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
+import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.payment.toss.TossCancelledPayment;
 import com.dropshipshop.api.payment.toss.TossApprovedPayment;
 import com.dropshipshop.api.payment.toss.TossPaymentException;
+import com.dropshipshop.api.payment.toss.TossPaymentSnapshot;
 import com.dropshipshop.api.payment.toss.TossPaymentsClient;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -84,6 +86,9 @@ class PaymentApiIntegrationTest {
 
 	@Autowired
 	private PaymentGroupRepository paymentGroupRepository;
+
+	@Autowired
+	private PaymentEventRepository paymentEventRepository;
 
 	@Autowired
 	private PaymentRepository paymentRepository;
@@ -167,7 +172,7 @@ class PaymentApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/payment-exceptions")
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.exceptions", hasSize(0)));
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')]".formatted(checkoutNumber), hasSize(0)));
 
 		assertThat(fakeTossPaymentsClient.confirmCalls).isEqualTo(1);
 		assertThat(fakeTossPaymentsClient.cancelCalls).isEqualTo(1);
@@ -193,20 +198,18 @@ class PaymentApiIntegrationTest {
 				.content(confirmRequest(checkoutNumber, "pay-mismatch-retry-1", 10000)))
 			.andExpect(status().isBadRequest());
 
-		MvcResult queueResult = mockMvc.perform(get("/api/admin/payment-exceptions")
+		mockMvc.perform(get("/api/admin/payment-exceptions")
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.exceptions", hasSize(1)))
-			.andExpect(jsonPath("$.exceptions[0].checkoutNumber", is(checkoutNumber)))
-			.andExpect(jsonPath("$.exceptions[0].paymentStatus", is("CANCEL_FAILED")))
-			.andExpect(jsonPath("$.exceptions[0].paymentGroupStatus", is("CANCEL_FAILED")))
-			.andExpect(jsonPath("$.exceptions[0].exceptionReason", is("AMOUNT_MISMATCH")))
-			.andExpect(jsonPath("$.exceptions[0].requestedAmount", is(10000)))
-			.andExpect(jsonPath("$.exceptions[0].approvedAmount", is(9000)))
-			.andExpect(jsonPath("$.exceptions[0].failureCode", is("TOSS_CANCEL_FAILED")))
-			.andReturn();
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')]".formatted(checkoutNumber), hasSize(1)))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].paymentStatus".formatted(checkoutNumber), is(List.of("CANCEL_FAILED"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].paymentGroupStatus".formatted(checkoutNumber), is(List.of("CANCEL_FAILED"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].exceptionReason".formatted(checkoutNumber), is(List.of("AMOUNT_MISMATCH"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].requestedAmount".formatted(checkoutNumber), is(List.of(10000))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].approvedAmount".formatted(checkoutNumber), is(List.of(9000))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].failureCode".formatted(checkoutNumber), is(List.of("TOSS_CANCEL_FAILED"))));
 
-		UUID paymentId = UUID.fromString(fieldFrom(queueResult, "paymentId"));
+		UUID paymentId = paymentRepository.findByProviderPaymentKey("pay-mismatch-retry-1").orElseThrow().getId();
 		String firstIdempotencyKey = fakeTossPaymentsClient.cancelIdempotencyKeys.get(0);
 
 		mockMvc.perform(get("/api/admin/payment-exceptions")
@@ -229,7 +232,7 @@ class PaymentApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/payment-exceptions")
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.exceptions", hasSize(0)));
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')]".formatted(checkoutNumber), hasSize(0)));
 
 		assertThat(fakeTossPaymentsClient.cancelCalls).isEqualTo(2);
 		assertThat(fakeTossPaymentsClient.cancelAmounts).containsExactly(9000L, 9000L);
@@ -270,6 +273,82 @@ class PaymentApiIntegrationTest {
 			.andExpect(status().isBadRequest());
 
 		assertThat(paymentGroupRepository.findById(expired.getId()).orElseThrow().getStatus().name()).isEqualTo("EXPIRED");
+	}
+
+	@Test
+	void storesDuplicateTossWebhookOnlyOnce() throws Exception {
+		UserAccount customer = createCustomer("payment-customer-5");
+		ProductOption option = createOption("Payment Product E", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
+		addCartItem(customer.getId(), option.getId(), 1);
+		String checkoutNumber = createCheckout(customer.getId());
+		confirmPolicy(customer.getId(), checkoutNumber);
+
+		mockMvc.perform(post("/api/payments/toss/confirm")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(confirmRequest(checkoutNumber, "pay-webhook-dup-1", 10000)))
+			.andExpect(status().isOk());
+
+		String webhookBody = tossWebhook("PAYMENT_STATUS_CHANGED", "pay-webhook-dup-1", "DONE");
+		mockMvc.perform(post("/api/payments/toss/webhook")
+				.header("TossPayments-Webhook-Transmission-Id", "wh-dup-1")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(webhookBody))
+			.andExpect(status().isAccepted());
+
+		mockMvc.perform(post("/api/payments/toss/webhook")
+				.header("TossPayments-Webhook-Transmission-Id", "wh-dup-1")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(webhookBody))
+			.andExpect(status().isAccepted());
+
+		assertThat(paymentEventRepository.countByIdempotencyKey("toss-webhook:wh-dup-1")).isEqualTo(1);
+		assertThat(fakeTossPaymentsClient.lookupCalls).isEqualTo(1);
+	}
+
+	@Test
+	void acceptsVerifiedTossWebhookForUnknownPaymentKeyWithoutLocalEvent() throws Exception {
+		mockMvc.perform(post("/api/payments/toss/webhook")
+				.header("TossPayments-Webhook-Transmission-Id", "wh-unknown-1")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(tossWebhook("PAYMENT_STATUS_CHANGED", "unknown-payment-key", "DONE")))
+			.andExpect(status().isAccepted());
+
+		assertThat(paymentRepository.findByProviderPaymentKey("unknown-payment-key")).isEmpty();
+		assertThat(paymentEventRepository.countByIdempotencyKey("toss-webhook:wh-unknown-1")).isZero();
+		assertThat(fakeTossPaymentsClient.lookupCalls).isEqualTo(1);
+	}
+
+	@Test
+	void movesPaymentToReviewRequiredWhenTossWebhookConflictsWithLocalState() throws Exception {
+		UserAccount customer = createCustomer("payment-customer-6");
+		ProductOption option = createOption("Payment Product F", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
+		addCartItem(customer.getId(), option.getId(), 1);
+		String checkoutNumber = createCheckout(customer.getId());
+		confirmPolicy(customer.getId(), checkoutNumber);
+
+		mockMvc.perform(post("/api/payments/toss/confirm")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(confirmRequest(checkoutNumber, "pay-webhook-conflict-1", 10000)))
+			.andExpect(status().isOk());
+
+		fakeTossPaymentsClient.lookupStatus = "CANCELED";
+		mockMvc.perform(post("/api/payments/toss/webhook")
+				.header("TossPayments-Webhook-Transmission-Id", "wh-conflict-1")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(tossWebhook("PAYMENT_STATUS_CHANGED", "pay-webhook-conflict-1", "CANCELED")))
+			.andExpect(status().isAccepted());
+
+		mockMvc.perform(get("/api/admin/payment-exceptions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')]".formatted(checkoutNumber), hasSize(1)))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].paymentStatus".formatted(checkoutNumber), is(List.of("REVIEW_REQUIRED"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].paymentGroupStatus".formatted(checkoutNumber), is(List.of("APPROVED"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].failureCode".formatted(checkoutNumber), is(List.of("WEBHOOK_STATUS_CONFLICT"))));
+
+		assertThat(paymentEventRepository.countByIdempotencyKey("toss-webhook:wh-conflict-1")).isEqualTo(1);
 	}
 
 	private UserAccount createCustomer(String providerUserId) {
@@ -397,6 +476,19 @@ class PaymentApiIntegrationTest {
 			""".formatted(checkoutNumber, paymentKey, amount);
 	}
 
+	private String tossWebhook(String eventType, String paymentKey, String status) {
+		return """
+			{
+			  "eventType": "%s",
+			  "createdAt": "2026-06-28T00:00:00Z",
+			  "data": {
+			    "paymentKey": "%s",
+			    "status": "%s"
+			  }
+			}
+			""".formatted(eventType, paymentKey, status);
+	}
+
 	private UUID paymentIdFrom(MvcResult result) throws Exception {
 		return UUID.fromString(fieldFrom(result, "paymentId"));
 	}
@@ -426,6 +518,8 @@ class PaymentApiIntegrationTest {
 		private boolean failNextCancel;
 		private int confirmCalls;
 		private int cancelCalls;
+		private int lookupCalls;
+		private String lookupStatus = "DONE";
 		private final List<Long> cancelAmounts = new ArrayList<>();
 		private final List<String> cancelIdempotencyKeys = new ArrayList<>();
 
@@ -455,11 +549,19 @@ class PaymentApiIntegrationTest {
 			return new TossCancelledPayment(paymentKey, "cancel-order", cancelAmount, 0, "cancel-" + paymentKey, "CANCELED");
 		}
 
+		@Override
+		public TossPaymentSnapshot getPayment(String paymentKey) {
+			lookupCalls += 1;
+			return new TossPaymentSnapshot(paymentKey, "order-" + paymentKey, 10000, lookupStatus);
+		}
+
 		void reset() {
 			nextApprovedAmount = null;
 			failNextCancel = false;
 			confirmCalls = 0;
 			cancelCalls = 0;
+			lookupCalls = 0;
+			lookupStatus = "DONE";
 			cancelAmounts.clear();
 			cancelIdempotencyKeys.clear();
 		}
