@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getAdminUser } from "@/lib/session";
+import { getAdminUser, getCurrentUser } from "@/lib/session";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const admin = await getAdminUser();
+  const [session, admin] = await Promise.all([getCurrentUser(), getAdminUser()]);
 
   return (
     <html lang="ko">
@@ -41,8 +41,19 @@ export default async function RootLayout({
             <Link href="/products">카테고리</Link>
             <Link href="/cart">장바구니</Link>
             <Link href="/orders">주문조회</Link>
-            <Link href="/account">사업자회원</Link>
-            <Link href="/login">로그인</Link>
+            {session ? (
+              <>
+                <Link href="/account">내 계정</Link>
+                <form action="/auth/logout" method="post">
+                  <button type="submit">로그아웃</button>
+                </form>
+              </>
+            ) : (
+              <>
+                <Link href="/account">사업자회원</Link>
+                <Link href="/login">로그인</Link>
+              </>
+            )}
             {admin ? <Link href="/admin">관리자</Link> : null}
           </nav>
         </header>

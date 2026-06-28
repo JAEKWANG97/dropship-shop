@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { apiGetWithCookie } from "./api";
-import { adminOrders, adminProducts, adminSuppliers } from "./admin-mock";
 
 export type AdminProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 
@@ -39,30 +38,28 @@ type AdminOrderListResponse = {
   orders: AdminOrder[];
 };
 
-async function readWithFallback<T>(path: string, fallback: T, emptyFallback = false) {
-  try {
-    const data = await apiGetWithCookie<T>(path, (await cookies()).toString());
-    if (emptyFallback && Array.isArray(data) && data.length === 0) return fallback;
-    return data;
-  } catch {
-    return fallback;
-  }
+async function readWithFallback<T>(path: string, fallback: T) {
+	try {
+		return await apiGetWithCookie<T>(path, (await cookies()).toString());
+	} catch {
+		return fallback;
+	}
 }
 
 export async function getAdminProducts() {
-  return readWithFallback<AdminProduct[]>("/api/admin/products", adminProducts, true);
+	return readWithFallback<AdminProduct[]>("/api/admin/products", []);
 }
 
 export async function getAdminSuppliers() {
-  return readWithFallback<AdminSupplier[]>("/api/admin/suppliers", adminSuppliers, true);
+	return readWithFallback<AdminSupplier[]>("/api/admin/suppliers", []);
 }
 
 export async function getAdminOrders() {
-  const data = await readWithFallback<AdminOrderListResponse>(
-    "/api/admin/orders",
-    { orders: adminOrders },
-  );
-  return data.orders.length > 0 ? data.orders : adminOrders;
+	const data = await readWithFallback<AdminOrderListResponse>(
+		"/api/admin/orders",
+		{ orders: [] },
+	);
+	return data.orders;
 }
 
 export function adminStatusLabel(status: string) {

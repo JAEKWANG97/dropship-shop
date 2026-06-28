@@ -117,7 +117,21 @@ textarea {
   font-weight: 700;
 }
 
+.site-nav form {
+  margin: 0;
+}
+
+.site-nav button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
 .site-nav a:hover,
+.site-nav button:hover,
 .brand:hover {
   color: var(--accent);
 }

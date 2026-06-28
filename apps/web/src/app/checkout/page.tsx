@@ -73,13 +73,6 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
         </div>
       ) : null}
 
-      {!data.agreement.requiredAgreed ? (
-        <RequiredAgreementForm
-          privacyVersion={data.agreement.requiredPrivacyVersion}
-          termsVersion={data.agreement.requiredTermsVersion}
-        />
-      ) : null}
-
       {data.cart.items.length === 0 ? (
         <div className="notice">
           <strong>장바구니가 비어 있습니다</strong>
@@ -88,14 +81,22 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
           </Link>
         </div>
       ) : (
-        <div className="checkout-layout">
-          <CreateCheckoutForm
-            cart={data.cart}
-            defaultAddress={defaultAddress}
-            disabled={!data.agreement.requiredAgreed || !data.cart.checkoutAvailable}
-          />
-          <CheckoutCartSummary cart={data.cart} />
-        </div>
+        <>
+          {!data.agreement.requiredAgreed ? (
+            <RequiredAgreementForm
+              privacyVersion={data.agreement.requiredPrivacyVersion}
+              termsVersion={data.agreement.requiredTermsVersion}
+            />
+          ) : null}
+          <div className="checkout-layout">
+            <CreateCheckoutForm
+              cart={data.cart}
+              defaultAddress={defaultAddress}
+              disabled={!data.agreement.requiredAgreed || !data.cart.checkoutAvailable}
+            />
+            <CheckoutCartSummary cart={data.cart} />
+          </div>
+        </>
       )}
     </section>
   );
