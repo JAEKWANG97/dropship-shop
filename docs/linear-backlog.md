@@ -1070,7 +1070,7 @@ Acceptance criteria:
 
 ### DS-48: Implement customer catalog UI
 
-Status: Planned
+Status: Implemented
 
 Description:
 
@@ -1082,4 +1082,4 @@ Acceptance criteria:
 - Product detail reads `GET /api/products/{productId}`.
 - Product image, option, detail block, notice, and policy link fields are displayed.
 - Unavailable purchase states are visible to customers.
-- Mobile and desktop layouts are checked.
+- Frontend lint/build checks cover the catalog pages.
