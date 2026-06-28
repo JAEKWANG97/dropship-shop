@@ -19,6 +19,7 @@
 - User policy agreement table: implemented in `apps/api/src/main/resources/db/migration/V10__create_user_policy_agreements.sql`.
 - User address table: implemented in `apps/api/src/main/resources/db/migration/V11__create_user_addresses.sql`.
 - Policy document table: implemented in `apps/api/src/main/resources/db/migration/V17__create_policy_documents.sql`.
+- Business profile and privacy processing item tables: implemented in `apps/api/src/main/resources/db/migration/V18__create_legal_disclosures.sql`.
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -699,7 +700,7 @@ Policy/legal tables:
 - `marketing_consents`
 - `legal_retention_records`
 
-DS-40 exposes business profile and privacy processing item public APIs as static backend responses; persisted admin-managed policy/legal tables remain planned.
+Business profile and privacy processing item public APIs read active DB rows. Admin-managed editing remains planned.
 
 ### policy_documents
 
@@ -716,6 +717,51 @@ DS-40 exposes business profile and privacy processing item public APIs as static
 DS-41 implements persisted managed policy versions. Unique `(type, version)` prevents duplicate versions, and activation archives the previous active policy of the same type.
 
 Public policy pages for `shipping`, `cancellation-refund`, and `stock-risk` are backed by active `policy_documents` rows.
+
+### business_profiles
+
+- `id`
+- `company_name`
+- `representative_name`
+- `business_registration_number`
+- `mail_order_sales_registration_number`
+- `mail_order_sales_registration_authority`
+- `business_address`
+- `customer_center_phone`
+- `customer_center_email`
+- `customer_center_hours`
+- `privacy_officer_name`
+- `privacy_officer_email`
+- `privacy_officer_phone`
+- `hosting_provider`
+- `active`
+- `effective_from`
+- `created_at`
+- `updated_at`
+
+Rule:
+
+- Public business disclosure reads the latest active row by `effective_from`.
+
+### privacy_processing_items
+
+- `id`
+- `category`
+- `collected_items`
+- `purpose`
+- `retention_period`
+- `processor_name`
+- `processor_purpose`
+- `third_party_recipient`
+- `third_party_purpose`
+- `sort_order`
+- `active`
+- `created_at`
+- `updated_at`
+
+Rule:
+
+- Public privacy processing table reads active rows ordered by `sort_order`.
 
 Audit/notification tables:
 
