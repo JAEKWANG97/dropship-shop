@@ -11,18 +11,22 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import com.dropshipshop.api.common.error.ApiErrorCode;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
+	SecurityFilterChain securityFilterChain(
+		HttpSecurity http,
+		CorsConfigurationSource corsConfigurationSource
+	) throws Exception {
 		return http
 			.cors(cors -> cors.configurationSource(corsConfigurationSource))
 			.csrf(AbstractHttpConfigurer::disable)
@@ -31,7 +35,20 @@ public class SecurityConfig {
 			.logout(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.exceptionHandling(exceptions -> exceptions
-				.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+				.authenticationEntryPoint((request, response, exception) -> SecurityErrorResponseWriter.write(
+					request,
+					response,
+					HttpStatus.UNAUTHORIZED,
+					ApiErrorCode.UNAUTHORIZED,
+					"Authentication is required"
+				))
+				.accessDeniedHandler((request, response, exception) -> SecurityErrorResponseWriter.write(
+					request,
+					response,
+					HttpStatus.FORBIDDEN,
+					ApiErrorCode.FORBIDDEN,
+					"Access is denied"
+				))
 			)
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/api/health", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()

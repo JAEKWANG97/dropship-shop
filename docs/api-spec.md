@@ -18,7 +18,54 @@
 - Server calculates all order, payment, refund, and shipping amounts.
 - Client-submitted totals are never trusted.
 - Mutating admin actions that affect order, refund, shipment, claim, or product status should record audit history.
-- API error format is not finalized yet. Current baseline uses Spring/default domain HTTP errors until a stable frontend contract is defined.
+- API errors use the standard response shape defined below.
+
+## Error Response Format
+
+Status: Implemented
+
+All API errors return the correct HTTP status and the following JSON body:
+
+```json
+{
+  "timestamp": "2026-06-28T00:00:00Z",
+  "status": 400,
+  "code": "BUSINESS_RULE_VIOLATION",
+  "message": "Cart is empty",
+  "path": "/api/checkouts",
+  "fields": []
+}
+```
+
+Validation errors include field-level details:
+
+```json
+{
+  "timestamp": "2026-06-28T00:00:00Z",
+  "status": 400,
+  "code": "VALIDATION_FAILED",
+  "message": "Request validation failed",
+  "path": "/api/cart/items",
+  "fields": [
+    {
+      "field": "productOptionId",
+      "message": "must not be null"
+    }
+  ]
+}
+```
+
+Initial error codes:
+
+- `UNAUTHORIZED`: authentication is required.
+- `FORBIDDEN`: authenticated user lacks permission.
+- `VALIDATION_FAILED`: request validation failed.
+- `MALFORMED_REQUEST`: request body cannot be parsed.
+- `BUSINESS_RULE_VIOLATION`: domain policy or state transition guard rejected the request.
+- `RESOURCE_NOT_FOUND`: requested resource is missing or hidden from the caller.
+- `CONFLICT`: request conflicts with an existing resource or idempotency boundary.
+- `UPSTREAM_SERVICE_ERROR`: external provider or upstream service failed.
+- `INTERNAL_SERVER_ERROR`: unexpected server error.
 
 ## Grouping Index
 
@@ -531,7 +578,6 @@ DS-6 should keep request/response DTOs separate from JPA entities.
 
 ## Open API Notes
 
-- Final error response format is not defined. This is documented as a production-readiness follow-up, and current APIs must still return the correct HTTP status for policy/state failures.
 - Pagination format is not defined.
 - Image upload binary flow is not defined; DS-6 can start with image URL/object key metadata.
 - OAuth token/session format is not defined.

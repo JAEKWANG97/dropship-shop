@@ -77,9 +77,11 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 
 ## Error Response Baseline
 
-- 현재 API 오류 응답은 Spring 기본 오류 응답과 각 도메인 예외의 HTTP status를 사용한다.
-- 프론트엔드 출시 전 공통 오류 응답 포맷을 별도 이슈로 확정한다.
-- 공통 포맷 확정 전에도 결제/환불/주문 상태 전이 오류는 잘못된 성공 응답으로 숨기지 않는다.
+- API 오류 응답은 `timestamp`, `status`, `code`, `message`, `path`, `fields`를 가진 공통 JSON 포맷을 사용한다.
+- Validation 오류는 `VALIDATION_FAILED`와 field-level details로 반환한다.
+- 도메인 정책 또는 상태 전이 guard 위반은 `BUSINESS_RULE_VIOLATION`으로 반환한다.
+- 인증/권한 오류도 같은 JSON 포맷으로 반환한다.
+- 결제/환불/주문 상태 전이 오류는 잘못된 성공 응답으로 숨기지 않는다.
 - 운영 알림은 우선 5xx와 결제/환불 실패 큐 증가를 기준으로 시작한다.
 
 ## Admin Operating Checklist

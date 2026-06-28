@@ -762,3 +762,35 @@ Acceptance criteria:
 - Backup plan for PostgreSQL is documented in `docs/production-readiness.md`.
 - Admin operating checklist is documented in `docs/production-readiness.md`.
 - Prod profile, readiness/liveness health probes, and env-based CORS baseline are covered by `ProductionReadinessIntegrationTest`.
+
+## Milestone 7: Backend MVP Completion
+
+### DS-55: Backend MVP completion track
+
+Status: Backlog
+
+Description:
+
+Track backend API, policy, state transition, notification, and audit work remaining after DS-17.
+
+Child issues:
+
+- DS-30 through DS-44 remain tracked in Linear.
+- DS-45 is implemented.
+
+### DS-45: Standardize API error response
+
+Status: Implemented
+
+Description:
+
+Standardize API error responses for frontend handling and operational diagnostics.
+
+Acceptance criteria:
+
+- Common error response schema is implemented with `timestamp`, `status`, `code`, `message`, `path`, and `fields`.
+- Validation errors return `VALIDATION_FAILED` with field-level details.
+- Domain policy and state guard failures return `BUSINESS_RULE_VIOLATION`.
+- Authentication and authorization errors use the same JSON response shape.
+- `docs/api-spec.md` and `docs/production-readiness.md` describe the implemented format.
+- `ApiErrorResponseIntegrationTest` covers 401, 403, validation, malformed request, not found, and business rule errors.
