@@ -200,6 +200,13 @@ public class CustomerOrder {
 		this.status = OrderStatus.PAYMENT_EXCEPTION;
 	}
 
+	public void markCancelledFromPaymentException() {
+		if (status != OrderStatus.PAYMENT_EXCEPTION) {
+			throw new IllegalStateException("Payment exception order can be cancelled only from payment exception");
+		}
+		this.status = OrderStatus.CANCELLED;
+	}
+
 	public void expire() {
 		this.status = OrderStatus.EXPIRED;
 	}

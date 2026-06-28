@@ -143,6 +143,7 @@ Order status: PAYMENT_PENDING
 -> System attempts immediate full PG cancel
 -> If PG cancel succeeds, payment status becomes CANCELLED and customer sees payment cancel completed
 -> If PG cancel fails, payment status becomes CANCEL_FAILED and admin emergency review is required
+-> Admin emergency review queue is derived from DB payment status, not a separate broker queue
 ```
 
 ## Payment Exception
@@ -166,7 +167,7 @@ PG cancel succeeds
 
 PG cancel fails
 -> Payment status: CANCEL_FAILED
--> Admin emergency payment queue item is created
+-> Payment remains visible in the DB state-based admin emergency payment queue
 -> Customer sees payment review or cancel processing status
 ```
 

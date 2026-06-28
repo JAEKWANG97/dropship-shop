@@ -98,6 +98,21 @@ public class PaymentGroup {
 		this.status = PaymentGroupStatus.PAYMENT_EXCEPTION;
 	}
 
+	public void markCancelled() {
+		if (status != PaymentGroupStatus.PAYMENT_EXCEPTION && status != PaymentGroupStatus.CANCEL_FAILED) {
+			throw new IllegalStateException("Payment group can be cancelled only from payment exception");
+		}
+		this.status = PaymentGroupStatus.CANCELLED;
+		this.refundableAmount = 0;
+	}
+
+	public void markCancelFailed() {
+		if (status != PaymentGroupStatus.PAYMENT_EXCEPTION && status != PaymentGroupStatus.CANCEL_FAILED) {
+			throw new IllegalStateException("Payment group cancel can fail only from payment exception");
+		}
+		this.status = PaymentGroupStatus.CANCEL_FAILED;
+	}
+
 	public void applyRefund(long refundAmount) {
 		if (status != PaymentGroupStatus.APPROVED && status != PaymentGroupStatus.PARTIALLY_REFUNDED) {
 			throw new IllegalStateException("Payment group is not refundable");

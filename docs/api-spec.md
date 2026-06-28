@@ -321,8 +321,8 @@ POST /api/checkouts/{checkoutNumber}/policy-confirmation
 | `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented | Confirm Toss Payments approved payment server-side |
 | `POST` | `/api/payments/toss/webhook` | Provider verification | Planned | Receive Toss Payments webhook if enabled |
 | `GET` | `/api/payments/{paymentId}` | Authenticated user | Planned | Customer-visible payment state |
-| `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Planned | Retry failed payment exception cancel |
-| `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Planned | List payment exception queue |
+| `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Implemented | Retry failed payment exception cancel |
+| `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Implemented | List payment exception queue |
 
 Rules:
 
@@ -335,7 +335,13 @@ Rules:
 - A payment key already attached to a different checkout is rejected as a conflict.
 - DS-9 stores payment events for confirm requested, approved, rejected, and payment exception paths.
 - Toss secret key is read from environment/config as `payments.toss.secret-key` and must not be committed.
-- Automatic PG cancel execution and admin retry APIs remain planned.
+- PG-approved amount mismatch creates a payment exception and immediately attempts full PG cancel.
+- Payment exception cancel uses a stable idempotency key derived from the payment id.
+- Successful payment exception cancel moves the payment group and orders to `CANCELLED`.
+- Failed payment exception cancel moves the payment and payment group to `CANCEL_FAILED`.
+- The admin payment exception queue is DB state based; it lists payments in `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, or `REVIEW_REQUIRED`.
+- Admin retry reuses the stored idempotency key.
+- Toss webhook handling and payment detail API remain planned.
 
 Implemented request body:
 

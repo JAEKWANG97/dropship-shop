@@ -524,6 +524,9 @@ Implemented by DS-9.
 - `idempotency_key`
 - `failure_code`
 - `failure_message`
+- `provider_cancel_transaction_key`
+- `cancel_requested_at`
+- `cancelled_at`
 - `raw_provider_status`
 - `last_synced_at`
 - `created_at`

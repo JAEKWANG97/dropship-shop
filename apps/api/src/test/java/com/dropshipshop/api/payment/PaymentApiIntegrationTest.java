@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +48,7 @@ import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.payment.toss.TossCancelledPayment;
 import com.dropshipshop.api.payment.toss.TossApprovedPayment;
+import com.dropshipshop.api.payment.toss.TossPaymentException;
 import com.dropshipshop.api.payment.toss.TossPaymentsClient;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -125,11 +128,11 @@ class PaymentApiIntegrationTest {
 			.andExpect(jsonPath("$.paymentStatus", is("APPROVED")));
 
 		assertThat(fakeTossPaymentsClient.confirmCalls).isEqualTo(1);
-		assertThat(paymentRepository.count()).isEqualTo(1);
+		assertThat(paymentRepository.findByProviderPaymentKey("pay-success-1")).isPresent();
 	}
 
 	@Test
-	void rejectsAmountMismatchFromTossAndMovesCheckoutToPaymentException() throws Exception {
+	void autoCancelsAmountMismatchFromTossAndHandlesDuplicateConfirmIdempotently() throws Exception {
 		UserAccount customer = createCustomer("payment-customer-2");
 		ProductOption option = createOption("Payment Product B", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
 		addCartItem(customer.getId(), option.getId(), 1);
@@ -146,14 +149,98 @@ class PaymentApiIntegrationTest {
 		mockMvc.perform(get("/api/checkouts/{checkoutNumber}", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.status", is("PAYMENT_EXCEPTION")))
-			.andExpect(jsonPath("$.orders[0].status", is("PAYMENT_EXCEPTION")));
+			.andExpect(jsonPath("$.status", is("CANCELLED")))
+			.andExpect(jsonPath("$.orders[0].status", is("CANCELLED")));
+
+		MvcResult duplicateResult = mockMvc.perform(post("/api/payments/toss/confirm")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(confirmRequest(checkoutNumber, "pay-mismatch-1", 10000)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.paymentStatus", is("CANCELLED")))
+			.andExpect(jsonPath("$.paymentGroupStatus", is("CANCELLED")))
+			.andExpect(jsonPath("$.orders[0].status", is("CANCELLED")))
+			.andReturn();
+
+		UUID paymentId = paymentIdFrom(duplicateResult);
+
+		mockMvc.perform(get("/api/admin/payment-exceptions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.exceptions", hasSize(0)));
+
+		assertThat(fakeTossPaymentsClient.confirmCalls).isEqualTo(1);
+		assertThat(fakeTossPaymentsClient.cancelCalls).isEqualTo(1);
+		assertThat(fakeTossPaymentsClient.cancelAmounts).containsExactly(9000L);
+		assertThat(fakeTossPaymentsClient.cancelIdempotencyKeys)
+			.containsExactly("payment-exception-cancel-" + paymentId);
+		assertThat(paymentRepository.findByProviderPaymentKey("pay-mismatch-1")).isPresent();
+	}
+
+	@Test
+	void listsFailedPaymentExceptionCancelAndAllowsAdminRetry() throws Exception {
+		UserAccount customer = createCustomer("payment-customer-3");
+		ProductOption option = createOption("Payment Product C", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
+		addCartItem(customer.getId(), option.getId(), 1);
+		String checkoutNumber = createCheckout(customer.getId());
+		confirmPolicy(customer.getId(), checkoutNumber);
+		fakeTossPaymentsClient.nextApprovedAmount = 9000L;
+		fakeTossPaymentsClient.failNextCancel = true;
+
+		mockMvc.perform(post("/api/payments/toss/confirm")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(confirmRequest(checkoutNumber, "pay-mismatch-retry-1", 10000)))
+			.andExpect(status().isBadRequest());
+
+		MvcResult queueResult = mockMvc.perform(get("/api/admin/payment-exceptions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.exceptions", hasSize(1)))
+			.andExpect(jsonPath("$.exceptions[0].checkoutNumber", is(checkoutNumber)))
+			.andExpect(jsonPath("$.exceptions[0].paymentStatus", is("CANCEL_FAILED")))
+			.andExpect(jsonPath("$.exceptions[0].paymentGroupStatus", is("CANCEL_FAILED")))
+			.andExpect(jsonPath("$.exceptions[0].exceptionReason", is("AMOUNT_MISMATCH")))
+			.andExpect(jsonPath("$.exceptions[0].requestedAmount", is(10000)))
+			.andExpect(jsonPath("$.exceptions[0].approvedAmount", is(9000)))
+			.andExpect(jsonPath("$.exceptions[0].failureCode", is("TOSS_CANCEL_FAILED")))
+			.andReturn();
+
+		UUID paymentId = UUID.fromString(fieldFrom(queueResult, "paymentId"));
+		String firstIdempotencyKey = fakeTossPaymentsClient.cancelIdempotencyKeys.get(0);
+
+		mockMvc.perform(get("/api/admin/payment-exceptions")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(post("/api/admin/payments/{paymentId}/retry-cancel", paymentId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.paymentStatus", is("CANCELLED")))
+			.andExpect(jsonPath("$.paymentGroupStatus", is("CANCELLED")))
+			.andExpect(jsonPath("$.providerCancelTransactionKey", is("cancel-pay-mismatch-retry-1")));
+
+		mockMvc.perform(get("/api/checkouts/{checkoutNumber}", checkoutNumber)
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("CANCELLED")))
+			.andExpect(jsonPath("$.orders[0].status", is("CANCELLED")));
+
+		mockMvc.perform(get("/api/admin/payment-exceptions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.exceptions", hasSize(0)));
+
+		assertThat(fakeTossPaymentsClient.cancelCalls).isEqualTo(2);
+		assertThat(fakeTossPaymentsClient.cancelAmounts).containsExactly(9000L, 9000L);
+		assertThat(fakeTossPaymentsClient.cancelIdempotencyKeys)
+			.containsExactly(firstIdempotencyKey, firstIdempotencyKey);
 	}
 
 	@Test
 	void rejectsExpiredPolicyMissingAndUnsellableCheckoutConfirmation() throws Exception {
-		UserAccount customer = createCustomer("payment-customer-3");
-		ProductOption option = createOption("Payment Product C", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
+		UserAccount customer = createCustomer("payment-customer-4");
+		ProductOption option = createOption("Payment Product D", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
 		addCartItem(customer.getId(), option.getId(), 1);
 		String checkoutWithoutPolicy = createCheckout(customer.getId());
 
@@ -336,7 +423,11 @@ class PaymentApiIntegrationTest {
 	static class FakeTossPaymentsClient implements TossPaymentsClient {
 
 		private Long nextApprovedAmount;
+		private boolean failNextCancel;
 		private int confirmCalls;
+		private int cancelCalls;
+		private final List<Long> cancelAmounts = new ArrayList<>();
+		private final List<String> cancelIdempotencyKeys = new ArrayList<>();
 
 		@Override
 		public TossApprovedPayment confirm(String paymentKey, String orderId, long amount) {
@@ -354,12 +445,23 @@ class PaymentApiIntegrationTest {
 
 		@Override
 		public TossCancelledPayment cancel(String paymentKey, String cancelReason, long cancelAmount, String idempotencyKey) {
+			cancelCalls += 1;
+			cancelAmounts.add(cancelAmount);
+			cancelIdempotencyKeys.add(idempotencyKey);
+			if (failNextCancel) {
+				failNextCancel = false;
+				throw new TossPaymentException("Toss cancel failed");
+			}
 			return new TossCancelledPayment(paymentKey, "cancel-order", cancelAmount, 0, "cancel-" + paymentKey, "CANCELED");
 		}
 
 		void reset() {
 			nextApprovedAmount = null;
+			failNextCancel = false;
 			confirmCalls = 0;
+			cancelCalls = 0;
+			cancelAmounts.clear();
+			cancelIdempotencyKeys.clear();
 		}
 	}
 }

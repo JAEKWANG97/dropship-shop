@@ -667,3 +667,23 @@ Consequences:
 - Checkout shipping address can change only while payment is pending and before checkout policy confirmation.
 - Paid order shipping address can change only while the order is `SUPPLIER_ORDER_PENDING` and supplier work/address lock has not started.
 - After `addressLockedAt` or `SUPPLIER_ORDERED`, customer direct address change is rejected.
+
+## 2026-06-28: DB State-Based Payment Exception Queue
+
+Decision:
+
+Use database payment/order states as the MVP admin queue for payment exceptions instead of introducing a separate queue broker.
+
+Context:
+
+Payment exception handling needs an operator-visible follow-up queue when an approved PG payment cannot become a confirmed order and automatic PG cancel fails. The MVP does not need Kafka, RabbitMQ, or a background worker queue for this. What the admin needs is a durable list of records whose current state requires action.
+
+Consequences:
+
+- `payments.status` is the queue source for payment exceptions.
+- `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, and `REVIEW_REQUIRED` are admin payment exception queue candidates.
+- Automatic payment exception cancel uses a stable idempotency key derived from the payment id.
+- Successful automatic cancel moves `Payment` and `PaymentGroup` to `CANCELLED` and removes the item from the admin queue.
+- Failed automatic cancel moves `Payment` and `PaymentGroup` to `CANCEL_FAILED`, keeps failure code/message, and exposes the item through the admin queue.
+- Admin retry reuses the same idempotency key so duplicate cancel requests do not double-cancel at the PG.
+- A separate broker-based queue can be added later for scheduled retries or alerting, but the state table remains the source of truth.

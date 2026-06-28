@@ -374,6 +374,9 @@ Implemented fields:
 - idempotencyKey
 - failureCode
 - failureMessage
+- providerCancelTransactionKey
+- cancelRequestedAt
+- cancelledAt
 - rawProviderStatus
 - lastSyncedAt
 - createdAt
@@ -386,6 +389,9 @@ Rules:
 - Same `providerPaymentKey` for another checkout is rejected.
 - `APPROVED` moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
 - `CANCEL_REQUIRED` is used for payment exception paths that need PG cancel/admin follow-up.
+- Payment exception cancel requests use a stable idempotency key.
+- Successful payment exception cancel moves `Payment`, `PaymentGroup`, and linked orders to `CANCELLED`.
+- Failed payment exception cancel moves `Payment` and `PaymentGroup` to `CANCEL_FAILED` and leaves the case in the admin payment exception queue.
 
 ## PaymentEvent
 
@@ -398,7 +404,7 @@ Implemented fields:
 - paymentGroupId
 - orderId
 - providerPaymentKey
-- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION
+- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION / PAYMENT_EXCEPTION_CANCEL_REQUESTED / PAYMENT_EXCEPTION_CANCEL_COMPLETED / PAYMENT_EXCEPTION_CANCEL_FAILED / REFUND_REQUESTED / REFUND_COMPLETED / REFUND_FAILED
 - idempotencyKey
 - rawPayload
 - resultMessage
@@ -408,7 +414,7 @@ Implemented fields:
 
 Deferred event types:
 
-- Cancel, refund, and webhook event types are added when the corresponding APIs are implemented.
+- Webhook-specific event types are added when Toss webhook handling is implemented.
 
 ## Fulfillment
 

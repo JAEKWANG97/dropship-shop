@@ -40,6 +40,7 @@ public class PaymentService {
 	private final CustomerOrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
 	private final TossPaymentsClient tossPaymentsClient;
+	private final PaymentExceptionService paymentExceptionService;
 	private final Clock clock;
 
 	public PaymentService(
@@ -48,7 +49,8 @@ public class PaymentService {
 		PaymentEventRepository paymentEventRepository,
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
-		TossPaymentsClient tossPaymentsClient
+		TossPaymentsClient tossPaymentsClient,
+		PaymentExceptionService paymentExceptionService
 	) {
 		this.paymentGroupRepository = paymentGroupRepository;
 		this.paymentRepository = paymentRepository;
@@ -56,6 +58,7 @@ public class PaymentService {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.tossPaymentsClient = tossPaymentsClient;
+		this.paymentExceptionService = paymentExceptionService;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -132,6 +135,7 @@ public class PaymentService {
 				"Approved amount mismatch",
 				now
 			));
+			paymentExceptionService.executeExceptionCancel(payment);
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved amount does not match checkout amount");
 		}
 
