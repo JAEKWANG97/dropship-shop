@@ -1032,3 +1032,53 @@ Acceptance criteria:
 - Authentication and authorization errors use the same JSON response shape.
 - `docs/api-spec.md` and `docs/production-readiness.md` describe the implemented format.
 - `ApiErrorResponseIntegrationTest` covers 401, 403, validation, malformed request, not found, and business rule errors.
+
+## Milestone 7: Frontend MVP
+
+### DS-46: Scaffold Next.js frontend
+
+Status: Implemented
+
+Description:
+
+Create the customer/admin web app foundation.
+
+Acceptance criteria:
+
+- `apps/web` contains a Next.js App Router frontend with TypeScript.
+- The app uses basic CSS instead of Tailwind or a component library.
+- API base URL configuration is documented through `.env.example`.
+- Root layout includes the MVP navigation shell.
+- Lint/build checks run for the scaffold.
+
+### DS-47: Implement auth session UI
+
+Status: Planned
+
+Description:
+
+Implement social login entry points and minimum session-aware route structure.
+
+Acceptance criteria:
+
+- Kakao, Google, and Naver login buttons link to the backend OAuth authorize endpoints.
+- Current user session can be fetched from the backend.
+- Customer and admin route guards have a minimum UI fallback.
+- Logout is available when the backend session exists.
+- Frontend docs and tests/checks are updated.
+
+### DS-48: Implement customer catalog UI
+
+Status: Planned
+
+Description:
+
+Implement customer product list and detail pages.
+
+Acceptance criteria:
+
+- Product list reads `GET /api/products`.
+- Product detail reads `GET /api/products/{productId}`.
+- Product image, option, detail block, notice, and policy link fields are displayed.
+- Unavailable purchase states are visible to customers.
+- Mobile and desktop layouts are checked.
