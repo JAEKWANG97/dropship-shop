@@ -125,6 +125,14 @@ The server must verify payment result directly with Toss Payments before approvi
 
 Product images should be stored outside the application server.
 
+Runtime storage rules:
+
+- PostgreSQL stores product data and image metadata only.
+- Image binaries are not stored in PostgreSQL.
+- Local development may use filesystem-backed product image storage.
+- Production should use S3-compatible object storage and return stable image URLs to the frontend.
+- Frontend catalog screens should consume backend API data instead of maintaining long-lived mock product JSON.
+
 ### Supplier
 
 MVP supplier operation is manual.
