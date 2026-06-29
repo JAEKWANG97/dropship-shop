@@ -216,20 +216,12 @@ Tasks:
 - [ ] `/api/health`, readiness, liveness를 staging/production에서 확인한다.
 - [ ] DB migration dry run과 backup/snapshot 상태를 확인한다.
 
-## Done
-
-- [x] 내부 배송조회 동기화 API 토큰 보호 및 관리자 API 실패 표시
-- [x] 카카오 OAuth 로그인 수정
-- [x] 관리자 mock operational data 제거
-- [x] 로컬 상품 이미지 fixture를 API upload URL 기준으로 정리
-- [x] 고객/관리자 로그인 상태별 헤더 정책 정리
-
 ## Working Rules
 
 - 작업 시작 전 `Now`에서 하나를 고른다.
 - 작은 버그와 문구 수정은 backlog 항목을 만들지 않아도 된다.
 - 큰 기능, 정책, 결제, 주문 상태, DB 변경은 backlog에 남긴다.
 - 각 backlog 항목의 하위 task/checklist는 같은 항목 아래 `Tasks:`로 관리한다.
-- 완료하면 항목을 `Done`으로 옮기고 git commit으로 이력을 남긴다.
+- 완료하면 `docs/BACKLOG_DONE.md`로 옮기고 git commit으로 이력을 남긴다.
 - PR과 외부 이슈는 팀 협업, 배포 전 리뷰, 큰 리스크 변경에만 사용한다.
 - PROJECT_LOG는 관련 backlog ID로 연결한다.
