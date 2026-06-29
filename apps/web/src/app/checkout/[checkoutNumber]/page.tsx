@@ -7,9 +7,9 @@ import { formatPrice } from "@/lib/catalog";
 import { getCurrentUser } from "@/lib/session";
 import {
   confirmCheckoutPolicies,
-  confirmTossPayment,
   updateCheckoutShippingAddress,
 } from "../actions";
+import { TossPaymentLauncher } from "./toss-payment-launcher";
 
 type CheckoutDetailPageProps = {
   params: Promise<{ checkoutNumber: string }>;
@@ -236,25 +236,18 @@ function PolicyConfirmationForm({
 }
 
 function TossPaymentForm({ checkout }: { checkout: Checkout }) {
+  const firstItem = checkout.orders[0]?.items[0];
+  const itemCount = checkout.orders.reduce((sum, order) => sum + order.items.length, 0);
+  const orderName = firstItem
+    ? `${firstItem.productName}${itemCount > 1 ? ` 외 ${itemCount - 1}건` : ""}`
+    : `주문 ${checkout.checkoutNumber}`;
+
   return (
-    <form action={confirmTossPayment} className="checkout-form">
-      <h2>Toss 결제 승인</h2>
-      <p>
-        Toss 결제창 승인 후 받은 paymentKey를 서버에 확인 요청합니다. 실제 Toss 위젯 호출은
-        운영 client key 확정 후 연결합니다.
-      </p>
-      <input name="checkoutNumber" type="hidden" value={checkout.checkoutNumber} />
-      <label>
-        paymentKey
-        <input name="paymentKey" required />
-      </label>
-      <label>
-        결제 금액
-        <input name="amount" readOnly value={checkout.totalAmount} />
-      </label>
-      <button className="button primary" type="submit">
-        결제 승인 확인
-      </button>
-    </form>
+    <TossPaymentLauncher
+      amount={checkout.totalAmount}
+      checkoutNumber={checkout.checkoutNumber}
+      clientKey={process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? ""}
+      orderName={orderName}
+    />
   );
 }

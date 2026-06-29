@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { apiSendWithCookie } from "@/lib/api";
 import type { AgreementState } from "@/lib/account";
 import type { Checkout } from "@/lib/checkout";
+import { confirmTossPaymentRequest } from "@/lib/payments";
 
 const ORDER_POLICY_VERSION = "order-2026-06-01";
 const REFUND_POLICY_VERSION = "refund-2026-06-01";
@@ -133,17 +134,10 @@ export async function confirmTossPayment(formData: FormData) {
   const checkoutNumber = value(formData, "checkoutNumber");
 
   try {
-    await apiSendWithCookie(
-      "/api/payments/toss/confirm",
-      (await cookies()).toString(),
-      {
-        method: "POST",
-        body: JSON.stringify({
-          checkoutNumber,
-          paymentKey: value(formData, "paymentKey"),
-          amount: Number(value(formData, "amount") || "0"),
-        }),
-      },
+    await confirmTossPaymentRequest(
+      checkoutNumber,
+      value(formData, "paymentKey"),
+      Number(value(formData, "amount") || "0"),
     );
   } catch {
     redirect(`/checkout/payment/exception?checkoutNumber=${encodeURIComponent(checkoutNumber)}`);

@@ -30,6 +30,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `DATABASE_PASSWORD` | PostgreSQL 비밀번호 |
 | `PAYMENTS_TOSS_SECRET_KEY` | Toss Payments secret key. 서버에서만 사용 |
 | `PAYMENTS_TOSS_BASE_URL` | Toss Payments API URL. 기본값은 `https://api.tosspayments.com` |
+| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | Toss Payments client key. frontend 결제창 호출에 사용 |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
 | `APP_AUTH_JWT_SECRET` | JWT access token 서명 secret. 충분히 긴 랜덤 값 사용 |
 | `APP_AUTH_SUCCESS_REDIRECT_URI` | OAuth callback 성공 후 frontend로 보낼 URI |
