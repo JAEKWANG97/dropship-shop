@@ -87,6 +87,7 @@ docs: switch workflow to markdown backlog
 - `Next`: 가까운 다음 작업을 둔다.
 - `Later`: 지금 하지 않을 아이디어를 둔다.
 - `Done`: 완료한 큰 작업만 옮긴다.
+- 각 큰 작업에는 `B-001` 같은 ID를 붙인다.
 
 작업을 마치면 필요한 경우 backlog 항목을 `Done`으로 옮기고 commit에 포함한다.
 
@@ -96,11 +97,13 @@ docs: switch workflow to markdown backlog
 
 - 키 입력, 수동 QA, 배포 전 확인처럼 작지만 잊으면 안 되는 항목을 둔다.
 - 큰 기능이나 정책 변경은 TODO가 아니라 `docs/BACKLOG.md`에 둔다.
+- backlog와 연결되는 TODO 섹션 제목은 같은 ID로 시작한다. 예: `## B-001 Toss Payments sandbox 결제 플로우 완성`.
 - 완료한 TODO는 체크하고, 관련 구현이나 검증 커밋에 포함한다.
 
 `docs/PROJECT_LOG.md` 사용 기준:
 
 - 중요한 결정, 막힌 이유, 해결방안, 후속작업을 시간순으로 남긴다.
+- backlog와 연결되는 로그에는 `관련 항목: B-001` 줄을 남긴다.
 - 단순 작업 목록이나 체크리스트는 project log가 아니라 TODO에 둔다.
 
 ## Verification

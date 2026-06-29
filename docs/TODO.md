@@ -2,7 +2,7 @@
 
 이 파일은 작은 확인사항, 수동 검증, 운영 전 체크리스트를 관리한다.
 
-## Payment
+## B-001 Toss Payments sandbox 결제 플로우 완성
 
 - [ ] Toss test client key를 로컬 env에 설정한다.
 - [ ] Toss test secret key를 로컬 env에 설정한다.

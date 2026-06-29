@@ -87,6 +87,9 @@ infra      Local and deployment infrastructure
 ## Backlog And Git Workflow
 
 - 구현 작업 전 `docs/BACKLOG.md`의 `Now` 항목을 확인한다.
+- `docs/BACKLOG.md`의 큰 작업은 `B-001` 같은 ID를 붙인다.
+- `docs/TODO.md`의 관련 섹션은 같은 backlog ID로 시작한다.
+- `docs/PROJECT_LOG.md`의 관련 기록에는 `관련 항목: B-001`처럼 연결 ID를 남긴다.
 - `docs/TODO.md`는 backlog로 올리기 애매한 작은 확인사항, env 설정, 수동 QA, 운영 전 체크리스트를 관리한다.
 - `docs/PROJECT_LOG.md`는 결정 이유, 문제와 해결방안, 후속 맥락을 기록한다.
 - 작은 버그, 문구, 스타일 수정은 backlog 항목 없이 바로 처리할 수 있다.
