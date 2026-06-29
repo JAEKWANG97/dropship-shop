@@ -731,12 +731,6 @@ p {
   font-size: 30px;
 }
 
-.product-tax-note {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .breadcrumb {
   display: flex;
   flex-wrap: wrap;
@@ -834,26 +828,6 @@ p {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
-}
-
-.product-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.product-badges span,
-.product-badges strong {
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--navy);
-  font-size: 13px;
-}
-
-.product-badges strong {
-  border-color: #b7e4c7;
-  color: #047857;
 }
 
 .product-buy-info {

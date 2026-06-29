@@ -90,25 +90,14 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </div>
         </div>
         <div className="product-hero-copy">
-          <div className="product-badges">
-            <span>사업자 전용가</span>
-            <span>배송비 포함</span>
-            <span>세금계산서 가능</span>
-            {purchasable ? <strong>재고 있음</strong> : null}
-          </div>
           <h1>{product.name}</h1>
           <p>{product.summary}</p>
           <strong className="product-price">{formatPrice(product.basePrice)}</strong>
-          <span className="product-tax-note">배송비 포함 가격 · 세금계산서 발행 가능</span>
           <div className="product-buy-info">
             <span>최소 주문</span>
             <strong>옵션별 1개</strong>
             <span>판매 상태</span>
             <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
-            <span>배송 정보</span>
-            <strong>결제 완료 후 공급처 출고</strong>
-            <span>세금계산서</span>
-            <strong>발행 가능</strong>
           </div>
           {purchasable ? (
             session ? (
