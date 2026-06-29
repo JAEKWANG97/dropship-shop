@@ -241,6 +241,40 @@ class PaymentApiIntegrationTest {
 	}
 
 	@Test
+	void recordsPaymentExceptionWhenTossConfirmFails() throws Exception {
+		UserAccount customer = createCustomer("payment-customer-confirm-fail");
+		ProductOption option = createOption("Payment Product Confirm Fail", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
+		addCartItem(customer.getId(), option.getId(), 1);
+		String checkoutNumber = createCheckout(customer.getId());
+		confirmPolicy(customer.getId(), checkoutNumber);
+		fakeTossPaymentsClient.failNextConfirm = true;
+
+		mockMvc.perform(post("/api/payments/toss/confirm")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(confirmRequest(checkoutNumber, "pay-confirm-fail-1", 10000)))
+			.andExpect(status().isBadGateway());
+
+		mockMvc.perform(get("/api/admin/payment-exceptions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')]".formatted(checkoutNumber), hasSize(1)))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].paymentStatus".formatted(checkoutNumber), is(List.of("CANCEL_REQUIRED"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].paymentGroupStatus".formatted(checkoutNumber), is(List.of("PAYMENT_EXCEPTION"))))
+			.andExpect(jsonPath("$.exceptions[?(@.checkoutNumber == '%s')].exceptionReason".formatted(checkoutNumber), is(List.of("PG_CONFIRMATION_ERROR"))));
+
+		mockMvc.perform(get("/api/checkouts/{checkoutNumber}", checkoutNumber)
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("PAYMENT_EXCEPTION")))
+			.andExpect(jsonPath("$.orders[0].status", is("PAYMENT_EXCEPTION")));
+
+		assertThat(fakeTossPaymentsClient.confirmCalls).isEqualTo(1);
+		assertThat(fakeTossPaymentsClient.cancelCalls).isZero();
+		assertThat(paymentRepository.findByProviderPaymentKey("pay-confirm-fail-1")).isPresent();
+	}
+
+	@Test
 	void rejectsExpiredPolicyMissingAndUnsellableCheckoutConfirmation() throws Exception {
 		UserAccount customer = createCustomer("payment-customer-4");
 		ProductOption option = createOption("Payment Product D", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0);
@@ -515,6 +549,7 @@ class PaymentApiIntegrationTest {
 	static class FakeTossPaymentsClient implements TossPaymentsClient {
 
 		private Long nextApprovedAmount;
+		private boolean failNextConfirm;
 		private boolean failNextCancel;
 		private int confirmCalls;
 		private int cancelCalls;
@@ -526,6 +561,10 @@ class PaymentApiIntegrationTest {
 		@Override
 		public TossApprovedPayment confirm(String paymentKey, String orderId, long amount) {
 			confirmCalls += 1;
+			if (failNextConfirm) {
+				failNextConfirm = false;
+				throw new TossPaymentException("Toss confirm failed");
+			}
 			long approvedAmount = nextApprovedAmount == null ? amount : nextApprovedAmount;
 			return new TossApprovedPayment(
 				paymentKey,
@@ -557,6 +596,7 @@ class PaymentApiIntegrationTest {
 
 		void reset() {
 			nextApprovedAmount = null;
+			failNextConfirm = false;
 			failNextCancel = false;
 			confirmCalls = 0;
 			cancelCalls = 0;
