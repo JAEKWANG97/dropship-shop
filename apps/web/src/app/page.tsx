@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./products/product-image";
@@ -36,6 +37,14 @@ export default async function Home() {
               바로 구매하기
             </Link>
           </div>
+          <Image
+            alt="현장 준비대에 놓인 안전용품"
+            className="hero-context-image"
+            height={600}
+            priority
+            src="/images/hero-worksite-prep.png"
+            width={1200}
+          />
         </div>
         <div className="hero-visual" aria-label="대표 안전용품">
           {products.slice(0, 4).map((product) => (

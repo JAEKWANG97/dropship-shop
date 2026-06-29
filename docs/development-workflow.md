@@ -35,7 +35,7 @@
 적절한 작업 예:
 
 - "Toss sandbox success redirect 처리"
-- "사업자 프로필 저장 API 추가"
+- "소셜 로그인 callback 검증"
 - "관리자 주문 발주 시작 액션 연결"
 
 ## Repository Model
@@ -64,7 +64,7 @@ branch 또는 PR을 쓰는 경우:
 
 ```text
 feature/toss-sandbox-payment
-feature/business-profile
+feature/oauth-browser-check
 fix/kakao-oauth-profile
 docs/backlog-workflow
 ```
@@ -74,7 +74,7 @@ docs/backlog-workflow
 커밋 메시지는 실제 변경을 설명한다. 외부 이슈 ID는 기본으로 붙이지 않는다.
 
 ```text
-feat: add business profile onboarding
+feat: connect admin order actions
 fix: hide checkout actions after payment exception
 docs: switch workflow to markdown backlog
 ```

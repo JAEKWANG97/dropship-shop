@@ -22,7 +22,7 @@ Evidence:
 
 User impact:
 - A buyer cannot visually trust what they are buying.
-- The site reads as a prototype, not a purchasable B2B shop.
+- The site reads as a prototype, not a purchasable safety gear shop.
 
 Recommendation:
 - Replace local SVG seed images with real product-like images or asset-backed fixtures.
@@ -56,14 +56,14 @@ Evidence:
 
 User impact:
 - The first screen communicates category, but not operational credibility.
-- B2B customers need fast confidence: “this shop understands jobsite purchasing.”
+- Customers need fast confidence: “this shop understands jobsite purchasing.”
 
 Recommendation:
 - Use a full-width or wide hero image with construction/safety gear context.
 - Keep headline copy, but reduce visual emptiness on the right side.
 - Benefits should include short supporting text, not only labels.
 
-### UX-004: Product Listing Filters Are Too Simplified For B2B Buying
+### UX-004: Product Listing Filters Are Too Simplified For Catalog Buying
 
 Severity: Medium
 
@@ -102,14 +102,14 @@ Severity: Medium
 
 Evidence:
 - Login page intentionally avoids over-explaining, but the social login surface is sparse.
-- The service is B2B and policy-heavy, but login does not reinforce trust or purpose.
+- The service is commerce and policy-heavy, but login does not reinforce trust or purpose.
 
 User impact:
 - Social login feels like a generic auth page, not part of the commerce experience.
 
 Recommendation:
 - Keep the page minimal.
-- Add small trust cues near social buttons: no email/password, no guest checkout, business order tracking after login.
+- Add small trust cues near social buttons: no email/password, no guest checkout, order tracking after login.
 - Do not reintroduce long explanatory copy.
 
 ### UX-007: Admin UI Is Useful But Still Reads As Mock-Oriented
@@ -140,7 +140,7 @@ Recommendation:
 
 ## Recommended Design Direction
 
-The service should move toward “quiet B2B commerce,” not a marketing landing page.
+The service should move toward quiet safety-gear commerce, not a marketing landing page.
 
 Use:
 - Real product images.

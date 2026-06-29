@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "코어블SAF",
-  description: "Business safety gear commerce",
+  description: "건설 안전용품 쇼핑몰",
 };
 
 export default async function RootLayout({
@@ -33,7 +33,7 @@ export default async function RootLayout({
                 <span>코어블</span>
                 <em>SAF</em>
               </strong>
-              <small>건설안전장비 B2B 전문몰</small>
+              <small>건설 안전용품 쇼핑몰</small>
             </Link>
             <form action="/products" className="site-search">
               <input
@@ -57,7 +57,7 @@ export default async function RootLayout({
                 </>
               ) : (
                 <>
-                  <Link href="/account">사업자회원</Link>
+                  <Link href="/account">내 계정</Link>
                   <Link href="/login">로그인</Link>
                 </>
               )}
@@ -82,7 +82,7 @@ export default async function RootLayout({
         <footer className="site-footer">
           <div>
             <strong>코어블SAF</strong>
-            <span>건설 안전장비 B2B 전문몰</span>
+            <span>건설 안전용품 쇼핑몰</span>
           </div>
           <div>
             <strong>고객 지원</strong>

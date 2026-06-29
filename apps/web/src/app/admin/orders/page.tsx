@@ -1,8 +1,15 @@
-import { adminStatusLabel, getAdminOrders } from "@/lib/admin";
+import Link from "next/link";
+import { adminStatusLabel, getAdminOrder, getAdminOrders, type AdminOrder } from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
+import {
+  completeSupplierOrder,
+  createOrderShipment,
+  markOrderOutOfStock,
+  startSupplierWork,
+} from "./actions";
 
 type AdminOrdersPageProps = {
-  searchParams: Promise<{ from?: string; q?: string; status?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; message?: string; orderId?: string; q?: string; status?: string; to?: string }>;
 };
 
 export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
@@ -21,7 +28,10 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
 
     return matchesKeyword && matchesStatus && matchesFrom && matchesTo;
   });
-  const selectedOrder = filteredOrders[0];
+  const selectedOrderId = params.orderId ?? filteredOrders[0]?.orderId;
+  const selectedSummary = filteredOrders.find((order) => order.orderId === selectedOrderId) ?? filteredOrders[0];
+  const detail = selectedOrderId ? await loadOrderDetail(selectedOrderId) : { error: false, order: null };
+  const selectedOrder = mergeOrderDetail(selectedSummary, detail.order);
 
   return (
     <div className="admin-page">
@@ -31,6 +41,13 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
           <p>고객 주문 내역과 결제, 배송 상태를 확인하고 처리하세요.</p>
         </div>
       </div>
+
+      {params.message ? (
+        <div className="notice">
+          <strong>알림</strong>
+          <span>{params.message}</span>
+        </div>
+      ) : null}
 
       {data.error ? (
         <div className="notice">
@@ -84,7 +101,11 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 <span>주문상태</span>
               </div>
               {filteredOrders.map((order) => (
-                <div className="admin-table-row" key={order.orderId}>
+                <Link
+                  className={`admin-table-row ${order.orderId === selectedOrder?.orderId ? "selected" : ""}`}
+                  href={orderHref(order.orderId, params)}
+                  key={order.orderId}
+                >
                   <strong>{order.orderNumber}</strong>
                   <span>{order.customerEmail}</span>
                   <span>{order.items?.length ?? 0}개</span>
@@ -92,7 +113,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                   <span className={`admin-badge ${order.status.toLowerCase()}`}>
                     {adminStatusLabel(order.status)}
                   </span>
-                </div>
+                </Link>
               ))}
               {filteredOrders.length === 0 ? (
                 <div className="admin-empty">
@@ -113,6 +134,12 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               </div>
               <strong>{selectedOrder.orderNumber}</strong>
               <span>{new Date(selectedOrder.createdAt).toLocaleString("ko-KR")}</span>
+              {detail.error ? (
+                <div className="notice">
+                  <strong>상세 데이터를 불러오지 못했습니다</strong>
+                  <span>주문 목록 정보만 표시합니다.</span>
+                </div>
+              ) : null}
               <h3>주문 상품</h3>
               <div className="admin-list">
                 {(selectedOrder.items ?? []).map((item) => (
@@ -126,18 +153,34 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 ))}
               </div>
               <h3>배송 정보</h3>
-              <p>{selectedOrder.shippingAddress ?? "배송지 상세는 주문 상세 API에서 확인합니다."}</p>
+              <p>{shippingAddressText(selectedOrder.shippingAddress)}</p>
               <h3>결제 정보</h3>
               <div className="summary-list compact">
                 <div>
-                  <span>결제수단</span>
-                  <strong>{selectedOrder.paymentMethod ?? "확인 필요"}</strong>
+                  <span>결제상태</span>
+                  <strong>{selectedOrder.payment?.status ?? selectedOrder.paymentGroup?.status ?? "확인 필요"}</strong>
                 </div>
                 <div>
                   <span>결제금액</span>
                   <strong>{formatPrice(selectedOrder.totalAmount)}</strong>
                 </div>
               </div>
+              <h3>운영 상태</h3>
+              <div className="summary-list compact">
+                <div>
+                  <span>발주</span>
+                  <strong>{selectedOrder.fulfillment?.status ?? "없음"}</strong>
+                </div>
+                <div>
+                  <span>배송</span>
+                  <strong>{selectedOrder.shipment?.status ?? "없음"}</strong>
+                </div>
+                <div>
+                  <span>환불</span>
+                  <strong>{selectedOrder.refund?.status ?? "없음"}</strong>
+                </div>
+              </div>
+              <AdminOrderActions order={selectedOrder} />
             </aside>
           ) : null}
         </div>
@@ -154,6 +197,14 @@ async function loadOrders() {
   }
 }
 
+async function loadOrderDetail(orderId: string) {
+  try {
+    return { error: false as const, order: await getAdminOrder(orderId) };
+  } catch {
+    return { error: true as const, order: null };
+  }
+}
+
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <article className="admin-metric">
@@ -161,5 +212,109 @@ function Metric({ label, value }: { label: string; value: number }) {
       <strong>{value}건</strong>
       <small>상태 기준 집계</small>
     </article>
+  );
+}
+
+function mergeOrderDetail(summary?: AdminOrder, detail?: AdminOrder | null) {
+  if (!detail) {
+    return summary;
+  }
+  return {
+    ...summary,
+    ...detail,
+    supplierName: detail.supplierName ?? detail.supplier?.name ?? summary?.supplierName ?? "",
+    customerEmail: detail.customerEmail ?? detail.customer?.email ?? summary?.customerEmail ?? "",
+    checkoutNumber: detail.checkoutNumber ?? detail.paymentGroup?.checkoutNumber ?? summary?.checkoutNumber ?? "",
+    totalAmount: detail.totalAmount ?? detail.paymentGroup?.totalAmount ?? summary?.totalAmount ?? 0,
+  };
+}
+
+function orderHref(
+  orderId: string,
+  params: { from?: string; q?: string; status?: string; to?: string },
+) {
+  const search = new URLSearchParams({ orderId });
+  for (const key of ["from", "q", "status", "to"] as const) {
+    if (params[key]) {
+      search.set(key, params[key]);
+    }
+  }
+  return `/admin/orders?${search.toString()}`;
+}
+
+function shippingAddressText(address: AdminOrder["shippingAddress"]) {
+  if (!address) {
+    return "배송지 상세는 주문 상세 API에서 확인합니다.";
+  }
+  if (typeof address === "string") {
+    return address;
+  }
+  return `${address.recipientName} / ${address.recipientPhone} / ${address.postalCode} ${address.address1} ${address.address2 ?? ""}`;
+}
+
+function AdminOrderActions({ order }: { order: AdminOrder }) {
+  return (
+    <div className="admin-order-actions">
+      <h3>처리 액션</h3>
+      <form action={startSupplierWork} className="admin-inline-form">
+        <input name="orderId" type="hidden" value={order.orderId} />
+        <label>
+          발주 시작 사유
+          <input name="reason" required placeholder="예: 결제 확인 후 공급처 발주 준비" />
+        </label>
+        <button className="button" type="submit">
+          발주 시작
+        </button>
+      </form>
+
+      <form action={completeSupplierOrder} className="admin-inline-form">
+        <input name="orderId" type="hidden" value={order.orderId} />
+        <label>
+          공급처 발주번호
+          <input name="supplierOrderNumber" required placeholder="공급처 주문번호" />
+        </label>
+        <label>
+          예상 출고일
+          <input name="expectedShipDate" type="date" />
+        </label>
+        <label>
+          공급처 메모
+          <input name="supplierResponseMemo" placeholder="선택 입력" />
+        </label>
+        <label>
+          처리 사유
+          <input name="reason" required placeholder="예: 공급처 발주 완료" />
+        </label>
+        <button className="button" type="submit">
+          발주 완료
+        </button>
+      </form>
+
+      <form action={markOrderOutOfStock} className="admin-inline-form">
+        <input name="orderId" type="hidden" value={order.orderId} />
+        <label>
+          품절 사유
+          <input name="reason" required placeholder="예: 공급처 재고 없음" />
+        </label>
+        <button className="button" type="submit">
+          품절 처리
+        </button>
+      </form>
+
+      <form action={createOrderShipment} className="admin-inline-form">
+        <input name="orderId" type="hidden" value={order.orderId} />
+        <label>
+          택배사
+          <input name="carrier" required placeholder="예: CJ대한통운" />
+        </label>
+        <label>
+          송장번호
+          <input name="trackingNumber" required />
+        </label>
+        <button className="button" type="submit">
+          송장 입력
+        </button>
+      </form>
+    </div>
   );
 }

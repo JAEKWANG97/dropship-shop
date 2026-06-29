@@ -261,6 +261,14 @@ textarea {
   z-index: 1;
 }
 
+.hero-context-image {
+  width: min(360px, 100%);
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(6, 27, 73, 0.1);
+}
+
 .hero-visual {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr));
@@ -1390,6 +1398,10 @@ textarea {
   border-bottom: 0;
 }
 
+.admin-table-row.selected {
+  background: #fff7ed;
+}
+
 .admin-table-head {
   background: var(--surface-soft);
   font-weight: 800;
@@ -1498,6 +1510,27 @@ textarea {
   font-size: 16px;
 }
 
+.admin-order-actions,
+.admin-inline-form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-inline-form {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.admin-inline-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 @media (max-width: 760px) {
   .site-utility {
     position: static;
@@ -1557,6 +1590,10 @@ textarea {
   .hero-visual {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     min-height: 170px;
+  }
+
+  .hero-context-image {
+    display: none;
   }
 
   .category-strip,

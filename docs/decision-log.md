@@ -758,3 +758,22 @@ Consequences:
 - Small bugs, copy changes, and style fixes can be handled without backlog entries.
 - PRs are reserved for team review, deployment review, or high-risk changes.
 - Linear and GitHub Issues remain historical records and can be reintroduced when team collaboration requires them.
+
+## 2026-06-29: Customer Required Info And Phone Verification
+
+Decision:
+
+Use one customer account flow with no business-member type. For production readiness, collect only minimal customer required info after social login and verify phone number ownership with SMS OTP.
+
+Context:
+
+The shop does not need a separate business-member profile. It does need reliable customer contact information before checkout and shipment. Full CI/DI identity verification through NICE, KCB, or Toss 인증 is heavier than the current requirement and should not be added until real-name verification, adult verification, or duplicate identity control is required.
+
+Consequences:
+
+- Customer account type remains simple: social-login customer or admin role.
+- Required customer info starts with display name, reachable email when social email is missing or placeholder, and verified phone number.
+- MVP phone verification uses SMS OTP, not CI/DI identity verification.
+- OTP codes must be hashed at rest and bounded by expiration, resend cooldown, and attempt limits.
+- Phone number changes require re-verification.
+- Checkout gating for incomplete required info is tracked as backlog item B-017.
