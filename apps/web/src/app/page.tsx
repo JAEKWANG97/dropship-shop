@@ -3,7 +3,6 @@ import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./products/product-image";
 
 const categories = ["안전모", "안전화", "형광조끼", "안전장갑", "추락방지", "보안경"];
-const benefits = ["사업자 전용가", "빠른 배송", "세금계산서 가능", "간편 결제"];
 
 async function loadProducts() {
   try {
@@ -20,20 +19,15 @@ export default async function Home() {
     <div className="home-page">
       <section className="home-hero">
         <div className="home-copy">
-          <p className="eyebrow">건설현장의 안전, 빠르게 확실하게!</p>
+          <p className="eyebrow">현장 안전용품을 한곳에서</p>
           <h1>
             현장 안전용품
-            <span>오늘 필요한 만큼 바로 주문</span>
+            <span>필요한 수량만 선택해 주문</span>
           </h1>
           <p>
-            사업자 전용가로 합리적으로, 빠른 배송으로 현장에서 바로 사용할 수 있게
-            준비합니다.
+            안전모, 안전화, 조끼, 장갑까지 현장에서 자주 쓰는 품목을 빠르게 찾고
+            주문하세요.
           </p>
-          <div className="hero-benefits">
-            {benefits.map((benefit) => (
-              <span key={benefit}>{benefit}</span>
-            ))}
-          </div>
           <div className="action-row">
             <Link className="button primary" href="/products">
               상품 보러가기
@@ -99,24 +93,6 @@ export default async function Home() {
         )}
       </section>
 
-      <section className="status-panel" aria-label="service benefits">
-        <div>
-          <span className="panel-label">사업자 전용가</span>
-          <strong>배송비 포함 가격으로 바로 주문</strong>
-        </div>
-        <div>
-          <span className="panel-label">빠른 배송</span>
-          <strong>결제 완료 후 공급처 출고 진행</strong>
-        </div>
-        <div>
-          <span className="panel-label">세금계산서 가능</span>
-          <strong>정책 문서 기준으로 거래 증빙 제공</strong>
-        </div>
-        <div>
-          <span className="panel-label">간편 결제</span>
-          <strong>카드, 계좌이체, 간편결제 지원</strong>
-        </div>
-      </section>
     </div>
   );
 }
