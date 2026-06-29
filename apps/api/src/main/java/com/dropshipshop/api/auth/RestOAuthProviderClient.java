@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import com.dropshipshop.api.user.domain.SocialProvider;
 
@@ -51,20 +52,28 @@ class RestOAuthProviderClient implements OAuthProviderClient {
 		body.add("redirect_uri", settings.redirectUri());
 		body.add("code", code);
 
-		return restClient.post()
-			.uri(settings.tokenUri())
-			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-			.body(body)
-			.retrieve()
-			.body(mapBodyType);
+		try {
+			return restClient.post()
+				.uri(settings.tokenUri())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.body(body)
+				.retrieve()
+				.body(mapBodyType);
+		} catch (RestClientResponseException exception) {
+			throw new OAuthProviderException("OAuth token request failed: " + exception.getStatusCode());
+		}
 	}
 
 	private Map<String, Object> profile(OAuthProviderProperties.ProviderSettings settings, String accessToken) {
-		return restClient.get()
-			.uri(settings.userInfoUri())
-			.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-			.retrieve()
-			.body(mapBodyType);
+		try {
+			return restClient.get()
+				.uri(settings.userInfoUri())
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.retrieve()
+				.body(mapBodyType);
+		} catch (RestClientResponseException exception) {
+			throw new OAuthProviderException("OAuth profile request failed: " + exception.getStatusCode());
+		}
 	}
 
 	private OAuthProfile googleProfile(Map<String, Object> response) {
@@ -93,7 +102,7 @@ class RestOAuthProviderClient implements OAuthProviderClient {
 	}
 
 	private OAuthProfile profile(String providerUserId, String email, String displayName) {
-		if (isBlank(providerUserId) || isBlank(email) || isBlank(displayName)) {
+		if (isBlank(providerUserId) || isBlank(email)) {
 			throw new OAuthProviderException("OAuth provider profile is missing required fields");
 		}
 		return new OAuthProfile(providerUserId, email, displayName);
