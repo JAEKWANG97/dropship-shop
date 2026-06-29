@@ -102,6 +102,7 @@ Sandbox path:
 
 - Use Toss Payments test client key in the frontend.
 - Use Toss Payments test secret key only on the Spring Boot server.
+- Current development proceeds with Toss Payments test keys until the deployed homepage URL is ready for live PG review.
 - Configure the Spring Boot server secret through `payments.toss.secret-key` or the equivalent environment variable, and never commit it.
 - Create a server-side `PaymentGroup` before invoking the Toss payment UI.
 - Confirm approved payment results on the server before moving orders to `SUPPLIER_ORDER_PENDING`.
@@ -109,6 +110,7 @@ Sandbox path:
 
 Production readiness:
 
+- A deployed homepage URL is required before live Toss Payments review and live key switching.
 - Toss Payments merchant account and contract must be ready before live keys are used.
 - Live client key and live secret key must be configured outside source control.
 - Enabled live payment methods must match the MVP method policy: card, easy payment, and account transfer only.

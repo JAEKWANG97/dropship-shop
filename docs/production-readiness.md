@@ -44,7 +44,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
 
-Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. `PAYMENTS_TOSS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. 현재 개발과 sandbox 검증은 Toss Payments test key로 진행하고, live PG 심사와 live key 전환은 배포된 홈페이지 URL이 준비된 뒤 진행한다. `PAYMENTS_TOSS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
 
 ## Health And Readiness
 

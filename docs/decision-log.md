@@ -218,6 +218,23 @@ Decision:
 
 Enable Toss Payments card, easy payment, and account transfer for MVP. Exclude virtual account/bank-transfer-like async payment, mobile phone payment, and gift certificate payment from MVP. Do not show failed, pending, or expired payment orders in customer order history.
 
+## 2026-06-29: Toss Payments Test Key First
+
+Decision:
+
+Use Toss Payments test keys for current development and sandbox verification. Defer live PG review, live key switching, and merchant production activation until a deployed homepage URL is available.
+
+Context:
+
+Toss Payments live operation needs merchant review inputs such as service URL, business information, customer-facing policy pages, and payment method approval. The project can still finish the technical payment flow with test keys before that review.
+
+Consequences:
+
+- Local and staging payment verification uses test client/secret keys only.
+- Live keys are not required for current development.
+- Production PG activation is a launch-readiness task after deployment URL, business registration, customer service information, and policy pages are ready.
+- Test keys and live keys must never be committed.
+
 Superseded note:
 
 The original decision excluded all partial cancellation/refund. That part is superseded by `2026-06-27: Payment Group And Delivery Group Refund Unit`, which allows delivery-group order level partial cancellation/refund while still excluding product, option, and quantity-level partial cancellation/refund.
