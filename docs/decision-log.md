@@ -707,3 +707,21 @@ Consequences:
 - Unknown local `paymentKey` webhooks are accepted after Toss lookup verification but do not create local payment events.
 - If webhook status conflicts with the local server-confirmed state, the payment moves to `REVIEW_REQUIRED` instead of auto-mutating orders or refunds.
 - `REVIEW_REQUIRED` appears in the admin payment exception queue.
+
+## 2026-06-29: Markdown Backlog And Git Commit Workflow
+
+Decision:
+
+Use `docs/BACKLOG.md` and git commits as the default solo-development workflow. Linear, GitHub Issues, and PRs are no longer the default work unit.
+
+Context:
+
+The project is currently developed by one person with frequent AI pair-programming. Linear issue updates, GitHub Issue management, PR creation, and cross-tool status sync add more overhead than value for small and medium changes.
+
+Consequences:
+
+- `docs/BACKLOG.md` is the current work queue.
+- A normal work unit is one backlog item and one git commit.
+- Small bugs, copy changes, and style fixes can be handled without backlog entries.
+- PRs are reserved for team review, deployment review, or high-risk changes.
+- Linear and GitHub Issues remain historical records and can be reintroduced when team collaboration requires them.

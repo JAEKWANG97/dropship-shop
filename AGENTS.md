@@ -8,10 +8,10 @@ AI agent가 Dropship Shop 저장소에서 작업할 때 따르는 운영 지침�
 
 - Project: 공급처 출고형 자사몰. 운영자가 상품을 팔고 공급처가 출고한다.
 - Backend: Spring Boot, PostgreSQL, JPA, Spring Security.
-- Frontend: `apps/web`에 추가 예정.
+- Frontend: `apps/web`의 Next.js customer/admin web.
 - Payment: Toss Payments.
-- Work unit: 기본적으로 Linear 이슈 1개가 구현/문서/테스트 단위다.
-- Before coding: 관련 정책 문서, ERD, API 문서, Linear 이슈를 먼저 확인한다.
+- Work unit: 기본적으로 `docs/BACKLOG.md` 항목 1개와 git commit 1개가 구현/문서/테스트 단위다.
+- Before coding: 관련 정책 문서, ERD, API 문서, `docs/BACKLOG.md`를 먼저 확인한다.
 - Before completion: 테스트와 문서 동기화를 확인한다.
 
 자주 쓰는 검증 명령:
@@ -35,7 +35,7 @@ infra      Local and deployment infrastructure
 - 제품 범위: `README.md`, `docs/product-brief.md`, `docs/requirements.md`
 - 정책 기준: `docs/policies/README.md`, `docs/decision-log.md`
 - 설계 기준: `docs/domain-model.md`, `docs/erd.md`, `docs/api-spec.md`, `docs/order-flow.md`, `docs/architecture.md`
-- 실행 단위: `docs/linear-backlog.md`, `docs/development-workflow.md`
+- 실행 단위: `docs/BACKLOG.md`, `docs/development-workflow.md`
 
 ## Instruction Model
 
@@ -83,21 +83,21 @@ infra      Local and deployment infrastructure
 - 취소, 반품, 교환 가능 상태
 - 개인정보 보관/삭제 경계
 
-## Linear And Git Workflow
+## Backlog And Git Workflow
 
-- 구현 작업 전 Linear 이슈를 확인하거나 생성한다.
-- 작업 시작 시 이슈를 `In Progress`로 이동한다.
-- 구현, 문서, 테스트가 같은 목적이면 같은 이슈에 포함할 수 있다.
-- 완료 시 테스트 결과와 변경 요약을 Linear에 남긴다.
-- PR을 만들 경우 제목과 본문에 Linear 이슈 ID를 포함한다.
-- 작은 문서 오타, 작업 규칙 문서 보강, 임시 조사 메모는 별도 이슈 없이 처리할 수 있다.
+- 구현 작업 전 `docs/BACKLOG.md`의 `Now` 항목을 확인한다.
+- 작은 버그, 문구, 스타일 수정은 backlog 항목 없이 바로 처리할 수 있다.
+- 큰 기능, 정책, 결제, 주문 상태, DB 변경은 backlog에 남긴다.
+- 기본 완료 단위는 git commit이다.
+- PR은 팀 리뷰, 배포 전 검토, 큰 리스크 변경에만 사용한다.
+- Linear와 GitHub Issues는 기본으로 사용하지 않는다.
 
 커밋 메시지는 실제 변경을 설명한다.
 
 ```text
-feat(ds-6): implement catalog domain
-docs(ds-2): define order state policy
-fix(ds-9): make payment confirmation idempotent
+feat: implement catalog domain
+docs: define order state policy
+fix: make payment confirmation idempotent
 ```
 
 ## Implementation Rules
@@ -158,7 +158,7 @@ fix(ds-9): make payment confirmation idempotent
 - 테이블/관계 변경: `docs/erd.md`
 - 도메인 개념 변경: `docs/domain-model.md`
 - 주문/결제/배송 흐름 변경: `docs/order-flow.md`
-- 작업 범위 변경: `docs/linear-backlog.md`
+- 작업 범위 변경: `docs/BACKLOG.md`
 
 구현이 아직 없으면 `Planned`, 구현되었으면 `Implemented`로 상태를 명확히 쓴다.
 
@@ -175,7 +175,7 @@ fix(ds-9): make payment confirmation idempotent
 
 완료 보고에는 다음을 포함한다.
 
-- 완료한 이슈 또는 작업명
+- 완료한 작업명
 - 주요 변경 내용
 - 문서 반영 여부
 - 실행한 테스트와 결과

@@ -22,7 +22,7 @@
 - `Initial Direction`은 논의 초기의 방향성 기록이며, 현재 기준과 충돌하면 `Confirmed Policy`를 우선한다.
 - [Policy Decision Questions](policy-decision-questions.md)는 결정 워크시트와 히스토리로 사용한다.
 - 결정 이유와 변경 이력은 [Decision Log](../decision-log.md)에 남긴다.
-- 실행 단위와 Linear 이슈 분리는 [Linear Backlog](../linear-backlog.md)를 기준으로 한다.
+- 실행 단위는 [Backlog](../BACKLOG.md)를 기준으로 한다.
 
 ## Decision Status
 

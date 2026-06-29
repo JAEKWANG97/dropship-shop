@@ -9,7 +9,7 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - 현재 제품 범위: [Product Brief](product-brief.md), [Requirements](requirements.md)
 - 현재 운영 정책: [Policy Documents](policies/README.md)
 - 정책 결정 이력과 이유: [Decision Log](decision-log.md)
-- 실행 단위와 Linear 이슈 기준: [Linear Backlog](linear-backlog.md)
+- 현재 작업 큐: [Backlog](BACKLOG.md)
 - 구현 설계 초안: [Domain Model](domain-model.md), [MVP ERD](erd.md), [MVP API Specification](api-spec.md), [Order Flow](order-flow.md), [Architecture](architecture.md), [Production Readiness](production-readiness.md)
 
 정책 파일에서는 `Confirmed Policy`가 현재 구현 기준이다. `Initial Direction`은 논의 초기에 잡은 방향이므로, 충돌이 있으면 `Confirmed Policy`와 `Decision Log`를 우선한다.
@@ -27,7 +27,7 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 9. [Architecture](architecture.md)
 10. [Production Readiness](production-readiness.md)
 11. [Roadmap](roadmap.md)
-12. [Linear Backlog](linear-backlog.md)
+12. [Backlog](BACKLOG.md)
 13. [Development Workflow](development-workflow.md)
 14. [Decision Log](decision-log.md)
 15. [GitHub And Linear Setup](github-linear-setup.md)
@@ -40,4 +40,4 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - DS-26: supplier fulfillment SLA, address lock, shipment unit, and tracking correction policy is reflected in fulfillment, order, admin, domain, requirements, and flow docs.
 - DS-27: privacy, business notice, legal disclosure, account deletion, and marketing consent policy is reflected in account, legal notice, domain, requirements, and decision docs.
 - DS-28: order transition table, forbidden transitions, notification log, visibility split, and order snapshot policy is reflected in order, admin, domain, requirements, flow, and decision docs.
-- Next policy issues are tracked in [Linear Backlog](linear-backlog.md) and Linear.
+- Next policy work is tracked in [Backlog](BACKLOG.md).

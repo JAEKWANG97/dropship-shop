@@ -2,137 +2,118 @@
 
 ## Purpose
 
-이 문서는 Dropship Shop 프로젝트의 GitHub PR과 Linear 이슈 운영 방식을 정의한다.
+이 문서는 Dropship Shop 프로젝트의 현재 개발 운영 방식을 정의한다.
 
 ## Core Rule
 
-모든 구현 작업은 Linear 이슈 단위로 진행한다.
+혼자 개발하는 동안 기본 작업 관리는 `docs/BACKLOG.md`와 git commit으로 한다.
 
-예외:
+기본값:
 
-- 아주 작은 문서 오타 수정
-- 긴급 운영 메모
-- Linear 이슈를 만들기 전 임시 조사 메모
+- Linear 사용 안 함
+- GitHub Issues 사용 안 함
+- PR 기본 생략
+- 큰 기능, 정책, 결제, 주문 상태, DB 변경만 backlog에 기록
+- 작은 버그, 문구, 스타일 수정은 바로 커밋
 
-## Linear Issue Scope
+## Work Unit
 
-좋은 이슈 크기:
+좋은 작업 크기:
 
-- 하나의 PR로 완료 가능하다.
-- 리뷰어가 변경 의도를 빠르게 이해할 수 있다.
-- 테스트 또는 검증 방법이 명확하다.
+- 하나의 git commit으로 설명 가능하다.
+- 테스트 또는 확인 방법이 명확하다.
+- 정책/DB/API 변경이면 관련 문서까지 함께 갱신 가능하다.
 
-너무 큰 이슈 예:
+너무 큰 작업 예:
 
-- "주문 시스템 전체 구현"
+- "결제 전체 붙이기"
 - "관리자 페이지 전체 구현"
-- "결제 붙이기"
+- "상품 관리 다 만들기"
 
-적절한 이슈 예:
+적절한 작업 예:
 
-- `DS-4 Scaffold Spring Boot backend`
-- `DS-6 Implement catalog domain`
-- `DS-8 Implement order creation`
-- `DS-9 Integrate PG sandbox payment approval`
+- "Toss sandbox success redirect 처리"
+- "사업자 프로필 저장 API 추가"
+- "관리자 주문 발주 시작 액션 연결"
 
 ## Repository Model
 
-This project uses a monorepo.
-
-Planned structure:
-
 ```text
-apps/web   Next.js frontend
+apps/web   Next.js customer/admin web
 apps/api   Spring Boot backend
 docs       product, policy, architecture, workflow docs
 infra      local and deployment infrastructure
 ```
 
-One PR can include frontend, backend, docs, and infra changes when they belong to the same Linear issue.
+frontend, backend, docs가 같은 목적이면 한 커밋에 포함할 수 있다.
 
-Example:
+## Branch And PR
 
-```text
-DS-8 Implement order creation
-- apps/api: order creation API
-- apps/web: checkout call site
-- docs: order API notes
-```
+기본은 `main`에서 작은 커밋으로 진행한다.
 
-## Branch Naming
+branch 또는 PR을 쓰는 경우:
 
-Branch names must include the Linear issue identifier.
+- 결제/주문/환불/배송 상태 전이 변경
+- DB migration이 크거나 되돌리기 어렵다
+- 배포 직전 리뷰가 필요하다
+- 팀원이 생겨 리뷰 흐름이 필요하다
 
-Recommended format:
+브랜치를 쓸 때는 짧게 쓴다.
 
 ```text
-feature/ds-4-backend-scaffold
-feature/ds-6-catalog-domain
-feature/ds-8-order-creation
-fix/ds-9-payment-idempotency
-docs/ds-2-order-state-policy
+feature/toss-sandbox-payment
+feature/business-profile
+fix/kakao-oauth-profile
+docs/backlog-workflow
 ```
-
-Rules:
-
-- Use lowercase issue id in branch names.
-- Keep branch names short.
-- Use `feature/`, `fix/`, `docs/`, or `chore/` prefixes.
 
 ## Commit Messages
 
-Commit messages should describe the actual change. Include the Linear issue id when useful.
-
-Examples:
+커밋 메시지는 실제 변경을 설명한다. 외부 이슈 ID는 기본으로 붙이지 않는다.
 
 ```text
-feat(ds-4): scaffold Spring Boot backend
-docs(ds-2): define order state policy
-fix(ds-9): make payment confirmation idempotent
+feat: add business profile onboarding
+fix: hide checkout actions after payment exception
+docs: switch workflow to markdown backlog
 ```
 
-## Pull Request Titles
+## Backlog Rules
 
-PR titles should start with the Linear issue id.
+`docs/BACKLOG.md` 사용 기준:
 
-Examples:
+- `Now`: 바로 할 일 1-3개만 둔다.
+- `Next`: 가까운 다음 작업을 둔다.
+- `Later`: 지금 하지 않을 아이디어를 둔다.
+- `Done`: 완료한 큰 작업만 옮긴다.
 
-```text
-DS-4 Scaffold Spring Boot backend
-DS-6 Implement catalog domain
-DS-9 Integrate PG sandbox payment approval
+작업을 마치면 필요한 경우 backlog 항목을 `Done`으로 옮기고 commit에 포함한다.
+
+## Verification
+
+변경 범위에 맞는 최소 검증을 한다.
+
+API 변경:
+
+```sh
+cd apps/api
+./gradlew test --tests '패키지또는테스트명'
 ```
 
-## Pull Request Body
+Web 변경:
 
-Use the repository PR template.
-
-For PRs that complete an issue, use:
-
-```text
-Fixes DS-4
+```sh
+cd apps/web
+npm run lint
+npm run build
 ```
 
-For PRs that only relate to an issue but should not close it, use:
+공통:
 
-```text
-Refs DS-4
+```sh
+git diff --check
 ```
 
-## Review And Merge
-
-Default flow:
-
-1. Create or pick a Linear issue.
-2. Create a branch with the issue id.
-3. Implement one issue-sized change.
-4. Open a PR with the issue id in the title.
-5. Link the issue in the PR body.
-6. Merge after review and verification.
-
-## Production Baseline Verification
-
-운영 설정, 보안 설정, DB migration, 결제 설정, health endpoint를 바꾸는 PR은 다음을 확인한다.
+운영 설정, 보안 설정, DB migration, 결제 설정, health endpoint를 바꾸면 더 넓게 확인한다.
 
 ```sh
 cd apps/api
@@ -151,28 +132,20 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 
 운영 환경 변수와 체크리스트 기준은 [Production Readiness](production-readiness.md)를 따른다.
 
-## Status Rules
+## Completion
 
-Recommended Linear status usage:
+완료 전 확인:
 
-- `Todo`: issue is ready but not started.
-- `In Progress`: branch or implementation work has started.
-- `In Review`: PR is open.
-- `Done`: PR is merged and verification is complete.
+- 변경이 backlog 또는 사용자 요청과 맞는가
+- 정책 결정이 필요한 부분을 임의로 정하지 않았는가
+- 필요한 테스트를 실행했는가
+- `git diff --check`를 통과했는가
+- secret, access token, OAuth secret, PG secret, DB password가 커밋에 없는가
 
-If Linear GitHub integration is enabled, some of these transitions can be automated.
+완료 보고에는 다음을 포함한다.
 
-## GitHub And Linear Integration
-
-Required setup:
-
-1. Install or enable the Linear GitHub integration for the `Dropship Shop` organization.
-2. Grant access to `JAEKWANG97/dropship-shop`.
-3. Configure Linear automation so PR activity updates issue status where appropriate.
-4. Keep `DS-*` issue identifiers in branch names, PR titles, and PR bodies.
-
-GitHub repository autolink should map:
-
-```text
-DS-123 -> https://linear.app/dropship-shop/issue/DS-123
-```
+- 완료한 작업명
+- 주요 변경 내용
+- 실행한 테스트와 결과
+- 커밋 여부
+- 남은 리스크 또는 다음 작업
