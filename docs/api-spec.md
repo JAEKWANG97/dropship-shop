@@ -13,7 +13,7 @@
 - Admin APIs use `/api/admin/**`.
 - Customer APIs must use the authenticated user id from the security context.
 - Admin APIs require `ADMIN`.
-- Non-user-authenticated access is allowed for public product pages, public policy/business/legal pages, health checks, OAuth start/callback, verified provider webhooks, and internal scheduler endpoints.
+- Non-user-authenticated access is allowed for public product pages, public policy/business/legal pages, health checks, OAuth start/callback, and verified provider webhooks. Internal scheduler endpoints require their configured internal token.
 - Basic login and form login are disabled. Social OAuth issues a stateless JWT access token in an HttpOnly cookie.
 - Server calculates all order, payment, refund, and shipping amounts.
 - Client-submitted totals are never trusted.
@@ -394,13 +394,14 @@ Rules:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/orders/{orderId}/shipment` | Authenticated user | Planned | Customer shipment detail |
-| `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler | Implemented | Sync tracking status batch by carrier/tracking number |
+| `POST` | `/api/internal/shipments/tracking-sync` | Internal scheduler token | Implemented | Sync tracking status batch by carrier/tracking number |
 | `POST` | `/api/admin/shipments/{shipmentId}/tracking-sync` | `ADMIN` | Implemented | Manual retry tracking sync |
 | `POST` | `/api/admin/shipments/{shipmentId}/manual-correction` | `ADMIN` | Implemented | Manually correct shipment status to delivered |
 
 Rules:
 
 - Customer order detail includes shipment summary when an admin-entered shipment exists.
+- Internal scheduler calls must include `X-Internal-Sync-Token`; the token is configured only on the API server and scheduler.
 - Shipment creation requires carrier and tracking number.
 - MVP supports one shipment per order.
 - Automatic tracking moves shipment forward only.

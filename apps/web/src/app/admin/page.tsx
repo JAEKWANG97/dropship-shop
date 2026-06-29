@@ -3,7 +3,23 @@ import { adminStatusLabel, getAdminOrders, getAdminProducts } from "@/lib/admin"
 import { formatPrice } from "@/lib/catalog";
 
 export default async function AdminDashboardPage() {
-  const [products, orders] = await Promise.all([getAdminProducts(), getAdminOrders()]);
+  const data = await loadDashboard();
+
+  if (data.error) {
+    return (
+      <div className="admin-page">
+        <div className="admin-heading">
+          <div>
+            <h1>관리자 대시보드</h1>
+            <p>주문, 배송, 상품 상태를 한 화면에서 확인하세요.</p>
+          </div>
+        </div>
+        <AdminDataError />
+      </div>
+    );
+  }
+
+  const { orders, products } = data;
   const pendingOrders = orders.filter((order) => order.status === "SUPPLIER_ORDER_PENDING");
   const shippedOrders = orders.filter((order) => order.status === "SHIPPED");
   const lowStockProducts = products.filter((product) => product.status === "SOLD_OUT");
@@ -119,6 +135,24 @@ export default async function AdminDashboardPage() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+async function loadDashboard() {
+  try {
+    const [products, orders] = await Promise.all([getAdminProducts(), getAdminOrders()]);
+    return { error: false as const, orders, products };
+  } catch {
+    return { error: true as const, orders: [], products: [] };
+  }
+}
+
+function AdminDataError() {
+  return (
+    <div className="notice">
+      <strong>운영 데이터를 불러오지 못했습니다</strong>
+      <span>권한, API 서버, 네트워크 상태를 확인한 뒤 다시 시도하세요.</span>
     </div>
   );
 }

@@ -11,6 +11,8 @@ spring:
       ddl-auto: create-drop
 
 app:
+  internal:
+    sync-token: test-internal-sync-token
   auth:
     jwt-secret: test-jwt-secret-for-cookie-authentication
     cookie-secure: false

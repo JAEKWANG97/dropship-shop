@@ -25,6 +25,7 @@
 
 ## Done
 
+- [x] 내부 배송조회 동기화 API 토큰 보호 및 관리자 API 실패 표시
 - [x] 카카오 OAuth 로그인 수정
 - [x] 관리자 mock operational data 제거
 - [x] 로컬 상품 이미지 fixture를 API upload URL 기준으로 정리

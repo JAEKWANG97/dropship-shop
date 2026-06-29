@@ -444,6 +444,7 @@ class AdminOrderApiIntegrationTest {
 		createShipment(order, "한진택배", "FAIL-123");
 
 		mockMvc.perform(post("/api/internal/shipments/tracking-sync")
+				.header("X-Internal-Sync-Token", "test-internal-sync-token")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -468,6 +469,30 @@ class AdminOrderApiIntegrationTest {
 		assertThat(shipment.getStatus()).isEqualTo(ShipmentStatus.SHIPPED);
 		assertThat(shipment.getTrackingSyncFailureReason()).isEqualTo("Carrier timeout");
 		assertThat(shipment.getTrackingSyncedAt()).isNotNull();
+	}
+
+	@Test
+	void rejectsInternalTrackingSyncWithoutToken() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-13-token");
+		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-TOKEN-1", "ADM-SHIP-TOKEN-CO-1", 37100);
+		createShipment(order, "한진택배", "TOKEN-123");
+
+		mockMvc.perform(post("/api/internal/shipments/tracking-sync")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "shipments": [
+					    {
+					      "carrier": "한진택배",
+					      "trackingNumber": "TOKEN-123",
+					      "trackingStatus": "DELIVERED"
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isUnauthorized());
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
 	}
 
 	@Test

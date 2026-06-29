@@ -38,27 +38,20 @@ type AdminOrderListResponse = {
   orders: AdminOrder[];
 };
 
-async function readWithFallback<T>(path: string, fallback: T) {
-	try {
-		return await apiGetWithCookie<T>(path, (await cookies()).toString());
-	} catch {
-		return fallback;
-	}
+async function readAdmin<T>(path: string) {
+	return apiGetWithCookie<T>(path, (await cookies()).toString());
 }
 
 export async function getAdminProducts() {
-	return readWithFallback<AdminProduct[]>("/api/admin/products", []);
+	return readAdmin<AdminProduct[]>("/api/admin/products");
 }
 
 export async function getAdminSuppliers() {
-	return readWithFallback<AdminSupplier[]>("/api/admin/suppliers", []);
+	return readAdmin<AdminSupplier[]>("/api/admin/suppliers");
 }
 
 export async function getAdminOrders() {
-	const data = await readWithFallback<AdminOrderListResponse>(
-		"/api/admin/orders",
-		{ orders: [] },
-	);
+	const data = await readAdmin<AdminOrderListResponse>("/api/admin/orders");
 	return data.orders;
 }
 
