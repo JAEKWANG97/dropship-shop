@@ -86,9 +86,6 @@ export default async function Home() {
                 <div className="product-card-copy">
                   <span className="product-card-name">{product.name}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
-                  <span className="product-card-summary">
-                    {product.status === "ACTIVE" ? "주문 가능" : "상태 확인 필요"}
-                  </span>
                 </div>
                 <span className="product-card-cta">상세 보고 구매</span>
               </Link>

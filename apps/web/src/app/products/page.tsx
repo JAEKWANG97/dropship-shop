@@ -88,14 +88,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <span className="product-card-name">{product.name}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
                   <span className="product-card-summary">{product.summary}</span>
-                  <span className="product-card-status">
-                    {product.status === "ACTIVE" ? "구매 가능" : "상태 확인 필요"}
-                  </span>
-                  <div className="product-card-meta">
-                    <span>배송비 포함</span>
-                    <span>세금계산서 가능</span>
-                    <span>최소주문 상세 확인</span>
-                  </div>
                 </div>
                 <span className="product-card-actions">
                   <span>장바구니</span>
