@@ -11,7 +11,6 @@ AI agent가 Dropship Shop 저장소에서 작업할 때 따르는 운영 지침�
 - Frontend: `apps/web`의 Next.js customer/admin web.
 - Payment: Toss Payments.
 - Work unit: 기본적으로 `docs/BACKLOG.md` 항목 1개와 git commit 1개가 구현/문서/테스트 단위다.
-- Todo: `docs/TODO.md`는 자잘한 확인사항, 수동 검증, 운영 전 체크리스트를 관리한다.
 - Before coding: 관련 정책 문서, ERD, API 문서, `docs/BACKLOG.md`를 먼저 확인한다.
 - Before completion: 테스트와 문서 동기화를 확인한다.
 
@@ -36,7 +35,7 @@ infra      Local and deployment infrastructure
 - 제품 범위: `README.md`, `docs/product-brief.md`, `docs/requirements.md`
 - 정책 기준: `docs/policies/README.md`, `docs/decision-log.md`
 - 설계 기준: `docs/domain-model.md`, `docs/erd.md`, `docs/api-spec.md`, `docs/order-flow.md`, `docs/architecture.md`
-- 실행 단위: `docs/BACKLOG.md`, `docs/TODO.md`, `docs/PROJECT_LOG.md`, `docs/development-workflow.md`
+- 실행 단위: `docs/BACKLOG.md`, `docs/PROJECT_LOG.md`, `docs/development-workflow.md`
 
 ## Instruction Model
 
@@ -88,9 +87,8 @@ infra      Local and deployment infrastructure
 
 - 구현 작업 전 `docs/BACKLOG.md`의 `Now` 항목을 확인한다.
 - `docs/BACKLOG.md`의 큰 작업은 `B-001` 같은 ID를 붙인다.
-- `docs/TODO.md`의 관련 섹션은 같은 backlog ID로 시작한다.
+- `docs/BACKLOG.md`의 각 큰 작업 아래 `Tasks:`로 하위 checklist를 관리한다.
 - `docs/PROJECT_LOG.md`의 관련 기록에는 `관련 항목: B-001`처럼 연결 ID를 남긴다.
-- `docs/TODO.md`는 backlog로 올리기 애매한 작은 확인사항, env 설정, 수동 QA, 운영 전 체크리스트를 관리한다.
 - `docs/PROJECT_LOG.md`는 결정 이유, 문제와 해결방안, 후속 맥락을 기록한다.
 - 작은 버그, 문구, 스타일 수정은 backlog 항목 없이 바로 처리할 수 있다.
 - 큰 기능, 정책, 결제, 주문 상태, DB 변경은 backlog에 남긴다.

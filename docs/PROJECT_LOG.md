@@ -43,3 +43,12 @@
 - 해결방안: 출시 전 필요한 인증, 결제, 관리자 주문 처리, 상품 관리, 배송, 법적 고지, 모바일 QA, 배포 readiness 항목을 `B-###` 기준으로 나눴다.
 - 결정: 당장 개발할 큰 작업은 `docs/BACKLOG.md`, 각 작업의 하위 실행 항목은 `docs/TODO.md`에서 관리한다.
 - 후속작업: 다음 goal을 시작할 때 `docs/BACKLOG.md`의 `Now` 항목 중 하나를 선택하고, 해당 `B-###`의 TODO를 완료 기준으로 사용한다.
+
+## 2026-06-29 18:01 KST
+
+- 관련 항목: WORKFLOW
+- 작업: `BACKLOG`와 `TODO`를 한 파일로 합쳤다.
+- 문제·고민: 혼자 개발하는 상황에서 backlog와 TODO를 분리하면 story와 하위 task를 계속 왕복해야 하고, goal 시작 시 읽을 문서가 늘어난다.
+- 해결방안: `docs/TODO.md`를 제거하고 `docs/BACKLOG.md`의 각 `B-###` 항목 아래 `Tasks:` checklist를 둔다.
+- 결정: 작업 관리는 `docs/BACKLOG.md`, 결정 이유와 맥락 기록은 `docs/PROJECT_LOG.md`로 단순화한다.
+- 후속작업: 새 goal은 관련 `B-###`의 `Tasks:`를 완료 기준으로 사용한다.

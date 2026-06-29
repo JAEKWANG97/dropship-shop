@@ -6,7 +6,7 @@
 
 ## Core Rule
 
-혼자 개발하는 동안 기본 작업 관리는 `docs/BACKLOG.md`, `docs/TODO.md`, `docs/PROJECT_LOG.md`, git commit으로 한다.
+혼자 개발하는 동안 기본 작업 관리는 `docs/BACKLOG.md`, `docs/PROJECT_LOG.md`, git commit으로 한다.
 
 기본값:
 
@@ -14,7 +14,7 @@
 - GitHub Issues 사용 안 함
 - PR 기본 생략
 - 큰 기능, 정책, 결제, 주문 상태, DB 변경만 backlog에 기록
-- 작은 확인사항, env 설정, 수동 검증, 운영 전 체크리스트는 TODO에 기록
+- 작은 확인사항, env 설정, 수동 검증, 운영 전 체크리스트는 backlog 항목의 `Tasks:`에 기록
 - 결정 이유와 작업 맥락은 project log에 기록
 - 작은 버그, 문구, 스타일 수정은 바로 커밋
 
@@ -91,20 +91,19 @@ docs: switch workflow to markdown backlog
 
 작업을 마치면 필요한 경우 backlog 항목을 `Done`으로 옮기고 commit에 포함한다.
 
-## TODO And Log Rules
+## Task And Log Rules
 
-`docs/TODO.md` 사용 기준:
+`docs/BACKLOG.md` task 사용 기준:
 
-- 키 입력, 수동 QA, 배포 전 확인처럼 작지만 잊으면 안 되는 항목을 둔다.
-- 큰 기능이나 정책 변경은 TODO가 아니라 `docs/BACKLOG.md`에 둔다.
-- backlog와 연결되는 TODO 섹션 제목은 같은 ID로 시작한다. 예: `## B-001 Toss Payments sandbox 결제 플로우 완성`.
-- 완료한 TODO는 체크하고, 관련 구현이나 검증 커밋에 포함한다.
+- 각 큰 작업 아래 `Tasks:`로 하위 checklist를 둔다.
+- 키 입력, 수동 QA, 배포 전 확인처럼 작지만 잊으면 안 되는 항목도 관련 backlog 항목 아래에 둔다.
+- 완료한 task는 체크하고, 관련 구현이나 검증 커밋에 포함한다.
 
 `docs/PROJECT_LOG.md` 사용 기준:
 
 - 중요한 결정, 막힌 이유, 해결방안, 후속작업을 시간순으로 남긴다.
 - backlog와 연결되는 로그에는 `관련 항목: B-001` 줄을 남긴다.
-- 단순 작업 목록이나 체크리스트는 project log가 아니라 TODO에 둔다.
+- 단순 작업 목록이나 체크리스트는 project log가 아니라 backlog task에 둔다.
 
 ## Verification
 
