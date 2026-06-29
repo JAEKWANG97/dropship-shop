@@ -81,7 +81,7 @@ export default async function Home() {
                   <span className="product-card-name">{product.name}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
                 </div>
-                <span className="product-card-cta">상세 보고 구매</span>
+                <span className="product-card-cta">상세 보기</span>
               </Link>
             ))}
           </div>

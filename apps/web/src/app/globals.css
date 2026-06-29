@@ -626,29 +626,6 @@ p {
   color: #ffffff;
 }
 
-.product-card-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.product-card-actions span,
-.product-card-actions strong {
-  display: grid;
-  place-items: center;
-  min-height: 34px;
-  border: 1px solid #c4ccda;
-  border-radius: 5px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.product-card-actions strong {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #ffffff;
-}
-
 .image-placeholder {
   display: grid;
   place-items: center;

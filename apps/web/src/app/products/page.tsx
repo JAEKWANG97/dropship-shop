@@ -89,10 +89,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
                   <span className="product-card-summary">{product.summary}</span>
                 </div>
-                <span className="product-card-actions">
-                  <span>장바구니</span>
-                  <strong>바로구매</strong>
-                </span>
+                <span className="product-card-cta">상세 보기</span>
               </Link>
             ))}
           </div>
