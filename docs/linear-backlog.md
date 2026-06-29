@@ -1191,7 +1191,7 @@ Linear is authoritative for this track. This section records the issue map only.
 
 Status: In Progress
 
-Parent issue for bringing the current MVP to a beta-ready B2B commerce UX while preserving SafeHub Pro policy and API/DB boundaries.
+Parent issue for bringing the current MVP to a beta-ready B2B commerce UX while preserving 코어블SAF policy and API/DB boundaries.
 
 Children:
 

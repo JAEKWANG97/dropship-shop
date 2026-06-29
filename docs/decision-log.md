@@ -235,6 +235,22 @@ Consequences:
 - Production PG activation is a launch-readiness task after deployment URL, business registration, customer service information, and policy pages are ready.
 - Test keys and live keys must never be committed.
 
+## 2026-06-29: Service Name
+
+Decision:
+
+The service name is `코어블SAF`.
+
+Context:
+
+The frontend previously used the temporary brand name `SafeHub Pro`. The product now needs a stable customer-facing service name before design and deployment work continues.
+
+Consequences:
+
+- Customer-facing frontend brand text uses `코어블SAF`.
+- Documentation should use `코어블SAF` for the service name.
+- Repository/package identifiers can remain `dropship-shop` unless a separate rename task is needed.
+
 Superseded note:
 
 The original decision excluded all partial cancellation/refund. That part is superseded by `2026-06-27: Payment Group And Delivery Group Refund Unit`, which allows delivery-group order level partial cancellation/refund while still excluding product, option, and quantity-level partial cancellation/refund.

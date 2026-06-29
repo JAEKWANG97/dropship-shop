@@ -31,8 +31,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <section className="admin-shell">
       <aside className="admin-sidebar">
         <Link className="admin-brand" href="/admin">
-          <span>SafeHub</span>
-          <em>Pro</em>
+          <span>코어블</span>
+          <em>SAF</em>
           <small>관리자</small>
         </Link>
         <nav aria-label="Admin navigation">

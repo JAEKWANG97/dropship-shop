@@ -4,7 +4,7 @@ import { getAdminUser, getCurrentUser } from "@/lib/session";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SafeHub Pro",
+  title: "코어블SAF",
   description: "Business safety gear commerce",
 };
 
@@ -28,10 +28,10 @@ export default async function RootLayout({
         </div>
         <header className="site-header">
           <div className="site-header-main">
-            <Link href="/" className="brand" aria-label="SafeHub Pro home">
+            <Link href="/" className="brand" aria-label="코어블SAF home">
               <strong>
-                <span>SafeHub</span>
-                <em>Pro</em>
+                <span>코어블</span>
+                <em>SAF</em>
               </strong>
               <small>건설안전장비 B2B 전문몰</small>
             </Link>
@@ -81,7 +81,7 @@ export default async function RootLayout({
         <main className="page-shell">{children}</main>
         <footer className="site-footer">
           <div>
-            <strong>SafeHub Pro</strong>
+            <strong>코어블SAF</strong>
             <span>건설 안전장비 B2B 전문몰</span>
           </div>
           <div>
