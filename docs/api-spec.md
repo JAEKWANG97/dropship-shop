@@ -100,6 +100,10 @@ Initial error codes:
 | `GET` | `/api/auth/oauth2/{provider}/callback` | Public | Implemented | Handle provider callback, create or find user, and set access token cookie |
 | `POST` | `/api/auth/logout` | Authenticated user | Implemented | Clear current access token cookie |
 | `GET` | `/api/me` | Authenticated user | Implemented | Current user identity |
+| `GET` | `/api/me/profile-completion` | Authenticated user | Implemented | Current required customer info completion state |
+| `PATCH` | `/api/me/profile` | Authenticated user | Implemented | Update display name and contact email |
+| `POST` | `/api/me/phone-verifications` | Authenticated user | Implemented | Request SMS OTP phone verification |
+| `POST` | `/api/me/phone-verifications/confirm` | Authenticated user | Implemented | Confirm SMS OTP phone verification |
 | `GET` | `/api/me/agreements` | Authenticated user | Implemented | Current user policy agreement state |
 | `POST` | `/api/me/agreements` | Authenticated user | Implemented | Agree to required terms/privacy policies |
 | `GET` | `/api/me/addresses` | `CUSTOMER` | Implemented | List saved shipping addresses |
@@ -120,7 +124,9 @@ Notes:
 - Current required versions start as `terms-2026-06-01` and `privacy-2026-06-01`.
 - `POST /api/me/agreements` requires both `termsAgreed=true` and `privacyAgreed=true` with current required versions.
 - Reposting the same current versions is idempotent and returns the existing agreement record.
-- `POST /api/checkouts` requires current account terms/privacy agreement before order creation.
+- Required customer info is display name, reachable contact email, and verified phone number.
+- Phone verification uses SMS OTP with hashed code storage, expiration, resend cooldown, and attempt limits.
+- `POST /api/checkouts` requires current account terms/privacy agreement and completed required customer info before order creation.
 - Saved shipping addresses belong to the authenticated customer only.
 - The first saved address becomes the default address automatically.
 - Creating or updating an address with `defaultAddress=true` clears the previous default address.
@@ -135,6 +141,36 @@ POST /api/me/agreements
   "privacyAgreed": true,
   "termsVersion": "terms-2026-06-01",
   "privacyVersion": "privacy-2026-06-01"
+}
+
+GET /api/me/profile-completion
+{
+  "displayName": "Customer",
+  "displayNameComplete": true,
+  "email": "customer@example.com",
+  "emailRequired": false,
+  "emailComplete": true,
+  "phoneNumber": "01012345678",
+  "phoneVerified": true,
+  "phoneVerifiedAt": "2026-06-29T00:00:00Z",
+  "requiredInfoComplete": true
+}
+
+PATCH /api/me/profile
+{
+  "displayName": "Customer",
+  "email": "customer@example.com"
+}
+
+POST /api/me/phone-verifications
+{
+  "phoneNumber": "010-1234-5678"
+}
+
+POST /api/me/phone-verifications/confirm
+{
+  "phoneNumber": "01012345678",
+  "code": "123456"
 }
 
 POST /api/me/addresses
@@ -264,7 +300,7 @@ Rules:
 
 - Order creation starts as `PAYMENT_PENDING`.
 - Payment-pending orders expire after 30 minutes.
-- Checkout creation requires current account terms/privacy agreement.
+- Checkout creation requires current account terms/privacy agreement and completed required customer info.
 - DS-8 creates checkouts from cart only; direct-buy checkout is deferred.
 - Checkout request includes shipping address fields directly.
 - Server calculates all totals and ignores client-submitted totals.

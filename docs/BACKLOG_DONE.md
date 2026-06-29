@@ -4,6 +4,10 @@
 
 ## 2026-06-29
 
+- B-017 로그인 후 고객 필수 정보와 휴대폰 번호 인증
+  - 커밋: `feat: add customer phone verification`
+  - 완료 내용: 이름, 연락 가능한 이메일, SMS OTP 휴대폰 번호 인증을 고객 필수 정보로 구현했다.
+  - 검증: `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`
 - 내부 배송조회 동기화 API 토큰 보호 및 관리자 API 실패 표시
 - 카카오 OAuth 로그인 수정
 - 관리자 mock operational data 제거

@@ -30,6 +30,11 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `DATABASE_PASSWORD` | PostgreSQL 비밀번호 |
 | `PAYMENTS_TOSS_SECRET_KEY` | Toss Payments secret key. 서버에서만 사용 |
 | `PAYMENTS_TOSS_BASE_URL` | Toss Payments API URL. 기본값은 `https://api.tosspayments.com` |
+| `SMS_SENS_ENABLED` | Naver Cloud SENS SMS 발송 활성화. 운영 기본값은 `true` |
+| `SMS_SENS_ACCESS_KEY` | Naver Cloud API access key |
+| `SMS_SENS_SECRET_KEY` | Naver Cloud API secret key. 서버에서만 사용 |
+| `SMS_SENS_SERVICE_ID` | SENS SMS service id |
+| `SMS_SENS_FROM_NUMBER` | SENS에 등록된 발신번호 |
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | Toss Payments client key. frontend 결제창 호출에 사용 |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
 | `APP_INTERNAL_SYNC_TOKEN` | 내부 배송조회 동기화 API 호출용 shared token. 서버/스케줄러에서만 사용 |
@@ -45,7 +50,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
 
-Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. 현재 개발과 sandbox 검증은 Toss Payments test key로 진행하고, live PG 심사와 live key 전환은 배포된 홈페이지 URL이 준비된 뒤 진행한다. `PAYMENTS_TOSS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. 현재 개발과 sandbox 검증은 Toss Payments test key로 진행하고, live PG 심사와 live key 전환은 배포된 홈페이지 URL이 준비된 뒤 진행한다. `PAYMENTS_TOSS_SECRET_KEY`, `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
 
 ## Health And Readiness
 
@@ -117,6 +122,7 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `git diff --check`
 - staging 또는 운영 동일 profile에서 `/api/health`, `/actuator/health/readiness`, `/actuator/health/liveness` 확인
 - `DATABASE_*`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
+- `SMS_SENS_*` 설정과 SENS 발신번호 승인 상태 확인
 - Flyway migration 적용 순서 확인
 - PostgreSQL backup/snapshot 상태 확인
 

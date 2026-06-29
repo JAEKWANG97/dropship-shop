@@ -6,6 +6,7 @@
 User
 SocialAccount
 UserAddress
+PhoneVerificationCode
 Product
 ProductImage
 ProductOption
@@ -47,6 +48,7 @@ Implemented fields:
 - email
 - name
 - phone
+- phoneVerifiedAt
 - role: CUSTOMER / ADMIN
 - status: ACTIVE / SUSPENDED / DELETED
 - deletedAt
@@ -61,6 +63,13 @@ DS-32 implementation notes:
 - The first saved address becomes default automatically.
 - Only one default address is kept per customer through service logic.
 - If the current default address is deleted and other addresses remain, the most recently created address becomes default.
+
+B-017 implementation notes:
+
+- 고객 회원 유형은 구분하지 않는다.
+- 로그인 후 필수 정보 완료 상태는 이름, 연락 가능한 이메일, 인증된 휴대폰 번호로 판단한다.
+- 소셜 로그인 placeholder 이메일은 고객 연락 주소로 보지 않는다.
+- 휴대폰 번호는 SMS OTP 성공 후 `phone`/`phoneVerifiedAt`에 저장한다.
 
 ## SocialAccount
 
@@ -95,6 +104,27 @@ Implemented fields:
 - defaultAddress
 - createdAt
 - updatedAt
+
+## PhoneVerificationCode
+
+휴대폰 번호 소유 확인을 위한 SMS OTP 시도 기록.
+
+Implemented fields:
+
+- id
+- userId
+- phoneNumber
+- codeHash
+- expiresAt
+- verifiedAt
+- attemptCount
+- createdAt
+
+Rules:
+
+- 인증번호는 평문 저장하지 않는다.
+- 5분 만료, 재발송 제한, 시도 횟수 제한을 적용한다.
+- NICE/PASS/CI/DI 본인확인은 MVP 범위가 아니다.
 
 ## Supplier
 

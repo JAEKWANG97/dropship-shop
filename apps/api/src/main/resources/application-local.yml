@@ -21,6 +21,14 @@ payments:
     secret-key: ${PAYMENTS_TOSS_SECRET_KEY:}
     base-url: ${PAYMENTS_TOSS_BASE_URL:https://api.tosspayments.com}
 
+sms:
+  sens:
+    enabled: ${SMS_SENS_ENABLED:false}
+    access-key: ${SMS_SENS_ACCESS_KEY:}
+    secret-key: ${SMS_SENS_SECRET_KEY:}
+    service-id: ${SMS_SENS_SERVICE_ID:}
+    from-number: ${SMS_SENS_FROM_NUMBER:}
+
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}

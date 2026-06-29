@@ -43,6 +43,12 @@ public class UserAccount {
 	@Column(name = "display_name", nullable = false, length = 100)
 	private String displayName;
 
+	@Column(name = "phone_number", length = 30)
+	private String phoneNumber;
+
+	@Column(name = "phone_verified_at")
+	private Instant phoneVerifiedAt;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private UserRole role = UserRole.CUSTOMER;
@@ -112,6 +118,24 @@ public class UserAccount {
 
 	public UserStatus getStatus() {
 		return status;
+	}
+
+	public String getPhoneNumber() {
+		return phoneNumber;
+	}
+
+	public Instant getPhoneVerifiedAt() {
+		return phoneVerifiedAt;
+	}
+
+	public void updateProfile(String displayName, String email) {
+		this.displayName = displayName;
+		this.email = email;
+	}
+
+	public void verifyPhone(String phoneNumber, Instant verifiedAt) {
+		this.phoneNumber = phoneNumber;
+		this.phoneVerifiedAt = verifiedAt;
 	}
 
 	public Instant getCreatedAt() {

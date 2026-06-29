@@ -20,6 +20,7 @@
 - User address table: implemented in `apps/api/src/main/resources/db/migration/V11__create_user_addresses.sql`.
 - Policy document table: implemented in `apps/api/src/main/resources/db/migration/V17__create_policy_documents.sql`.
 - Business profile and privacy processing item tables: implemented in `apps/api/src/main/resources/db/migration/V18__create_legal_disclosures.sql`.
+- Customer required info and phone verification fields: implemented in `apps/api/src/main/resources/db/migration/V19__add_customer_required_info.sql`.
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -46,6 +47,8 @@ erDiagram
         varchar provider_user_id
         varchar email
         varchar display_name
+        varchar phone_number
+        timestamptz phone_verified_at
         varchar role
         varchar status
         timestamptz created_at
@@ -74,8 +77,20 @@ erDiagram
         timestamptz updated_at
     }
 
+    PHONE_VERIFICATION_CODES {
+        uuid id PK
+        uuid user_id FK
+        varchar phone_number
+        varchar code_hash
+        timestamptz expires_at
+        timestamptz verified_at
+        int attempt_count
+        timestamptz created_at
+    }
+
     USERS ||--o{ USER_POLICY_AGREEMENTS : agrees
     USERS ||--o{ USER_ADDRESSES : saves
+    USERS ||--o{ PHONE_VERIFICATION_CODES : verifies_phone
 ```
 
 Current implementation intentionally stores social identity directly on `users`.
@@ -176,6 +191,8 @@ Current fields:
 - `provider_user_id`
 - `email`: provider email when supplied, otherwise an internal placeholder such as `kakao-{providerUserId}@oauth.local`; do not use placeholder email as a customer contact address.
 - `display_name`
+- `phone_number`
+- `phone_verified_at`
 - `role`: `CUSTOMER` / `ADMIN`
 - `status`: `ACTIVE` / `DELETED`
 - `created_at`
@@ -235,6 +252,32 @@ Rules:
 - Rows are scoped by `user_id`.
 - First saved address becomes default automatically.
 - Service logic keeps one default address when addresses remain.
+
+### phone_verification_codes
+
+Implemented by B-017.
+
+Purpose:
+
+- Stores SMS OTP verification attempts for customer phone number ownership checks.
+- Code values are stored as hashes, not plaintext.
+
+Current fields:
+
+- `id`
+- `user_id`
+- `phone_number`
+- `code_hash`
+- `expires_at`
+- `verified_at`
+- `attempt_count`
+- `created_at`
+
+Rules:
+
+- Latest code for `(user_id, phone_number)` is used for confirmation.
+- Verification code has a short expiration window and retry limits.
+- Successful verification stores the normalized number and verified timestamp on `users`.
 
 ### social_accounts
 

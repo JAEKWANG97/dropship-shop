@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -158,13 +160,15 @@ class AccountAgreementApiIntegrationTest {
 	}
 
 	private UserAccount createCustomer(String providerUserId) {
-		return userAccountRepository.save(new UserAccount(
+		UserAccount customer = userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,
 			providerUserId,
 			providerUserId + "@example.com",
 			providerUserId,
 			UserRole.CUSTOMER
 		));
+		customer.verifyPhone("01011112222", Instant.now());
+		return userAccountRepository.save(customer);
 	}
 
 	private ProductOption createOption(String productName) {

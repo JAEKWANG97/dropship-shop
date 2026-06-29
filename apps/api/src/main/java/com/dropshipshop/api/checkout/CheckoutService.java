@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.account.AccountAgreementService;
+import com.dropshipshop.api.account.AccountProfileService;
 import com.dropshipshop.api.cart.domain.CartItem;
 import com.dropshipshop.api.cart.repository.CartItemRepository;
 import com.dropshipshop.api.catalog.domain.Product;
@@ -54,6 +55,7 @@ public class CheckoutService {
 	private final OrderPolicyAgreementRepository orderPolicyAgreementRepository;
 	private final UserAccountRepository userAccountRepository;
 	private final AccountAgreementService accountAgreementService;
+	private final AccountProfileService accountProfileService;
 	private final CustomerPolicyLinkService customerPolicyLinkService;
 	private final Clock clock;
 
@@ -66,6 +68,7 @@ public class CheckoutService {
 		OrderPolicyAgreementRepository orderPolicyAgreementRepository,
 		UserAccountRepository userAccountRepository,
 		AccountAgreementService accountAgreementService,
+		AccountProfileService accountProfileService,
 		CustomerPolicyLinkService customerPolicyLinkService
 	) {
 		this.cartItemRepository = cartItemRepository;
@@ -76,6 +79,7 @@ public class CheckoutService {
 		this.orderPolicyAgreementRepository = orderPolicyAgreementRepository;
 		this.userAccountRepository = userAccountRepository;
 		this.accountAgreementService = accountAgreementService;
+		this.accountProfileService = accountProfileService;
 		this.customerPolicyLinkService = customerPolicyLinkService;
 		this.clock = Clock.systemUTC();
 	}
@@ -84,6 +88,7 @@ public class CheckoutService {
 	public CheckoutDtos.CheckoutResponse createCheckout(UUID userId, CheckoutDtos.CreateCheckoutRequest request) {
 		UserAccount user = findUser(userId);
 		accountAgreementService.requireCurrentAgreement(userId);
+		accountProfileService.requireRequiredInfo(userId);
 		List<CartItem> cartItems = cartItemRepository.findAllByCart_User_IdOrderByCreatedAtAsc(userId);
 		if (cartItems.isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");

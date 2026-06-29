@@ -31,12 +31,13 @@ DB_PASSWORD=dropship
 
 The local profile reads the values above from environment variables and falls back to those defaults.
 For Toss sandbox payment confirmation, also set `PAYMENTS_TOSS_SECRET_KEY`.
+For local SMS OTP testing, leave `SMS_SENS_ENABLED=false` to use the development log sender.
 
 ## Production Profile
 
 - Production runs with `SPRING_PROFILES_ACTIVE=prod`.
 - Required production variables are documented in [Production Readiness](../../docs/production-readiness.md).
-- The `prod` profile requires `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_JWT_SECRET`, `APP_AUTH_SUCCESS_REDIRECT_URI`, and OAuth provider credentials.
+- The `prod` profile requires `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `PAYMENTS_TOSS_SECRET_KEY`, `SMS_SENS_*`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_JWT_SECRET`, `APP_AUTH_SUCCESS_REDIRECT_URI`, and OAuth provider credentials.
 - Flyway is enabled and Hibernate uses `ddl-auto=validate` in production.
 
 ## Health Checks
@@ -66,6 +67,8 @@ curl http://localhost:8080/actuator/health/liveness
 - Account agreement APIs are available at `/api/me/agreements`.
 - Checkout creation requires current required terms/privacy agreement.
 - Customer address book APIs are available at `/api/me/addresses`.
+- Customer required information APIs are available at `/api/me/profile-completion`, `/api/me/profile`, and `/api/me/phone-verifications`.
+- Production SMS OTP uses Naver Cloud SENS when `SMS_SENS_ENABLED=true`.
 
 ## Catalog Foundation
 

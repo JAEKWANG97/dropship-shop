@@ -216,6 +216,8 @@ class CheckoutApiIntegrationTest {
 			providerUserId,
 			UserRole.CUSTOMER
 		));
+		customer.verifyPhone("01011112222", Instant.now());
+		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
 			"terms-2026-06-01",

@@ -26,9 +26,28 @@ export type AddressList = {
   addresses: Address[];
 };
 
+export type ProfileCompletion = {
+  displayName: string;
+  displayNameComplete: boolean;
+  email: string;
+  emailRequired: boolean;
+  emailComplete: boolean;
+  phoneNumber: string | null;
+  phoneVerified: boolean;
+  phoneVerifiedAt: string | null;
+  requiredInfoComplete: boolean;
+};
+
 export async function getAgreementState() {
   return apiGetWithCookie<AgreementState>(
     "/api/me/agreements",
+    (await cookies()).toString(),
+  );
+}
+
+export async function getProfileCompletion() {
+  return apiGetWithCookie<ProfileCompletion>(
+    "/api/me/profile-completion",
     (await cookies()).toString(),
   );
 }
