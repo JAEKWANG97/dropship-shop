@@ -16,6 +16,11 @@ logging:
   level:
     org.hibernate.SQL: debug
 
+payments:
+  toss:
+    secret-key: ${PAYMENTS_TOSS_SECRET_KEY:}
+    base-url: ${PAYMENTS_TOSS_BASE_URL:https://api.tosspayments.com}
+
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}

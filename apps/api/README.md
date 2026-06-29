@@ -30,6 +30,7 @@ DB_PASSWORD=dropship
 ```
 
 The local profile reads the values above from environment variables and falls back to those defaults.
+For Toss sandbox payment confirmation, also set `PAYMENTS_TOSS_SECRET_KEY`.
 
 ## Production Profile
 
