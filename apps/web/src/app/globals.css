@@ -237,16 +237,16 @@ textarea {
 
 .home-page {
   display: grid;
-  gap: 26px;
+  gap: 20px;
 }
 
 .home-hero {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
-  gap: 24px;
+  gap: 20px;
   align-items: center;
-  min-height: clamp(320px, 52svh, 380px);
-  padding: 36px 44px;
+  min-height: clamp(260px, 42svh, 320px);
+  padding: 28px 36px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(90deg, #ffffff 0%, #ffffff 42%, #f7f9fd 100%);
@@ -256,7 +256,7 @@ textarea {
 
 .home-copy {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   position: relative;
   z-index: 1;
 }
@@ -264,8 +264,8 @@ textarea {
 .hero-visual {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 12px;
-  min-height: 280px;
+  gap: 10px;
+  min-height: 230px;
   align-self: stretch;
   align-items: center;
   padding: 18px;
@@ -330,7 +330,7 @@ h1 {
   margin: 0;
   max-width: 780px;
   color: var(--navy);
-  font-size: 50px;
+  font-size: 42px;
   line-height: 1.08;
 }
 
@@ -342,7 +342,7 @@ p {
 
 .home-copy > p:not(.eyebrow) {
   max-width: 620px;
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .action-row {
@@ -1573,12 +1573,12 @@ textarea {
   .home-hero {
     grid-template-columns: 1fr;
     min-height: 0;
-    padding: 22px 18px;
+    padding: 18px 16px;
   }
 
   .hero-visual {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-height: 200px;
+    min-height: 170px;
   }
 
   .category-strip,
@@ -1666,7 +1666,7 @@ textarea {
   }
 
   h1 {
-    font-size: 34px;
+    font-size: 30px;
   }
 
   .site-footer {
