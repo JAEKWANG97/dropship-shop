@@ -8,6 +8,8 @@ import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -27,6 +29,7 @@ import jakarta.servlet.http.HttpServletRequest;
 @Service
 class OAuthLoginService {
 
+	private static final Logger log = LoggerFactory.getLogger(OAuthLoginService.class);
 	private static final SecureRandom RANDOM = new SecureRandom();
 
 	private final OAuthProviderProperties oauthProviderProperties;
@@ -115,6 +118,7 @@ class OAuthLoginService {
 		try {
 			return oauthProviderClient.fetchProfile(provider, code);
 		} catch (RuntimeException exception) {
+			log.warn("OAuth provider request failed: provider={}, message={}", provider, exception.getMessage());
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "OAuth provider profile request failed");
 		}
 	}
