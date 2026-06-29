@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { apiSendWithCookie } from "@/lib/api";
+import { ApiError, apiSendWithCookie } from "@/lib/api";
 import type { AgreementState } from "@/lib/account";
 import type { Checkout } from "@/lib/checkout";
 import { confirmTossPaymentRequest } from "@/lib/payments";
@@ -139,8 +139,9 @@ export async function confirmTossPayment(formData: FormData) {
       value(formData, "paymentKey"),
       Number(value(formData, "amount") || "0"),
     );
-  } catch {
-    redirect(`/checkout/payment/exception?checkoutNumber=${encodeURIComponent(checkoutNumber)}`);
+  } catch (error) {
+    const status = error instanceof ApiError ? `&status=${error.status}` : "";
+    redirect(`/checkout/payment/exception?checkoutNumber=${encodeURIComponent(checkoutNumber)}${status}`);
   }
 
   revalidatePath(`/checkout/${checkoutNumber}`);

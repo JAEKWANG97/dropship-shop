@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import { confirmTossPaymentRequest } from "@/lib/payments";
 
 type PaymentSuccessPageProps = {
@@ -25,8 +26,9 @@ export default async function PaymentSuccessPage({ searchParams }: PaymentSucces
       await confirmTossPaymentRequest(checkoutNumber, paymentKey, amount);
       revalidatePath(`/checkout/${checkoutNumber}`);
       revalidatePath("/orders");
-    } catch {
-      redirect(`/checkout/payment/exception?checkoutNumber=${encodeURIComponent(checkoutNumber)}`);
+    } catch (error) {
+      const status = error instanceof ApiError ? `&status=${error.status}` : "";
+      redirect(`/checkout/payment/exception?checkoutNumber=${encodeURIComponent(checkoutNumber)}${status}`);
     }
   }
 
