@@ -14,6 +14,8 @@ import { formatPrice, type ProductDetail } from "@/lib/catalog";
 import { ProductImage } from "@/app/products/product-image";
 import {
   createAdminProductOption,
+  updateAdminProductDetailBlocks,
+  updateAdminProductNotice,
   updateAdminProductOption,
   updateAdminProductOptionStatus,
   updateAdminProductStatus,
@@ -107,6 +109,9 @@ export default async function AdminProductDetailPage({
         <ProductSummaryPanel listProduct={listProduct} product={product} />
         <ProductStatusPanel product={product} />
       </section>
+
+      <ProductDetailBlocksPanel product={product} />
+      <ProductNoticePanel product={product} />
 
       <section className="admin-panel">
         <div className="admin-panel-head">
@@ -312,6 +317,164 @@ function ProductStatusPanel({ product }: { product: ProductDetail }) {
         <button className="button primary" type="submit">
           상품 상태 변경
         </button>
+      </form>
+    </section>
+  );
+}
+
+function ProductDetailBlocksPanel({ product }: { product: ProductDetail }) {
+  const nextSortOrder = product.detailBlocks.length;
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel-head">
+        <h2>상세 콘텐츠</h2>
+        <span>현재 {product.detailBlocks.length}개</span>
+      </div>
+      <form action={updateAdminProductDetailBlocks} className="admin-detail-form" encType="multipart/form-data">
+        <input name="productId" type="hidden" value={product.id} />
+        <input name="blockCount" type="hidden" value={product.detailBlocks.length} />
+        <div className="admin-detail-block-list">
+          {product.detailBlocks.map((block, index) => (
+            <article className="admin-detail-block-card" key={block.id}>
+              <input name={`blockType-${index}`} type="hidden" value={block.type} />
+              <input name={`blockImageUrl-${index}`} type="hidden" value={block.imageUrl ?? ""} />
+              <div className="admin-detail-block-head">
+                <strong>{block.type === "IMAGE" ? "이미지 블록" : "HTML 블록"}</strong>
+                <label className="admin-check-field">
+                  <input name={`blockInclude-${index}`} type="checkbox" value="true" defaultChecked />
+                  포함
+                </label>
+              </div>
+              <div className="admin-form-grid">
+                <label>
+                  정렬값
+                  <input name={`blockSortOrder-${index}`} type="number" defaultValue={block.sortOrder} />
+                </label>
+                {block.type === "IMAGE" ? (
+                  <>
+                    <label>
+                      대체 텍스트
+                      <input name={`blockAltText-${index}`} defaultValue={block.altText ?? ""} />
+                    </label>
+                    <div className="wide admin-detail-image-row">
+                      <ProductImage
+                        alt={block.altText ?? product.name}
+                        className="admin-detail-block-image"
+                        src={block.imageUrl}
+                      />
+                      <label>
+                        이미지 교체
+                        <input name={`blockImageFile-${index}`} type="file" accept="image/jpeg,image/png,image/webp" />
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <label className="wide">
+                    HTML 내용
+                    <textarea name={`blockHtmlContent-${index}`} required rows={7} defaultValue={block.htmlContent ?? ""} />
+                  </label>
+                )}
+              </div>
+            </article>
+          ))}
+          {product.detailBlocks.length === 0 ? (
+            <div className="admin-empty compact">
+              <strong>등록된 상세 콘텐츠가 없습니다</strong>
+              <span>아래 입력칸으로 이미지 또는 HTML 블록을 추가하세요.</span>
+            </div>
+          ) : null}
+        </div>
+        <div className="admin-detail-add-grid">
+          <section>
+            <h3>새 이미지 블록</h3>
+            <div className="admin-form-grid">
+              <label>
+                이미지 파일
+                <input name="newImageFile" type="file" accept="image/jpeg,image/png,image/webp" />
+              </label>
+              <label>
+                정렬값
+                <input name="newImageSortOrder" type="number" defaultValue={nextSortOrder} />
+              </label>
+              <label className="wide">
+                대체 텍스트
+                <input name="newImageAltText" placeholder={product.name} />
+              </label>
+            </div>
+          </section>
+          <section>
+            <h3>새 HTML 블록</h3>
+            <div className="admin-form-grid">
+              <label>
+                정렬값
+                <input name="newHtmlSortOrder" type="number" defaultValue={nextSortOrder + 1} />
+              </label>
+              <label className="wide">
+                HTML 내용
+                <textarea name="newHtmlContent" rows={6} placeholder="<p>상세 설명을 입력하세요.</p>" />
+              </label>
+            </div>
+          </section>
+        </div>
+        <label>
+          변경 사유
+          <input name="reason" required placeholder="예: 상품 상세 설명 보강" />
+        </label>
+        <div className="admin-form-actions">
+          <button className="button primary" type="submit">
+            상세 콘텐츠 저장
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function ProductNoticePanel({ product }: { product: ProductDetail }) {
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel-head">
+        <h2>상품 고시</h2>
+        <span>{product.productNotice ? `v${product.productNotice.version}` : "미등록"}</span>
+      </div>
+      <form action={updateAdminProductNotice} className="admin-form">
+        <input name="productId" type="hidden" value={product.id} />
+        <label>
+          상품 정보
+          <textarea
+            name="productInfoNotice"
+            required
+            rows={3}
+            defaultValue={product.productNotice?.productInfoNotice ?? ""}
+          />
+        </label>
+        <label>
+          배송
+          <textarea name="shippingInfo" required rows={3} defaultValue={product.productNotice?.shippingInfo ?? ""} />
+        </label>
+        <label>
+          AS
+          <textarea name="asInfo" required rows={3} defaultValue={product.productNotice?.asInfo ?? ""} />
+        </label>
+        <label>
+          반품/교환
+          <textarea
+            name="returnExchangeInfo"
+            required
+            rows={3}
+            defaultValue={product.productNotice?.returnExchangeInfo ?? ""}
+          />
+        </label>
+        <label>
+          변경 사유
+          <input name="reason" required placeholder="예: 상품 고시 최신화" />
+        </label>
+        <div className="admin-form-actions">
+          <button className="button primary" type="submit">
+            상품 고시 저장
+          </button>
+        </div>
       </form>
     </section>
   );

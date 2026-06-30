@@ -1572,12 +1572,21 @@ textarea {
   gap: 14px;
 }
 
-.admin-form label {
+.admin-form label,
+.admin-detail-form label,
+.admin-form-grid label {
   display: grid;
   gap: 6px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 800;
+}
+
+.admin-form textarea,
+.admin-form-grid textarea,
+.admin-detail-form textarea {
+  min-height: 96px;
+  resize: vertical;
 }
 
 .field-help {
@@ -1656,6 +1665,69 @@ textarea {
 .admin-option-list {
   display: grid;
   gap: 12px;
+}
+
+.admin-detail-form,
+.admin-detail-block-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-detail-block-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.admin-detail-block-head,
+.admin-detail-image-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-check-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-check-field input {
+  width: auto;
+}
+
+.admin-detail-block-image,
+.image-placeholder.admin-detail-block-image {
+  width: 120px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.admin-detail-add-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-detail-add-grid section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.admin-detail-add-grid h3 {
+  font-size: 16px;
 }
 
 .admin-option-card {
@@ -1978,10 +2050,16 @@ textarea {
   .admin-product-layout,
   .admin-product-summary,
   .admin-product-summary dl,
+  .admin-detail-add-grid,
   .admin-option-card dl,
   .admin-inline-form,
   .admin-change-list > div:not(.admin-empty) {
     grid-template-columns: 1fr;
+  }
+
+  .admin-detail-image-row {
+    align-items: start;
+    flex-direction: column;
   }
 
   .catalog-heading {

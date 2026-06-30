@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-005 상품 상세 HTML/이미지 블록 관리
+  - 커밋: `feat: connect admin product detail content`
+  - 완료 내용: 관리자 상품 상세 화면에서 IMAGE/HTML 상세 블록을 전체 교체 방식으로 저장하고, 상세 이미지 파일 업로드와 상품 고시 저장을 기존 catalog API에 연결했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test --tests '*Catalog*'`, `git diff --check`
 - B-024 API 계약 리뷰 후속 정리
   - 커밋: `fix: align api contract followups`
   - 완료 내용: 관리자 계정의 고객 주문 화면 권한 안내를 분리하고, 약관 동의 응답 타입 선언, 옵션 생성 사유 입력, 고객 취소/클레임 API 문서 상태, 이미지 업로드 note를 실제 계약에 맞게 정리했다.
