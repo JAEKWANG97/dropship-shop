@@ -409,6 +409,69 @@ p {
   aspect-ratio: 5 / 3;
 }
 
+.home-bundles {
+  display: grid;
+  gap: 14px;
+}
+
+.home-bundle-grid,
+.home-trust {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-bundle-card,
+.home-trust > div {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(6, 27, 73, 0.05);
+}
+
+.home-bundle-card h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 18px;
+}
+
+.home-bundle-card p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.home-bundle-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-bundle-card a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.home-trust strong {
+  color: var(--navy);
+}
+
+.home-trust span {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .narrow-page {
   display: grid;
   gap: 18px;
@@ -1693,6 +1756,11 @@ textarea {
   .home-products .catalog-heading {
     display: flex;
     align-items: center;
+  }
+
+  .home-bundle-grid,
+  .home-trust {
+    grid-template-columns: 1fr;
   }
 
   .catalog-tools {
