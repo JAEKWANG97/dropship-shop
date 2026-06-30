@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-025 고객 문의 테이블 생성 migration 추가
+  - 커밋: `fix: add customer inquiry migration`
+  - 완료 내용: B-012에서 구현된 고객 문의 접수/관리자 문의 목록 기능이 실제 DB에서 동작하도록 `customer_inquiries` Flyway migration을 추가했다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*CustomerInquiry*'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`, 로컬 Postgres Flyway V21 적용 및 `/admin/inquiries` SSR 확인
 - B-007 송장 입력과 배송조회 운영 화면 연결
   - 커밋: `feat: connect admin shipment tracking controls`
   - 완료 내용: 관리자 주문 상세에서 배송조회 상태, 실패 사유, 수동 보정 사유를 확인하고 배송조회 결과/실패 사유 반영 및 수동 배송완료 보정을 기존 shipment API에 연결했다. 내부 배송조회 sync token 운영 문서도 보강했다.
