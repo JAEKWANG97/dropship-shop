@@ -777,3 +777,21 @@ Consequences:
 - OTP codes must be hashed at rest and bounded by expiration, resend cooldown, and attempt limits.
 - Phone number changes require re-verification.
 - Checkout gating for incomplete required info is tracked as backlog item B-017.
+
+## 2026-06-30: B-012 Legal Footer And Customer Inquiry MVP
+
+Decision:
+
+Use the confirmed 가라사니 business information in the customer-facing footer and company page, and receive customer inquiries through a site form backed by `customer_inquiries`.
+
+Context:
+
+The shop needs visible legal/customer notice paths before real operation and Toss live review. Terms, privacy, shipping, cancellation/refund, and post-payment stock risk pages can start as MVP drafts based on existing policy documents. The owner accepts public display of the business address.
+
+Consequences:
+
+- Footer and company page display 상호 `가라사니`, 대표자명 `김문교`, 사업자등록번호 `611-05-94564`, and the 송파구 business address.
+- 통신판매업 신고번호, hosting provider, customer center phone/email, and payment/purchase safety details remain marked as 준비중 until live payment opening.
+- Customer inquiries are accepted without login through `/support` and listed for admins at `/admin/inquiries`.
+- Reply workflow, inquiry assignment, and customer center SLA are deferred until inquiry volume requires them.
+- Legal text remains an MVP draft and requires final launch review.
