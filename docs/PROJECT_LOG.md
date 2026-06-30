@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-06-30 19:16 KST
+
+- 관련 항목: B-007
+- 작업: 관리자 주문 상세에 배송조회 상태와 수동 배송조회/배송완료 보정 액션을 연결했다.
+- 문제·고민: 송장 입력, 배송조회 sync, 배송완료 전환 backend는 이미 구현되어 있었지만 관리자 화면은 송장 입력 이후의 조회 실패 사유와 보정 기능을 보여주지 못했다.
+- 해결방안: 주문 상세의 배송 영역에 택배사, 송장번호, 배송 상태, 출고/배송완료/조회 시각, 실패 사유, 수동 보정 사유를 표시하고 기존 `/api/admin/shipments/{shipmentId}/tracking-sync`, `/manual-correction` API를 form으로 연결했다.
+- 결정: 실제 택배사 API 연동과 scheduler 구현은 이번 범위에서 제외하고, 기존 internal sync API를 외부 scheduler 또는 배포 플랫폼 cron이 호출하는 구조로 유지한다.
+- 후속작업: 배포 환경에서 `APP_INTERNAL_SYNC_TOKEN`과 scheduler 호출 주기를 확정하고, 실제 택배사 조회 provider 선택은 별도 운영 준비 작업으로 진행한다.
+
 ## 2026-06-30 18:53 KST
 
 - 관련 항목: B-012

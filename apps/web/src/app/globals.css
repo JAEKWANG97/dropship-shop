@@ -528,6 +528,11 @@ p {
   background: #f1f8f3;
 }
 
+.notice.danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
 .notice span {
   overflow-wrap: anywhere;
   color: var(--muted);
@@ -1905,6 +1910,11 @@ textarea {
 .admin-order-detail {
   position: sticky;
   top: 96px;
+}
+
+.admin-shipment-panel {
+  display: grid;
+  gap: 12px;
 }
 
 .admin-order-detail h3 {

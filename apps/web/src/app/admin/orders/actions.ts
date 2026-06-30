@@ -21,6 +21,13 @@ async function postOrderAction(orderId: string, path: string, body: Record<strin
   });
 }
 
+async function postShipmentAction(shipmentId: string, path: string, body: Record<string, string>) {
+  await apiSendWithCookie(`/api/admin/shipments/${shipmentId}${path}`, (await cookies()).toString(), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function startSupplierWork(formData: FormData) {
   const orderId = value(formData, "orderId");
 
@@ -79,4 +86,37 @@ export async function createOrderShipment(formData: FormData) {
 
   revalidatePath("/admin/orders");
   done(orderId, "송장을 입력했습니다.");
+}
+
+export async function syncShipmentTracking(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const shipmentId = value(formData, "shipmentId");
+  const failureReason = value(formData, "failureReason");
+  const trackingStatus = value(formData, "trackingStatus");
+
+  try {
+    await postShipmentAction(shipmentId, "/tracking-sync", failureReason ? { failureReason } : { trackingStatus });
+  } catch {
+    done(orderId, "배송조회 결과 반영에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, failureReason ? "배송조회 실패 사유를 기록했습니다." : "배송조회 결과를 반영했습니다.");
+}
+
+export async function correctShipmentDelivered(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const shipmentId = value(formData, "shipmentId");
+
+  try {
+    await postShipmentAction(shipmentId, "/manual-correction", {
+      status: "DELIVERED",
+      reason: value(formData, "reason"),
+    });
+  } catch {
+    done(orderId, "수동 배송완료 보정에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "수동 배송완료 보정을 반영했습니다.");
 }

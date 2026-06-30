@@ -3,9 +3,11 @@ import { adminStatusLabel, getAdminOrder, getAdminOrders, type AdminOrder } from
 import { formatPrice } from "@/lib/catalog";
 import {
   completeSupplierOrder,
+  correctShipmentDelivered,
   createOrderShipment,
   markOrderOutOfStock,
   startSupplierWork,
+  syncShipmentTracking,
 } from "./actions";
 
 type AdminOrdersPageProps = {
@@ -154,6 +156,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               </div>
               <h3>배송 정보</h3>
               <p>{shippingAddressText(selectedOrder.shippingAddress)}</p>
+              <ShipmentPanel order={selectedOrder} />
               <h3>결제 정보</h3>
               <div className="summary-list compact">
                 <div>
@@ -250,6 +253,95 @@ function shippingAddressText(address: AdminOrder["shippingAddress"]) {
     return address;
   }
   return `${address.recipientName} / ${address.recipientPhone} / ${address.postalCode} ${address.address1} ${address.address2 ?? ""}`;
+}
+
+function ShipmentPanel({ order }: { order: AdminOrder }) {
+  const shipment = order.shipment;
+  if (!shipment) {
+    return (
+      <div className="admin-empty compact">
+        <strong>등록된 송장이 없습니다</strong>
+        <span>공급처 발주 완료 후 송장을 입력하면 배송조회 상태를 관리할 수 있습니다.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-shipment-panel">
+      {shipment.trackingSyncFailureReason ? (
+        <div className="notice danger">
+          <strong>배송조회 실패</strong>
+          <span>{shipment.trackingSyncFailureReason}</span>
+        </div>
+      ) : null}
+      <div className="summary-list compact">
+        <SummaryItem label="배송상태" value={shipment.status} />
+        <SummaryItem label="택배사" value={shipment.carrier} />
+        <SummaryItem label="송장번호" value={shipment.trackingNumber} />
+        <SummaryItem label="출고시각" value={formatDateTime(shipment.shippedAt)} />
+        <SummaryItem label="배송완료시각" value={formatDateTime(shipment.deliveredAt)} />
+        <SummaryItem label="마지막 조회" value={formatDateTime(shipment.trackingSyncedAt)} />
+        <SummaryItem label="수동 보정" value={shipment.manualOverride ? "적용됨" : "없음"} />
+        <SummaryItem label="보정 사유" value={shipment.manualCorrectionReason ?? "-"} />
+      </div>
+      <div className="admin-order-actions">
+        <form action={syncShipmentTracking} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="shipmentId" type="hidden" value={shipment.shipmentId} />
+          <label>
+            배송조회 상태
+            <select name="trackingStatus" required defaultValue="IN_TRANSIT">
+              <option value="IN_TRANSIT">배송 중</option>
+              <option value="DELIVERED">배송 완료</option>
+            </select>
+          </label>
+          <button className="button" type="submit">
+            조회 결과 반영
+          </button>
+        </form>
+
+        <form action={syncShipmentTracking} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="shipmentId" type="hidden" value={shipment.shipmentId} />
+          <label className="wide">
+            배송조회 실패 사유
+            <input name="failureReason" required placeholder="예: 택배사 조회 지연" />
+          </label>
+          <button className="button" type="submit">
+            실패 사유 기록
+          </button>
+        </form>
+
+        <form action={correctShipmentDelivered} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="shipmentId" type="hidden" value={shipment.shipmentId} />
+          <label className="wide">
+            수동 배송완료 사유
+            <input name="reason" required placeholder="예: 택배사 사이트에서 배송완료 확인" />
+          </label>
+          <button className="button" type="submit">
+            수동 배송완료
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+  return new Date(value).toLocaleString("ko-KR");
 }
 
 function AdminOrderActions({ order }: { order: AdminOrder }) {

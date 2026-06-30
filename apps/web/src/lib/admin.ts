@@ -65,7 +65,20 @@ export type AdminOrder = {
     supplierOrderNumber: string | null;
     expectedShipDate: string | null;
   } | null;
-  shipment?: { status: string; carrier: string; trackingNumber: string; shippedAt: string | null } | null;
+  shipment?: {
+    shipmentId: string;
+    status: string;
+    carrier: string;
+    trackingNumber: string;
+    shippedAt: string | null;
+    deliveredAt: string | null;
+    trackingSyncedAt: string | null;
+    trackingSyncFailureReason: string | null;
+    manualOverride: boolean;
+    manualCorrectedByAdminId: string | null;
+    manualCorrectedAt: string | null;
+    manualCorrectionReason: string | null;
+  } | null;
   refund?: { status: string; refundAmount: number; failureMessage: string | null } | null;
   items?: { productName: string; optionName: string; quantity: number; unitPrice: number }[];
   shippingAddress?: string | {

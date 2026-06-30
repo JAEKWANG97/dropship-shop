@@ -82,6 +82,8 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `/api/products`, `/api/policies`, `/api/health`, actuator health/info만 public이다.
 - `/api/auth/oauth2/**`는 OAuth 시작/콜백을 위해 public이다.
 - `/api/internal/**`는 브라우저 UI에서 호출하지 않으며 `X-Internal-Sync-Token` header가 `APP_INTERNAL_SYNC_TOKEN`과 일치해야 한다.
+- 배송조회 scheduler 또는 배포 플랫폼 cron은 `POST /api/internal/shipments/tracking-sync`를 호출하고, 요청 header에 `X-Internal-Sync-Token: ${APP_INTERNAL_SYNC_TOKEN}`을 넣는다.
+- 배송조회 payload는 carrier/trackingNumber별 `trackingStatus` 또는 `failureReason`을 전달한다. `DELIVERED`는 주문을 배송완료로 전환하고, `failureReason`은 현재 주문 상태를 유지한 채 관리자 화면에 실패 사유로 남긴다.
 - `/api/admin/**`는 `ADMIN` role만 접근할 수 있다.
 - Session, form login, basic login은 사용하지 않는다.
 - 인증은 `ACCESS_TOKEN` HttpOnly cookie의 stateless JWT로 처리한다.
@@ -114,7 +116,8 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 관리자 주문 큐에서 `SUPPLIER_ORDER_PENDING` 지연 건을 확인한다.
 - 환불 큐에서 `RETRY_REQUIRED` 또는 `FAILED` 건을 확인한다.
 - 품절 처리 건의 환불 상태가 고객에게 완료로 잘못 노출되지 않았는지 확인한다.
-- 송장번호 입력 누락과 배송조회 실패 건을 확인한다.
+- 송장번호 입력 누락, 배송조회 실패 사유, 장기 미조회 배송 건을 확인한다.
+- 배송조회 실패가 반복되는 건은 관리자 주문 상세에서 조회 실패 사유를 갱신하거나 수동 배송완료 보정 사유를 남긴다.
 
 배포 전 확인:
 

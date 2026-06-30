@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-007 송장 입력과 배송조회 운영 화면 연결
+  - 커밋: `feat: connect admin shipment tracking controls`
+  - 완료 내용: 관리자 주문 상세에서 배송조회 상태, 실패 사유, 수동 보정 사유를 확인하고 배송조회 결과/실패 사유 반영 및 수동 배송완료 보정을 기존 shipment API에 연결했다. 내부 배송조회 sync token 운영 문서도 보강했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test --tests '*AdminOrder*'`, `git diff --check`
 - B-012 사업자 정보/푸터/정책 페이지/고객 문의 운영 고지
   - 커밋: `feat: add legal footer and customer inquiries`, `docs: record legal notice decision`
   - 완료 내용: 푸터에 실제 사업자 정보와 정책 링크를 노출하고, 이용약관/개인정보처리방침/배송/취소환불/품절 안내 페이지, 회사 정보 페이지, 고객 문의 접수와 관리자 문의 목록을 연결했다.
