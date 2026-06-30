@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { apiGetWithCookie } from "./api";
 import type { ProductCategoryCode } from "./categories";
+import type { ProductDetail, ProductOptionStatus } from "./catalog";
 
 export type AdminProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 
@@ -20,6 +21,23 @@ export type AdminProduct = {
 export type AdminSupplier = {
   id: string;
   name: string;
+};
+
+export type AdminProductDetail = ProductDetail;
+
+export type AdminProductChange = {
+  changeId: string;
+  productOptionId: string | null;
+  adminUserId: string;
+  changeType: string;
+  beforeValue: string | null;
+  afterValue: string | null;
+  reason: string;
+  createdAt: string;
+};
+
+type AdminProductChangesResponse = {
+  changes: AdminProductChange[];
 };
 
 export type AdminOrder = {
@@ -72,6 +90,15 @@ export async function getAdminProducts() {
 	return readAdmin<AdminProduct[]>("/api/admin/products");
 }
 
+export async function getAdminProduct(productId: string) {
+	return readAdmin<AdminProductDetail>(`/api/admin/products/${productId}`);
+}
+
+export async function getAdminProductChanges(productId: string) {
+	const data = await readAdmin<AdminProductChangesResponse>(`/api/admin/products/${productId}/changes`);
+	return data.changes;
+}
+
 export async function getAdminSuppliers() {
 	return readAdmin<AdminSupplier[]>("/api/admin/suppliers");
 }
@@ -103,4 +130,8 @@ export function adminStatusLabel(status: string) {
       CANCELLED: "취소완료",
     }[status] ?? status
   );
+}
+
+export function adminOptionStatusLabel(status: ProductOptionStatus) {
+  return adminStatusLabel(status);
 }

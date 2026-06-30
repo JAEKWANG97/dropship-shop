@@ -54,6 +54,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
             <option value="">전체 상태</option>
             <option value="ACTIVE">판매중</option>
             <option value="SOLD_OUT">품절</option>
+            <option value="HIDDEN">숨김</option>
             <option value="STOPPED">판매중지</option>
           </select>
           <button className="button" type="submit">
@@ -76,7 +77,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
               <span>공급처</span>
               <span>가격</span>
               <span>상태</span>
-              <span>상세</span>
+              <span>관리</span>
             </div>
             {filteredProducts.map((product) => (
               <div className="admin-table-row" key={product.id}>
@@ -92,7 +93,9 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
                 <span className={`admin-badge ${product.status.toLowerCase()}`}>
                   {adminStatusLabel(product.status)}
                 </span>
-                <span>v{product.detailVersion}</span>
+                <Link className="admin-text-link" href={`/admin/products/${product.id}`}>
+                  관리
+                </Link>
               </div>
             ))}
             {filteredProducts.length === 0 ? (
