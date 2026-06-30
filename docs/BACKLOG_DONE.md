@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-031 도매꾹 상품 이미지/상세이미지 수집 도구
+  - 커밋: `feat: add domeggook product collector`
+  - 완료 내용: 도매꾹 상품 URL에서 상품 후보 정보, 대표 이미지, 상세 이미지 URL을 파싱하고 `이미지사용: 허용`일 때만 이미지를 로컬 `tmp/domeggook-products/{상품번호}/`에 다운로드하는 스크립트를 추가했다. 결과는 JSON/CSV로 저장해 관리자 수동 등록 전에 검수하도록 했다.
+  - 검증: `node scripts/collect-domeggook-product.mjs --help`, `node scripts/collect-domeggook-product.mjs https://mobile.domeggook.com/8667274`, `git diff --check`
 - B-025 고객 문의 테이블 생성 migration 추가
   - 커밋: `fix: add customer inquiry migration`
   - 완료 내용: B-012에서 구현된 고객 문의 접수/관리자 문의 목록 기능이 실제 DB에서 동작하도록 `customer_inquiries` Flyway migration을 추가했다.

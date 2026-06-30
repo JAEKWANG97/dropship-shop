@@ -42,3 +42,17 @@
 5. 상품 고시에 제조사/수입자, 원산지, 재질, 규격, 인증번호, AS/반품 기준을 입력한다.
 6. `/products`, `/products/{productId}`, `/cart`에서 이미지와 가격 표시를 확인한다.
 7. 이상 없으면 다음 상품 묶음을 등록한다.
+
+## Domeggook Collection
+
+도매꾹 상품은 자동 등록하지 않고 수동 검수용으로만 수집한다.
+
+```bash
+node scripts/collect-domeggook-product.mjs https://mobile.domeggook.com/8667274
+node scripts/collect-domeggook-product.mjs --file tmp/domeggook-urls.txt
+```
+
+- 결과는 `tmp/domeggook-products/{상품번호}/`에 저장된다.
+- `이미지사용` 값이 `허용`인 상품만 대표 이미지와 상세 이미지를 다운로드한다.
+- 수집 후 상품명, 가격, 카테고리, 인증/KC, 상품고시, 이미지 품질을 확인한다.
+- 이미지는 필요한 크기로 수동 보정한 뒤 관리자 화면에서 업로드한다.
