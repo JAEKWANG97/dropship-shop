@@ -4,25 +4,6 @@
 
 ## Now
 
-### B-019 UX 리뷰 핵심 개선
-
-Status: In Progress
-
-Notes:
-- 브라우저 스크린샷 리뷰에서 나온 P0와 핵심 P1만 처리한다.
-- 관리자 계정은 운영자 계정이며 고객 구매 기능은 고객 계정으로만 사용한다.
-- 관리자 모바일 전면 개선과 이미지 asset polish는 후속 QA 작업으로 남긴다.
-
-Tasks:
-- [x] `/cart`, `/checkout`에서 관리자 권한 오류와 API 장애를 분리한다.
-- [x] 관리자 계정으로 고객 구매 흐름에 접근하면 고객용 API 장애가 아닌 권한 안내와 CTA를 보여준다.
-- [x] `/products` 카테고리 필터를 상위 그룹과 선택 그룹 하위 카테고리로 줄인다.
-- [x] `/account`와 관리자 topbar에서 내부 user UUID 노출을 제거한다.
-- [x] 휴대폰 인증 단계 안내를 보강한다.
-- [x] `cd apps/web && npm run lint`를 통과한다.
-- [x] `cd apps/web && npm run build`를 통과한다.
-- [x] 브라우저에서 desktop/mobile 주요 화면을 재확인한다.
-
 ### B-001 Toss Payments sandbox 결제 플로우 완성
 
 Status: Todo

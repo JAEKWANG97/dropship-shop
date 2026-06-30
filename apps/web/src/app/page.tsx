@@ -1,6 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
-import { FEATURED_CATEGORIES, categoryLabel } from "@/lib/categories";
+import { FEATURED_CATEGORIES, PRODUCT_CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./products/product-image";
 
@@ -14,59 +13,51 @@ async function loadProducts() {
 
 export default async function Home() {
   const products = await loadProducts();
+  const groups = [...new Set(PRODUCT_CATEGORIES.map((category) => category[0]))];
 
   return (
     <div className="home-page">
       <section className="home-hero">
         <div className="home-copy">
-          <p className="eyebrow">현장 안전용품을 한곳에서</p>
+          <p className="eyebrow">건설 안전용품 쇼핑몰</p>
           <h1>
-            현장 안전용품
-            <span>필요한 수량만 선택해 주문</span>
+            필요한 안전용품을
+            <span>바로 찾고 주문</span>
           </h1>
           <p>
-            안전모, 안전화, 조끼, 장갑까지 현장에서 자주 쓰는 품목을 빠르게 찾고
-            주문하세요.
+            안전모, 안전화, 보호구, 추락방지 장비까지 현장에서 자주 쓰는 품목을
+            빠르게 확인하세요.
           </p>
           <div className="action-row">
             <Link className="button primary" href="/products">
               상품 보러가기
             </Link>
-            <Link className="button accent" href="/products">
-              바로 구매하기
-            </Link>
           </div>
-          <Image
-            alt="현장 준비대에 놓인 안전용품"
-            className="hero-context-image"
-            height={600}
-            priority
-            src="/images/hero-worksite-prep.png"
-            width={1200}
-          />
         </div>
-        <div className="hero-visual" aria-label="대표 안전용품">
-          {products.slice(0, 4).map((product) => (
-            <Link className="hero-product-tile" href={`/products/${product.id}`} key={product.id}>
-              <ProductImage
-                alt={product.name}
-                className="hero-product-image"
-                src={product.thumbnailImageUrl}
-              />
-              <span>{product.name}</span>
-              <strong>{formatPrice(product.basePrice)}</strong>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="category-strip" aria-label="대표 카테고리">
-        {FEATURED_CATEGORIES.map((category) => (
-          <Link href={`/products?category=${encodeURIComponent(category)}`} key={category}>
-            {categoryLabel(category)}
-          </Link>
-        ))}
-        <Link href="/products">전체 보기</Link>
+        <form action="/products" className="home-category-form">
+          <label htmlFor="home-category-group">필요한 품목 찾기</label>
+          <div>
+            <select id="home-category-group" name="group" defaultValue={groups[0]}>
+              {groups.map((group) => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
+            <button className="button" type="submit">
+              상품 보기
+            </button>
+          </div>
+          <nav className="home-category-chips" aria-label="자주 찾는 품목">
+            <span>자주 찾는 품목</span>
+            {FEATURED_CATEGORIES.map((category) => (
+              <Link href={`/products?category=${encodeURIComponent(category)}`} key={category}>
+                {categoryLabel(category)}
+              </Link>
+            ))}
+            <Link href="/products">전체 보기</Link>
+          </nav>
+        </form>
       </section>
 
       <section className="home-products">
