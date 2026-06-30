@@ -24,7 +24,7 @@ export default async function RootLayout({
             <Link href="/products">입점상품</Link>
             <Link href="/orders">주문배송</Link>
             <Link href="/cart">장바구니</Link>
-            {admin ? <Link href="/admin">관리자</Link> : null}
+            {admin ? <Link className="admin-entry" href="/admin">운영관리</Link> : null}
           </nav>
         </div>
         <header className="site-header">

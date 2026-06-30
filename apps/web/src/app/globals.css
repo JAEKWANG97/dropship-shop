@@ -193,6 +193,10 @@ textarea {
   color: var(--accent);
 }
 
+.site-utility .admin-entry {
+  color: var(--navy);
+}
+
 .category-nav .category-all {
   min-height: 44px;
   display: inline-flex;
@@ -441,6 +445,11 @@ p {
   background: var(--surface);
 }
 
+.account-form h2,
+.account-form p {
+  margin: 0;
+}
+
 .account-form label {
   display: grid;
   gap: 6px;
@@ -549,6 +558,7 @@ p {
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  align-content: start;
   gap: 16px;
 }
 
@@ -706,6 +716,7 @@ p {
 .catalog-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
   gap: 22px;
 }
 
@@ -1669,6 +1680,11 @@ textarea {
   .admin-orders-layout,
   .admin-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-sidebar {
+    max-height: 320px;
+    overflow: auto;
   }
 
   .admin-sidebar {

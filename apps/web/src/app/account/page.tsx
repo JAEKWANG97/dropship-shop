@@ -37,8 +37,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         </div>
       ) : null}
       <div className="notice success">
-        <strong>세션 확인</strong>
-        <span>{session.userId}</span>
+        <strong>로그인 상태</strong>
+        <span>현재 계정으로 로그인되어 있습니다.</span>
       </div>
       {profile.error ? (
         <div className="notice">
@@ -65,6 +65,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </button>
           </form>
           <form action={requestPhoneVerification} className="account-form">
+            <h2>휴대폰 번호 인증</h2>
+            <p className="field-help">주문과 배송 안내를 받을 번호로 6자리 인증번호를 발송합니다.</p>
             <label>
               휴대폰 번호
               <input
@@ -80,6 +82,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </button>
           </form>
           <form action={confirmPhoneVerification} className="account-form">
+            <h2>인증번호 입력</h2>
+            <p className="field-help">문자로 받은 6자리 번호를 입력하면 주문 전 필수 정보가 완료됩니다.</p>
             <label>
               인증할 휴대폰 번호
               <input

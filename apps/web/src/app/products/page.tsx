@@ -4,7 +4,14 @@ import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./product-image";
 
 type ProductsPageProps = {
-  searchParams: Promise<{ category?: string; maxPrice?: string; minPrice?: string; q?: string; sort?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    group?: string;
+    maxPrice?: string;
+    minPrice?: string;
+    q?: string;
+    sort?: string;
+  }>;
 };
 
 async function loadProducts() {
@@ -18,6 +25,9 @@ async function loadProducts() {
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const [{ products, error }, params] = await Promise.all([loadProducts(), searchParams]);
   const filteredProducts = filterProducts(products, params);
+  const groups = categoryGroups();
+  const activeGroup = selectedGroup(params.group, params.category);
+  const visibleCategories = PRODUCT_CATEGORIES.filter((category) => category[0] === activeGroup);
 
   return (
     <section className="catalog-page">
@@ -50,7 +60,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <Link className={!params.category ? "active" : ""} href="/products">
             전체 상품 <span>{products.length}</span>
           </Link>
-          {PRODUCT_CATEGORIES.map((category) => (
+          <h2>분류 그룹</h2>
+          {groups.map((group) => (
+            <Link
+              className={!params.category && activeGroup === group ? "active" : ""}
+              href={withGroup(params, group)}
+              key={group}
+            >
+              {group} <span>{groupProductCount(products, group)}</span>
+            </Link>
+          ))}
+          <h2>{activeGroup}</h2>
+          {visibleCategories.map((category) => (
             <Link
               className={params.category === category[2] ? "active" : ""}
               href={withCategory(params, category[2])}
@@ -121,16 +142,48 @@ function filterProducts(
   });
 }
 
+function categoryGroups() {
+  return [...new Set(PRODUCT_CATEGORIES.map((category) => category[0]))];
+}
+
+function selectedGroup(group: string | undefined, categoryCode: string | undefined) {
+  const categoryGroup = PRODUCT_CATEGORIES.find((category) => category[2] === categoryCode)?.[0];
+  if (categoryGroup) return categoryGroup;
+  if (group && PRODUCT_CATEGORIES.some((category) => category[0] === group)) return group;
+  return PRODUCT_CATEGORIES[0][0];
+}
+
+function groupProductCount(products: ProductSummary[], group: string) {
+  return products.filter((product) => {
+    const category = PRODUCT_CATEGORIES.find((item) => item[2] === product.categoryCode);
+    return category?.[0] === group;
+  }).length;
+}
+
 function withSort(
-  params: { category?: string; maxPrice?: string; minPrice?: string; q?: string },
+  params: { category?: string; group?: string; maxPrice?: string; minPrice?: string; q?: string },
   sort: string,
 ) {
   const searchParams = new URLSearchParams();
   if (params.category) searchParams.set("category", params.category);
+  if (params.group && !params.category) searchParams.set("group", params.group);
   if (params.q) searchParams.set("q", params.q);
   if (params.minPrice) searchParams.set("minPrice", params.minPrice);
   if (params.maxPrice) searchParams.set("maxPrice", params.maxPrice);
   searchParams.set("sort", sort);
+  return `/products?${searchParams.toString()}`;
+}
+
+function withGroup(
+  params: { maxPrice?: string; minPrice?: string; q?: string; sort?: string },
+  group: string,
+) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("group", group);
+  if (params.q) searchParams.set("q", params.q);
+  if (params.minPrice) searchParams.set("minPrice", params.minPrice);
+  if (params.maxPrice) searchParams.set("maxPrice", params.maxPrice);
+  if (params.sort) searchParams.set("sort", params.sort);
   return `/products?${searchParams.toString()}`;
 }
 

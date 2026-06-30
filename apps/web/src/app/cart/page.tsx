@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { getCart, type Cart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
-import { getCurrentUser } from "@/lib/session";
+import { getAdminUser, getCurrentUser } from "@/lib/session";
 import { ProductImage } from "../products/product-image";
 import { removeCartItem, updateCartItem, validateCart } from "./actions";
 
@@ -12,19 +12,20 @@ type CartPageProps = {
 
 async function loadCart() {
   try {
-    return { cart: await getCart(), error: false };
+    return { cart: await getCart(), status: "ok" as const };
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-      return { cart: null, error: false };
+      return { cart: null, status: "forbidden" as const };
     }
-    return { cart: null, error: true };
+    return { cart: null, status: "error" as const };
   }
 }
 
 export default async function CartPage({ searchParams }: CartPageProps) {
-  const [{ cart, error }, session, params] = await Promise.all([
+  const [{ cart, status }, session, admin, params] = await Promise.all([
     loadCart(),
     getCurrentUser(),
+    getAdminUser(),
     searchParams,
   ]);
 
@@ -41,7 +42,11 @@ export default async function CartPage({ searchParams }: CartPageProps) {
     );
   }
 
-  if (error || !cart) {
+  if (status === "forbidden" && admin) {
+    return <AdminCustomerFlowNotice eyebrow="Cart" />;
+  }
+
+  if (status === "error" || !cart) {
     return (
       <section className="narrow-page">
         <p className="eyebrow">Cart</p>
@@ -67,6 +72,24 @@ export default async function CartPage({ searchParams }: CartPageProps) {
       ) : null}
 
       {cart.items.length === 0 ? <EmptyCart /> : <CartContents cart={cart} />}
+    </section>
+  );
+}
+
+function AdminCustomerFlowNotice({ eyebrow }: { eyebrow: string }) {
+  return (
+    <section className="narrow-page">
+      <p className="eyebrow">{eyebrow}</p>
+      <h1>관리자 계정은 고객 구매 기능을 사용할 수 없습니다</h1>
+      <p>상품 확인은 가능하지만 장바구니와 주문서는 고객 계정으로 이용해 주세요.</p>
+      <div className="link-list">
+        <Link className="button primary" href="/products">
+          상품 보기
+        </Link>
+        <Link className="button" href="/admin">
+          관리자 홈
+        </Link>
+      </div>
     </section>
   );
 }

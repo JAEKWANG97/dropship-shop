@@ -50,7 +50,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
           <div className="admin-user">
             <span>운영 관리자</span>
-            <small>{admin.userId}</small>
+            <small>관리자 권한 확인됨</small>
           </div>
         </header>
         {children}

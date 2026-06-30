@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/api";
 import { getAddresses, getAgreementState, type Address } from "@/lib/account";
 import { getCart, type Cart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
-import { getCurrentUser } from "@/lib/session";
+import { getAdminUser, getCurrentUser } from "@/lib/session";
 import { agreeRequiredPolicies, createCheckout } from "./actions";
 
 type CheckoutPageProps = {
@@ -17,18 +17,19 @@ async function loadCheckoutStart() {
       getCart(),
       getAddresses(),
     ]);
-    return { agreement, cart, addresses: addresses.addresses, error: false };
+    return { agreement, cart, addresses: addresses.addresses, status: "ok" as const };
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-      return { agreement: null, cart: null, addresses: [] as Address[], error: false };
+      return { agreement: null, cart: null, addresses: [] as Address[], status: "forbidden" as const };
     }
-    return { agreement: null, cart: null, addresses: [] as Address[], error: true };
+    return { agreement: null, cart: null, addresses: [] as Address[], status: "error" as const };
   }
 }
 
 export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
-  const [session, data, params] = await Promise.all([
+  const [session, admin, data, params] = await Promise.all([
     getCurrentUser(),
+    getAdminUser(),
     loadCheckoutStart(),
     searchParams,
   ]);
@@ -46,7 +47,11 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
     );
   }
 
-  if (data.error || !data.agreement || !data.cart) {
+  if (data.status === "forbidden" && admin) {
+    return <AdminCustomerFlowNotice />;
+  }
+
+  if (data.status === "error" || !data.agreement || !data.cart) {
     return (
       <section className="narrow-page">
         <p className="eyebrow">Checkout</p>
@@ -98,6 +103,24 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+function AdminCustomerFlowNotice() {
+  return (
+    <section className="narrow-page">
+      <p className="eyebrow">Checkout</p>
+      <h1>관리자 계정은 고객 구매 기능을 사용할 수 없습니다</h1>
+      <p>주문서는 고객 계정으로 생성해 주세요. 운영 처리는 관리자 화면에서 계속할 수 있습니다.</p>
+      <div className="link-list">
+        <Link className="button primary" href="/products">
+          상품 보기
+        </Link>
+        <Link className="button" href="/admin">
+          관리자 홈
+        </Link>
+      </div>
     </section>
   );
 }
