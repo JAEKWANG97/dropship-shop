@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { adminStatusLabel, getAdminProducts } from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
+import { ProductImage } from "@/app/products/product-image";
 
 type AdminProductsPageProps = {
   searchParams: Promise<{ message?: string; q?: string; status?: string }>;
@@ -68,6 +69,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
           </div>
           <div className="admin-table products">
             <div className="admin-table-row admin-table-head">
+              <span>이미지</span>
               <span>상품명</span>
               <span>공급처</span>
               <span>가격</span>
@@ -76,6 +78,11 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
             </div>
             {filteredProducts.map((product) => (
               <div className="admin-table-row" key={product.id}>
+                <ProductImage
+                  alt={product.name}
+                  className="admin-product-image"
+                  src={product.thumbnailImageUrl}
+                />
                 <strong>{product.name}</strong>
                 <span>{product.supplierName}</span>
                 <span>{formatPrice(product.basePrice)}</span>

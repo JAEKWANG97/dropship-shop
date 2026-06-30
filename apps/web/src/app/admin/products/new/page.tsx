@@ -1,8 +1,12 @@
 import { getAdminSuppliers } from "@/lib/admin";
 import { createAdminProduct } from "./actions";
 
-export default async function AdminProductNewPage() {
-  const data = await loadSuppliers();
+type AdminProductNewPageProps = {
+  searchParams: Promise<{ message?: string }>;
+};
+
+export default async function AdminProductNewPage({ searchParams }: AdminProductNewPageProps) {
+  const [data, params] = await Promise.all([loadSuppliers(), searchParams]);
   const suppliers = data.suppliers;
 
   return (
@@ -21,8 +25,15 @@ export default async function AdminProductNewPage() {
         </div>
       ) : null}
 
+      {params.message ? (
+        <div className="notice">
+          <strong>알림</strong>
+          <span>{params.message}</span>
+        </div>
+      ) : null}
+
       {!data.error ? (
-        <form action={createAdminProduct} className="admin-form">
+        <form action={createAdminProduct} className="admin-form" encType="multipart/form-data">
           <section className="admin-panel">
             <h2>기본 정보</h2>
             <div className="admin-form-grid">
@@ -84,8 +95,13 @@ export default async function AdminProductNewPage() {
             <h2>이미지 / 상세 설명</h2>
             <div className="admin-form-grid">
               <label>
-                대표 이미지 URL
-                <input placeholder="이미지 업로드 후 URL 또는 object key" />
+                대표 이미지 파일
+                <input accept="image/jpeg,image/png,image/webp" name="thumbnailFile" type="file" />
+                <span className="field-help">jpg, png, webp 파일을 5MB 이하로 업로드하세요.</span>
+              </label>
+              <label>
+                대표 이미지 대체 텍스트
+                <input name="thumbnailAltText" placeholder="비워두면 상품명으로 저장" />
               </label>
               <label>
                 상세 타입

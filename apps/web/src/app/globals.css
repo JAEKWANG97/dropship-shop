@@ -1411,6 +1411,10 @@ textarea {
   grid-template-columns: 1.5fr 1fr 110px 100px 90px;
 }
 
+.admin-table.products .admin-table-row {
+  grid-template-columns: 72px 1.5fr 1fr 110px 100px 90px;
+}
+
 .admin-table-row:last-child {
   border-bottom: 0;
 }
@@ -1427,6 +1431,22 @@ textarea {
 .admin-table-row strong,
 .admin-table-row span {
   overflow-wrap: anywhere;
+}
+
+.admin-product-image,
+.image-placeholder.admin-product-image {
+  width: 56px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.image-placeholder.admin-product-image {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  font-size: 11px;
+  text-align: center;
 }
 
 .admin-empty {
@@ -1506,6 +1526,12 @@ textarea {
   color: var(--muted);
   font-size: 14px;
   font-weight: 800;
+}
+
+.field-help {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .admin-form .wide {

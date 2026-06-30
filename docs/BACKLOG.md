@@ -56,17 +56,6 @@ Tasks:
 
 ## Next
 
-### B-004 상품 이미지 업로드
-
-Status: Todo
-
-Tasks:
-- [ ] 관리자 상품 등록/수정 화면에서 이미지 파일 선택 UI를 만든다.
-- [ ] 기존 admin product image upload API와 연결한다.
-- [ ] 업로드 후 반환 URL/object key를 상품 이미지 metadata에 반영한다.
-- [ ] 썸네일/갤러리 이미지 미리보기를 제공한다.
-- [ ] 허용 확장자, 파일 크기, 실패 메시지를 확인한다.
-
 ### B-005 상품 상세 HTML/이미지 블록 관리
 
 Status: Todo

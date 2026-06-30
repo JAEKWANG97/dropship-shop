@@ -10,7 +10,7 @@ async function getSession(path: string): Promise<UserSession | null> {
   try {
     return await apiGetWithCookie<UserSession>(path, cookieHeader);
   } catch (error) {
-    if (error instanceof ApiError) {
+    if (error instanceof ApiError || error instanceof TypeError) {
       return null;
     }
     throw error;

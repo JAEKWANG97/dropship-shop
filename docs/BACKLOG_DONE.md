@@ -4,6 +4,10 @@
 
 ## 2026-06-29
 
+- B-004 상품 이미지 업로드
+  - 커밋: `feat: connect product image upload`
+  - 완료 내용: 관리자 상품 등록 시 대표 이미지 파일을 업로드하고, 반환된 URL을 상품 대표 이미지 metadata에 저장하도록 연결했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test --tests '*Catalog*'`, `git diff --check`
 - B-017 로그인 후 고객 필수 정보와 휴대폰 번호 인증
   - 커밋: `feat: add customer phone verification`
   - 완료 내용: 이름, 연락 가능한 이메일, SMS OTP 휴대폰 번호 인증을 고객 필수 정보로 구현했다.
