@@ -5,7 +5,7 @@
 ## 2026-06-30
 
 - B-022 상품목록 모바일 필터/카드 UX 정리
-  - 커밋: `pending` `feat: improve mobile catalog ux`
+  - 커밋: `71d60a9` `feat: improve mobile catalog ux`
   - 완료 내용: 모바일 상품목록 필터를 접힘 구조로 바꾸고, 상품 카드를 리스트형으로 압축했다. 헤더 중복 카테고리와 `바로 구매` CTA를 제거하고, Pretendard CDN과 최신 카테고리 체계를 반영했다.
   - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test --tests '*Catalog*'`, `git diff --check`, 브라우저 desktop/mobile 확인
 - B-021 메인페이지 신뢰 정보와 현장별 구매 묶음 추가
