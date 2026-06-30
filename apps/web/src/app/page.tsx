@@ -30,12 +30,6 @@ const SITE_BUNDLES = [
   categories: ProductCategoryCode[];
 }[];
 
-const TRUST_ITEMS = [
-  ["배송비 포함 가격", "상품 가격에 배송비를 포함해 결제 단계에서 별도 배송비를 청구하지 않습니다."],
-  ["세금계산서 가능", "주문 상품과 결제 금액 기준으로 증빙 처리를 준비합니다."],
-  ["품절 시 배송 그룹 주문 단위 환불", "공급처 품절이 확인되면 해당 배송 그룹 주문 금액을 기준으로 환불 처리합니다."],
-] as const;
-
 async function loadProducts() {
   try {
     return (await getProducts()).slice(0, 6);
@@ -145,15 +139,6 @@ export default async function Home() {
             </article>
           ))}
         </div>
-      </section>
-
-      <section className="home-trust" aria-label="구매 안내">
-        {TRUST_ITEMS.map(([title, summary]) => (
-          <div key={title}>
-            <strong>{title}</strong>
-            <span>{summary}</span>
-          </div>
-        ))}
       </section>
 
     </div>

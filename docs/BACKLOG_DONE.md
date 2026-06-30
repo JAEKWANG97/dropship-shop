@@ -4,6 +4,14 @@
 
 ## 2026-06-30
 
+- B-022 상품목록 모바일 필터/카드 UX 정리
+  - 커밋: `pending` `feat: improve mobile catalog ux`
+  - 완료 내용: 모바일 상품목록 필터를 접힘 구조로 바꾸고, 상품 카드를 리스트형으로 압축했다. 헤더 중복 카테고리와 `바로 구매` CTA를 제거하고, Pretendard CDN과 최신 카테고리 체계를 반영했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test --tests '*Catalog*'`, `git diff --check`, 브라우저 desktop/mobile 확인
+- B-021 메인페이지 신뢰 정보와 현장별 구매 묶음 추가
+  - 커밋: `7cf44da` `feat: add homepage purchase guidance`
+  - 완료 내용: 홈 추천 상품 문구를 `현장에서 자주 찾는 상품`으로 바꾸고, 현장별 구매 묶음을 추가했다. 홈 하단 신뢰 정보는 후속 UX 정리에서 제거했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`, 브라우저 desktop/mobile 확인
 - B-020 메인페이지 쇼핑 전환형 UX 개선
   - 커밋: `feat: streamline shopping home`
   - 완료 내용: 메인페이지 히어로를 압축하고, 필요한 품목 찾기와 자주 찾는 품목 링크를 히어로 안으로 정리해 첫 상품 노출 위치를 앞당겼다.

@@ -4,14 +4,16 @@ import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./product-image";
 
 type ProductsPageProps = {
-  searchParams: Promise<{
-    category?: string;
-    group?: string;
-    maxPrice?: string;
-    minPrice?: string;
-    q?: string;
-    sort?: string;
-  }>;
+  searchParams: Promise<ProductSearchParams>;
+};
+
+type ProductSearchParams = {
+  category?: string;
+  group?: string;
+  maxPrice?: string;
+  minPrice?: string;
+  q?: string;
+  sort?: string;
 };
 
 async function loadProducts() {
@@ -56,41 +58,31 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <div className="catalog-layout">
         <aside className="catalog-sidebar">
-          <h2>카테고리</h2>
-          <Link className={!params.category ? "active" : ""} href="/products">
-            전체 상품 <span>{products.length}</span>
-          </Link>
-          <h2>분류 그룹</h2>
-          {groups.map((group) => (
-            <Link
-              className={!params.category && activeGroup === group ? "active" : ""}
-              href={withGroup(params, group)}
-              key={group}
-            >
-              {group} <span>{groupProductCount(products, group)}</span>
-            </Link>
-          ))}
-          <h2>{activeGroup}</h2>
-          {visibleCategories.map((category) => (
-            <Link
-              className={params.category === category[2] ? "active" : ""}
-              href={withCategory(params, category[2])}
-              key={category[2]}
-            >
-              {category[3]}
-            </Link>
-          ))}
-          <h2>가격대</h2>
-          <Link href="/products">전체</Link>
-          <Link href="/products?maxPrice=10000">1만원 이하</Link>
-          <Link href="/products?minPrice=10000&maxPrice=50000">1만원 - 5만원</Link>
-          <Link href="/products?minPrice=50000">5만원 이상</Link>
+          <CategoryFilterPanel
+            activeGroup={activeGroup}
+            groups={groups}
+            params={params}
+            products={products}
+            visibleCategories={visibleCategories}
+          />
         </aside>
 
         <div className="catalog-results">
           <div className="catalog-tools">
             <span>전체 {filteredProducts.length}개 상품</span>
             <div>
+              <details className="catalog-mobile-filters">
+                <summary>필터</summary>
+                <div>
+                  <CategoryFilterPanel
+                    activeGroup={activeGroup}
+                    groups={groups}
+                    params={params}
+                    products={products}
+                    visibleCategories={visibleCategories}
+                  />
+                </div>
+              </details>
               <Link href={withSort(params, "price-asc")}>낮은가격순</Link>
               <Link href={withSort(params, "price-desc")}>높은가격순</Link>
             </div>
@@ -108,6 +100,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <span className="product-card-name">{product.name}</span>
                   <span className="product-card-category">{categoryLabel(product.categoryCode)}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
+                  <span className="product-card-status">배송비 포함</span>
                   <span className="product-card-summary">{product.summary}</span>
                 </div>
                 <span className="product-card-cta">상세 보기</span>
@@ -120,9 +113,61 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   );
 }
 
+function CategoryFilterPanel({
+  activeGroup,
+  groups,
+  params,
+  products,
+  visibleCategories,
+}: {
+  activeGroup: string;
+  groups: string[];
+  params: ProductSearchParams;
+  products: ProductSummary[];
+  visibleCategories: (typeof PRODUCT_CATEGORIES)[number][];
+}) {
+  return (
+    <>
+      <h2>카테고리</h2>
+      <Link className={!params.category ? "active" : ""} href="/products">
+        전체 상품 <span>{products.length}</span>
+      </Link>
+      <h2>대분류</h2>
+      <div className="catalog-group-list">
+        {groups.map((group) => (
+          <Link
+            className={!params.category && activeGroup === group ? "active" : ""}
+            href={withGroup(params, group)}
+            key={group}
+          >
+            {group} <span>{groupProductCount(products, group)}</span>
+          </Link>
+        ))}
+      </div>
+      <h2>{activeGroup}</h2>
+      <div className="catalog-category-chips">
+        {visibleCategories.map((category) => (
+          <Link
+            className={params.category === category[2] ? "active" : ""}
+            href={withCategory(params, category[2])}
+            key={category[2]}
+          >
+            {category[3]}
+          </Link>
+        ))}
+      </div>
+      <h2>가격대</h2>
+      <Link href={withPriceRange(params)}>전체</Link>
+      <Link href={withPriceRange(params, undefined, "10000")}>1만원 이하</Link>
+      <Link href={withPriceRange(params, "10000", "50000")}>1만원 - 5만원</Link>
+      <Link href={withPriceRange(params, "50000")}>5만원 이상</Link>
+    </>
+  );
+}
+
 function filterProducts(
   products: ProductSummary[],
-  params: { category?: string; maxPrice?: string; minPrice?: string; q?: string; sort?: string },
+  params: ProductSearchParams,
 ) {
   const keyword = params.q?.trim().toLowerCase();
   const minPrice = Number(params.minPrice ?? 0);
@@ -160,10 +205,7 @@ function groupProductCount(products: ProductSummary[], group: string) {
   }).length;
 }
 
-function withSort(
-  params: { category?: string; group?: string; maxPrice?: string; minPrice?: string; q?: string },
-  sort: string,
-) {
+function withSort(params: ProductSearchParams, sort: string) {
   const searchParams = new URLSearchParams();
   if (params.category) searchParams.set("category", params.category);
   if (params.group && !params.category) searchParams.set("group", params.group);
@@ -174,10 +216,7 @@ function withSort(
   return `/products?${searchParams.toString()}`;
 }
 
-function withGroup(
-  params: { maxPrice?: string; minPrice?: string; q?: string; sort?: string },
-  group: string,
-) {
+function withGroup(params: ProductSearchParams, group: string) {
   const searchParams = new URLSearchParams();
   searchParams.set("group", group);
   if (params.q) searchParams.set("q", params.q);
@@ -187,10 +226,7 @@ function withGroup(
   return `/products?${searchParams.toString()}`;
 }
 
-function withCategory(
-  params: { maxPrice?: string; minPrice?: string; q?: string; sort?: string },
-  category: string,
-) {
+function withCategory(params: ProductSearchParams, category: string) {
   const searchParams = new URLSearchParams();
   searchParams.set("category", category);
   if (params.q) searchParams.set("q", params.q);
@@ -198,4 +234,16 @@ function withCategory(
   if (params.maxPrice) searchParams.set("maxPrice", params.maxPrice);
   if (params.sort) searchParams.set("sort", params.sort);
   return `/products?${searchParams.toString()}`;
+}
+
+function withPriceRange(params: ProductSearchParams, minPrice?: string, maxPrice?: string) {
+  const searchParams = new URLSearchParams();
+  if (params.category) searchParams.set("category", params.category);
+  if (params.group && !params.category) searchParams.set("group", params.group);
+  if (params.q) searchParams.set("q", params.q);
+  if (params.sort) searchParams.set("sort", params.sort);
+  if (minPrice) searchParams.set("minPrice", minPrice);
+  if (maxPrice) searchParams.set("maxPrice", maxPrice);
+  const query = searchParams.toString();
+  return query ? `/products?${query}` : "/products";
 }
