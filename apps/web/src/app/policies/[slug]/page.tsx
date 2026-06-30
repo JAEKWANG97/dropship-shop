@@ -24,7 +24,7 @@ export default async function PolicyPage({ params }: PolicyPageProps) {
         </span>
       </div>
       <div className="legal-notice">
-        이 문서는 MVP 운영 초안입니다. 실결제 오픈 전 실제 약관, 개인정보처리방침, 결제/구매안전서비스 고지는 최종 검토가 필요합니다.
+        이 문서는 실제 운영 전 최종 검토가 필요한 정책 안내입니다. 실결제 오픈 전 약관, 개인정보처리방침, 결제/구매안전서비스 고지를 확정해야 합니다.
       </div>
       {policy.sections.map((section) => (
         <section className="detail-section" key={section.heading}>

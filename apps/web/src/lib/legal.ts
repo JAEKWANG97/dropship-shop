@@ -26,13 +26,14 @@ export const BUSINESS_PROFILE = {
   privacyOfficerPhone: "사이트 문의 접수",
   hostingProvider: "준비중",
   purchaseSafetyNotice: "결제/구매안전서비스 정보는 실결제 오픈 전 확정 예정입니다.",
+  businessRegistryUrl: "https://www.ftc.go.kr/www/bizContents.do?key=253",
 } as const;
 
 export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "terms",
     title: "이용약관",
-    version: "mvp-2026-06-30",
+    version: "prelaunch-2026-06-30",
     effectiveDate: "2026-06-30",
     summary: "본 약관은 코어블SAF 쇼핑몰 이용과 상품 주문, 결제, 배송, 취소 및 클레임 처리의 기본 조건을 정합니다.",
     sections: [
@@ -62,7 +63,7 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "privacy",
     title: "개인정보처리방침",
-    version: "mvp-2026-06-30",
+    version: "prelaunch-2026-06-30",
     effectiveDate: "2026-06-30",
     summary: "본 방침은 회원 식별, 주문, 배송, 결제, 환불, 클레임 처리를 위해 필요한 개인정보 처리 기준을 설명합니다.",
     sections: [
@@ -84,7 +85,7 @@ export const POLICY_PAGES: PolicyPage[] = [
       {
         heading: "제3자 제공과 처리 위탁",
         paragraphs: [
-          "MVP에서는 개인정보를 기본적으로 제3자에게 제공하지 않으며, 법령상 필요하거나 별도 고지/동의한 경우에만 제공합니다.",
+          "현재 운영 범위에서는 개인정보를 기본적으로 제3자에게 제공하지 않으며, 법령상 필요하거나 별도 고지/동의한 경우에만 제공합니다.",
           "결제, 배송조회, 이메일 발송, SMS 인증, 클라우드 인프라, 이미지 저장소 등 외부 처리자는 실제 운영 전 확정해 고지합니다.",
         ],
       },
@@ -93,7 +94,7 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "shipping",
     title: "배송 정책",
-    version: "mvp-2026-06-30",
+    version: "prelaunch-2026-06-30",
     effectiveDate: "2026-06-30",
     summary: "배송비는 상품 가격에 포함되어 있으며, 주문은 배송 그룹 단위로 처리됩니다.",
     sections: [
@@ -116,7 +117,7 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "cancellation-refund",
     title: "취소/환불 정책",
-    version: "mvp-2026-06-30",
+    version: "prelaunch-2026-06-30",
     effectiveDate: "2026-06-30",
     summary: "취소, 반품, 교환, 환불은 주문 상태와 공급처 발주 여부에 따라 처리됩니다.",
     sections: [
@@ -147,7 +148,7 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "stock-risk",
     title: "결제 후 품절 안내",
-    version: "mvp-2026-06-30",
+    version: "prelaunch-2026-06-30",
     effectiveDate: "2026-06-30",
     summary: "공급처 출고형 상품은 결제 후 공급처 확인 과정에서 품절이 확인될 수 있습니다.",
     sections: [
@@ -156,7 +157,7 @@ export const POLICY_PAGES: PolicyPage[] = [
         paragraphs: [
           "공급처 품절이 확인되면 즉시 품절 안내와 환불 흐름으로 전환합니다.",
           "품절된 배송 그룹 주문 금액만 환불할 수 있습니다.",
-          "배송 그룹 주문 내부의 일부 상품, 옵션, 수량만 따로 환불하는 기능은 MVP에서 지원하지 않습니다.",
+          "배송 그룹 주문 내부의 일부 상품, 옵션, 수량만 따로 환불하는 기능은 현재 운영 범위에서 지원하지 않습니다.",
         ],
       },
     ],
