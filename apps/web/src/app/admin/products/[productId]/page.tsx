@@ -206,10 +206,6 @@ export default async function AdminProductDetailPage({
               ))}
             </select>
           </label>
-          <label>
-            사유
-            <input name="reason" placeholder="예: 신규 옵션 추가" />
-          </label>
           <div className="admin-form-actions wide">
             <button className="button primary" type="submit">
               옵션 추가

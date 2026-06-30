@@ -11,7 +11,7 @@ import {
   shipmentStatusLabel,
   type OrderDetail,
 } from "@/lib/orders";
-import { getCurrentUser } from "@/lib/session";
+import { getAdminUser, getCurrentUser } from "@/lib/session";
 import { cancelOrder, createClaim, updateOrderShippingAddress } from "../actions";
 
 type OrderDetailPageProps = {
@@ -21,20 +21,24 @@ type OrderDetailPageProps = {
 
 async function loadOrder(orderId: string) {
   try {
-    return { order: await getCustomerOrder(orderId), error: false };
+    return { order: await getCustomerOrder(orderId), status: "ok" as const };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       notFound();
     }
-    return { order: null, error: true };
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return { order: null, status: "forbidden" as const };
+    }
+    return { order: null, status: "error" as const };
   }
 }
 
 export default async function OrderDetailPage({ params, searchParams }: OrderDetailPageProps) {
-  const [{ orderId }, query, session] = await Promise.all([
+  const [{ orderId }, query, session, admin] = await Promise.all([
     params,
     searchParams,
     getCurrentUser(),
+    getAdminUser(),
   ]);
 
   if (!session) {
@@ -49,9 +53,13 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
     );
   }
 
-  const { order, error } = await loadOrder(orderId);
+  const { order, status } = await loadOrder(orderId);
 
-  if (error || !order) {
+  if (status === "forbidden" && admin) {
+    return <AdminCustomerOrderNotice />;
+  }
+
+  if (status !== "ok" || !order) {
     return (
       <section className="narrow-page">
         <p className="eyebrow">Orders</p>
@@ -83,6 +91,24 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
       <Link className="button" href="/orders">
         주문 목록
       </Link>
+    </section>
+  );
+}
+
+function AdminCustomerOrderNotice() {
+  return (
+    <section className="narrow-page">
+      <p className="eyebrow">Orders</p>
+      <h1>관리자 계정은 고객 주문 기능을 사용할 수 없습니다</h1>
+      <p>주문 조회와 운영 처리는 관리자 화면에서 확인해 주세요.</p>
+      <div className="link-list">
+        <Link className="button primary" href="/products">
+          상품 보기
+        </Link>
+        <Link className="button" href="/admin">
+          관리자 홈
+        </Link>
+      </div>
     </section>
   );
 }

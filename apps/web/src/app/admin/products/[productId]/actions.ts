@@ -43,7 +43,6 @@ export async function createAdminProductOption(formData: FormData) {
         name: text(formData, "name"),
         additionalPrice: Number(text(formData, "additionalPrice") || "0"),
         status: text(formData, "status") as ProductOptionStatus,
-        reason: text(formData, "reason") || undefined,
       }),
     });
   } catch {

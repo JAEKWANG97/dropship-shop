@@ -242,7 +242,7 @@ DS-6 implementation notes:
 - Public `/api/products/**` must be permitted by `SecurityConfig`.
 - `/api/admin/**` remains `ADMIN` only.
 - DS-43 implements the admin product change history read API at `GET /api/admin/products/{productId}/changes`.
-- Image binary upload can remain planned; DS-6 may store URL or object key metadata.
+- Product image binary upload is implemented for local product image storage and returns URL/object key metadata.
 - Product detail and notice version sources must exist before DS-8 order creation can safely snapshot order items.
 
 ## Cart APIs
@@ -295,7 +295,7 @@ PATCH /api/cart/items/{cartItemId}
 | `GET` | `/api/orders` | `CUSTOMER` | Implemented | Customer order history |
 | `GET` | `/api/orders/{orderId}` | `CUSTOMER` | Implemented | Customer order detail |
 | `PATCH` | `/api/orders/{orderId}/shipping-address` | `CUSTOMER` | Implemented | Change address before supplier work starts |
-| `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Planned | Self-service cancel when allowed |
+| `POST` | `/api/orders/{orderId}/cancel` | `CUSTOMER` | Implemented | Self-service cancel when allowed |
 
 Rules:
 
@@ -451,10 +451,10 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/orders/{orderId}/cancel` | Authenticated user | Implemented | Self-service cancel when eligible |
-| `POST` | `/api/orders/{orderId}/claims` | Authenticated user | Implemented | Create cancellation, return, or exchange claim |
-| `GET` | `/api/orders/{orderId}/claims` | Authenticated user | Planned | Customer claim list for an order |
-| `GET` | `/api/claims/{claimId}` | Authenticated user | Planned | Customer claim detail |
+| `POST` | `/api/orders/{orderId}/cancel` | `CUSTOMER` | Implemented | Self-service cancel when eligible |
+| `POST` | `/api/orders/{orderId}/claims` | `CUSTOMER` | Implemented | Create cancellation, return, or exchange claim |
+| `GET` | `/api/orders/{orderId}/claims` | `CUSTOMER` | Planned | Customer claim list for an order |
+| `GET` | `/api/claims/{claimId}` | `CUSTOMER` | Planned | Customer claim detail |
 | `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin claim queue |
 | `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve claim |
 | `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject claim |

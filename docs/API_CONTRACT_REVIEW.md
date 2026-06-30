@@ -13,6 +13,8 @@
 
 ## Findings
 
+> B-024에서 아래 후속 정리를 반영했다. 이 문서는 B-023 검토 당시 발견 내역을 보관한다.
+
 ### P1: 관리자 계정의 고객 주문 화면 권한 처리가 장바구니/체크아웃과 다르다
 
 - 화면/파일: `apps/web/src/app/orders/page.tsx`, `apps/web/src/app/orders/[orderId]/page.tsx`

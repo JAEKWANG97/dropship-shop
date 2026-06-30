@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ApiError, apiSendWithCookie } from "@/lib/api";
-import type { AgreementState } from "@/lib/account";
 import type { Checkout } from "@/lib/checkout";
 import { confirmTossPaymentRequest } from "@/lib/payments";
 
@@ -39,7 +38,7 @@ function shippingAddress(formData: FormData) {
 
 export async function agreeRequiredPolicies(formData: FormData) {
   try {
-    await apiSendWithCookie<AgreementState>(
+    await apiSendWithCookie(
       "/api/me/agreements",
       (await cookies()).toString(),
       {

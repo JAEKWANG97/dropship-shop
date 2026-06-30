@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-024 API 계약 리뷰 후속 정리
+  - 커밋: `fix: align api contract followups`
+  - 완료 내용: 관리자 계정의 고객 주문 화면 권한 안내를 분리하고, 약관 동의 응답 타입 선언, 옵션 생성 사유 입력, 고객 취소/클레임 API 문서 상태, 이미지 업로드 note를 실제 계약에 맞게 정리했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test`, `git diff --check`, 브라우저 관리자 주문 화면 권한 안내 확인
 - B-023 프론트엔드-백엔드 API 계약 검토
   - 커밋: `docs: record api contract review`
   - 완료 내용: 프론트 `/api/**` 호출과 백엔드 controller/DTO, `docs/api-spec.md`를 대조해 API path/method, 권한, DTO, 오류 처리 계약을 점검했다. 결과는 `docs/API_CONTRACT_REVIEW.md`에 정리하고 후속 정리 항목은 B-024로 분리했다.
