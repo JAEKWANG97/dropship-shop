@@ -1,4 +1,5 @@
 import { apiGet } from "./api";
+import type { ProductCategoryCode } from "./categories";
 
 export type ProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 export type ProductOptionStatus = "ACTIVE" | "SOLD_OUT" | "STOPPED";
@@ -10,6 +11,7 @@ export type ProductSummary = {
   name: string;
   summary: string;
   basePrice: number;
+  categoryCode: ProductCategoryCode;
   status: ProductStatus;
   thumbnailImageUrl: string | null;
 };

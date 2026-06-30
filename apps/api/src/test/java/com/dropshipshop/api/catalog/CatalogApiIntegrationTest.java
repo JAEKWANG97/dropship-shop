@@ -221,10 +221,12 @@ class CatalogApiIntegrationTest {
 					  "name": "Product A",
 					  "summary": "Summary",
 					  "basePrice": 39000,
+					  "categoryCode": "PPE_SAFETY_HELMET",
 					  "status": "ACTIVE"
 					}
 					""".formatted(supplierId)))
 			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.categoryCode", is("PPE_SAFETY_HELMET")))
 			.andExpect(jsonPath("$.status", is("ACTIVE")))
 			.andReturn();
 		return idFrom(result);

@@ -154,10 +154,16 @@ Suggested fields:
 - summary
 - description
 - basePrice
+- categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
 - thumbnailImageUrl: optional denormalized cache of the thumbnail `ProductImage`
 - createdAt
 - updatedAt
+
+Modeling notes:
+
+- MVP stores one fixed `categoryCode` per product.
+- Category administration, multi-category assignment, and tag search are out of MVP scope.
 
 ## ProductImage
 

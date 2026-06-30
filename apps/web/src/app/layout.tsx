@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FEATURED_CATEGORIES, categoryLabel } from "@/lib/categories";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
 import "./globals.css";
 
@@ -70,12 +71,11 @@ export default async function RootLayout({
             <Link className="category-all" href="/products">
               전체 카테고리
             </Link>
-            <Link href="/products?q=안전모">안전모</Link>
-            <Link href="/products?q=안전화">안전화</Link>
-            <Link href="/products?q=형광조끼">형광조끼</Link>
-            <Link href="/products?q=안전장갑">안전장갑</Link>
-            <Link href="/products?q=추락방지">추락방지</Link>
-            <Link href="/products?q=보안경">보안경</Link>
+            {FEATURED_CATEGORIES.map((category) => (
+              <Link href={`/products?category=${encodeURIComponent(category)}`} key={category}>
+                {categoryLabel(category)}
+              </Link>
+            ))}
           </nav>
         </header>
         <main className="page-shell">{children}</main>

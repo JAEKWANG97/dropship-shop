@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
+import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
@@ -49,6 +50,7 @@ final class CatalogDtos {
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
 		@Min(0) long basePrice,
+		@NotNull ProductCategory categoryCode,
 		@NotNull ProductStatus status
 	) {
 	}
@@ -58,6 +60,7 @@ final class CatalogDtos {
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
 		@Min(0) long basePrice,
+		@NotNull ProductCategory categoryCode,
 		@NotBlank @Size(max = 500) String reason
 	) {
 	}
@@ -172,6 +175,7 @@ final class CatalogDtos {
 		String name,
 		String summary,
 		long basePrice,
+		ProductCategory categoryCode,
 		ProductStatus status,
 		String thumbnailImageUrl,
 		int detailVersion
@@ -183,6 +187,7 @@ final class CatalogDtos {
 		String name,
 		String summary,
 		long basePrice,
+		ProductCategory categoryCode,
 		ProductStatus status,
 		String thumbnailImageUrl
 	) {
@@ -193,6 +198,7 @@ final class CatalogDtos {
 		String name,
 		String summary,
 		long basePrice,
+		ProductCategory categoryCode,
 		ProductStatus status,
 		String thumbnailImageUrl,
 		int detailVersion,

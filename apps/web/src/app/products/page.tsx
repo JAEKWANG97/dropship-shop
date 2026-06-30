@@ -1,12 +1,11 @@
 import Link from "next/link";
+import { PRODUCT_CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./product-image";
 
 type ProductsPageProps = {
-  searchParams: Promise<{ maxPrice?: string; minPrice?: string; q?: string; sort?: string }>;
+  searchParams: Promise<{ category?: string; maxPrice?: string; minPrice?: string; q?: string; sort?: string }>;
 };
-
-const categories = ["안전모", "안전화", "형광조끼", "안전장갑", "추락방지", "보안경"];
 
 async function loadProducts() {
   try {
@@ -48,16 +47,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       <div className="catalog-layout">
         <aside className="catalog-sidebar">
           <h2>카테고리</h2>
-          <Link className={!params.q ? "active" : ""} href="/products">
+          <Link className={!params.category ? "active" : ""} href="/products">
             전체 상품 <span>{products.length}</span>
           </Link>
-          {categories.map((category) => (
+          {PRODUCT_CATEGORIES.map((category) => (
             <Link
-              className={params.q === category ? "active" : ""}
-              href={`/products?q=${encodeURIComponent(category)}`}
-              key={category}
+              className={params.category === category[2] ? "active" : ""}
+              href={withCategory(params, category[2])}
+              key={category[2]}
             >
-              {category}
+              {category[3]}
             </Link>
           ))}
           <h2>가격대</h2>
@@ -86,6 +85,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 />
                 <div className="product-card-copy">
                   <span className="product-card-name">{product.name}</span>
+                  <span className="product-card-category">{categoryLabel(product.categoryCode)}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
                   <span className="product-card-summary">{product.summary}</span>
                 </div>
@@ -101,7 +101,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
 function filterProducts(
   products: ProductSummary[],
-  params: { maxPrice?: string; minPrice?: string; q?: string; sort?: string },
+  params: { category?: string; maxPrice?: string; minPrice?: string; q?: string; sort?: string },
 ) {
   const keyword = params.q?.trim().toLowerCase();
   const minPrice = Number(params.minPrice ?? 0);
@@ -110,7 +110,8 @@ function filterProducts(
     const matchesKeyword = keyword
       ? `${product.name} ${product.summary}`.toLowerCase().includes(keyword)
       : true;
-    return matchesKeyword && product.basePrice >= minPrice && product.basePrice <= maxPrice;
+    const matchesCategory = params.category ? product.categoryCode === params.category : true;
+    return matchesKeyword && matchesCategory && product.basePrice >= minPrice && product.basePrice <= maxPrice;
   });
 
   return filtered.sort((a, b) => {
@@ -121,13 +122,27 @@ function filterProducts(
 }
 
 function withSort(
-  params: { maxPrice?: string; minPrice?: string; q?: string },
+  params: { category?: string; maxPrice?: string; minPrice?: string; q?: string },
   sort: string,
 ) {
   const searchParams = new URLSearchParams();
+  if (params.category) searchParams.set("category", params.category);
   if (params.q) searchParams.set("q", params.q);
   if (params.minPrice) searchParams.set("minPrice", params.minPrice);
   if (params.maxPrice) searchParams.set("maxPrice", params.maxPrice);
   searchParams.set("sort", sort);
+  return `/products?${searchParams.toString()}`;
+}
+
+function withCategory(
+  params: { maxPrice?: string; minPrice?: string; q?: string; sort?: string },
+  category: string,
+) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("category", category);
+  if (params.q) searchParams.set("q", params.q);
+  if (params.minPrice) searchParams.set("minPrice", params.minPrice);
+  if (params.maxPrice) searchParams.set("maxPrice", params.maxPrice);
+  if (params.sort) searchParams.set("sort", params.sort);
   return `/products?${searchParams.toString()}`;
 }

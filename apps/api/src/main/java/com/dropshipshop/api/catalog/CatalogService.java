@@ -118,7 +118,14 @@ public class CatalogService {
 	@Transactional
 	public CatalogDtos.AdminProductResponse createProduct(CatalogDtos.ProductCreateRequest request) {
 		Supplier supplier = findSupplier(request.supplierId());
-		Product product = new Product(supplier, request.name(), request.summary(), request.basePrice(), request.status());
+		Product product = new Product(
+			supplier,
+			request.name(),
+			request.summary(),
+			request.basePrice(),
+			request.categoryCode(),
+			request.status()
+		);
 		return toAdminProductResponse(productRepository.save(product));
 	}
 
@@ -148,7 +155,7 @@ public class CatalogService {
 		Supplier supplier = findSupplier(request.supplierId());
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
-		product.updateBase(supplier, request.name(), request.summary(), request.basePrice());
+		product.updateBase(supplier, request.name(), request.summary(), request.basePrice(), request.categoryCode());
 		return toAdminProductResponse(product);
 	}
 
@@ -342,6 +349,10 @@ public class CatalogService {
 			recordChange(product, null, adminUserId, ProductChangeType.PRICE,
 				String.valueOf(product.getBasePrice()), String.valueOf(request.basePrice()), request.reason());
 		}
+		if (product.getCategoryCode() != request.categoryCode()) {
+			recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_CATEGORY,
+				product.getCategoryCode().name(), request.categoryCode().name(), request.reason());
+		}
 		if (!Objects.equals(product.getName(), request.name()) || !Objects.equals(product.getSummary(), request.summary())) {
 			recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_BASE,
 				product.getName() + " / " + product.getSummary(),
@@ -489,6 +500,7 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			product.getBasePrice(),
+			product.getCategoryCode(),
 			product.getStatus(),
 			product.getThumbnailImageUrl(),
 			product.getDetailVersion()
@@ -501,6 +513,7 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			product.getBasePrice(),
+			product.getCategoryCode(),
 			product.getStatus(),
 			product.getThumbnailImageUrl()
 		);
@@ -531,6 +544,7 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			product.getBasePrice(),
+			product.getCategoryCode(),
 			product.getStatus(),
 			product.getThumbnailImageUrl(),
 			product.getDetailVersion(),

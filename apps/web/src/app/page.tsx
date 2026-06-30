@@ -1,9 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import { FEATURED_CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
 import { ProductImage } from "./products/product-image";
-
-const categories = ["안전모", "안전화", "형광조끼", "안전장갑", "추락방지", "보안경"];
 
 async function loadProducts() {
   try {
@@ -62,9 +61,9 @@ export default async function Home() {
       </section>
 
       <section className="category-strip" aria-label="대표 카테고리">
-        {categories.map((category) => (
-          <Link href={`/products?q=${encodeURIComponent(category)}`} key={category}>
-            {category}
+        {FEATURED_CATEGORIES.map((category) => (
+          <Link href={`/products?category=${encodeURIComponent(category)}`} key={category}>
+            {categoryLabel(category)}
           </Link>
         ))}
         <Link href="/products">전체 보기</Link>

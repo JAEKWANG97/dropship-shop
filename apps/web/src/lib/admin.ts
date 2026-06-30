@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { apiGetWithCookie } from "./api";
+import type { ProductCategoryCode } from "./categories";
 
 export type AdminProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 
@@ -10,6 +11,7 @@ export type AdminProduct = {
   name: string;
   summary: string;
   basePrice: number;
+  categoryCode: ProductCategoryCode;
   status: AdminProductStatus;
   thumbnailImageUrl: string | null;
   detailVersion: number;

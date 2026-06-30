@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlock;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImage;
@@ -76,16 +77,16 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 	@Transactional
 	public void run(ApplicationArguments args) {
 		List<SeedProduct> products = List.of(
-			new SeedProduct(0, "K2 안전모 K2-THINK 1", "가볍고 편한 기본형 안전모", 7200, ProductStatus.ACTIVE, "HELMET", "#ff4d00"),
-			new SeedProduct(1, "K2 안전화 K2-67S", "현장 작업용 미끄럼 방지 안전화", 48500, ProductStatus.ACTIVE, "BOOTS", "#061b49"),
-			new SeedProduct(0, "반사 형광조끼 SV-1001", "야간 작업용 고시인성 형광조끼", 5800, ProductStatus.ACTIVE, "VEST", "#f59e0b"),
-			new SeedProduct(2, "3M 컴포트 그립 장갑 CG-100", "정밀 작업용 코팅 안전장갑", 1650, ProductStatus.ACTIVE, "GLOVES", "#475569"),
-			new SeedProduct(0, "포스탑 추락방지 세트 FS-2020", "고소 작업용 안전벨트 세트", 89000, ProductStatus.ACTIVE, "HARNESS", "#0f766e"),
-			new SeedProduct(2, "3M 보안경 SF401", "분진과 비산물 차단 보안경", 3300, ProductStatus.ACTIVE, "GOGGLES", "#2563eb"),
-			new SeedProduct(1, "세이프원 안전모 SW-200", "대량 구매에 적합한 보급형 안전모", 6900, ProductStatus.ACTIVE, "SAFE", "#1d4ed8"),
-			new SeedProduct(1, "지벤 안전화 ZB-186", "장시간 착용용 쿠션 안전화", 52000, ProductStatus.SOLD_OUT, "ZIBEN", "#111827"),
-			new SeedProduct(2, "토와 파워그랩 장갑", "미끄럼 방지 작업 장갑", 2200, ProductStatus.ACTIVE, "TOWA", "#2563eb"),
-			new SeedProduct(0, "보안경 김서림 방지형", "습한 현장용 안티포그 보안경", 4200, ProductStatus.HIDDEN, "FOG", "#64748b")
+			new SeedProduct(0, "K2 안전모 K2-THINK 1", "가볍고 편한 기본형 안전모", 7200, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_HELMET, "HELMET", "#ff4d00"),
+			new SeedProduct(1, "K2 안전화 K2-67S", "현장 작업용 미끄럼 방지 안전화", 48500, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_SHOES, "BOOTS", "#061b49"),
+			new SeedProduct(0, "반사 형광조끼 SV-1001", "야간 작업용 고시인성 형광조끼", 5800, ProductStatus.ACTIVE, ProductCategory.PPE_HIGH_VISIBILITY_VEST, "VEST", "#f59e0b"),
+			new SeedProduct(2, "3M 컴포트 그립 장갑 CG-100", "정밀 작업용 코팅 안전장갑", 1650, ProductStatus.ACTIVE, ProductCategory.PPE_INSULATED_GLOVES, "GLOVES", "#475569"),
+			new SeedProduct(0, "포스탑 추락방지 세트 FS-2020", "고소 작업용 안전벨트 세트", 89000, ProductStatus.ACTIVE, ProductCategory.PPE_FALL_ARREST_HARNESS, "HARNESS", "#0f766e"),
+			new SeedProduct(2, "3M 보안경 SF401", "분진과 비산물 차단 보안경", 3300, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_GLASSES, "GOGGLES", "#2563eb"),
+			new SeedProduct(1, "세이프원 안전모 SW-200", "대량 구매에 적합한 보급형 안전모", 6900, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_HELMET, "SAFE", "#1d4ed8"),
+			new SeedProduct(1, "지벤 안전화 ZB-186", "장시간 착용용 쿠션 안전화", 52000, ProductStatus.SOLD_OUT, ProductCategory.PPE_SAFETY_SHOES, "ZIBEN", "#111827"),
+			new SeedProduct(2, "토와 파워그랩 장갑", "미끄럼 방지 작업 장갑", 2200, ProductStatus.ACTIVE, ProductCategory.PPE_INSULATED_GLOVES, "TOWA", "#2563eb"),
+			new SeedProduct(0, "보안경 김서림 방지형", "습한 현장용 안티포그 보안경", 4200, ProductStatus.HIDDEN, ProductCategory.PPE_SAFETY_GLASSES, "FOG", "#64748b")
 		);
 
 		products.forEach(this::ensureImages);
@@ -111,6 +112,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 			seed.name(),
 			seed.summary(),
 			seed.basePrice(),
+			seed.categoryCode(),
 			seed.status()
 		));
 		product.updateThumbnailImageUrl(imageUrl);
@@ -257,6 +259,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		String summary,
 		long basePrice,
 		ProductStatus status,
+		ProductCategory categoryCode,
 		String label,
 		String color
 	) {

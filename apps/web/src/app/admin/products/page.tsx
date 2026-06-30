@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { adminStatusLabel, getAdminProducts } from "@/lib/admin";
+import { categoryLabel } from "@/lib/categories";
 import { formatPrice } from "@/lib/catalog";
 import { ProductImage } from "@/app/products/product-image";
 
@@ -71,6 +72,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
             <div className="admin-table-row admin-table-head">
               <span>이미지</span>
               <span>상품명</span>
+              <span>카테고리</span>
               <span>공급처</span>
               <span>가격</span>
               <span>상태</span>
@@ -84,6 +86,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
                   src={product.thumbnailImageUrl}
                 />
                 <strong>{product.name}</strong>
+                <span>{categoryLabel(product.categoryCode)}</span>
                 <span>{product.supplierName}</span>
                 <span>{formatPrice(product.basePrice)}</span>
                 <span className={`admin-badge ${product.status.toLowerCase()}`}>

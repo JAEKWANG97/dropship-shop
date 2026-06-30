@@ -595,6 +595,12 @@ p {
   line-height: 1.35;
 }
 
+.product-card-category {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .product-card-copy {
   display: grid;
   gap: 6px;
@@ -1412,7 +1418,7 @@ textarea {
 }
 
 .admin-table.products .admin-table-row {
-  grid-template-columns: 72px 1.5fr 1fr 110px 100px 90px;
+  grid-template-columns: 72px 1.4fr 1fr 1fr 110px 100px 90px;
 }
 
 .admin-table-row:last-child {

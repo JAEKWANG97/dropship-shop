@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { apiSendWithCookie, apiUrl } from "@/lib/api";
 import type { AdminProduct, AdminProductStatus } from "@/lib/admin";
+import type { ProductCategoryCode } from "@/lib/categories";
 
 function text(formData: FormData, name: string) {
   const value = formData.get(name);
@@ -60,6 +61,7 @@ export async function createAdminProduct(formData: FormData) {
         name: text(formData, "name"),
         summary: text(formData, "summary"),
         basePrice: Number(text(formData, "basePrice") || "0"),
+        categoryCode: text(formData, "categoryCode") as ProductCategoryCode,
         status: text(formData, "status") as AdminProductStatus,
       }),
     });

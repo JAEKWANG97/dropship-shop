@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { addCartItem } from "@/app/cart/actions";
 import { ApiError, apiUrl } from "@/lib/api";
+import { categoryLabel } from "@/lib/categories";
 import {
   formatPrice,
   getProduct,
@@ -94,6 +95,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <p>{product.summary}</p>
           <strong className="product-price">{formatPrice(product.basePrice)}</strong>
           <div className="product-buy-info">
+            <span>카테고리</span>
+            <strong>{categoryLabel(product.categoryCode)}</strong>
             <span>최소 주문</span>
             <strong>옵션별 1개</strong>
             <span>판매 상태</span>

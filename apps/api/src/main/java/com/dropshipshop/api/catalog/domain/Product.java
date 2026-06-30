@@ -38,6 +38,10 @@ public class Product {
 	private long basePrice;
 
 	@Enumerated(EnumType.STRING)
+	@Column(name = "category_code", nullable = false, length = 80)
+	private ProductCategory categoryCode;
+
+	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private ProductStatus status;
 
@@ -57,10 +61,22 @@ public class Product {
 	}
 
 	public Product(Supplier supplier, String name, String summary, long basePrice, ProductStatus status) {
+		this(supplier, name, summary, basePrice, ProductCategory.PPE_SAFETY_HELMET, status);
+	}
+
+	public Product(
+		Supplier supplier,
+		String name,
+		String summary,
+		long basePrice,
+		ProductCategory categoryCode,
+		ProductStatus status
+	) {
 		this.supplier = supplier;
 		this.name = name;
 		this.summary = summary;
 		this.basePrice = basePrice;
+		this.categoryCode = categoryCode;
 		this.status = status;
 	}
 
@@ -76,11 +92,12 @@ public class Product {
 		updatedAt = Instant.now();
 	}
 
-	public void updateBase(Supplier supplier, String name, String summary, long basePrice) {
+	public void updateBase(Supplier supplier, String name, String summary, long basePrice, ProductCategory categoryCode) {
 		this.supplier = supplier;
 		this.name = name;
 		this.summary = summary;
 		this.basePrice = basePrice;
+		this.categoryCode = categoryCode;
 	}
 
 	public void updateStatus(ProductStatus status) {
@@ -113,6 +130,10 @@ public class Product {
 
 	public long getBasePrice() {
 		return basePrice;
+	}
+
+	public ProductCategory getCategoryCode() {
+		return categoryCode;
 	}
 
 	public ProductStatus getStatus() {

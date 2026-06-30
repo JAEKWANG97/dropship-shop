@@ -1,4 +1,5 @@
 import { getAdminSuppliers } from "@/lib/admin";
+import { PRODUCT_CATEGORIES, categoryPath } from "@/lib/categories";
 import { createAdminProduct } from "./actions";
 
 type AdminProductNewPageProps = {
@@ -54,6 +55,16 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
               <label className="wide">
                 요약 설명
                 <input name="summary" required placeholder="상품 목록과 상세 상단에 노출되는 설명" />
+              </label>
+              <label className="wide">
+                카테고리
+                <select name="categoryCode" required defaultValue="PPE_SAFETY_HELMET">
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category[2]} value={category[2]}>
+                      {categoryPath(category[2])}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </section>

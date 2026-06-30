@@ -314,6 +314,7 @@ Relationships:
 - `name`
 - `summary`
 - `base_price`
+- `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - `status`: `ACTIVE` / `SOLD_OUT` / `HIDDEN` / `STOPPED`
 - `thumbnail_image_url`: optional denormalized cache
 - `created_at`
@@ -322,6 +323,7 @@ Relationships:
 Rules:
 
 - No real stock quantity.
+- One product has one `category_code`; category admin and multi-category mapping are future scope.
 - Customer-visible sale requires product `ACTIVE` and option `ACTIVE`.
 - Canonical thumbnail data lives in `product_images` where `type = THUMBNAIL`.
 - If `thumbnail_image_url` is kept on `products`, it is a cache updated from canonical thumbnail image metadata.

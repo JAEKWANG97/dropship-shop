@@ -230,6 +230,7 @@ DS-6 minimum:
 - Product option model and admin create/update API.
 - Product image metadata API with one thumbnail and up to ten gallery images.
 - Product image upload stores files under local product image storage and returns `imageUrl` and `objectKey`.
+- Products carry one fixed `categoryCode`; category administration and multi-category assignment are future scope.
 - Product detail block API with ordered `IMAGE` and sanitized `HTML` blocks.
 - Product notice/version source for product information notice, shipping, AS, return, and exchange information.
 - Product change history writes for product, option, image, detail, notice, and supplier changes.
@@ -574,6 +575,7 @@ Customer visibility:
   "name": "Product name",
   "summary": "Short customer-facing summary",
   "basePrice": 39000,
+  "categoryCode": "PPE_SAFETY_HELMET",
   "status": "ACTIVE"
 }
 ```
@@ -654,6 +656,7 @@ Rule:
   "name": "Product name",
   "summary": "Short customer-facing summary",
   "basePrice": 39000,
+  "categoryCode": "PPE_SAFETY_HELMET",
   "status": "ACTIVE",
   "detailVersion": 3,
   "productNoticeVersion": 2,
