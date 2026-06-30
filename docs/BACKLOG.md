@@ -79,6 +79,17 @@ Tasks:
 - [ ] 배송조회 실패 사유가 관리자 화면에 보이는지 확인한다.
 - [ ] 배송완료 sync 후 주문 상태가 `DELIVERED`로 전환되는지 확인한다.
 
+### B-024 API 계약 리뷰 후속 정리
+
+Status: Todo
+
+Tasks:
+- [ ] 관리자 계정으로 `/orders`, `/orders/{orderId}` 접근 시 고객 주문 API 장애처럼 보이지 않게 안내 화면을 분리한다.
+- [ ] `docs/api-spec.md`의 고객 취소/클레임 API 상태와 권한을 실제 `CUSTOMER` 구현 기준으로 정리한다.
+- [ ] `POST /api/me/agreements` 프론트 응답 타입 선언을 실제 `AgreeResponse` 또는 unused 호출에 맞게 정리한다.
+- [ ] 옵션 생성 사유 입력을 제거할지, 옵션 생성 변경 이력을 백엔드에 남길지 결정한다.
+- [ ] 이미지 업로드 구현 상태 관련 오래된 DS-6 note를 현재 구현 상태에 맞춘다.
+
 ### B-012 사업자 정보/개인정보 처리표 관리자 설정
 
 Status: Todo

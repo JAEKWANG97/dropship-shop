@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-023 프론트엔드-백엔드 API 계약 검토
+  - 커밋: `docs: record api contract review`
+  - 완료 내용: 프론트 `/api/**` 호출과 백엔드 controller/DTO, `docs/api-spec.md`를 대조해 API path/method, 권한, DTO, 오류 처리 계약을 점검했다. 결과는 `docs/API_CONTRACT_REVIEW.md`에 정리하고 후속 정리 항목은 B-024로 분리했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test`, `git diff --check`, 브라우저 샘플 확인
 - B-006 상품 옵션/판매 상태 관리 화면 정리
   - 커밋: `feat: connect admin product option management`
   - 완료 내용: 관리자 상품 목록의 `관리` 링크를 상품 상세 관리 화면으로 연결하고, 상품 판매 상태 변경, 옵션 추가, 옵션 정보/상태 변경, 변경 이력 조회를 기존 admin catalog API에 연결했다.
