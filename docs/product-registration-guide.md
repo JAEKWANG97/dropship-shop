@@ -56,3 +56,18 @@ node scripts/collect-domeggook-product.mjs --file tmp/domeggook-urls.txt
 - `이미지사용` 값이 `허용`인 상품만 대표 이미지와 상세 이미지를 다운로드한다.
 - 수집 후 상품명, 가격, 카테고리, 인증/KC, 상품고시, 이미지 품질을 확인한다.
 - 이미지는 필요한 크기로 수동 보정한 뒤 관리자 화면에서 업로드한다.
+
+## Domeggook Import
+
+도매꾹 수집 상품은 관리자 API를 통해 `HIDDEN` 상태로만 먼저 적재한다.
+
+```bash
+node scripts/import-domeggook-products.mjs --init-manifest
+node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json
+node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json --cookie-file tmp/admin-cookie.txt --apply
+```
+
+- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `basePrice`를 먼저 확인한다.
+- 생성된 manifest는 기본적으로 `import: false`, `status: "HIDDEN"`이다.
+- `ACTIVE` 전환은 관리자 화면에서 상품 고시, 인증/KC, 가격, 이미지 품질을 확인한 뒤 진행한다.
+- import 결과는 `tmp/domeggook-import-result.json`에 저장된다.

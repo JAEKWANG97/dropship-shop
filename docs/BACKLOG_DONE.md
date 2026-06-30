@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-032 도매꾹 수집 상품 관리자 API 적재 도구
+  - 커밋: `feat: add domeggook product importer`
+  - 완료 내용: 도매꾹 수집 산출물에서 manifest를 만들고, 선택된 상품을 기존 관리자 API로 공급처/상품/옵션/대표 이미지/상세 이미지 블록까지 적재하는 로컬 스크립트를 추가했다. 기본 상태는 `HIDDEN`이고 카테고리는 자동 추정하지 않는다.
+  - 검증: `node scripts/import-domeggook-products.mjs --help`, `node scripts/import-domeggook-products.mjs --init-manifest`, `node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json`, `git diff --check`
 - B-031 도매꾹 상품 이미지/상세이미지 수집 도구
   - 커밋: `feat: add domeggook product collector`
   - 완료 내용: 도매꾹 상품 URL에서 상품 후보 정보, 대표 이미지, 상세 이미지 URL을 파싱하고 `이미지사용: 허용`일 때만 이미지를 로컬 `tmp/domeggook-products/{상품번호}/`에 다운로드하는 스크립트를 추가했다. 결과는 JSON/CSV로 저장해 관리자 수동 등록 전에 검수하도록 했다.
