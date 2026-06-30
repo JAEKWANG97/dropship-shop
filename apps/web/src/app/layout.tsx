@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BUSINESS_PROFILE, POLICY_PAGES } from "@/lib/legal";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
 import "./globals.css";
 
@@ -23,6 +24,7 @@ export default async function RootLayout({
             <Link href="/products">입점상품</Link>
             <Link href="/orders">주문배송</Link>
             <Link href="/cart">장바구니</Link>
+            <Link href="/support">고객문의</Link>
             {admin ? <Link className="admin-entry" href="/admin">운영관리</Link> : null}
           </nav>
         </div>
@@ -67,18 +69,30 @@ export default async function RootLayout({
         <main className="page-shell">{children}</main>
         <footer className="site-footer">
           <div>
-            <strong>코어블SAF</strong>
+            <strong>{BUSINESS_PROFILE.brandName}</strong>
             <span>건설 안전용품 쇼핑몰</span>
+            <span>상호 {BUSINESS_PROFILE.companyName}</span>
+            <span>대표 {BUSINESS_PROFILE.representativeName}</span>
+            <span>사업자등록번호 {BUSINESS_PROFILE.businessRegistrationNumber}</span>
+            <span>통신판매업 신고번호 {BUSINESS_PROFILE.mailOrderSalesRegistrationNumber}</span>
+            <span>주소 {BUSINESS_PROFILE.businessAddress}</span>
           </div>
           <div>
             <strong>고객 지원</strong>
-            <span>주문/배송 문의는 주문조회에서 확인</span>
-            <span>운영 권한 계정 기준 관리</span>
+            <Link href="/support">고객 문의 접수</Link>
+            <Link href="/company">회사 정보</Link>
+            <span>반품 주소 {BUSINESS_PROFILE.returnAddress}</span>
+            <span>{BUSINESS_PROFILE.purchaseSafetyNotice}</span>
           </div>
           <div>
             <strong>거래 정책</strong>
-            <span>배송비는 상품 가격에 포함됩니다.</span>
-            <span>공급처 품절 시 배송 그룹 주문 단위로 환불됩니다.</span>
+            <div className="footer-links">
+              {POLICY_PAGES.map((policy) => (
+                <Link href={`/policies/${policy.slug}`} key={policy.slug}>
+                  {policy.title}
+                </Link>
+              ))}
+            </div>
           </div>
         </footer>
       </body>

@@ -742,6 +742,7 @@ Policy/legal tables:
 - `user_policy_agreements`
 - `business_profiles`
 - `privacy_processing_items`
+- `customer_inquiries`
 - `marketing_consents`
 - `legal_retention_records`
 
@@ -807,6 +808,22 @@ Rule:
 Rule:
 
 - Public privacy processing table reads active rows ordered by `sort_order`.
+
+### customer_inquiries
+
+- `id`
+- `customer_name`
+- `email`
+- `phone`
+- `subject`
+- `message`
+- `created_at`
+
+Rule:
+
+- Public customers can create inquiries without login.
+- Admin users can list inquiries in newest-first order.
+- Reply status and assignment are out of MVP scope.
 
 Audit/notification tables:
 

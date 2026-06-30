@@ -197,6 +197,21 @@ textarea {
   color: var(--navy);
 }
 
+.site-footer a {
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.footer-links a {
+  width: fit-content;
+}
+
 .home-page {
   display: grid;
   gap: 16px;
@@ -997,6 +1012,75 @@ h2 {
   font-weight: 700;
 }
 
+.legal-page {
+  display: grid;
+  gap: 18px;
+}
+
+.legal-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.legal-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.legal-card strong {
+  color: var(--navy);
+  font-size: 18px;
+}
+
+.legal-card span,
+.legal-card small {
+  color: var(--muted);
+}
+
+.legal-notice {
+  padding: 12px 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.support-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.support-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.support-form .wide {
+  grid-column: 1 / -1;
+}
+
+.support-consent {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.support-consent input {
+  width: auto;
+  min-height: auto;
+}
+
 .cart-add-form {
   display: grid;
   gap: 12px;
@@ -1776,6 +1860,48 @@ textarea {
   font-size: 13px;
 }
 
+.admin-inquiry-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-inquiry-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.admin-inquiry-card > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-inquiry-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.admin-inquiry-card dt,
+.admin-inquiry-card time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-inquiry-card dd {
+  margin: 0;
+  color: var(--navy);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .admin-order-detail {
   position: sticky;
   top: 96px;
@@ -1882,6 +2008,8 @@ textarea {
   .cart-layout,
   .checkout-layout,
   .login-page,
+  .legal-card-grid,
+  .support-form,
   .admin-shell,
   .admin-dashboard-grid,
   .admin-orders-layout,
@@ -2051,6 +2179,7 @@ textarea {
   .admin-product-summary,
   .admin-product-summary dl,
   .admin-detail-add-grid,
+  .admin-inquiry-card dl,
   .admin-option-card dl,
   .admin-inline-form,
   .admin-change-list > div:not(.admin-empty) {

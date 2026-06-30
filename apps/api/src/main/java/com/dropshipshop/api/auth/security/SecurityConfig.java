@@ -68,6 +68,7 @@ public class SecurityConfig {
 				.requestMatchers("/uploads/products/**").permitAll()
 				.requestMatchers("/api/policies", "/api/policies/**").permitAll()
 				.requestMatchers("/api/business-profile", "/api/privacy-processing-items").permitAll()
+				.requestMatchers("/api/customer-inquiries").permitAll()
 				.requestMatchers("/api/admin/**").hasRole("ADMIN")
 				.anyRequest().authenticated()
 			)

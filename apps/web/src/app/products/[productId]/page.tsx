@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { addCartItem } from "@/app/cart/actions";
-import { ApiError, apiUrl } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { categoryLabel } from "@/lib/categories";
 import {
   formatPrice,
@@ -10,6 +10,7 @@ import {
   type ProductDetail,
   type ProductSummary,
 } from "@/lib/catalog";
+import { policyHref } from "@/lib/legal";
 import { getCurrentUser } from "@/lib/session";
 import { ProductImage } from "../product-image";
 
@@ -236,9 +237,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <h2>정책</h2>
           <div className="policy-links">
             {product.policyLinks.map((policy) => (
-              <a href={apiUrl(policy.href)} key={policy.policyType}>
+              <Link href={policyHref(policy.policyType)} key={policy.policyType}>
                 {policy.label}
-              </a>
+              </Link>
             ))}
           </div>
         </section>

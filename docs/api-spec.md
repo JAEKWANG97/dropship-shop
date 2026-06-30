@@ -496,12 +496,14 @@ Rules:
 | `GET` | `/api/policies/{type}/versions/{version}` | Public | Implemented | Specific policy version |
 | `GET` | `/api/business-profile` | Public | Implemented | Active business disclosure |
 | `GET` | `/api/privacy-processing-items` | Public | Implemented | Active privacy processing table |
+| `POST` | `/api/customer-inquiries` | Public | Implemented | Create customer support inquiry |
 | `GET` | `/api/admin/policies` | `ADMIN` | Implemented | Admin policy document list |
 | `POST` | `/api/admin/policies` | `ADMIN` | Implemented | Create policy draft |
 | `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Implemented | Update policy draft |
 | `POST` | `/api/admin/policies/{policyId}/activate` | `ADMIN` | Implemented | Activate policy version |
 | `PATCH` | `/api/admin/business-profile` | `ADMIN` | Planned | Update business disclosure |
 | `PUT` | `/api/admin/privacy-processing-items` | `ADMIN` | Planned | Replace privacy processing table |
+| `GET` | `/api/admin/customer-inquiries` | `ADMIN` | Implemented | List customer support inquiries |
 
 Rules:
 
@@ -514,6 +516,7 @@ Rules:
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.
 - Checkout stores policy versions per payment group.
+- Customer inquiry MVP stores name, email, optional phone, subject, message, and created timestamp. Reply workflow is planned later.
 - Actual legal wording requires launch review.
 
 ## Notification And Audit APIs

@@ -4,6 +4,10 @@
 
 ## 2026-06-30
 
+- B-012 사업자 정보/푸터/정책 페이지/고객 문의 운영 고지
+  - 커밋: `feat: add legal footer and customer inquiries`
+  - 완료 내용: 푸터에 실제 사업자 정보와 정책 링크를 노출하고, 이용약관/개인정보처리방침/배송/취소환불/품절 안내 페이지, 회사 정보 페이지, 고객 문의 접수와 관리자 문의 목록을 연결했다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test`, `git diff --check`
 - B-005 상품 상세 HTML/이미지 블록 관리
   - 커밋: `feat: connect admin product detail content`
   - 완료 내용: 관리자 상품 상세 화면에서 IMAGE/HTML 상세 블록을 전체 교체 방식으로 저장하고, 상세 이미지 파일 업로드와 상품 고시 저장을 기존 catalog API에 연결했다.

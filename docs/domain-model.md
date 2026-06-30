@@ -36,6 +36,7 @@ OrderPolicyAgreement
 MarketingConsent
 PrivacyProcessingItem
 LegalRetentionRecord
+CustomerInquiry
 ```
 
 ## User
@@ -1022,3 +1023,25 @@ Suggested fields:
 - 결제 그룹(PaymentGroup) 시점에는 주문서 통합 확인 체크의 정책 버전과 확인 시각을 저장한다.
 - 주문서 통합 확인 체크는 결제 그룹(PaymentGroup) 단위로 저장한다.
 - 주문서 통합 확인 체크는 주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 가능성, 품절 시 해당 배송 그룹 주문 금액 환불 안내를 포함한다.
+- 고객 문의는 `CustomerInquiry`로 저장하고 관리자 화면에서 접수 내용을 확인한다.
+- MVP 문의 처리는 접수/확인으로 시작하고 답변 상태, 담당자 배정, SLA 관리는 이후 범위로 둔다.
+
+## CustomerInquiry
+
+사이트 고객 문의 접수 기록이다.
+
+Implemented fields:
+
+- id
+- customerName
+- email
+- phone
+- subject
+- message
+- createdAt
+
+Rules:
+
+- 비로그인 고객도 문의를 접수할 수 있다.
+- 관리자만 문의 목록을 조회할 수 있다.
+- 답변 상태와 처리 이력은 MVP 이후에 추가한다.

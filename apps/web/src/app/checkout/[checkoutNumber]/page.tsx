@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ApiError, apiUrl } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { getAgreementState, type AgreementState } from "@/lib/account";
 import { getCheckout, type Checkout, type CheckoutOrder } from "@/lib/checkout";
 import { formatPrice } from "@/lib/catalog";
+import { policyHref } from "@/lib/legal";
 import { getCurrentUser } from "@/lib/session";
 import {
   confirmCheckoutPolicies,
@@ -125,9 +126,9 @@ function CheckoutSummary({ checkout }: { checkout: Checkout }) {
 
       <div className="policy-links">
         {checkout.policyLinks.map((policy) => (
-          <a href={apiUrl(policy.href)} key={policy.policyType}>
+          <Link href={policyHref(policy.policyType)} key={policy.policyType}>
             {policy.label}
-          </a>
+          </Link>
         ))}
       </div>
 
