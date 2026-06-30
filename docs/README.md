@@ -9,6 +9,7 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - 현재 제품 범위: [Product Brief](product-brief.md), [Requirements](requirements.md)
 - 현재 운영 정책: [Policy Documents](policies/README.md)
 - 정책 결정 이력과 이유: [Decision Log](decision-log.md)
+- 상품 등록 운영 기준: [Product Registration Guide](product-registration-guide.md)
 - 현재 작업 큐: [Backlog](BACKLOG.md)
 - 구현 설계 초안: [Domain Model](domain-model.md), [MVP ERD](erd.md), [MVP API Specification](api-spec.md), [Order Flow](order-flow.md), [Architecture](architecture.md), [Production Readiness](production-readiness.md)
 

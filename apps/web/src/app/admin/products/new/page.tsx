@@ -108,7 +108,9 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
               <label>
                 대표 이미지 파일
                 <input accept="image/jpeg,image/png,image/webp" name="thumbnailFile" type="file" />
-                <span className="field-help">jpg, png, webp 파일을 5MB 이하로 업로드하세요.</span>
+                <span className="field-help">
+                  1:1 정사각형, 1200x1200px webp 권장. jpg, png, webp 파일을 5MB 이하로 업로드하세요.
+                </span>
               </label>
               <label>
                 대표 이미지 대체 텍스트

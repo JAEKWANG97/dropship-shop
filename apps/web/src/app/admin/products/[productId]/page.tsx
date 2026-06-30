@@ -392,6 +392,9 @@ function ProductDetailBlocksPanel({ product }: { product: ProductDetail }) {
               <label>
                 이미지 파일
                 <input name="newImageFile" type="file" accept="image/jpeg,image/png,image/webp" />
+                <span className="field-help">
+                  상세 이미지 블록은 16:9, 1600x900px 또는 1920x1080px webp 권장.
+                </span>
               </label>
               <label>
                 정렬값
