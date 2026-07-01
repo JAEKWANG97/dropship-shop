@@ -154,6 +154,7 @@ Suggested fields:
 - name
 - summary
 - description
+- sourcePrice: supplier/domeggook cost, admin-only
 - basePrice
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
@@ -164,6 +165,8 @@ Suggested fields:
 Modeling notes:
 
 - MVP stores one fixed `categoryCode` per product.
+- `sourcePrice` is internal cost. `basePrice` is the customer sale price including expected shipping cost.
+- Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded up to 100 KRW.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
 
 ## ProductImage

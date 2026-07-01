@@ -6,6 +6,14 @@ const DEFAULT_API = "http://localhost:8080";
 const DEFAULT_PRODUCTS_DIR = "tmp/domeggook-products";
 const DEFAULT_MANIFEST = "tmp/domeggook-import-manifest.json";
 const DEFAULT_RESULT = "tmp/domeggook-import-result.json";
+const DEFAULT_PRICING_POLICY = {
+  commissionRate: 5,
+  taxBufferRate: 10,
+  overheadRate: 5,
+  safetyMarginRate: 5,
+  roundingUnit: 100,
+  totalMarkupRate: 25,
+};
 
 function usage() {
   console.log(`Usage:
@@ -37,7 +45,22 @@ function parseArgs(argv) {
 }
 
 function parsePrice(priceText) {
-  return Number(String(priceText || "").replace(/[^\d]/g, "")) || 0;
+  return Number(String(priceText || "").match(/[\d,]+/)?.[0].replace(/[^\d]/g, "")) || 0;
+}
+
+function totalMarkupRate(policy) {
+  return Number(policy.totalMarkupRate ?? (
+    Number(policy.commissionRate || 0) +
+    Number(policy.taxBufferRate || 0) +
+    Number(policy.overheadRate || 0) +
+    Number(policy.safetyMarginRate || 0)
+  ));
+}
+
+function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
+  const roundingUnit = Number(policy.roundingUnit || 100);
+  const rawPrice = Math.ceil(Number(sourcePrice || 0) * (1 + totalMarkupRate(policy) / 100));
+  return Math.ceil(rawPrice / roundingUnit) * roundingUnit;
 }
 
 function summaryFor(product) {
@@ -67,6 +90,7 @@ async function readCollectedProducts() {
 async function initManifest() {
   const products = await readCollectedProducts();
   const items = products.map((product) => {
+    const sourcePrice = parsePrice(product.priceText);
     return {
       itemNo: product.itemNo,
       import: false,
@@ -75,7 +99,8 @@ async function initManifest() {
       status: "HIDDEN",
       name: product.title,
       summary: summaryFor(product),
-      basePrice: parsePrice(product.priceText),
+      sourcePrice,
+      basePrice: calculateBasePrice(sourcePrice),
       optionName: "기본",
       additionalPrice: 0,
       supplierName: product.sellerName || "도매꾹 공급처",
@@ -113,6 +138,14 @@ async function apiFetch(args, pathName, init = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+async function pricingPolicy(args) {
+  try {
+    return await apiFetch(args, "/api/admin/pricing-policy");
+  } catch {
+    return DEFAULT_PRICING_POLICY;
+  }
+}
+
 async function uploadImage(args, productId, filePath) {
   const form = new FormData();
   const bytes = await readFile(filePath);
@@ -135,13 +168,16 @@ function manifestIssue(item) {
   if (!item.import) return "";
   if (!item.categoryCode) return "categoryCode is required";
   if (!item.summary) return "summary is required";
-  if (!Number.isFinite(Number(item.basePrice)) || Number(item.basePrice) < 0) return "basePrice must be a non-negative number";
+  if (!Number.isFinite(Number(item.sourcePrice)) || Number(item.sourcePrice) <= 0) return "sourcePrice must be a positive number";
+  if (!Number.isFinite(Number(item.basePrice)) || Number(item.basePrice) <= 0) return "basePrice must be a positive number";
   if (item.status === "ACTIVE" && !item.productInfoNotice) return "ACTIVE import requires product notice";
   return "";
 }
 
-async function importItem(args, item, product, suppliers, products) {
+async function importItem(args, item, product, suppliers, products, policy) {
   if (!item.import) return { itemNo: item.itemNo, status: "SKIPPED", reason: "manifest import=false" };
+  item.sourcePrice = Number(item.sourcePrice || item.basePrice || parsePrice(product.priceText));
+  item.basePrice = Number(item.basePrice || calculateBasePrice(item.sourcePrice, policy));
   const issue = manifestIssue(item);
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
   if (products.some((existing) => existing.name === item.name)) {
@@ -155,6 +191,7 @@ async function importItem(args, item, product, suppliers, products) {
       supplierId: supplier.id,
       name: item.name,
       summary: item.summary,
+      sourcePrice: item.sourcePrice,
       basePrice: item.basePrice,
       categoryCode: item.categoryCode,
       status: item.status || "HIDDEN",
@@ -210,12 +247,22 @@ async function runManifest(args) {
   const manifest = JSON.parse(await readFile(args.manifest, "utf8"));
   const results = [];
   if (!args.apply) {
+    const policy = await pricingPolicy(args);
     for (const item of manifest.items || []) {
-      const issue = manifestIssue(item);
+      const sourcePrice = Number(item.sourcePrice || item.basePrice || 0);
+      const checkedItem = {
+        ...item,
+        sourcePrice,
+        basePrice: Number(item.basePrice || calculateBasePrice(sourcePrice, policy)),
+      };
+      const issue = manifestIssue(checkedItem);
       results.push({
         itemNo: item.itemNo,
         status: item.import ? (issue ? "FAILED" : "DRY_RUN") : "SKIPPED",
         reason: item.import ? issue : "manifest import=false",
+        sourcePrice,
+        currentBasePrice: Number(item.basePrice || 0),
+        calculatedBasePrice: calculateBasePrice(sourcePrice, policy),
       });
     }
     await writeFile(DEFAULT_RESULT, `${JSON.stringify(results, null, 2)}\n`);
@@ -231,11 +278,12 @@ async function runManifest(args) {
     apiFetch(args, "/api/admin/suppliers"),
     apiFetch(args, "/api/admin/products"),
   ]);
+  const policy = await pricingPolicy(args);
 
   for (const item of manifest.items || []) {
     try {
       const product = JSON.parse(await readFile(item.productFile, "utf8"));
-      results.push(await importItem(args, item, product, suppliers, products));
+      results.push(await importItem(args, item, product, suppliers, products, policy));
     } catch (error) {
       results.push({ itemNo: item.itemNo, status: "FAILED", reason: error.message });
     }

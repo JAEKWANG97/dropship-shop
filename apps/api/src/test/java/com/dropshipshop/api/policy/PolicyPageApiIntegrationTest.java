@@ -231,6 +231,19 @@ class PolicyPageApiIntegrationTest {
 			.andExpect(jsonPath("$.policyLinks[2].policyType", is("OUT_OF_STOCK_NOTICE")));
 	}
 
+	@Test
+	void usesCustomerFacingPolicyLinkLabelsWithoutActivePolicyDocuments() throws Exception {
+		policyDocumentRepository.deleteAll();
+		ProductOption option = createOption("Fallback Policy Link Product", 10000);
+
+		mockMvc.perform(get("/api/products/{productId}", option.getProduct().getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.policyLinks", hasSize(3)))
+			.andExpect(jsonPath("$.policyLinks[0].label", is("배송 정책")))
+			.andExpect(jsonPath("$.policyLinks[1].label", is("취소/환불 정책")))
+			.andExpect(jsonPath("$.policyLinks[2].label", is("결제 후 품절 안내")));
+	}
+
 	private void seedPublicPolicyDocuments() {
 		seedPublicPolicy(
 			PolicyDocumentType.SHIPPING_POLICY,

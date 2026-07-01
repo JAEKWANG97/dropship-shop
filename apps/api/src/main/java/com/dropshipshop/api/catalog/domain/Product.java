@@ -37,6 +37,9 @@ public class Product {
 	@Column(name = "base_price", nullable = false)
 	private long basePrice;
 
+	@Column(name = "source_price", nullable = false)
+	private long sourcePrice;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "category_code", nullable = false, length = 80)
 	private ProductCategory categoryCode;
@@ -61,7 +64,7 @@ public class Product {
 	}
 
 	public Product(Supplier supplier, String name, String summary, long basePrice, ProductStatus status) {
-		this(supplier, name, summary, basePrice, ProductCategory.PPE_SAFETY_HELMET, status);
+		this(supplier, name, summary, basePrice, basePrice, ProductCategory.PPE_SAFETY_HELMET, status);
 	}
 
 	public Product(
@@ -72,9 +75,22 @@ public class Product {
 		ProductCategory categoryCode,
 		ProductStatus status
 	) {
+		this(supplier, name, summary, basePrice, basePrice, categoryCode, status);
+	}
+
+	public Product(
+		Supplier supplier,
+		String name,
+		String summary,
+		long sourcePrice,
+		long basePrice,
+		ProductCategory categoryCode,
+		ProductStatus status
+	) {
 		this.supplier = supplier;
 		this.name = name;
 		this.summary = summary;
+		this.sourcePrice = sourcePrice;
 		this.basePrice = basePrice;
 		this.categoryCode = categoryCode;
 		this.status = status;
@@ -92,10 +108,11 @@ public class Product {
 		updatedAt = Instant.now();
 	}
 
-	public void updateBase(Supplier supplier, String name, String summary, long basePrice, ProductCategory categoryCode) {
+	public void updateBase(Supplier supplier, String name, String summary, long sourcePrice, long basePrice, ProductCategory categoryCode) {
 		this.supplier = supplier;
 		this.name = name;
 		this.summary = summary;
+		this.sourcePrice = sourcePrice;
 		this.basePrice = basePrice;
 		this.categoryCode = categoryCode;
 	}
@@ -130,6 +147,10 @@ public class Product {
 
 	public long getBasePrice() {
 		return basePrice;
+	}
+
+	public long getSourcePrice() {
+		return sourcePrice;
 	}
 
 	public ProductCategory getCategoryCode() {

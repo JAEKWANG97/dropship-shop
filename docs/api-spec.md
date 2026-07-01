@@ -222,6 +222,8 @@ Customer visibility rules:
 | `PUT` | `/api/admin/products/{productId}/detail-blocks` | `ADMIN` | Implemented | Replace ordered IMAGE/HTML detail blocks |
 | `PUT` | `/api/admin/products/{productId}/notice` | `ADMIN` | Implemented | Create next active product notice version |
 | `GET` | `/api/admin/products/{productId}/changes` | `ADMIN` | Implemented | Product change audit history |
+| `GET` | `/api/admin/pricing-policy` | `ADMIN` | Implemented | Read active product pricing policy |
+| `PUT` | `/api/admin/pricing-policy` | `ADMIN` | Implemented | Update active product pricing policy |
 
 DS-6 minimum:
 
@@ -235,6 +237,8 @@ DS-6 minimum:
 - Product notice/version source for product information notice, shipping, AS, return, and exchange information.
 - Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
+- Admin product responses include `sourcePrice`; public product responses do not expose supplier cost.
+- Active pricing policy stores the default margin rates used to calculate customer sale prices from supplier cost.
 - Customer product list/detail read APIs.
 
 DS-6 implementation notes:
@@ -577,6 +581,7 @@ Customer visibility:
   "supplierId": "00000000-0000-0000-0000-000000000000",
   "name": "Product name",
   "summary": "Short customer-facing summary",
+  "sourcePrice": 31200,
   "basePrice": 39000,
   "categoryCode": "PPE_SAFETY_HELMET",
   "status": "ACTIVE"
@@ -650,6 +655,24 @@ Validation:
 Rule:
 
 - The active product notice version or equivalent snapshot source must be available to order creation.
+- Public product detail responses omit `sourcePrice`; admin product detail responses include it.
+
+### Pricing Policy Request
+
+```json
+{
+  "name": "기본 가격 정책",
+  "commissionRate": 5.0,
+  "taxBufferRate": 10.0,
+  "overheadRate": 5.0,
+  "safetyMarginRate": 5.0,
+  "roundingUnit": 100
+}
+```
+
+Rule:
+
+- Default customer sale price is supplier cost plus the total markup rate, rounded up by `roundingUnit`.
 
 ### Product Detail Response Shape
 

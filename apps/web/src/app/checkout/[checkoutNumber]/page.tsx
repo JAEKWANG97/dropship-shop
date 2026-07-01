@@ -5,6 +5,7 @@ import { getAgreementState, type AgreementState } from "@/lib/account";
 import { getCheckout, type Checkout, type CheckoutOrder } from "@/lib/checkout";
 import { formatPrice } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
+import { orderStatusLabel, paymentGroupStatusLabel } from "@/lib/orders";
 import { getCurrentUser } from "@/lib/session";
 import {
   confirmCheckoutPolicies,
@@ -45,7 +46,7 @@ export default async function CheckoutDetailPage({
   if (!session) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Checkout</p>
+        <p className="eyebrow">주문서</p>
         <h1>로그인이 필요합니다</h1>
         <Link className="button primary" href="/login">
           로그인
@@ -59,7 +60,7 @@ export default async function CheckoutDetailPage({
   if (error || !checkout || !agreement) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Checkout</p>
+        <p className="eyebrow">주문서</p>
         <h1>주문서를 불러오지 못했습니다</h1>
         <p>백엔드 API 연결 상태를 확인해 주세요.</p>
       </section>
@@ -72,7 +73,7 @@ export default async function CheckoutDetailPage({
   return (
     <section className="checkout-page">
       <div className="section-heading">
-        <p className="eyebrow">{checkout.status}</p>
+        <p className="eyebrow">{paymentGroupStatusLabel(checkout.status)}</p>
         <h1>주문서 {checkout.checkoutNumber}</h1>
       </div>
 
@@ -100,7 +101,7 @@ function CheckoutSummary({ checkout }: { checkout: Checkout }) {
       <div className="summary-list">
         <div>
           <span>상태</span>
-          <strong>{checkout.status}</strong>
+          <strong>{paymentGroupStatusLabel(checkout.status)}</strong>
         </div>
         <div>
           <span>결제 금액</span>
@@ -146,7 +147,7 @@ function CheckoutOrderCard({ order }: { order: CheckoutOrder }) {
     <article className="order-card">
       <div>
         <strong>{order.deliveryGroupName}</strong>
-        <span>{order.status}</span>
+        <span>{orderStatusLabel(order.status)}</span>
       </div>
       <div className="summary-list compact">
         {order.items.map((item) => (

@@ -12,7 +12,7 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
   return (
     <section className="legal-page">
       <div className="section-heading">
-        <p className="eyebrow">Support</p>
+        <p className="eyebrow">고객지원</p>
         <h1>고객 문의</h1>
         <p>주문, 배송, 반품, 교환, 환불 문의를 사이트에서 접수합니다.</p>
       </div>

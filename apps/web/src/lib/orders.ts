@@ -139,7 +139,7 @@ export function fulfillmentStatusLabel(status: string) {
 }
 
 export function shipmentStatusLabel(status: string) {
-  return ({ READY: "배송 전", SHIPPED: "배송 중", DELIVERED: "배송 완료" }[status] ?? status);
+  return ({ READY: "배송 전", IN_TRANSIT: "배송 중", SHIPPED: "배송 중", DELIVERED: "배송 완료" }[status] ?? status);
 }
 
 export function refundStatusLabel(status: string | null) {

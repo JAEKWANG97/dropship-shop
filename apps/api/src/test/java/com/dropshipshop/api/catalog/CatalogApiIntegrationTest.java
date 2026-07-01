@@ -54,6 +54,29 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isForbidden());
 
 		UUID supplierId = createSupplier();
+
+		mockMvc.perform(get("/api/admin/pricing-policy")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalMarkupRate", is(25.0)))
+			.andExpect(jsonPath("$.roundingUnit", is(100)));
+
+		mockMvc.perform(put("/api/admin/pricing-policy")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Default margin",
+					  "commissionRate": 5.00,
+					  "taxBufferRate": 10.00,
+					  "overheadRate": 5.00,
+					  "safetyMarginRate": 5.00,
+					  "roundingUnit": 100
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalMarkupRate", is(25.0)));
+
 		UUID productId = createProduct(supplierId);
 		MockMultipartFile imageFile = new MockMultipartFile(
 			"file",
@@ -149,10 +172,12 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/products"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$", hasSize(1)))
-			.andExpect(jsonPath("$[0].id", is(productId.toString())));
+			.andExpect(jsonPath("$[0].id", is(productId.toString())))
+			.andExpect(jsonPath("$[0].sourcePrice").doesNotExist());
 
 		mockMvc.perform(get("/api/products/{productId}", productId))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
 			.andExpect(jsonPath("$.options", hasSize(1)))
 			.andExpect(jsonPath("$.images", hasSize(2)))
 			.andExpect(jsonPath("$.productNoticeVersion", is(1)));
@@ -220,12 +245,15 @@ class CatalogApiIntegrationTest {
 					  "supplierId": "%s",
 					  "name": "Product A",
 					  "summary": "Summary",
+					  "sourcePrice": 31200,
 					  "basePrice": 39000,
 					  "categoryCode": "PPE_SAFETY_HELMET",
 					  "status": "ACTIVE"
 					}
 					""".formatted(supplierId)))
 			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.sourcePrice", is(31200)))
+			.andExpect(jsonPath("$.basePrice", is(39000)))
 			.andExpect(jsonPath("$.categoryCode", is("PPE_SAFETY_HELMET")))
 			.andExpect(jsonPath("$.status", is("ACTIVE")))
 			.andReturn();

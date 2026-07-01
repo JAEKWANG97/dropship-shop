@@ -16,7 +16,7 @@ export default async function PolicyPage({ params }: PolicyPageProps) {
   return (
     <article className="legal-page">
       <div className="section-heading">
-        <p className="eyebrow">Policy</p>
+        <p className="eyebrow">정책</p>
         <h1>{policy.title}</h1>
         <p>{policy.summary}</p>
         <span>

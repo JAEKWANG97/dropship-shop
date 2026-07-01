@@ -17,7 +17,8 @@
 - 상품명
 - 카테고리
 - 공급처
-- 기본가
+- 공급가
+- 판매가
 - 옵션명과 추가금액
 - 판매 상태
 - 대표 이미지와 대체 텍스트
@@ -40,8 +41,9 @@
 3. 상세 이미지는 16:9로 맞춘 뒤 상세 이미지 블록으로 추가한다.
 4. 안전모, 안전화, 안전대, 마스크, 보안경 같은 보호구는 인증서, 인증번호, KC 또는 안전인증 대상 여부를 먼저 확인한다.
 5. 상품 고시에 제조사/수입자, 원산지, 재질, 규격, 인증번호, AS/반품 기준을 입력한다.
-6. `/products`, `/products/{productId}`, `/cart`에서 이미지와 가격 표시를 확인한다.
-7. 이상 없으면 다음 상품 묶음을 등록한다.
+6. 공급가는 운영자 전용으로 입력하고, 판매가는 가격 정책 기준 계산가를 적용한 뒤 필요하면 수동 조정한다.
+7. `/products`, `/products/{productId}`, `/cart`에서 이미지와 가격 표시를 확인한다.
+8. 이상 없으면 다음 상품 묶음을 등록한다.
 
 ## Domeggook Collection
 
@@ -67,7 +69,9 @@ node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manif
 node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json --cookie-file tmp/admin-cookie.txt --apply
 ```
 
-- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `basePrice`를 먼저 확인한다.
+- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`를 먼저 확인한다.
 - 생성된 manifest는 기본적으로 `import: false`, `status: "HIDDEN"`이다.
+- `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 올린 값이다.
+- 숫자 가격이 없는 상품은 import 실패 또는 `HIDDEN` 유지 대상으로 보고 수동 검수한다.
 - `ACTIVE` 전환은 관리자 화면에서 상품 고시, 인증/KC, 가격, 이미지 품질을 확인한 뒤 진행한다.
 - import 결과는 `tmp/domeggook-import-result.json`에 저장된다.

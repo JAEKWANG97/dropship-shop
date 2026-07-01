@@ -37,7 +37,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   if (!session) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Checkout</p>
+        <p className="eyebrow">주문서</p>
         <h1>로그인이 필요합니다</h1>
         <p>주문서는 소셜 로그인 후 생성할 수 있습니다.</p>
         <Link className="button primary" href="/login">
@@ -54,7 +54,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   if (data.status === "error" || !data.agreement || !data.cart) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Checkout</p>
+        <p className="eyebrow">주문서</p>
         <h1>주문서를 시작하지 못했습니다</h1>
         <p>백엔드 API 연결 상태를 확인해 주세요.</p>
       </section>
@@ -66,7 +66,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   return (
     <section className="checkout-page">
       <div className="section-heading">
-        <p className="eyebrow">Checkout</p>
+        <p className="eyebrow">주문서</p>
         <h1>주문 결제</h1>
         <p>주문자, 배송지, 결제수단과 필수 정책을 확인한 뒤 결제를 진행합니다.</p>
       </div>
@@ -110,7 +110,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
 function AdminCustomerFlowNotice() {
   return (
     <section className="narrow-page">
-      <p className="eyebrow">Checkout</p>
+      <p className="eyebrow">주문서</p>
       <h1>관리자 계정은 고객 구매 기능을 사용할 수 없습니다</h1>
       <p>주문서는 고객 계정으로 생성해 주세요. 운영 처리는 관리자 화면에서 계속할 수 있습니다.</p>
       <div className="link-list">

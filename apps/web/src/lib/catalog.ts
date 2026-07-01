@@ -56,6 +56,7 @@ export type PolicyLink = {
 };
 
 export type ProductDetail = ProductSummary & {
+  sourcePrice?: number;
   detailVersion: number;
   productNoticeVersion: number | null;
   images: ProductImage[];

@@ -73,8 +73,14 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
             <h2>가격 / 판매 상태</h2>
             <div className="admin-form-grid">
               <label>
-                기본 가격
+                공급가
+                <input min="0" name="sourcePrice" required type="number" />
+                <span className="field-help">도매꾹/공급처 원가입니다. 고객 화면에는 노출하지 않습니다.</span>
+              </label>
+              <label>
+                판매가
                 <input min="0" name="basePrice" required type="number" />
+                <span className="field-help">고객 결제 기준 가격입니다. 기본 기준은 공급가의 25% 증액입니다.</span>
               </label>
               <label>
                 판매 상태

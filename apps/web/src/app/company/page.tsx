@@ -5,7 +5,7 @@ export default function CompanyPage() {
   return (
     <section className="legal-page">
       <div className="section-heading">
-        <p className="eyebrow">Company</p>
+        <p className="eyebrow">회사 정보</p>
         <h1>회사 정보</h1>
         <p>코어블SAF 운영 및 소비자 고지 정보입니다.</p>
       </div>

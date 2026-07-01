@@ -313,6 +313,7 @@ Relationships:
 - `supplier_id`
 - `name`
 - `summary`
+- `source_price`: supplier cost, admin-only
 - `base_price`
 - `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - `status`: `ACTIVE` / `SOLD_OUT` / `HIDDEN` / `STOPPED`
@@ -323,6 +324,8 @@ Relationships:
 Rules:
 
 - No real stock quantity.
+- `base_price` is the customer-facing sale price. `source_price` must not be exposed by public customer APIs.
+- Existing order item price snapshots are not changed when product source or sale prices change.
 - One product has one `category_code`; category admin and multi-category mapping are future scope.
 - Customer-visible sale requires product `ACTIVE` and option `ACTIVE`.
 - Canonical thumbnail data lives in `product_images` where `type = THUMBNAIL`.

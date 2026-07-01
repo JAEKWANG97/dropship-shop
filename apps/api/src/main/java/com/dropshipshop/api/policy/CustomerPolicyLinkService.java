@@ -33,7 +33,16 @@ public class CustomerPolicyLinkService {
 	private String title(PolicyDocumentType type) {
 		return policyDocumentRepository.findByTypeAndStatus(type, PolicyDocumentStatus.ACTIVE)
 			.map(policy -> policy.getTitle())
-			.orElse(type.name());
+			.orElse(defaultTitle(type));
+	}
+
+	private String defaultTitle(PolicyDocumentType type) {
+		return switch (type) {
+			case SHIPPING_POLICY -> "배송 정책";
+			case CANCELLATION_REFUND_POLICY -> "취소/환불 정책";
+			case OUT_OF_STOCK_NOTICE -> "결제 후 품절 안내";
+			default -> type.name();
+		};
 	}
 
 	private String href(PolicyDocumentType type) {

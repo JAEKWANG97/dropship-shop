@@ -5,7 +5,7 @@ export default function PolicyIndexPage() {
   return (
     <section className="legal-page">
       <div className="section-heading">
-        <p className="eyebrow">Policies</p>
+        <p className="eyebrow">정책</p>
         <h1>정책 안내</h1>
         <p>실제 운영 전 최종 검토가 필요한 정책 안내입니다.</p>
       </div>

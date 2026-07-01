@@ -15,7 +15,7 @@ export default async function PaymentFailPage({ searchParams }: PaymentFailPageP
 
   return (
     <section className="narrow-page">
-      <p className="eyebrow">Payment</p>
+      <p className="eyebrow">결제</p>
       <h1>결제가 완료되지 않았습니다</h1>
       <p>{params.message ?? "Toss 결제창에서 실패 또는 취소가 발생했습니다."}</p>
       {params.code ? <p>오류 코드: {params.code}</p> : null}

@@ -8,6 +8,7 @@
 
 - [Account Policy](account-policy.md)
 - [Catalog And Inventory Policy](catalog-inventory-policy.md)
+- [Pricing Policy](pricing-policy.md)
 - [Order Policy](order-policy.md)
 - [Payment Policy](payment-policy.md)
 - [Fulfillment And Shipping Policy](fulfillment-shipping-policy.md)

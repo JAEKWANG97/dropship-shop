@@ -32,7 +32,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
   if (!session) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Cart</p>
+        <p className="eyebrow">장바구니</p>
         <h1>로그인이 필요합니다</h1>
         <p>장바구니는 소셜 로그인 후 사용할 수 있습니다.</p>
         <Link className="button primary" href="/login">
@@ -49,7 +49,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
   if (status === "error" || !cart) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Cart</p>
+        <p className="eyebrow">장바구니</p>
         <h1>장바구니를 불러오지 못했습니다</h1>
         <p>백엔드 API 연결 상태를 확인해 주세요.</p>
       </section>
@@ -59,7 +59,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
   return (
     <section className="cart-page">
       <div className="section-heading">
-        <p className="eyebrow">Cart</p>
+        <p className="eyebrow">장바구니</p>
         <h1>장바구니</h1>
         <p>선택하신 상품의 수량을 확인하고 주문 결제를 진행하세요.</p>
       </div>

@@ -11,6 +11,7 @@ export type AdminProduct = {
   supplierName: string;
   name: string;
   summary: string;
+  sourcePrice: number;
   basePrice: number;
   categoryCode: ProductCategoryCode;
   status: AdminProductStatus;
@@ -24,6 +25,17 @@ export type AdminSupplier = {
 };
 
 export type AdminProductDetail = ProductDetail;
+
+export type PricingPolicy = {
+  id: string | null;
+  name: string;
+  commissionRate: number;
+  taxBufferRate: number;
+  overheadRate: number;
+  safetyMarginRate: number;
+  roundingUnit: number;
+  totalMarkupRate: number;
+};
 
 export type AdminProductChange = {
   changeId: string;
@@ -110,6 +122,10 @@ export async function getAdminProduct(productId: string) {
 export async function getAdminProductChanges(productId: string) {
 	const data = await readAdmin<AdminProductChangesResponse>(`/api/admin/products/${productId}/changes`);
 	return data.changes;
+}
+
+export async function getAdminPricingPolicy() {
+	return readAdmin<PricingPolicy>("/api/admin/pricing-policy");
 }
 
 export async function getAdminSuppliers() {

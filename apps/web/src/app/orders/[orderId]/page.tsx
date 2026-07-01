@@ -44,7 +44,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
   if (!session) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Orders</p>
+        <p className="eyebrow">주문</p>
         <h1>로그인이 필요합니다</h1>
         <Link className="button primary" href="/login">
           로그인
@@ -62,7 +62,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
   if (status !== "ok" || !order) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Orders</p>
+        <p className="eyebrow">주문</p>
         <h1>주문을 불러오지 못했습니다</h1>
         <p>백엔드 API 연결 상태를 확인해 주세요.</p>
       </section>
@@ -98,7 +98,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
 function AdminCustomerOrderNotice() {
   return (
     <section className="narrow-page">
-      <p className="eyebrow">Orders</p>
+      <p className="eyebrow">주문</p>
       <h1>관리자 계정은 고객 주문 기능을 사용할 수 없습니다</h1>
       <p>주문 조회와 운영 처리는 관리자 화면에서 확인해 주세요.</p>
       <div className="link-list">

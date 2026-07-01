@@ -64,6 +64,18 @@ class AdminCatalogController {
 		return catalogService.listAdminProducts();
 	}
 
+	@GetMapping("/pricing-policy")
+	CatalogDtos.PricingPolicyResponse getPricingPolicy() {
+		return catalogService.getPricingPolicy();
+	}
+
+	@PutMapping("/pricing-policy")
+	CatalogDtos.PricingPolicyResponse updatePricingPolicy(
+		@Valid @RequestBody CatalogDtos.PricingPolicyRequest request
+	) {
+		return catalogService.updatePricingPolicy(request);
+	}
+
 	@PostMapping("/products")
 	@ResponseStatus(HttpStatus.CREATED)
 	CatalogDtos.AdminProductResponse createProduct(@Valid @RequestBody CatalogDtos.ProductCreateRequest request) {

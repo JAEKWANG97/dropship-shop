@@ -48,7 +48,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   if (error || !product) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Catalog</p>
+        <p className="eyebrow">상품</p>
         <h1>상품을 불러오지 못했습니다</h1>
         <p>백엔드 API 연결 상태를 확인해 주세요.</p>
       </section>

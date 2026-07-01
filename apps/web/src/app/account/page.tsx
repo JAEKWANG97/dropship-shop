@@ -14,7 +14,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   if (!session) {
     return (
       <section className="narrow-page">
-        <p className="eyebrow">Customer area</p>
+        <p className="eyebrow">계정</p>
         <h1>로그인이 필요합니다</h1>
         <p>장바구니, 주문, 배송지 관리는 소셜 로그인 후 사용할 수 있습니다.</p>
         <Link className="button primary" href="/login">
@@ -28,7 +28,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   return (
     <section className="narrow-page">
-      <p className="eyebrow">Customer area</p>
+      <p className="eyebrow">계정</p>
       <h1>내 계정</h1>
       {params.message ? (
         <div className="notice">

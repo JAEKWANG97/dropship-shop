@@ -1,8 +1,11 @@
 package com.dropshipshop.api.catalog;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
@@ -13,6 +16,7 @@ import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -49,6 +53,7 @@ final class CatalogDtos {
 		@NotNull UUID supplierId,
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
+		@Min(0) Long sourcePrice,
 		@Min(0) long basePrice,
 		@NotNull ProductCategory categoryCode,
 		@NotNull ProductStatus status
@@ -59,9 +64,32 @@ final class CatalogDtos {
 		@NotNull UUID supplierId,
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
+		@Min(0) Long sourcePrice,
 		@Min(0) long basePrice,
 		@NotNull ProductCategory categoryCode,
 		@NotBlank @Size(max = 500) String reason
+	) {
+	}
+
+	record PricingPolicyRequest(
+		@NotBlank @Size(max = 100) String name,
+		@NotNull @DecimalMin("0.00") BigDecimal commissionRate,
+		@NotNull @DecimalMin("0.00") BigDecimal taxBufferRate,
+		@NotNull @DecimalMin("0.00") BigDecimal overheadRate,
+		@NotNull @DecimalMin("0.00") BigDecimal safetyMarginRate,
+		@Min(1) int roundingUnit
+	) {
+	}
+
+	record PricingPolicyResponse(
+		UUID id,
+		String name,
+		BigDecimal commissionRate,
+		BigDecimal taxBufferRate,
+		BigDecimal overheadRate,
+		BigDecimal safetyMarginRate,
+		int roundingUnit,
+		BigDecimal totalMarkupRate
 	) {
 	}
 
@@ -174,6 +202,7 @@ final class CatalogDtos {
 		String supplierName,
 		String name,
 		String summary,
+		long sourcePrice,
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,
@@ -197,6 +226,7 @@ final class CatalogDtos {
 		UUID id,
 		String name,
 		String summary,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourcePrice,
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,

@@ -10,7 +10,7 @@ export default async function PaymentExceptionPage({ searchParams }: PaymentExce
 
   return (
     <section className="narrow-page">
-      <p className="eyebrow">Payment</p>
+      <p className="eyebrow">결제</p>
       <h1>결제 확인이 보류되었습니다</h1>
       <p>{message}</p>
       <Link className="button primary" href={checkoutNumber ? `/checkout/${checkoutNumber}` : "/orders"}>

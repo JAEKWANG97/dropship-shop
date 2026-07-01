@@ -1,5 +1,6 @@
 package com.dropshipshop.api.catalog;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -27,8 +28,10 @@ import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
+import com.dropshipshop.api.catalog.domain.PricingPolicy;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
+import com.dropshipshop.api.catalog.repository.PricingPolicyRepository;
 import com.dropshipshop.api.catalog.repository.ProductChangeHistoryRepository;
 import com.dropshipshop.api.catalog.repository.ProductDetailBlockRepository;
 import com.dropshipshop.api.catalog.repository.ProductImageRepository;
@@ -45,10 +48,16 @@ public class CatalogService {
 	private static final Pattern EVENT_ATTRIBUTE = Pattern.compile("(?i)\\son[a-z]+\\s*=\\s*(['\"]).*?\\1");
 	private static final Pattern JAVASCRIPT_URL = Pattern.compile("(?i)javascript:");
 	private static final List<String> ALLOWED_IMAGE_EXTENSIONS = List.of(".jpg", ".jpeg", ".png", ".webp");
-	private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+	private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+	private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("5.00");
+	private static final BigDecimal DEFAULT_TAX_BUFFER_RATE = new BigDecimal("10.00");
+	private static final BigDecimal DEFAULT_OVERHEAD_RATE = new BigDecimal("5.00");
+	private static final BigDecimal DEFAULT_SAFETY_MARGIN_RATE = new BigDecimal("5.00");
+	private static final int DEFAULT_ROUNDING_UNIT = 100;
 
 	private final SupplierRepository supplierRepository;
 	private final ProductRepository productRepository;
+	private final PricingPolicyRepository pricingPolicyRepository;
 	private final ProductOptionRepository productOptionRepository;
 	private final ProductImageRepository productImageRepository;
 	private final ProductDetailBlockRepository productDetailBlockRepository;
@@ -60,6 +69,7 @@ public class CatalogService {
 	public CatalogService(
 		SupplierRepository supplierRepository,
 		ProductRepository productRepository,
+		PricingPolicyRepository pricingPolicyRepository,
 		ProductOptionRepository productOptionRepository,
 		ProductImageRepository productImageRepository,
 		ProductDetailBlockRepository productDetailBlockRepository,
@@ -70,6 +80,7 @@ public class CatalogService {
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
+		this.pricingPolicyRepository = pricingPolicyRepository;
 		this.productOptionRepository = productOptionRepository;
 		this.productImageRepository = productImageRepository;
 		this.productDetailBlockRepository = productDetailBlockRepository;
@@ -115,6 +126,26 @@ public class CatalogService {
 			.toList();
 	}
 
+	@Transactional(readOnly = true)
+	public CatalogDtos.PricingPolicyResponse getPricingPolicy() {
+		return toPricingPolicyResponse(activePricingPolicy());
+	}
+
+	@Transactional
+	public CatalogDtos.PricingPolicyResponse updatePricingPolicy(CatalogDtos.PricingPolicyRequest request) {
+		PricingPolicy policy = pricingPolicyRepository.findFirstByActiveTrueOrderByCreatedAtAsc()
+			.orElseGet(this::defaultPricingPolicy);
+		policy.update(
+			request.name(),
+			request.commissionRate(),
+			request.taxBufferRate(),
+			request.overheadRate(),
+			request.safetyMarginRate(),
+			request.roundingUnit()
+		);
+		return toPricingPolicyResponse(pricingPolicyRepository.save(policy));
+	}
+
 	@Transactional
 	public CatalogDtos.AdminProductResponse createProduct(CatalogDtos.ProductCreateRequest request) {
 		Supplier supplier = findSupplier(request.supplierId());
@@ -122,6 +153,7 @@ public class CatalogService {
 			supplier,
 			request.name(),
 			request.summary(),
+			sourcePrice(request.sourcePrice(), request.basePrice()),
 			request.basePrice(),
 			request.categoryCode(),
 			request.status()
@@ -131,7 +163,7 @@ public class CatalogService {
 
 	@Transactional(readOnly = true)
 	public CatalogDtos.ProductDetailResponse getAdminProduct(UUID productId) {
-		return toProductDetailResponse(findProduct(productId));
+		return toProductDetailResponse(findProduct(productId), true);
 	}
 
 	@Transactional(readOnly = true)
@@ -155,7 +187,7 @@ public class CatalogService {
 		Supplier supplier = findSupplier(request.supplierId());
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
-		product.updateBase(supplier, request.name(), request.summary(), request.basePrice(), request.categoryCode());
+		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
 		return toAdminProductResponse(product);
 	}
 
@@ -237,7 +269,7 @@ public class CatalogService {
 		productImageRepository.saveAll(images);
 		product.updateThumbnailImageUrl(thumbnailUrl(images));
 		recordChange(product, null, adminUserId, ProductChangeType.IMAGES, null, "replaced", request.reason());
-		return toProductDetailResponse(product);
+		return toProductDetailResponse(product, true);
 	}
 
 	@Transactional
@@ -293,7 +325,7 @@ public class CatalogService {
 		product.bumpDetailVersion();
 		recordChange(product, null, adminUserId, ProductChangeType.DETAIL_BLOCKS, null,
 			"detailVersion=" + product.getDetailVersion(), request.reason());
-		return toProductDetailResponse(product);
+		return toProductDetailResponse(product, true);
 	}
 
 	@Transactional
@@ -316,7 +348,7 @@ public class CatalogService {
 		productNoticeRepository.save(notice);
 		recordChange(product, null, adminUserId, ProductChangeType.NOTICE, null,
 			"productNoticeVersion=" + nextVersion, request.reason());
-		return toProductDetailResponse(product);
+		return toProductDetailResponse(product, true);
 	}
 
 	@Transactional(readOnly = true)
@@ -332,7 +364,7 @@ public class CatalogService {
 		if (product.getStatus() == ProductStatus.HIDDEN || product.getStatus() == ProductStatus.STOPPED) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
 		}
-		return toProductDetailResponse(product);
+		return toProductDetailResponse(product, false);
 	}
 
 	private void recordProductBaseChanges(
@@ -348,6 +380,10 @@ public class CatalogService {
 		if (product.getBasePrice() != request.basePrice()) {
 			recordChange(product, null, adminUserId, ProductChangeType.PRICE,
 				String.valueOf(product.getBasePrice()), String.valueOf(request.basePrice()), request.reason());
+		}
+		if (product.getSourcePrice() != sourcePrice(product, request)) {
+			recordChange(product, null, adminUserId, ProductChangeType.PRICE,
+				"source=" + product.getSourcePrice(), "source=" + sourcePrice(product, request), request.reason());
 		}
 		if (product.getCategoryCode() != request.categoryCode()) {
 			recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_CATEGORY,
@@ -480,6 +516,37 @@ public class CatalogService {
 		return value == null || value.isBlank();
 	}
 
+	private long sourcePrice(Long sourcePrice, long basePrice) {
+		return sourcePrice == null ? basePrice : sourcePrice;
+	}
+
+	private long sourcePrice(Product product, CatalogDtos.ProductUpdateRequest request) {
+		return request.sourcePrice() == null ? product.getSourcePrice() : request.sourcePrice();
+	}
+
+	private PricingPolicy activePricingPolicy() {
+		return pricingPolicyRepository.findFirstByActiveTrueOrderByCreatedAtAsc()
+			.orElse(defaultPricingPolicy());
+	}
+
+	private PricingPolicy defaultPricingPolicy() {
+		return new PricingPolicy(
+			"기본 가격 정책",
+			DEFAULT_COMMISSION_RATE,
+			DEFAULT_TAX_BUFFER_RATE,
+			DEFAULT_OVERHEAD_RATE,
+			DEFAULT_SAFETY_MARGIN_RATE,
+			DEFAULT_ROUNDING_UNIT
+		);
+	}
+
+	private BigDecimal totalMarkupRate(PricingPolicy policy) {
+		return policy.getCommissionRate()
+			.add(policy.getTaxBufferRate())
+			.add(policy.getOverheadRate())
+			.add(policy.getSafetyMarginRate());
+	}
+
 	private CatalogDtos.SupplierResponse toSupplierResponse(Supplier supplier) {
 		return new CatalogDtos.SupplierResponse(
 			supplier.getId(),
@@ -499,6 +566,7 @@ public class CatalogService {
 			product.getSupplier().getName(),
 			product.getName(),
 			product.getSummary(),
+			product.getSourcePrice(),
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
@@ -519,7 +587,7 @@ public class CatalogService {
 		);
 	}
 
-	private CatalogDtos.ProductDetailResponse toProductDetailResponse(Product product) {
+	private CatalogDtos.ProductDetailResponse toProductDetailResponse(Product product, boolean includeSourcePrice) {
 		List<CatalogDtos.ProductImageResponse> images = productImageRepository
 			.findAllByProduct_IdOrderBySortOrderAsc(product.getId())
 			.stream()
@@ -543,6 +611,7 @@ public class CatalogService {
 			product.getId(),
 			product.getName(),
 			product.getSummary(),
+			includeSourcePrice ? product.getSourcePrice() : null,
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
@@ -563,6 +632,19 @@ public class CatalogService {
 			option.getName(),
 			option.getAdditionalPrice(),
 			option.getStatus()
+		);
+	}
+
+	private CatalogDtos.PricingPolicyResponse toPricingPolicyResponse(PricingPolicy policy) {
+		return new CatalogDtos.PricingPolicyResponse(
+			policy.getId(),
+			policy.getName(),
+			policy.getCommissionRate(),
+			policy.getTaxBufferRate(),
+			policy.getOverheadRate(),
+			policy.getSafetyMarginRate(),
+			policy.getRoundingUnit(),
+			totalMarkupRate(policy)
 		);
 	}
 

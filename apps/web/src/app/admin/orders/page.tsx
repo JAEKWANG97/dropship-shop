@@ -2,6 +2,13 @@ import Link from "next/link";
 import { adminStatusLabel, getAdminOrder, getAdminOrders, type AdminOrder } from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
 import {
+  fulfillmentStatusLabel,
+  paymentGroupStatusLabel,
+  paymentStatusLabel,
+  refundStatusLabel,
+  shipmentStatusLabel,
+} from "@/lib/orders";
+import {
   completeSupplierOrder,
   correctShipmentDelivered,
   createOrderShipment,
@@ -161,7 +168,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               <div className="summary-list compact">
                 <div>
                   <span>결제상태</span>
-                  <strong>{selectedOrder.payment?.status ?? selectedOrder.paymentGroup?.status ?? "확인 필요"}</strong>
+                  <strong>{adminPaymentLabel(selectedOrder)}</strong>
                 </div>
                 <div>
                   <span>결제금액</span>
@@ -172,15 +179,15 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               <div className="summary-list compact">
                 <div>
                   <span>발주</span>
-                  <strong>{selectedOrder.fulfillment?.status ?? "없음"}</strong>
+                  <strong>{selectedOrder.fulfillment ? fulfillmentStatusLabel(selectedOrder.fulfillment.status) : "없음"}</strong>
                 </div>
                 <div>
                   <span>배송</span>
-                  <strong>{selectedOrder.shipment?.status ?? "없음"}</strong>
+                  <strong>{selectedOrder.shipment ? shipmentStatusLabel(selectedOrder.shipment.status) : "없음"}</strong>
                 </div>
                 <div>
                   <span>환불</span>
-                  <strong>{selectedOrder.refund?.status ?? "없음"}</strong>
+                  <strong>{selectedOrder.refund ? refundStatusLabel(selectedOrder.refund.status) : "없음"}</strong>
                 </div>
               </div>
               <AdminOrderActions order={selectedOrder} />
@@ -255,6 +262,16 @@ function shippingAddressText(address: AdminOrder["shippingAddress"]) {
   return `${address.recipientName} / ${address.recipientPhone} / ${address.postalCode} ${address.address1} ${address.address2 ?? ""}`;
 }
 
+function adminPaymentLabel(order: AdminOrder) {
+  if (order.payment?.status) {
+    return paymentStatusLabel(order.payment.status);
+  }
+  if (order.paymentGroup?.status) {
+    return paymentGroupStatusLabel(order.paymentGroup.status);
+  }
+  return "확인 필요";
+}
+
 function ShipmentPanel({ order }: { order: AdminOrder }) {
   const shipment = order.shipment;
   if (!shipment) {
@@ -275,7 +292,7 @@ function ShipmentPanel({ order }: { order: AdminOrder }) {
         </div>
       ) : null}
       <div className="summary-list compact">
-        <SummaryItem label="배송상태" value={shipment.status} />
+        <SummaryItem label="배송상태" value={shipmentStatusLabel(shipment.status)} />
         <SummaryItem label="택배사" value={shipment.carrier} />
         <SummaryItem label="송장번호" value={shipment.trackingNumber} />
         <SummaryItem label="출고시각" value={formatDateTime(shipment.shippedAt)} />

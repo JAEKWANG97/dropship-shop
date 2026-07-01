@@ -129,7 +129,7 @@ function CategoryFilterPanel({
   return (
     <>
       <h2>카테고리</h2>
-      <Link className={!params.category ? "active" : ""} href="/products">
+      <Link className={!params.category && !params.group ? "active" : ""} href="/products">
         전체 상품 <span>{products.length}</span>
       </Link>
       <h2>대분류</h2>
@@ -177,7 +177,8 @@ function filterProducts(
       ? `${product.name} ${product.summary}`.toLowerCase().includes(keyword)
       : true;
     const matchesCategory = params.category ? product.categoryCode === params.category : true;
-    return matchesKeyword && matchesCategory && product.basePrice >= minPrice && product.basePrice <= maxPrice;
+    const matchesGroup = params.category || !params.group ? true : productGroup(product) === params.group;
+    return matchesKeyword && matchesCategory && matchesGroup && product.basePrice >= minPrice && product.basePrice <= maxPrice;
   });
 
   return filtered.sort((a, b) => {
@@ -199,10 +200,11 @@ function selectedGroup(group: string | undefined, categoryCode: string | undefin
 }
 
 function groupProductCount(products: ProductSummary[], group: string) {
-  return products.filter((product) => {
-    const category = PRODUCT_CATEGORIES.find((item) => item[2] === product.categoryCode);
-    return category?.[0] === group;
-  }).length;
+  return products.filter((product) => productGroup(product) === group).length;
+}
+
+function productGroup(product: ProductSummary) {
+  return PRODUCT_CATEGORIES.find((item) => item[2] === product.categoryCode)?.[0];
 }
 
 function withSort(params: ProductSearchParams, sort: string) {

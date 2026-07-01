@@ -34,7 +34,7 @@ export default async function PaymentSuccessPage({ searchParams }: PaymentSucces
 
   return (
     <section className="narrow-page">
-      <p className="eyebrow">Payment</p>
+      <p className="eyebrow">결제</p>
       <h1>{canConfirm ? "결제가 완료되었습니다" : "결제 승인 정보를 확인할 수 없습니다"}</h1>
       {canConfirm ? (
         <p>결제 승인을 서버에서 확인했고 주문이 공급처 발주 대기로 이동했습니다.</p>

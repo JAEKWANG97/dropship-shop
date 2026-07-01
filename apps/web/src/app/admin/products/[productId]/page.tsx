@@ -3,11 +3,13 @@ import { ApiError } from "@/lib/api";
 import {
   adminOptionStatusLabel,
   adminStatusLabel,
+  getAdminPricingPolicy,
   getAdminProduct,
   getAdminProductChanges,
   getAdminProducts,
   type AdminProduct,
   type AdminProductChange,
+  type PricingPolicy,
 } from "@/lib/admin";
 import { categoryLabel } from "@/lib/categories";
 import { formatPrice, type ProductDetail } from "@/lib/catalog";
@@ -18,6 +20,7 @@ import {
   updateAdminProductNotice,
   updateAdminProductOption,
   updateAdminProductOptionStatus,
+  updateAdminProductPrices,
   updateAdminProductStatus,
 } from "./actions";
 
@@ -36,17 +39,19 @@ async function loadProduct(productId: string) {
       getAdminProducts(),
       loadChanges(productId),
     ]);
+    const pricingPolicy = await getAdminPricingPolicy();
     return {
       changes,
       error: false as const,
       listProduct: products.find((item) => item.id === productId) ?? null,
+      pricingPolicy,
       product,
     };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
-      return { changes: [], error: true as const, listProduct: null, product: null };
+      return { changes: [], error: true as const, listProduct: null, pricingPolicy: null, product: null };
     }
-    return { changes: [], error: true as const, listProduct: null, product: null };
+    return { changes: [], error: true as const, listProduct: null, pricingPolicy: null, product: null };
   }
 }
 
@@ -63,7 +68,7 @@ export default async function AdminProductDetailPage({
   searchParams,
 }: AdminProductDetailPageProps) {
   const [{ productId }, query] = await Promise.all([params, searchParams]);
-  const { changes, error, listProduct, product } = await loadProduct(productId);
+  const { changes, error, listProduct, pricingPolicy, product } = await loadProduct(productId);
 
   if (error || !product) {
     return (
@@ -109,6 +114,10 @@ export default async function AdminProductDetailPage({
         <ProductSummaryPanel listProduct={listProduct} product={product} />
         <ProductStatusPanel product={product} />
       </section>
+
+      {pricingPolicy ? (
+        <ProductPricingPanel listProduct={listProduct} pricingPolicy={pricingPolicy} product={product} />
+      ) : null}
 
       <ProductDetailBlocksPanel product={product} />
       <ProductNoticePanel product={product} />
@@ -274,7 +283,11 @@ function ProductSummaryPanel({
               <dd>{listProduct?.supplierName ?? "목록에서 확인 불가"}</dd>
             </div>
             <div>
-              <dt>기본 가격</dt>
+              <dt>공급가</dt>
+              <dd>{formatPrice(product.sourcePrice ?? listProduct?.sourcePrice ?? product.basePrice)}</dd>
+            </div>
+            <div>
+              <dt>판매가</dt>
               <dd>{formatPrice(product.basePrice)}</dd>
             </div>
             <div>
@@ -285,6 +298,55 @@ function ProductSummaryPanel({
           <p>{product.summary}</p>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ProductPricingPanel({
+  listProduct,
+  pricingPolicy,
+  product,
+}: {
+  listProduct: AdminProduct | null;
+  pricingPolicy: PricingPolicy;
+  product: ProductDetail;
+}) {
+  const sourcePrice = product.sourcePrice ?? listProduct?.sourcePrice ?? product.basePrice;
+  const calculatedPrice = Math.ceil(Math.ceil(sourcePrice * (1 + pricingPolicy.totalMarkupRate / 100)) / pricingPolicy.roundingUnit) * pricingPolicy.roundingUnit;
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel-head">
+        <h2>가격 관리</h2>
+        <span>계산 판매가 {formatPrice(calculatedPrice)}</span>
+      </div>
+      <form action={updateAdminProductPrices} className="admin-form-grid">
+        <input name="productId" type="hidden" value={product.id} />
+        <input name="supplierId" type="hidden" value={listProduct?.supplierId ?? ""} />
+        <input name="name" type="hidden" value={product.name} />
+        <input name="summary" type="hidden" value={product.summary} />
+        <input name="categoryCode" type="hidden" value={product.categoryCode} />
+        <label>
+          공급가
+          <input name="sourcePrice" required min="0" type="number" defaultValue={sourcePrice} />
+        </label>
+        <label>
+          판매가
+          <input name="basePrice" required min="0" type="number" defaultValue={product.basePrice} />
+        </label>
+        <label>
+          변경 사유
+          <input name="reason" required placeholder="예: 도매가 25% 마진 적용" />
+        </label>
+        <div className="admin-form-actions wide">
+          <button className="button" name="priceMode" value="manual" type="submit">
+            입력 가격 저장
+          </button>
+          <button className="button primary" name="priceMode" value="apply" type="submit">
+            계산가 적용
+          </button>
+        </div>
+      </form>
     </section>
   );
 }
