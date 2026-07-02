@@ -63,13 +63,30 @@ function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
   return Math.ceil(rawPrice / roundingUnit) * roundingUnit;
 }
 
+function publicSummaryPart(part) {
+  const value = String(part || "").trim();
+  if (!value) return "";
+  if (value.includes("도매꾹")) return "";
+  if (value.includes("상품번호")) return "";
+  if (value.startsWith("최대구매수량")) return "";
+  return value;
+}
+
+function sanitizePublicSummary(summary) {
+  return String(summary || "")
+    .split(/\s+\/\s+/)
+    .map(publicSummaryPart)
+    .filter(Boolean)
+    .join(" / ")
+    .slice(0, 500);
+}
+
 function summaryFor(product) {
-  return [
+  return sanitizePublicSummary([
     product.minOrderQuantityText,
     product.origin ? `원산지 ${product.origin}` : "",
     product.manufacturer ? `제조사 ${product.manufacturer}` : "",
-    `도매꾹 상품번호 ${product.itemNo}`,
-  ].filter(Boolean).join(" / ").slice(0, 500);
+  ].filter(Boolean).join(" / "));
 }
 
 async function readCollectedProducts() {
@@ -178,6 +195,7 @@ async function importItem(args, item, product, suppliers, products, policy) {
   if (!item.import) return { itemNo: item.itemNo, status: "SKIPPED", reason: "manifest import=false" };
   item.sourcePrice = Number(item.sourcePrice || item.basePrice || parsePrice(product.priceText));
   item.basePrice = Number(item.basePrice || calculateBasePrice(item.sourcePrice, policy));
+  item.summary = sanitizePublicSummary(item.summary || summaryFor(product));
   const issue = manifestIssue(item);
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
   if (products.some((existing) => existing.name === item.name)) {
