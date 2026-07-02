@@ -62,7 +62,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		ProductImageRepository productImageRepository,
 		ProductDetailBlockRepository productDetailBlockRepository,
 		ProductNoticeRepository productNoticeRepository,
-		@Value("${app.catalog.image-storage-path:build/product-images}") String imageStoragePath
+		@Value("${app.storage.local.upload-dir:${app.catalog.image-storage-path:build/product-images}}") String imageStoragePath
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;

@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 	"spring.datasource.password=",
 	"spring.flyway.enabled=false",
 	"spring.jpa.hibernate.ddl-auto=create-drop",
+	"app.storage.local.upload-dir=build/test-product-images",
 	"app.catalog.image-storage-path=build/test-product-images"
 })
 @AutoConfigureMockMvc
