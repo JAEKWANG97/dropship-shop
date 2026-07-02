@@ -1,6 +1,8 @@
 package com.dropshipshop.api.auth;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Arrays;
@@ -31,6 +33,7 @@ class OAuthLoginService {
 
 	private static final Logger log = LoggerFactory.getLogger(OAuthLoginService.class);
 	private static final SecureRandom RANDOM = new SecureRandom();
+	private static final String REDIRECT_TO_COOKIE_NAME = "OAUTH2_REDIRECT_TO";
 
 	private final OAuthProviderProperties oauthProviderProperties;
 	private final OAuthProviderClient oauthProviderClient;
@@ -52,7 +55,7 @@ class OAuthLoginService {
 		this.authProperties = authProperties;
 	}
 
-	ResponseEntity<Void> authorize(String providerValue) {
+	ResponseEntity<Void> authorize(String providerValue, String redirectTo) {
 		SocialProvider provider = provider(providerValue);
 		OAuthProviderProperties.ProviderSettings settings = configuredSettings(provider);
 		String state = newState();
@@ -70,6 +73,7 @@ class OAuthLoginService {
 		return ResponseEntity.status(HttpStatus.FOUND)
 			.location(location)
 			.header(HttpHeaders.SET_COOKIE, cookie(authProperties.stateCookieName(), state, authProperties.stateTtl()).toString())
+			.header(HttpHeaders.SET_COOKIE, redirectToCookie(redirectTo).toString())
 			.build();
 	}
 
@@ -102,9 +106,10 @@ class OAuthLoginService {
 
 		String token = jwtAccessTokenService.issue(user);
 		return ResponseEntity.status(HttpStatus.FOUND)
-			.location(URI.create(authProperties.successRedirectUri()))
+			.location(successRedirectUri(request))
 			.header(HttpHeaders.SET_COOKIE, cookie(authProperties.accessTokenCookieName(), token, authProperties.accessTokenTtl()).toString())
 			.header(HttpHeaders.SET_COOKIE, deleteCookie(authProperties.stateCookieName()).toString())
+			.header(HttpHeaders.SET_COOKIE, deleteCookie(REDIRECT_TO_COOKIE_NAME).toString())
 			.build();
 	}
 
@@ -170,6 +175,46 @@ class OAuthLoginService {
 
 	private ResponseCookie deleteCookie(String name) {
 		return cookie(name, "", Duration.ZERO);
+	}
+
+	private ResponseCookie redirectToCookie(String redirectTo) {
+		return safeRedirectTo(redirectTo)
+			.map(value -> cookie(REDIRECT_TO_COOKIE_NAME, encode(value), authProperties.stateTtl()))
+			.orElseGet(() -> deleteCookie(REDIRECT_TO_COOKIE_NAME));
+	}
+
+	private URI successRedirectUri(HttpServletRequest request) {
+		Optional<String> redirectTo = cookieValue(request, REDIRECT_TO_COOKIE_NAME)
+			.flatMap(this::decode)
+			.flatMap(this::safeRedirectTo);
+		if (redirectTo.isEmpty()) {
+			return URI.create(authProperties.successRedirectUri());
+		}
+		String separator = authProperties.successRedirectUri().contains("?") ? "&" : "?";
+		String encodedRedirectTo = URLEncoder.encode(redirectTo.get(), StandardCharsets.UTF_8);
+		return URI.create(authProperties.successRedirectUri() + separator + "redirectTo=" + encodedRedirectTo);
+	}
+
+	private Optional<String> safeRedirectTo(String value) {
+		if (isBlank(value) || !value.startsWith("/") || value.startsWith("//")) {
+			return Optional.empty();
+		}
+		if (value.contains("\r") || value.contains("\n")) {
+			return Optional.empty();
+		}
+		return Optional.of(value);
+	}
+
+	private String encode(String value) {
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+	}
+
+	private Optional<String> decode(String value) {
+		try {
+			return Optional.of(new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8));
+		} catch (IllegalArgumentException exception) {
+			return Optional.empty();
+		}
 	}
 
 	private String newState() {

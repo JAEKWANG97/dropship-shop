@@ -22,8 +22,11 @@ class AuthController {
 	}
 
 	@GetMapping("/oauth2/{provider}/authorize")
-	ResponseEntity<Void> authorize(@PathVariable String provider) {
-		return oauthLoginService.authorize(provider);
+	ResponseEntity<Void> authorize(
+		@PathVariable String provider,
+		@RequestParam(required = false) String redirectTo
+	) {
+		return oauthLoginService.authorize(provider, redirectTo);
 	}
 
 	@GetMapping("/oauth2/{provider}/callback")

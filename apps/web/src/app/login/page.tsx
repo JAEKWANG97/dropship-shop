@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { publicApiUrl } from "@/lib/api";
 import { getCurrentUser } from "@/lib/session";
 
@@ -7,8 +8,19 @@ const providers = [
   { id: "naver", label: "네이버로 계속하기" },
 ];
 
-export default async function LoginPage() {
-  const session = await getCurrentUser();
+type LoginPageProps = {
+  searchParams: Promise<{ redirectTo?: string | string[] }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const [session, params] = await Promise.all([getCurrentUser(), searchParams]);
+  const redirectTo = safeRedirectTo(params.redirectTo);
+
+  if (session && redirectTo) {
+    redirect(redirectTo);
+  }
+
+  const redirectQuery = redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : "";
 
   return (
     <section className="login-page">
@@ -24,7 +36,7 @@ export default async function LoginPage() {
             {providers.map((provider) => (
               <a
                 className={`oauth-button ${provider.id}`}
-                href={publicApiUrl(`/api/auth/oauth2/${provider.id}/authorize`)}
+                href={publicApiUrl(`/api/auth/oauth2/${provider.id}/authorize${redirectQuery}`)}
                 key={provider.id}
               >
                 {provider.label}
@@ -35,4 +47,12 @@ export default async function LoginPage() {
       </div>
     </section>
   );
+}
+
+function safeRedirectTo(value: string | string[] | undefined) {
+  const redirectTo = Array.isArray(value) ? value[0] : value;
+  if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
+    return "";
+  }
+  return redirectTo;
 }

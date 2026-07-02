@@ -133,8 +133,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <div className="notice">
                 <strong>로그인이 필요합니다</strong>
                 <span>장바구니와 주문은 소셜 로그인 후 이용할 수 있습니다.</span>
-                <Link className="button primary" href="/login">
-                  로그인
+                <Link className="button primary" href={`/login?redirectTo=${encodeURIComponent(`/products/${product.id}`)}`}>
+                  로그인하고 계속하기
                 </Link>
               </div>
             )

@@ -122,6 +122,35 @@ class OAuthLoginApiIntegrationTest {
 	}
 
 	@Test
+	void redirectsToRequestedInternalPathAfterCallback() throws Exception {
+		fakeOAuthProviderClient.profile(
+			SocialProvider.GOOGLE,
+			"redirect-code",
+			new OAuthProfile("google-redirect-user", "redirect@example.com", "Redirect")
+		);
+
+		MvcResult authorizeResult = mockMvc.perform(get("/api/auth/oauth2/google/authorize")
+				.param("redirectTo", "/products/product-1?from=detail"))
+			.andExpect(status().isFound())
+			.andExpect(cookie().exists("OAUTH2_STATE"))
+			.andExpect(cookie().exists("OAUTH2_REDIRECT_TO"))
+			.andReturn();
+
+		Cookie stateCookie = authorizeResult.getResponse().getCookie("OAUTH2_STATE");
+		Cookie redirectToCookie = authorizeResult.getResponse().getCookie("OAUTH2_REDIRECT_TO");
+
+		mockMvc.perform(get("/api/auth/oauth2/google/callback")
+				.param("code", "redirect-code")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie, redirectToCookie))
+			.andExpect(status().isFound())
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("http://localhost:3000/auth/callback/success")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("redirectTo=")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("%2Fproducts%2Fproduct-1%3Ffrom%3Ddetail")))
+			.andExpect(cookie().maxAge("OAUTH2_REDIRECT_TO", 0));
+	}
+
+	@Test
 	void preservesAdminRoleFromDatabaseAfterSocialLogin() throws Exception {
 		UserAccount admin = userAccountRepository.save(new UserAccount(
 			SocialProvider.NAVER,
