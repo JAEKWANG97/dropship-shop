@@ -13,6 +13,8 @@ Notes:
 - 비용 우선으로 `t4g.micro` 단일 서버에 Web/API/PostgreSQL/업로드 이미지를 함께 둔다.
 - GitHub-hosted Actions SSH 배포를 위해 SSH 보안그룹은 key-only `0.0.0.0/0`로 둔다. 장기 운영 전 SSM 또는 fixed egress runner로 좁히는 것을 검토한다.
 - S3/RDS/CloudFront는 테스트 URL 확보 뒤 필요 시 전환한다.
+- EC2 `43.200.135.171` 기준 Docker 배포와 host-local health check는 성공했다.
+- Cloudflare DNS가 아직 연결되지 않아 `coreable-saf.com` HTTPS 인증서 발급과 도메인 smoke는 남아 있다.
 
 Tasks:
 - [x] API/Web Dockerfile을 추가한다.
@@ -22,9 +24,9 @@ Tasks:
 - [x] EC2 Docker 배포 운영 문서를 추가한다.
 - [x] AWS EC2, Elastic IP, 보안그룹을 생성한다.
 - [x] 서버에 Docker, compose, env, Caddy 설정을 준비한다.
-- [ ] GitHub Secrets를 등록하고 main 배포를 실행한다. Secrets 등록은 완료, main 배포는 남음.
+- [x] GitHub Secrets를 등록하고 main 배포를 실행한다.
 - [ ] Cloudflare DNS를 Elastic IP로 연결한다.
-- [ ] 배포 URL health/browser smoke를 확인한다.
+- [ ] 배포 URL health/browser smoke를 확인한다. EC2 내부 health는 확인됨, 도메인 smoke는 DNS 연결 후 진행.
 
 ### B-016 테스트 배포 및 운영 readiness 점검
 

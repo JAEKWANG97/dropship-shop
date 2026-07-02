@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-02 14:12 KST
+
+- 관련 항목: B-039, B-016
+- 작업: GitHub Actions 기반 AWS EC2 Docker 테스트 배포를 실제로 실행했다.
+- 문제·고민: 첫 deploy run은 API 컨테이너가 정상 기동했지만 host의 `localhost:8080`에 포트가 바인딩되지 않아 Actions readiness check가 실패했다. 또한 `coreable-saf.com`과 `www.coreable-saf.com` DNS A 레코드가 아직 없어 Caddy 인증서 발급은 실패 중이다.
+- 해결방안: API 컨테이너를 EC2 loopback `127.0.0.1:8080`에만 바인딩해 host-local readiness check를 통과하게 했다. EC2 `43.200.135.171`에서 API/PostgreSQL/Web/Caddy 컨테이너 상태와 `/actuator/health/readiness`, `/api/health` 응답을 확인했다.
+- 결정: B-039는 CI/CD와 EC2 배포 baseline은 완료로 보고, Cloudflare DNS 연결과 도메인 HTTPS/browser smoke는 남은 작업으로 유지한다.
+- 후속작업: Cloudflare에서 `coreable-saf.com`, `www.coreable-saf.com` A 레코드를 `43.200.135.171`로 연결한 뒤 Caddy 인증서 발급, public health, 브라우저 smoke를 확인한다.
+
 ## 2026-07-02 11:35 KST
 
 - 관련 항목: B-039, B-016
