@@ -7,6 +7,7 @@
 - 문제·고민: AWS 테스트 배포에서 EC2 pull/up은 약 1분대지만, `build-and-push`가 약 7분 39초로 전체 배포 시간을 지배했다. 특히 Web ARM64 Docker image build가 반복 배포마다 오래 걸렸다.
 - 해결방안: API와 Web Docker build에 각각 `type=gha` cache scope를 추가했다. 문서-only 변경은 이미 Deploy skip 처리되어 있으므로, 이번 cache는 실제 app/infra/workflow 변경 배포 시간을 줄이는 목적이다.
 - 결정: Next.js build 중복 제거, self-hosted ARM runner, amd64 EC2 전환은 이번 범위에서 제외하고 cache 효과를 먼저 측정한다.
+- 검증: 첫 cache 적용 배포는 성공했다. 실행 시간은 `verify 3m05s`, `build-and-push 8m16s`, `deploy 1m27s`였고 EC2 readiness는 `UP`이었다. 첫 실행은 cache export를 포함한 warm-up으로 본다.
 - 후속작업: cache warm-up 이후 앱 변경 배포에서 `build-and-push` 시간을 비교하고, 여전히 길면 B-041로 Docker build 중복 제거 또는 runner 전략을 검토한다.
 
 ## 2026-07-02 14:12 KST
