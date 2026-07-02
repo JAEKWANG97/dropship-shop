@@ -1,5 +1,3 @@
-import { apiUrl } from "@/lib/api";
-
 type ProductImageProps = {
   src: string | null;
   alt: string;
@@ -12,9 +10,5 @@ export function ProductImage({ src, alt, className }: ProductImageProps) {
   }
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img alt={alt} className={className} src={imageSrc(src)} />;
-}
-
-function imageSrc(src: string) {
-  return src.startsWith("/uploads/") ? apiUrl(src) : src;
+  return <img alt={alt} className={className} src={src} />;
 }
