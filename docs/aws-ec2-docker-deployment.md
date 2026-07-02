@@ -1,6 +1,6 @@
-# AWS EC2 Docker Test Deployment
+# AWS EC2 Docker Deployment
 
-Status: Test deployment baseline for B-039
+Status: single-EC2 Docker deployment baseline for B-039
 
 ## Runtime Shape
 
@@ -12,8 +12,10 @@ Status: Test deployment baseline for B-039
 - Runtime: Docker Compose on a single EC2 instance
 - Registry: GHCR
 - Domain: `coreable-saf.com`, `www.coreable-saf.com`
+- Edge TLS: Cloudflare proxy with SSL/TLS mode `Full (strict)`
+- Origin TLS: nginx with a Cloudflare Origin Certificate
 
-This is a test deployment for external integration preparation. It is not the final live-payment production shape.
+This is the low-cost first production-style deployment shape. RDS, S3, CloudFront, and a load balancer are deferred until traffic, backup, or operational requirements justify the added cost.
 
 ## One-Time AWS Setup
 
@@ -28,7 +30,7 @@ The script creates or reuses:
 - EC2 instance `coreable-saf-test`
 - Elastic IP tagged `coreable-saf-test-eip`
 
-Current test deployment:
+Current deployment:
 
 - EC2 instance id: `i-0c795cb4b0f0b4177`
 - Elastic IP: `43.200.135.171`
@@ -41,7 +43,7 @@ Security group baseline:
 - HTTP `80`: `0.0.0.0/0`
 - HTTPS `443`: `0.0.0.0/0`
 
-GitHub-hosted runners do not have a stable small source IP range. SSH is therefore open to the internet for this test deployment, but access is key-only with the deploy key stored in GitHub Secrets. If this becomes long-lived production infrastructure, replace this with SSM Session Manager, a self-hosted runner, or a fixed egress deploy host.
+GitHub-hosted runners do not have a stable small source IP range. SSH is therefore open to the internet for this first deployment, but access is key-only with the deploy key stored in GitHub Secrets. If this becomes long-lived production infrastructure, replace this with SSM Session Manager, a self-hosted runner, or a fixed egress deploy host.
 
 ## One-Time Server Setup
 
@@ -50,12 +52,19 @@ After SSH access works:
 ```sh
 scp infra/aws/ec2/bootstrap-ubuntu.sh ubuntu@<elastic-ip>:/tmp/bootstrap-ubuntu.sh
 ssh ubuntu@<elastic-ip> 'sudo bash /tmp/bootstrap-ubuntu.sh'
-ssh ubuntu@<elastic-ip> 'sudo mkdir -p /opt/coreable'
-scp infra/aws/ec2/compose.prod.yml infra/aws/ec2/Caddyfile ubuntu@<elastic-ip>:/tmp/
-ssh ubuntu@<elastic-ip> 'sudo cp /tmp/compose.prod.yml /opt/coreable/compose.prod.yml && sudo cp /tmp/Caddyfile /opt/coreable/Caddyfile'
+ssh ubuntu@<elastic-ip> 'sudo mkdir -p /opt/coreable /var/lib/coreable/proxy/certs'
+scp infra/aws/ec2/compose.prod.yml infra/aws/ec2/nginx.conf ubuntu@<elastic-ip>:/tmp/
+ssh ubuntu@<elastic-ip> 'sudo cp /tmp/compose.prod.yml /opt/coreable/compose.prod.yml && sudo cp /tmp/nginx.conf /opt/coreable/nginx.conf'
 ```
 
 Create `/opt/coreable/.env` from `infra/aws/ec2/env.example` and replace all `change-me` or blank values. Keep this file only on the server.
+
+Install the Cloudflare Origin Certificate and private key on the server. Do not commit or print the key:
+
+```sh
+scp tmp/cloudflare-origin.pem tmp/cloudflare-origin.key ubuntu@<elastic-ip>:/tmp/
+ssh ubuntu@<elastic-ip> 'sudo install -m 0644 /tmp/cloudflare-origin.pem /var/lib/coreable/proxy/certs/cloudflare-origin.pem && sudo install -m 0600 /tmp/cloudflare-origin.key /var/lib/coreable/proxy/certs/cloudflare-origin.key && sudo rm -f /tmp/cloudflare-origin.pem /tmp/cloudflare-origin.key'
+```
 
 ## GitHub Secrets
 
@@ -73,7 +82,7 @@ On push to `main`:
 
 1. GitHub Actions builds API and Web Docker images for `linux/arm64`.
 2. Images are pushed to GHCR with both commit SHA and `latest` tags.
-3. Actions copies compose/Caddy config to EC2.
+3. Actions copies compose/nginx config to EC2.
 4. EC2 updates `API_IMAGE` and `WEB_IMAGE` in `/opt/coreable/.env`.
 5. EC2 runs `docker compose pull && docker compose up -d`.
 6. Actions checks `http://localhost:8080/actuator/health/readiness`.
@@ -101,8 +110,13 @@ Deploy is skipped when only `docs/**`, `README.md`, or `AGENTS.md` changes. Work
 
 Cloudflare DNS:
 
-- `A coreable-saf.com -> <Elastic IP>`
-- `A www.coreable-saf.com -> <Elastic IP>`
+- `A coreable-saf.com -> 43.200.135.171`, proxied
+- `A www.coreable-saf.com -> 43.200.135.171`, proxied
+
+Cloudflare SSL/TLS:
+
+- Use `Full (strict)` after nginx is serving the Cloudflare Origin Certificate on port `443`.
+- Do not use `Flexible`. It leaves the Cloudflare-to-origin leg on HTTP and can create redirect/cookie issues.
 
 OAuth redirect URIs:
 
@@ -112,21 +126,28 @@ OAuth redirect URIs:
 
 ## Validation
 
-Before DNS is connected, validate on the EC2 host and with a temporary Host header:
+Validate on the EC2 host:
 
 ```sh
 ssh ubuntu@43.200.135.171 'cd /opt/coreable && sudo docker compose --env-file .env -f compose.prod.yml ps'
 ssh ubuntu@43.200.135.171 'curl -fsS http://localhost:8080/actuator/health/readiness'
 ssh ubuntu@43.200.135.171 'curl -fsS http://localhost:8080/api/health'
-curl -i -H 'Host: coreable-saf.com' http://43.200.135.171/api/health
 ```
 
-After Cloudflare DNS points to the Elastic IP, validate the public URL:
+Validate origin HTTPS directly. Cloudflare Origin Certificates are not trusted by the local OS trust store, so direct `curl` needs `-k` or the Cloudflare Origin CA root. This check validates origin routing and TLS service; Cloudflare `Full (strict)` performs the trusted validation from Cloudflare's edge:
+
+```sh
+curl -kfsS --resolve coreable-saf.com:443:43.200.135.171 https://coreable-saf.com/api/health
+curl -kfsS --resolve www.coreable-saf.com:443:43.200.135.171 https://www.coreable-saf.com/
+```
+
+After Cloudflare is proxied and SSL/TLS is `Full (strict)`, validate the public URL:
 
 ```sh
 curl -fsS https://coreable-saf.com/api/health
 curl -fsS https://coreable-saf.com/actuator/health/readiness
-curl -fsS https://coreable-saf.com
+curl -IfsS https://coreable-saf.com
+curl -IfsS https://www.coreable-saf.com
 ssh ubuntu@<elastic-ip> 'cd /opt/coreable && sudo docker compose --env-file .env -f compose.prod.yml ps'
 ```
 
@@ -145,6 +166,5 @@ Browser smoke:
 ## Current Deferrals
 
 - S3/RDS/CloudFront are deferred.
-- Cloudflare DNS is not connected yet. Caddy can start and redirect HTTP to HTTPS, but Let's Encrypt certificate issuance waits for valid `A` records for `coreable-saf.com` and `www.coreable-saf.com`.
 - Live Toss key switch is deferred until the test URL and legal/customer notice pages are verified.
-- Real SMS provider activation is deferred unless phone verification is required on the test deployment.
+- Real SMS provider activation is deferred unless phone verification is required before live launch.

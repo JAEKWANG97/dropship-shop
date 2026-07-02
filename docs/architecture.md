@@ -159,8 +159,8 @@ Later expansion:
 Start simple:
 
 ```text
-Single EC2 test server
-+ Caddy reverse proxy
+Single EC2 server
++ nginx reverse proxy with Cloudflare Origin Certificate
 + Next.js web container
 + Spring Boot API container
 + PostgreSQL container

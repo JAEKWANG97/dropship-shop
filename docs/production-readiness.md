@@ -84,12 +84,13 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - local storage 사용 시 `APP_STORAGE_LOCAL_UPLOAD_DIR`는 애플리케이션 재배포로 지워지지 않는 persistent volume 경로로 둔다.
 - `APP_STORAGE_PUBLIC_BASE_URL`은 API가 직접 `/uploads/products/**`를 서빙하면 `/uploads/products`, CDN/object storage로 이전하면 해당 public prefix로 바꾼다.
 
-## AWS EC2 Docker Test Deployment
+## AWS EC2 Docker Deployment
 
-- 테스트 배포 baseline은 [AWS EC2 Docker Test Deployment](aws-ec2-docker-deployment.md)를 따른다.
+- 배포 baseline은 [AWS EC2 Docker Deployment](aws-ec2-docker-deployment.md)를 따른다.
 - GitHub Actions가 API/Web Docker 이미지를 GHCR에 push하고, EC2는 이미지를 pull해 Docker Compose로 재시작한다.
 - 서버에서 애플리케이션 소스 빌드는 하지 않는다.
-- PostgreSQL data, 상품 이미지, Caddy 인증서 data는 EC2 local persistent path에 둔다.
+- PostgreSQL data, 상품 이미지, Cloudflare Origin Certificate는 EC2 local persistent path에 둔다.
+- Cloudflare SSL/TLS는 nginx origin TLS가 준비된 뒤 `Full (strict)`를 사용한다.
 - 실결제 오픈 전에는 RDS, S3-compatible object storage, backup/restore 리허설을 다시 검토한다.
 
 ## CORS And Security

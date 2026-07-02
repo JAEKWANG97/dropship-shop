@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-02 17:29 KST
+
+- 관련 항목: B-039
+- 작업: Cloudflare proxied DNS 기준으로 EC2 origin HTTPS를 nginx + Cloudflare Origin Certificate로 전환하고 SSL/TLS 모드를 `Full (strict)`로 변경했다.
+- 문제·고민: 기존 Caddy 구성은 Cloudflare proxy 상태에서 ACME 인증서 발급이 막혀 `525`가 발생했고, 쇼핑몰 운영 기준에서는 Cloudflare와 origin 사이 인증서 검증이 필요했다.
+- 해결방안: EC2 Docker Compose의 reverse proxy를 nginx로 바꾸고 `/api/**`, `/actuator/**`, `/uploads/products/**`는 API로, 나머지는 Web으로 라우팅했다. Cloudflare Origin Certificate와 private key는 서버 local path에만 배치하고 git에는 남기지 않았다.
+- 검증: EC2 `docker compose ps`에서 API/PostgreSQL/Web/nginx가 정상 동작했고, origin 직접 HTTPS는 `curl -k --resolve coreable-saf.com:443:43.200.135.171 https://coreable-saf.com/api/health`로 성공했다. Cloudflare 경유 `https://coreable-saf.com`, `https://www.coreable-saf.com`, `/api/health`, `/actuator/health/readiness`, `/products`도 200 응답을 확인했다.
+- 후속작업: 장기 운영 전 SSH 보안그룹을 SSM 또는 fixed egress runner로 좁히고, RDS/S3/backup 전환 필요성을 트래픽과 운영 부담 기준으로 재검토한다.
+
 ## 2026-07-02 16:23 KST
 
 - 관련 항목: B-040, B-039

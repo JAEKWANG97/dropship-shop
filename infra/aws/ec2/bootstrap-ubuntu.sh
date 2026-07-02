@@ -25,8 +25,8 @@ usermod -aG docker ubuntu
 install -d -m 0755 /opt/coreable
 install -d -m 0755 /var/lib/coreable/postgres
 install -d -m 0755 /var/lib/coreable/uploads/products
-install -d -m 0755 /var/lib/coreable/proxy/data
-install -d -m 0755 /var/lib/coreable/proxy/config
+install -d -m 0755 /var/lib/coreable/proxy
+install -d -m 0700 /var/lib/coreable/proxy/certs
 
 if ! swapon --show | grep -q /swapfile; then
   fallocate -l 2G /swapfile
@@ -48,4 +48,4 @@ cat >/etc/logrotate.d/coreable-docker <<'LOGROTATE'
 }
 LOGROTATE
 
-echo "Bootstrap complete. Copy compose.prod.yml, Caddyfile, and /opt/coreable/.env before deploying."
+echo "Bootstrap complete. Copy compose.prod.yml, nginx.conf, Cloudflare origin cert/key, and /opt/coreable/.env before deploying."
