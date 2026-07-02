@@ -1,0 +1,19 @@
+{$SITE_HOST}, {$WWW_SITE_HOST} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle /actuator/* {
+		reverse_proxy api:8080
+	}
+
+	handle /uploads/products/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -4,17 +4,40 @@
 
 ## Now
 
+### B-039 AWS EC2 Docker CI/CD 테스트 배포
+
+Status: In Progress
+
+Notes:
+- `coreable-saf.com` 테스트 배포를 GitHub Actions, GHCR, EC2 Docker Compose로 반복 가능하게 만든다.
+- 비용 우선으로 `t4g.micro` 단일 서버에 Web/API/PostgreSQL/업로드 이미지를 함께 둔다.
+- GitHub-hosted Actions SSH 배포를 위해 SSH 보안그룹은 key-only `0.0.0.0/0`로 둔다. 장기 운영 전 SSM 또는 fixed egress runner로 좁히는 것을 검토한다.
+- S3/RDS/CloudFront는 테스트 URL 확보 뒤 필요 시 전환한다.
+
+Tasks:
+- [x] API/Web Dockerfile을 추가한다.
+- [x] EC2 production compose와 Caddy reverse proxy 설정을 추가한다.
+- [x] GitHub Actions CI와 deploy workflow를 추가한다.
+- [x] AWS EC2/Elastic IP 생성 스크립트와 서버 bootstrap 스크립트를 추가한다.
+- [x] EC2 Docker 배포 운영 문서를 추가한다.
+- [x] AWS EC2, Elastic IP, 보안그룹을 생성한다.
+- [x] 서버에 Docker, compose, env, Caddy 설정을 준비한다.
+- [ ] GitHub Secrets를 등록하고 main 배포를 실행한다. Secrets 등록은 완료, main 배포는 남음.
+- [ ] Cloudflare DNS를 Elastic IP로 연결한다.
+- [ ] 배포 URL health/browser smoke를 확인한다.
+
 ### B-016 테스트 배포 및 운영 readiness 점검
 
 Status: Todo
 
 Notes:
 - `coreable-saf.com` 도메인은 확보됨.
+- 테스트 배포 baseline은 B-039의 AWS EC2 Docker Compose 기준으로 진행한다.
 - 아직 정식 서비스 오픈이 아니라 테스트 배포와 외부 연동 준비용 배포다.
 - Toss live 심사, 통신판매업 신고, 실결제 오픈은 배포 URL 확인 후 별도 단계로 진행한다.
 
 Tasks:
-- [ ] 테스트 배포 아키텍처를 확정한다.
+- [x] 테스트 배포 아키텍처를 확정한다.
 - [ ] production/staging env 변수 목록을 배포 서버에 등록한다.
 - [ ] 상품 이미지 local volume 경로와 `APP_STORAGE_*` 값을 확정한다.
 - [ ] `/api/health`, readiness, liveness를 배포 환경에서 확인한다.

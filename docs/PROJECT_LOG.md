@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-02 11:35 KST
+
+- 관련 항목: B-039, B-016
+- 작업: AWS EC2 저비용 테스트 배포를 Docker 기반 CI/CD로 진행하기로 정리했다.
+- 문제·고민: Oracle Always Free A1 인스턴스는 capacity 부족으로 생성이 막혔고, Lightsail/EC2/RDS/S3를 한 번에 도입하면 비용과 운영면이 커진다.
+- 해결방안: `t4g.micro` 단일 EC2에 Caddy, Web, API, PostgreSQL, local uploads를 Docker Compose로 올리고, GitHub Actions가 GHCR 이미지를 빌드/푸시한 뒤 EC2에서 pull/up만 수행하게 한다.
+- 결정: 서버에서 소스 빌드는 하지 않는다. S3/RDS/CloudFront는 테스트 URL 확보 뒤 이미지 용량, 백업, 트래픽 리스크가 현실화될 때 전환한다.
+- 후속작업: AWS 리소스 생성, EC2 env 등록, GitHub Secrets 등록, Cloudflare DNS 연결, 배포 URL smoke 확인을 닫는다.
+
 ## 2026-07-02 10:12 KST
 
 - 관련 항목: B-016

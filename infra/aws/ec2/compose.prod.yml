@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /var/lib/coreable/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${COREABLE_ENV_FILE:-/opt/coreable/.env}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DATABASE_USERNAME: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_STORAGE_LOCAL_UPLOAD_DIR: /var/app/uploads/products
+      APP_STORAGE_PUBLIC_BASE_URL: /uploads/products
+    volumes:
+      - /var/lib/coreable/uploads/products:/var/app/uploads/products
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    env_file:
+      - ${COREABLE_ENV_FILE:-/opt/coreable/.env}
+    environment:
+      DROPSHIP_API_BASE_URL: http://api:8080
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    environment:
+      SITE_HOST: ${SITE_HOST}
+      WWW_SITE_HOST: ${WWW_SITE_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/coreable/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /var/lib/coreable/proxy/data:/data
+      - /var/lib/coreable/proxy/config:/config

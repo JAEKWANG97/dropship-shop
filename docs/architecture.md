@@ -130,7 +130,7 @@ Runtime storage rules:
 - PostgreSQL stores product data and image metadata only.
 - Image binaries are not stored in PostgreSQL.
 - Local development may use filesystem-backed product image storage.
-- Test deployment may use an Oracle VM local volume for product images.
+- Test deployment may use the EC2 EBS-backed local upload volume for product images.
 - Production should move to S3-compatible object storage when image volume, backup, or traffic makes local disk risky.
 - Backend file storage is behind a small storage boundary so the API can keep returning stable image URLs to the frontend.
 - Frontend catalog screens should consume backend API data instead of maintaining long-lived mock product JSON.
@@ -159,11 +159,13 @@ Later expansion:
 Start simple:
 
 ```text
-Single server
-+ Spring Boot app
-+ managed PostgreSQL
-+ object storage
-+ CDN later if needed
+Single EC2 test server
++ Caddy reverse proxy
++ Next.js web container
++ Spring Boot API container
++ PostgreSQL container
++ EBS-backed local uploads
++ S3/RDS/CDN later if needed
 ```
 
 Do not introduce microservices before order and fulfillment workflows are stable.
