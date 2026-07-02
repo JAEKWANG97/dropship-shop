@@ -53,7 +53,8 @@ Notes:
 - `coreable-saf.com` 도메인은 확보됨.
 - 배포 baseline은 B-039의 AWS EC2 Docker Compose 기준으로 진행한다.
 - 아직 실결제 오픈 전이며, 외부 연동 준비용 운영 기준 배포로 본다.
-- Toss live 심사, 통신판매업 신고, 실결제 오픈은 배포 URL 확인 후 별도 단계로 진행한다.
+- MVP 결제는 Toss Payments가 아니라 고객 직접 계좌입금과 관리자 입금확인 흐름으로 전환한다.
+- Toss live 심사와 live key 전환은 후순위로 미루고, 통신판매업 신고와 실주문 운영 준비는 계좌입금 기준으로 확인한다.
 
 Tasks:
 - [x] 테스트 배포 아키텍처를 확정한다.
@@ -63,26 +64,32 @@ Tasks:
 - [ ] DB migration dry run과 backup/snapshot 상태를 확인한다.
 - [x] Web/API 도메인과 HTTPS를 연결한다.
 - [ ] 배포 URL 기준 Playwright smoke를 실행한다.
-- [ ] Toss live 심사에 필요한 홈페이지/정책/사업자 정보 접근 경로를 확인한다.
-- [ ] Toss live 승인이 완료되면 live key 전환 작업을 별도 진행한다.
+- [ ] 계좌입금 주문/입금확인 플로우 기준 공개 정책, 회사 정보, 고객센터 접근 경로를 확인한다.
+- [ ] 실주문 전 DB와 업로드 이미지 backup/restore 방법을 확인한다.
 
-### B-001 Toss Payments sandbox 결제 플로우 완성
+### B-041 계좌입금 주문/입금확인 플로우 전환
 
 Status: Todo
 
 Notes:
-- 웹 결제창 호출과 성공 리다이렉트 서버 confirm 연결은 구현됨.
-- 실제 sandbox key로 결제창/승인 검증 후 완료 처리.
+- Toss Payments PG 연동은 우선 붙이지 않는다.
+- MVP 결제 방식은 고객 직접 계좌입금 후 관리자가 실제 입금 내역을 확인하는 흐름으로 전환한다.
+- 고객 주문은 `입금대기`로 생성하고, 관리자 `입금확인` 이후 공급처 발주 가능 상태로 넘긴다.
+- 입금 계좌, 입금자명, 입금 금액, 입금 기한, 미입금 취소, 입금 불일치, 수동 환불 기록 정책을 함께 정리한다.
+- 계좌입금은 현금성 결제이므로 구매안전서비스(에스크로/소비자피해보상보험)와 현금영수증 의무가 새로 생긴다. 확보 방안 결정이 다른 구현보다 먼저다.
+- 입금확인/미입금취소/수동환불은 관리자 수동 액션이므로 CS 분쟁 대비를 위해 주체/시각이 남는 상태 이력이 필수다.
 
 Tasks:
-- [ ] Toss test client key를 로컬 env에 설정한다.
-- [ ] Toss test secret key를 로컬 env에 설정한다.
-- [ ] Toss sandbox 결제창에서 성공 결제를 실행한다.
-- [ ] Success redirect 후 backend confirm 호출을 확인한다.
-- [ ] 주문 상태가 `SUPPLIER_ORDER_PENDING`으로 바뀌는지 확인한다.
-- [ ] Toss 실패/취소 redirect 화면을 확인한다.
-- [ ] 중복 success redirect 또는 중복 confirm 요청이 같은 결제 결과를 반환하는지 확인한다.
-- [ ] 결제 예외 발생 시 고객 화면과 관리자 payment exception queue를 함께 확인한다.
+- [ ] 계좌입금(현금 결제) 기준 구매안전서비스(에스크로 또는 소비자피해보상보험) 확보 방안을 결정하고 `docs/legal-launch-checklist.md`와 `docs/decision-log.md`에 반영한다.
+- [ ] 현금영수증 발급 의무 범위와 발급 방법(홈택스 수동/API)을 정하고 정책 문서와 주문 화면에 반영한다.
+- [ ] `docs/policies/payment-policy.md`, `docs/policies/order-policy.md`, `docs/order-flow.md`를 계좌입금 기준으로 갱신한다.
+- [ ] `docs/domain-model.md`, `docs/erd.md`, `docs/api-spec.md`에 입금대기/입금확인/미입금취소/수동환불 기록 계약을 반영한다.
+- [ ] 고객 checkout 완료 화면에 입금 계좌, 금액, 입금자명, 입금 기한을 표시한다.
+- [ ] 관리자 주문 목록/상세에서 입금대기 필터와 입금확인, 미입금취소, 입금 불일치 메모 액션을 제공한다.
+- [ ] 입금확인, 미입금취소, 수동환불 상태 전이를 액션 주체/시각과 함께 `OrderStatusHistory`에 기록한다.
+- [ ] 환불은 PG 취소가 아니라 관리자 수동 환불 완료 기록으로 처리한다.
+- [ ] Toss 결제 버튼, success/fail confirm 흐름은 고객 주 경로에서 제거하거나 비활성화한다.
+- [ ] 계좌입금 주문 생성, 관리자 입금확인, 미입금취소, 수동환불 회귀 테스트를 추가한다.
 
 ### B-002 소셜 로그인 실브라우저 검증
 
@@ -106,6 +113,7 @@ Notes:
 - 관리자 주문 상세 상태 표시와 발주/품절/송장 액션 form은 웹에 연결됨.
 - 관리자 화면 노출은 확인됨.
 - 실제 액션 실행 성공/실패 검증은 출시 전 최종 테스트로 남김.
+- B-041 계좌입금 전환 후 공급처 발주는 관리자 입금확인 완료 주문만 대상으로 재검증한다.
 
 Tasks:
 - [x] 관리자 주문 상세에서 현재 주문/결제/배송/환불 상태를 확인할 수 있게 한다.
@@ -116,7 +124,82 @@ Tasks:
 - [ ] 각 액션 성공 후 주문 목록/상세 상태가 갱신되는지 확인한다. 출시 전 최종 테스트에서 실행.
 - [ ] 권한/validation/API 실패가 빈 화면이 아니라 오류 안내로 보이는지 확인한다. 출시 전 최종 테스트에서 실행.
 
+### B-042 즉시 보안/운영 핫픽스
+
+Status: Todo
+
+Notes:
+- 외부 리뷰에서 확인된 작지만 위험도가 큰 항목을 먼저 닫는다.
+- 계좌입금 전환으로 Toss 환불 재시도 위험은 당장 고객 돈 이중 환불로 이어지지 않지만, Toss 코드를 유지하는 동안에는 같은 멱등성 원칙을 맞춘다.
+
+Tasks:
+- [ ] OAuth/login `redirectTo` 검증에서 백슬래시(`\`)를 차단한다.
+- [ ] Toss 환불 retry가 새 idempotency key를 만들지 않고 저장된 동일 key를 재사용하게 한다.
+- [ ] `SMS_SENS_ENABLED` 운영 기본값을 안전하게 `false`로 바꾸고 문서를 맞춘다.
+- [ ] GitHub Actions deploy workflow에 concurrency를 추가한다.
+- [ ] 배포 스크립트 말미에 오래된 Docker image prune을 추가한다.
+- [ ] EC2 compose에 API/Web/Postgres memory 제한과 API JVM heap 옵션을 둔다.
+
 ## Next
+
+### B-043 체크아웃 중복 제출 및 주문 상태 경합 방지
+
+Status: Todo
+
+Notes:
+- Toss 실시간 결제는 보류하지만, 계좌입금에서도 더블클릭/동시 요청으로 중복 입금대기 주문이 생기면 CS와 입금확인이 꼬인다.
+- 주문 상태 전이 전반이 read-check-write 방식에 낙관적 잠금이 없어, 고객 취소 vs 관리자 입금확인/발주 같은 동시 액션에서 lost update가 가능하다.
+
+Tasks:
+- [ ] 같은 고객 장바구니 기준 동시 checkout 생성 경합을 막는 방식을 정한다.
+- [ ] 장바구니 잠금 또는 활성 checkout unique 제약을 구현한다.
+- [ ] 중복 제출 시 기존 입금대기 주문으로 안내하거나 명확한 오류를 반환한다.
+- [ ] `CustomerOrder`, `PaymentGroup` 등 핵심 엔티티에 `@Version` 낙관적 잠금을 도입하고 충돌 시 오류 응답/재시도 규칙을 정한다.
+- [ ] 동시 checkout 요청과 고객 취소 vs 관리자 액션 동시 실행 회귀 테스트를 추가한다.
+
+### B-044 배송 후 반품/환불 플로우 완성
+
+Status: Todo
+
+Notes:
+- 배송완료 후 청약철회/반품이 들어왔을 때 현재는 `RETURN_WAITING` 이후 환불 완료까지의 운영 흐름이 부족하다.
+- 계좌입금 MVP에서는 PG 취소가 아니라 관리자 수동 환불 기록과 주문/클레임 상태 전이를 중심으로 처리한다.
+
+Tasks:
+- [ ] `DELIVERED` 이후 반품 요청, 승인, 반품대기, 반품수령, 환불처리, 완료 상태 전이를 정리한다.
+- [ ] 관리자 반품 수령과 수동 환불 완료 액션을 추가한다.
+- [ ] 고객 주문 상세에서 반품/환불 처리 상태를 확인할 수 있게 한다.
+- [ ] 취소/환불 정책 문서와 API 문서를 함께 갱신한다.
+- [ ] 배송완료 후 반품 환불 회귀 테스트를 추가한다.
+
+### B-045 백업/복구 최소 운영
+
+Status: Todo
+
+Notes:
+- 현재 EC2 local Postgres와 upload volume은 단일 서버 장애나 termination에 취약하다.
+- 실주문을 받기 전 최소한 DB dump와 업로드 이미지 백업, 복구 리허설 기준을 만든다.
+
+Tasks:
+- [ ] `pg_dump` backup 주기, 보관 기간, 저장 위치를 정한다.
+- [ ] 업로드 이미지 backup 방식을 정한다.
+- [ ] S3 또는 S3 호환 저장소에 백업을 업로드하는 운영 절차를 만든다.
+- [ ] restore rehearsal 절차를 문서화한다.
+- [ ] EC2 root volume DeleteOnTermination 설정과 snapshot 정책을 재검토한다.
+
+### B-046 sanitizer/업로드 검증 강화
+
+Status: Todo
+
+Notes:
+- 관리자 입력 상세 HTML과 업로드 이미지는 고객 공개 화면으로 노출되므로 출시 전 방어선을 강화한다.
+
+Tasks:
+- [ ] 상세 HTML sanitizer를 safelist 기반으로 강화하거나 검증된 sanitizer로 교체한다.
+- [ ] 이미지 업로드에서 확장자뿐 아니라 magic byte를 확인한다.
+- [ ] 업로드 응답에 `X-Content-Type-Options: nosniff`를 적용한다.
+- [ ] HTML 상세 블록 XSS 회귀 테스트를 추가한다.
+- [ ] 미지원 파일 업로드 회귀 테스트를 추가한다.
 
 ### B-013 출시 전 모바일/디자인 QA 정리
 
@@ -161,7 +244,9 @@ Tasks:
 - [x] 상품 등록 기준에 안전용품 인증/상품정보제공고시 체크를 추가한다.
 - [ ] 통신판매업 신고번호와 신고 기관을 실제 값으로 교체한다.
 - [ ] 고객센터 전화번호, 이메일, 운영 시간을 실제 값으로 교체한다.
-- [ ] 호스팅 제공자와 결제/구매안전서비스 정보를 실제 값으로 교체한다.
+- [ ] 호스팅 제공자와 계좌입금/구매안전서비스 정보를 실제 값으로 교체한다.
+- [ ] 통신판매업 신고에 필요한 구매안전서비스 이용확인증 확보 방법을 확인한다. B-041의 확보 방안 결정과 연결한다.
+- [ ] 현금영수증 발급 준비 상태를 출시 차단 체크리스트에 추가한다.
 - [ ] 초기 판매 상품별 안전인증/KC/상품정보제공고시 항목을 확인한다.
 
 ### B-033 상품 원가/판매가/마진 정책 관리
@@ -182,6 +267,27 @@ Tasks:
 - [ ] 기존 등록 상품의 원가/판매가를 운영자가 검수한다.
 
 ## Later
+
+### B-001 Toss Payments sandbox 결제 플로우 완성
+
+Status: Deferred
+
+Notes:
+- `B-001`은 기존 Toss Payments 결제 플로우 이슈 번호로 보존한다. 다른 결제 방식 작업에 재사용하지 않는다.
+- MVP 결제는 B-041 계좌입금 주문/입금확인 플로우로 전환한다.
+- Toss Payments PG 연동은 주문량, 입금확인 운영 부담, 구매전환, 구매안전서비스 요건을 보고 재검토한다.
+- 웹 결제창 호출과 성공 리다이렉트 서버 confirm 연결 코드는 남아 있지만 고객 주 경로에서는 우선 제외한다.
+
+Tasks:
+- [ ] Toss Payments 재도입 여부와 카드/간편결제/PG 계좌이체/가상계좌 범위를 다시 정한다.
+- [ ] Toss test client key를 로컬 env에 설정한다.
+- [ ] Toss test secret key를 로컬 env에 설정한다.
+- [ ] Toss sandbox 결제창에서 성공 결제를 실행한다.
+- [ ] Success redirect 후 backend confirm 호출을 확인한다.
+- [ ] 주문 상태가 `SUPPLIER_ORDER_PENDING`으로 바뀌는지 확인한다.
+- [ ] Toss 실패/취소 redirect 화면을 확인한다.
+- [ ] 중복 success redirect 또는 중복 confirm 요청이 같은 결제 결과를 반환하는지 확인한다.
+- [ ] 결제 예외 발생 시 고객 화면과 관리자 payment exception queue를 함께 확인한다.
 
 ### B-008 검색/필터 고도화
 
