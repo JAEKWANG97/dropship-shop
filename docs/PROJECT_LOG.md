@@ -1,5 +1,23 @@
 # Project Log
 
+## 2026-07-02 10:12 KST
+
+- 관련 항목: B-016
+- 작업: 테스트 배포에서 상품 이미지를 Oracle VM local volume에 저장할 수 있도록 backend storage 경계를 추가했다.
+- 문제·고민: 지금 바로 R2/S3 SDK를 붙이면 테스트 배포보다 저장소 연동 작업이 커진다. 반대로 `CatalogService`가 local path에 직접 쓰는 구조를 유지하면 운영 전환 때 코드 영향이 커진다.
+- 해결방안: `FileStorage` 경계를 두고 현재 구현은 local filesystem만 제공한다. `APP_STORAGE_LOCAL_UPLOAD_DIR`, `APP_STORAGE_PUBLIC_BASE_URL`로 배포 경로와 공개 URL prefix를 분리한다.
+- 결정: 테스트 배포는 Oracle VM persistent volume을 사용하고, 이미지 용량/백업/트래픽 부담이 커지면 R2/S3 호환 object storage 구현체를 추가한다.
+- 후속작업: B-016 배포 아키텍처에서 이미지 volume mount와 backup 범위를 확정한다.
+
+## 2026-07-02 09:40 KST
+
+- 관련 항목: B-034, B-036
+- 작업: 배포 전 회귀 확인을 위해 Playwright UI smoke와 Testcontainers PostgreSQL smoke를 도입한다.
+- 문제·고민: 수동 스크린샷 QA와 H2 기반 통합 테스트만으로는 모바일 레이아웃 깨짐, 관리자 화면 회귀, Flyway/PostgreSQL drift를 배포 전마다 놓칠 수 있다.
+- 해결방안: Playwright는 공개/고객/관리자 핵심 화면과 모바일 screenshot만 최소로 확인하고, Testcontainers는 기존 H2 테스트를 대체하지 않고 PostgreSQL migration/JPA validate/public API 계약만 smoke로 확인한다.
+- 결정: k6, Lighthouse, ZAP은 테스트 배포 후 별도 이슈로 미룬다. OAuth 실계정 로그인과 Toss sandbox 성공 결제는 기존 B-002, B-001 수동 검증 범위로 유지한다.
+- 후속작업: 배포 URL이 준비되면 같은 Playwright smoke를 `coreable-saf.com` 기준으로 실행한다.
+
 ## 2026-07-01 17:12 KST
 
 - 관련 항목: B-033

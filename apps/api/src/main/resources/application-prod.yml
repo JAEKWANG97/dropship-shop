@@ -23,6 +23,10 @@ sms:
     from-number: ${SMS_SENS_FROM_NUMBER}
 
 app:
+  storage:
+    public-base-url: ${APP_STORAGE_PUBLIC_BASE_URL:/uploads/products}
+    local:
+      upload-dir: ${APP_STORAGE_LOCAL_UPLOAD_DIR:/var/app/uploads/products}
   internal:
     sync-token: ${APP_INTERNAL_SYNC_TOKEN}
   cors:

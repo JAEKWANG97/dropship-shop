@@ -2,6 +2,17 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-02
+
+- B-036 Testcontainers PostgreSQL Smoke 도입
+  - 커밋: 미커밋
+  - 완료 내용: 기존 H2 통합 테스트는 유지하면서 PostgreSQL 17 Testcontainers smoke를 추가했다. Flyway migration, JPA `ddl-auto=validate`, readiness endpoint, public catalog `sourcePrice` 미노출, active pricing policy seed를 확인한다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*Postgres*Smoke*'`, `cd apps/api && ./gradlew test`, `git diff --check`
+- B-034 Playwright 기반 배포 전 UI Smoke 도입
+  - 커밋: 미커밋
+  - 완료 내용: `apps/web`에 Playwright smoke를 도입하고 desktop/mobile Chromium 기준 공개 고객 화면, 로그인 고객 화면, 관리자 화면, 정책/고지 화면 접근과 horizontal overflow를 확인하도록 했다. 인증 쿠키가 없으면 auth smoke는 skip된다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/web && npm run test:e2e`, `git diff --check`
+
 ## 2026-06-30
 
 - B-032 도매꾹 수집 상품 관리자 API 적재 도구

@@ -6,10 +6,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +36,8 @@ import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.common.storage.FileStorage;
+import com.dropshipshop.api.common.storage.StoredFile;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 
 @Service
@@ -64,7 +63,7 @@ public class CatalogService {
 	private final ProductNoticeRepository productNoticeRepository;
 	private final ProductChangeHistoryRepository productChangeHistoryRepository;
 	private final CustomerPolicyLinkService customerPolicyLinkService;
-	private final Path imageStoragePath;
+	private final FileStorage fileStorage;
 
 	public CatalogService(
 		SupplierRepository supplierRepository,
@@ -76,7 +75,7 @@ public class CatalogService {
 		ProductNoticeRepository productNoticeRepository,
 		ProductChangeHistoryRepository productChangeHistoryRepository,
 		CustomerPolicyLinkService customerPolicyLinkService,
-		@Value("${app.catalog.image-storage-path:build/product-images}") String imageStoragePath
+		FileStorage fileStorage
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -87,7 +86,7 @@ public class CatalogService {
 		this.productNoticeRepository = productNoticeRepository;
 		this.productChangeHistoryRepository = productChangeHistoryRepository;
 		this.customerPolicyLinkService = customerPolicyLinkService;
-		this.imageStoragePath = Path.of(imageStoragePath);
+		this.fileStorage = fileStorage;
 	}
 
 	@Transactional(readOnly = true)
@@ -286,18 +285,17 @@ public class CatalogService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported image extension");
 		}
 		String objectKey = productId + "/" + UUID.randomUUID() + extension;
-		Path target = imageStoragePath.resolve(objectKey).normalize();
+		StoredFile storedFile;
 		try {
-			Files.createDirectories(target.getParent());
-			file.transferTo(target);
-		} catch (Exception exception) {
+			storedFile = fileStorage.store(objectKey, file);
+		} catch (RuntimeException exception) {
 			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Image upload failed");
 		}
 		return new CatalogDtos.ProductImageUploadResponse(
-			"/uploads/products/" + objectKey,
-			objectKey,
-			file.getSize(),
-			file.getContentType()
+			storedFile.url(),
+			storedFile.objectKey(),
+			storedFile.size(),
+			storedFile.contentType()
 		);
 	}
 

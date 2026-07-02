@@ -130,7 +130,9 @@ Runtime storage rules:
 - PostgreSQL stores product data and image metadata only.
 - Image binaries are not stored in PostgreSQL.
 - Local development may use filesystem-backed product image storage.
-- Production should use S3-compatible object storage and return stable image URLs to the frontend.
+- Test deployment may use an Oracle VM local volume for product images.
+- Production should move to S3-compatible object storage when image volume, backup, or traffic makes local disk risky.
+- Backend file storage is behind a small storage boundary so the API can keep returning stable image URLs to the frontend.
 - Frontend catalog screens should consume backend API data instead of maintaining long-lived mock product JSON.
 
 ### Supplier

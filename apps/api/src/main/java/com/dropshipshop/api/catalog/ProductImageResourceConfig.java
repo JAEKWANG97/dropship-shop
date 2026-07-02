@@ -12,7 +12,9 @@ class ProductImageResourceConfig implements WebMvcConfigurer {
 
 	private final Path imageStoragePath;
 
-	ProductImageResourceConfig(@Value("${app.catalog.image-storage-path:build/product-images}") String imageStoragePath) {
+	ProductImageResourceConfig(
+		@Value("${app.storage.local.upload-dir:${app.catalog.image-storage-path:build/product-images}}") String imageStoragePath
+	) {
 		this.imageStoragePath = Path.of(imageStoragePath);
 	}
 

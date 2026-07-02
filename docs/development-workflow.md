@@ -139,6 +139,20 @@ cd ../..
 git diff --check
 ```
 
+DB migration 또는 PostgreSQL-specific schema 동작을 바꾸면 Docker가 켜진 환경에서 PostgreSQL smoke도 확인한다.
+
+```sh
+cd apps/api
+./gradlew test --tests '*Postgres*Smoke*'
+```
+
+모바일/관리자 화면 회귀를 확인해야 하는 변경이면 로컬 API/Web을 띄운 뒤 Playwright smoke를 실행한다. 로그인 화면은 `E2E_CUSTOMER_COOKIE`, `E2E_ADMIN_COOKIE`가 있을 때만 확인한다.
+
+```sh
+cd apps/web
+npm run test:e2e
+```
+
 필요하면 API를 실행하고 health endpoints를 직접 확인한다.
 
 ```sh

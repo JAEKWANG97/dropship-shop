@@ -4,6 +4,26 @@
 
 ## Now
 
+### B-016 테스트 배포 및 운영 readiness 점검
+
+Status: Todo
+
+Notes:
+- `coreable-saf.com` 도메인은 확보됨.
+- 아직 정식 서비스 오픈이 아니라 테스트 배포와 외부 연동 준비용 배포다.
+- Toss live 심사, 통신판매업 신고, 실결제 오픈은 배포 URL 확인 후 별도 단계로 진행한다.
+
+Tasks:
+- [ ] 테스트 배포 아키텍처를 확정한다.
+- [ ] production/staging env 변수 목록을 배포 서버에 등록한다.
+- [ ] 상품 이미지 local volume 경로와 `APP_STORAGE_*` 값을 확정한다.
+- [ ] `/api/health`, readiness, liveness를 배포 환경에서 확인한다.
+- [ ] DB migration dry run과 backup/snapshot 상태를 확인한다.
+- [ ] Web/API 도메인과 HTTPS를 연결한다.
+- [ ] 배포 URL 기준 Playwright smoke를 실행한다.
+- [ ] Toss live 심사에 필요한 홈페이지/정책/사업자 정보 접근 경로를 확인한다.
+- [ ] Toss live 승인이 완료되면 live key 전환 작업을 별도 진행한다.
+
 ### B-001 Toss Payments sandbox 결제 플로우 완성
 
 Status: Todo
@@ -179,17 +199,31 @@ Tasks:
 - [ ] 판매자 귀책 클레임의 인지일/증빙 파일 입력 정책을 정한다.
 - [ ] 고객 화면에서 클레임 처리 상태를 확인할 수 있게 한다.
 
-### B-016 배포 및 운영 readiness 점검
+### B-037 배포 환경 부하 smoke
 
 Status: Todo
 
+Notes:
+- Oracle VM/API가 실제로 떠 있는 뒤에만 진행한다.
+- 목적은 한계 측정이 아니라 상품 목록/상세/장바구니/체크아웃 기본 부하에서 장애가 나는지 확인하는 것이다.
+
 Tasks:
-- [ ] 배포 URL을 확보한다.
-- [ ] Toss live 심사에 필요한 홈페이지/정책/사업자 정보 접근 경로를 확인한다.
-- [ ] Toss live 승인이 완료되면 live key 전환 작업을 별도 진행한다.
-- [ ] production env 변수 목록을 배포 플랫폼에 등록한다.
-- [ ] `/api/health`, readiness, liveness를 staging/production에서 확인한다.
-- [ ] DB migration dry run과 backup/snapshot 상태를 확인한다.
+- [ ] 배포 URL 기준 짧은 k6 smoke 시나리오를 만든다.
+- [ ] `/products`, `/products/{id}`, `/cart`, `/checkout` 응답 시간과 오류율을 확인한다.
+- [ ] 부하 기준과 VM 업그레이드 판단선을 문서에 남긴다.
+
+### B-038 실오픈 전 성능/보안 baseline 점검
+
+Status: Todo
+
+Notes:
+- 테스트 배포와 HTTPS 연결 후 진행한다.
+- Lighthouse와 OWASP ZAP baseline만 우선 사용한다.
+
+Tasks:
+- [ ] Lighthouse 모바일 성능/접근성 baseline을 확인한다.
+- [ ] 공개 페이지 ZAP baseline scan을 실행한다.
+- [ ] 실결제 오픈 전 차단 수준의 보안/정책 이슈를 정리한다.
 
 ## Working Rules
 

@@ -40,6 +40,8 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `APP_INTERNAL_SYNC_TOKEN` | 내부 배송조회 동기화 API 호출용 shared token. 서버/스케줄러에서만 사용 |
 | `APP_AUTH_JWT_SECRET` | JWT access token 서명 secret. 충분히 긴 랜덤 값 사용 |
 | `APP_AUTH_SUCCESS_REDIRECT_URI` | OAuth callback 성공 후 frontend로 보낼 URI |
+| `APP_STORAGE_PUBLIC_BASE_URL` | 상품 이미지 공개 URL prefix. 기본값은 `/uploads/products` |
+| `APP_STORAGE_LOCAL_UPLOAD_DIR` | local storage 사용 시 상품 이미지 저장 디렉터리. 테스트 배포 기본값은 `/var/app/uploads/products` |
 | `OAUTH_GOOGLE_CLIENT_ID` | Google OAuth client id |
 | `OAUTH_GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `OAUTH_GOOGLE_REDIRECT_URI` | Google OAuth redirect URI |
@@ -74,6 +76,13 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 결제/주문 운영 전 point-in-time recovery 사용 가능 여부를 확인한다.
 - 주요 배포 전에는 수동 snapshot을 생성하고 복구 절차를 문서화한다.
 - 복구 리허설은 최소 월 1회 수행한다.
+
+## Product Image Storage
+
+- 테스트 배포는 Oracle VM local volume에 상품 이미지를 저장할 수 있다.
+- 운영 전환 시에도 PostgreSQL에는 이미지 binary를 넣지 않는다. 상품/상세 API는 image URL metadata만 저장한다.
+- local storage 사용 시 `APP_STORAGE_LOCAL_UPLOAD_DIR`는 애플리케이션 재배포로 지워지지 않는 persistent volume 경로로 둔다.
+- `APP_STORAGE_PUBLIC_BASE_URL`은 API가 직접 `/uploads/products/**`를 서빙하면 `/uploads/products`, CDN/object storage로 이전하면 해당 public prefix로 바꾼다.
 
 ## CORS And Security
 

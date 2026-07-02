@@ -32,6 +32,10 @@ sms:
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}
+  storage:
+    public-base-url: ${APP_STORAGE_PUBLIC_BASE_URL:/uploads/products}
+    local:
+      upload-dir: ${APP_STORAGE_LOCAL_UPLOAD_DIR:${APP_CATALOG_IMAGE_STORAGE_PATH:build/product-images}}
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:local-dev-jwt-secret-change-before-production}
     cookie-secure: false
