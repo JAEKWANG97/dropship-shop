@@ -80,6 +80,23 @@ On push to `main`:
 
 Manual deploy is available through the `Deploy` workflow's `workflow_dispatch`.
 
+## Build Time And Cache
+
+Current bottleneck is GitHub Actions image build, not EC2 runtime deploy. A recent baseline was:
+
+- `verify`: 2m58s
+- `build-and-push`: 7m39s
+- `deploy`: 1m12s
+
+The deploy workflow uses Docker BuildKit GitHub Actions cache:
+
+- API image: `type=gha,scope=api-arm64`
+- Web image: `type=gha,scope=web-arm64`
+
+The first run after cache setup may still be slow because it warms the cache. Later runs can reuse dependency and image layers. Next.js application changes can still require a full `npm run build` inside the Web image, so the cache reduces repeated work but does not remove the ARM64 build cost entirely.
+
+Deploy is skipped when only `docs/**`, `README.md`, or `AGENTS.md` changes. Workflow, app, or infra changes still trigger deploy.
+
 ## DNS And OAuth
 
 Cloudflare DNS:

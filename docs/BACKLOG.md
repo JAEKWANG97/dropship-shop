@@ -4,6 +4,21 @@
 
 ## Now
 
+### B-040 GitHub Actions Docker build 최적화
+
+Status: In Progress
+
+Notes:
+- 현재 AWS 테스트 배포 병목은 EC2 pull/up이 아니라 GitHub Actions의 `build-and-push`, 특히 Web ARM64 Docker image build다.
+- 기준 실행 시간은 `verify 2m58s`, `build-and-push 7m39s`, `deploy 1m12s`다.
+- 1차 최적화는 Docker BuildKit GitHub Actions cache를 사용한다.
+
+Tasks:
+- [x] API Docker build에 GitHub Actions cache scope를 추가한다.
+- [x] Web Docker build에 GitHub Actions cache scope를 추가한다.
+- [x] 배포 문서에 build cache 정책과 한계를 기록한다.
+- [ ] cache warm-up 이후 앱 변경 배포 시간을 비교한다.
+
 ### B-039 AWS EC2 Docker CI/CD 테스트 배포
 
 Status: In Progress
