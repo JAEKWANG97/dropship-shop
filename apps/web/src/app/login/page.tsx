@@ -1,4 +1,4 @@
-import { apiUrl } from "@/lib/api";
+import { publicApiUrl } from "@/lib/api";
 import { getCurrentUser } from "@/lib/session";
 
 const providers = [
@@ -24,7 +24,7 @@ export default async function LoginPage() {
             {providers.map((provider) => (
               <a
                 className={`oauth-button ${provider.id}`}
-                href={apiUrl(`/api/auth/oauth2/${provider.id}/authorize`)}
+                href={publicApiUrl(`/api/auth/oauth2/${provider.id}/authorize`)}
                 key={provider.id}
               >
                 {provider.label}
