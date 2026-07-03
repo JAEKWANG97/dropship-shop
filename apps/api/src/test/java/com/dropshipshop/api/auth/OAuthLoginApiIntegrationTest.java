@@ -151,6 +151,28 @@ class OAuthLoginApiIntegrationTest {
 	}
 
 	@Test
+	void rejectsBackslashAndControlCharactersInRedirectTo() throws Exception {
+		mockMvc.perform(get("/api/auth/oauth2/google/authorize")
+				.param("redirectTo", "/\\evil.com"))
+			.andExpect(status().isFound())
+			.andExpect(cookie().maxAge("OAUTH2_REDIRECT_TO", 0));
+
+		mockMvc.perform(get("/api/auth/oauth2/google/authorize?redirectTo=/%5Cevil.com"))
+			.andExpect(status().isFound())
+			.andExpect(cookie().maxAge("OAUTH2_REDIRECT_TO", 0));
+
+		mockMvc.perform(get("/api/auth/oauth2/google/authorize")
+				.param("redirectTo", "/products\r\nLocation: https://evil.com"))
+			.andExpect(status().isFound())
+			.andExpect(cookie().maxAge("OAUTH2_REDIRECT_TO", 0));
+
+		mockMvc.perform(get("/api/auth/oauth2/google/authorize")
+				.param("redirectTo", "/products/123"))
+			.andExpect(status().isFound())
+			.andExpect(cookie().exists("OAUTH2_REDIRECT_TO"));
+	}
+
+	@Test
 	void preservesAdminRoleFromDatabaseAfterSocialLogin() throws Exception {
 		UserAccount admin = userAccountRepository.save(new UserAccount(
 			SocialProvider.NAVER,

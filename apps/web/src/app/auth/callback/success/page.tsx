@@ -14,5 +14,9 @@ function safeRedirectTo(value: string | string[] | undefined) {
   if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
     return "";
   }
+  const normalized = redirectTo.toLowerCase();
+  if (redirectTo.includes("\\") || normalized.includes("%5c") || /[\r\n]/.test(redirectTo)) {
+    return "";
+  }
   return redirectTo;
 }

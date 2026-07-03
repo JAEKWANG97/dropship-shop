@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-03 09:42 KST
+
+- 관련 항목: B-042, B-039, B-016
+- 작업: 즉시 보안/운영 핫픽스를 적용했다. OAuth `redirectTo`는 백슬래시와 인코딩된 `%5C`, CRLF를 차단하고, Toss 환불 retry는 저장된 동일 idempotency key를 재사용하게 했다. 운영 SMS 기본값은 `SMS_SENS_ENABLED=false`로 바꾸고, deploy workflow에는 production concurrency와 readiness 성공 후 Docker image prune을 추가했다.
+- 문제·고민: EC2 `t4g.micro` 단일 서버는 디스크와 메모리 여유가 작아, SHA-tag image가 쌓이거나 JVM heap이 무제한으로 커지면 배포 후 안정성이 떨어질 수 있다.
+- 해결방안: compose에 API/PostgreSQL/Web/nginx memory limit을 두고 API JVM에 `-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError`를 지정했다. 배포 스크립트는 readiness 성공 후 168시간보다 오래된 Docker image를 prune한다.
+- 검증: `cd apps/api && ./gradlew test --tests '*OAuthLogin*' --tests '*Refund*'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, workflow/compose YAML parse, `COREABLE_ENV_FILE=env.example docker compose --env-file infra/aws/ec2/env.example -f infra/aws/ec2/compose.prod.yml config`, `git diff --check`.
+- 후속작업: 다음 실제 배포에서 image prune, memory limit, `SMS_SENS_ENABLED=false`가 운영 env와 충돌하지 않는지 확인한다.
+
 ## 2026-07-03 09:24 KST
 
 - 관련 항목: B-041, B-016, B-043, B-044

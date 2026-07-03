@@ -223,6 +223,7 @@ class RefundApiIntegrationTest {
 		UUID refundId = refundRepository.findByOrder_Id(order.getId()).orElseThrow().getId();
 		approveRefund(refundId, "Customer cancel approved");
 		fakeTossPaymentsClient.failNextCancel = true;
+		String expectedIdempotencyKey = "refund-" + refundId;
 
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/request-pg-cancel", refundId)
 				.with(authentication(TestAuthentication.admin())))
@@ -234,6 +235,7 @@ class RefundApiIntegrationTest {
 
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUND_REQUESTED);
 		assertThat(refundRepository.findById(refundId).orElseThrow().getStatus()).isEqualTo(RefundStatus.RETRY_REQUIRED);
+		assertThat(fakeTossPaymentsClient.cancelIdempotencyKeys).containsExactly(expectedIdempotencyKey);
 
 		fakeTossPaymentsClient.failNextCancel = true;
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/retry", refundId)
@@ -241,6 +243,8 @@ class RefundApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status", is("MANUAL_REVIEW_REQUIRED")))
 			.andExpect(jsonPath("$.failureCode", is("TOSS_CANCEL_FAILED")));
+		assertThat(fakeTossPaymentsClient.cancelIdempotencyKeys)
+			.containsExactly(expectedIdempotencyKey, expectedIdempotencyKey);
 
 		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-review", refundId)
 				.with(authentication(TestAuthentication.admin()))
@@ -262,6 +266,8 @@ class RefundApiIntegrationTest {
 			.andExpect(jsonPath("$.status", is("COMPLETED")))
 			.andExpect(jsonPath("$.orderStatus", is("REFUNDED")))
 			.andExpect(jsonPath("$.paymentStatus", is("REFUNDED")));
+		assertThat(fakeTossPaymentsClient.cancelIdempotencyKeys)
+			.containsExactly(expectedIdempotencyKey, expectedIdempotencyKey, expectedIdempotencyKey);
 	}
 
 	@Test
@@ -528,6 +534,7 @@ class RefundApiIntegrationTest {
 
 		private boolean failNextCancel;
 		private final List<Long> cancelAmounts = new ArrayList<>();
+		private final List<String> cancelIdempotencyKeys = new ArrayList<>();
 
 		@Override
 		public TossApprovedPayment confirm(String paymentKey, String orderId, long amount) {
@@ -543,6 +550,7 @@ class RefundApiIntegrationTest {
 
 		@Override
 		public TossCancelledPayment cancel(String paymentKey, String cancelReason, long cancelAmount, String idempotencyKey) {
+			cancelIdempotencyKeys.add(idempotencyKey);
 			if (failNextCancel) {
 				failNextCancel = false;
 				throw new TossPaymentException("temporary cancel failure");
@@ -566,6 +574,7 @@ class RefundApiIntegrationTest {
 		void reset() {
 			failNextCancel = false;
 			cancelAmounts.clear();
+			cancelIdempotencyKeys.clear();
 		}
 	}
 }

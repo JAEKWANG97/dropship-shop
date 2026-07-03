@@ -30,7 +30,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `DATABASE_PASSWORD` | PostgreSQL 비밀번호 |
 | `PAYMENTS_TOSS_SECRET_KEY` | Toss Payments secret key. 서버에서만 사용 |
 | `PAYMENTS_TOSS_BASE_URL` | Toss Payments API URL. 기본값은 `https://api.tosspayments.com` |
-| `SMS_SENS_ENABLED` | Naver Cloud SENS SMS 발송 활성화. 운영 기본값은 `true` |
+| `SMS_SENS_ENABLED` | Naver Cloud SENS SMS 발송 활성화. 운영 기본값은 `false`; 실제 SENS 자격증명과 발신번호가 준비된 뒤 명시적으로 `true`로 켠다 |
 | `SMS_SENS_ACCESS_KEY` | Naver Cloud API access key |
 | `SMS_SENS_SECRET_KEY` | Naver Cloud API secret key. 서버에서만 사용 |
 | `SMS_SENS_SERVICE_ID` | SENS SMS service id |

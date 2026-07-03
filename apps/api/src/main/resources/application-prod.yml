@@ -16,7 +16,7 @@ payments:
 
 sms:
   sens:
-    enabled: ${SMS_SENS_ENABLED:true}
+    enabled: ${SMS_SENS_ENABLED:false}
     access-key: ${SMS_SENS_ACCESS_KEY}
     secret-key: ${SMS_SENS_SECRET_KEY}
     service-id: ${SMS_SENS_SERVICE_ID}

@@ -86,6 +86,7 @@ On push to `main`:
 4. EC2 updates `API_IMAGE` and `WEB_IMAGE` in `/opt/coreable/.env`.
 5. EC2 runs `docker compose pull && docker compose up -d`.
 6. Actions checks `http://localhost:8080/actuator/health/readiness`.
+7. After readiness succeeds, EC2 prunes Docker images older than 168 hours to avoid filling the 20GB disk with SHA-tagged images.
 
 Manual deploy is available through the `Deploy` workflow's `workflow_dispatch`.
 
@@ -105,6 +106,19 @@ The deploy workflow uses Docker BuildKit GitHub Actions cache:
 The first run after cache setup may still be slow because it warms the cache. Later runs can reuse dependency and image layers. Next.js application changes can still require a full `npm run build` inside the Web image, so the cache reduces repeated work but does not remove the ARM64 build cost entirely.
 
 Deploy is skipped when only `docs/**`, `README.md`, or `AGENTS.md` changes. Workflow, app, or infra changes still trigger deploy.
+
+Deploy workflow concurrency is `deploy-production` with `cancel-in-progress: false`. Consecutive pushes wait in order instead of running two EC2 deploy scripts at the same time.
+
+## Runtime Memory Limits
+
+The first deployment runs on `t4g.micro`, so Docker services have conservative memory limits:
+
+- API: `512m`
+- PostgreSQL: `256m`
+- Web: `192m`
+- nginx: `64m`
+
+The API container also receives `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError` from compose so the JVM does not compete without a heap ceiling. All services keep `restart: unless-stopped`; actual behavior under memory pressure must be rechecked on the next live deploy.
 
 ## DNS And OAuth
 
@@ -167,4 +181,4 @@ Browser smoke:
 
 - S3/RDS/CloudFront are deferred.
 - Live Toss key switch is deferred until the test URL and legal/customer notice pages are verified.
-- Real SMS provider activation is deferred unless phone verification is required before live launch.
+- Real SMS provider activation is deferred unless phone verification is required before live launch. Production default is `SMS_SENS_ENABLED=false`; set it explicitly to `true` only after real Naver SENS credentials are installed.

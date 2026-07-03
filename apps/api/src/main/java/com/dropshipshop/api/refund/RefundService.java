@@ -263,9 +263,7 @@ public class RefundService {
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(refund.getPaymentGroup().getId())
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved payment not found"));
 		Instant now = Instant.now();
-		String idempotencyKey = retry
-			? "refund-" + refund.getId() + "-retry-" + now.toEpochMilli()
-			: "refund-" + refund.getId();
+		String idempotencyKey = refundIdempotencyKey(refund, retry);
 		try {
 			refund.getOrder().markRefundRequested();
 			refund.requestPgCancel(payment, idempotencyKey, now, retry);
@@ -323,5 +321,15 @@ public class RefundService {
 	private Refund findRefund(UUID refundId) {
 		return refundRepository.findById(refundId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
+	}
+
+	private String refundIdempotencyKey(Refund refund, boolean retry) {
+		if (refund.getIdempotencyKey() != null) {
+			return refund.getIdempotencyKey();
+		}
+		if (retry) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund idempotency key is missing");
+		}
+		return "refund-" + refund.getId();
 	}
 }

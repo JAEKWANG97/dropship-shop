@@ -14,6 +14,10 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   API_IMAGE: ghcr.io/jaekwang97/dropship-shop-api
@@ -138,11 +142,16 @@ jobs:
             sudo docker compose --env-file .env -f compose.prod.yml pull
             sudo docker compose --env-file .env -f compose.prod.yml up -d
             sudo docker compose --env-file .env -f compose.prod.yml ps
+            healthy=0
             for i in $(seq 1 40); do
               if curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null; then
-                exit 0
+                healthy=1
+                break
               fi
               sleep 3
             done
-            sudo docker compose --env-file .env -f compose.prod.yml logs --tail=200 api
-            exit 1
+            if [ "${healthy}" != "1" ]; then
+              sudo docker compose --env-file .env -f compose.prod.yml logs --tail=200 api
+              exit 1
+            fi
+            sudo docker image prune -af --filter "until=168h"

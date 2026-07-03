@@ -199,7 +199,13 @@ class OAuthLoginService {
 		if (isBlank(value) || !value.startsWith("/") || value.startsWith("//")) {
 			return Optional.empty();
 		}
-		if (value.contains("\r") || value.contains("\n")) {
+		String normalized = value.toLowerCase(Locale.ROOT);
+		if (
+			value.contains("\\")
+				|| normalized.contains("%5c")
+				|| value.contains("\r")
+				|| value.contains("\n")
+		) {
 			return Optional.empty();
 		}
 		return Optional.of(value);

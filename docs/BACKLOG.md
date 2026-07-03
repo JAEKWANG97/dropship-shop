@@ -102,19 +102,19 @@ Tasks:
 
 ### B-042 즉시 보안/운영 핫픽스
 
-Status: Todo
+Status: Done
 
 Notes:
 - 외부 리뷰에서 확인된 작지만 위험도가 큰 항목을 먼저 닫는다.
 - 계좌입금 전환으로 Toss 환불 재시도 위험은 당장 고객 돈 이중 환불로 이어지지 않지만, Toss 코드를 유지하는 동안에는 같은 멱등성 원칙을 맞춘다.
 
 Tasks:
-- [ ] OAuth/login `redirectTo` 검증에서 백슬래시(`\`)를 차단한다.
-- [ ] Toss 환불 retry가 새 idempotency key를 만들지 않고 저장된 동일 key를 재사용하게 한다.
-- [ ] `SMS_SENS_ENABLED` 운영 기본값을 안전하게 `false`로 바꾸고 문서를 맞춘다.
-- [ ] GitHub Actions deploy workflow에 concurrency를 추가한다.
-- [ ] 배포 스크립트 말미에 오래된 Docker image prune을 추가한다.
-- [ ] EC2 compose에 API/Web/Postgres memory 제한과 API JVM heap 옵션을 둔다.
+- [x] OAuth/login `redirectTo` 검증에서 백슬래시(`\`)를 차단한다.
+- [x] Toss 환불 retry가 새 idempotency key를 만들지 않고 저장된 동일 key를 재사용하게 한다.
+- [x] `SMS_SENS_ENABLED` 운영 기본값을 안전하게 `false`로 바꾸고 문서를 맞춘다.
+- [x] GitHub Actions deploy workflow에 concurrency를 추가한다.
+- [x] 배포 스크립트 말미에 오래된 Docker image prune을 추가한다.
+- [x] EC2 compose에 API/Web/Postgres memory 제한과 API JVM heap 옵션을 둔다.
 
 ## Next
 
