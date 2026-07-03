@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-03 09:24 KST
+
+- 관련 항목: B-041, B-016, B-043, B-044
+- 작업: 고객 결제 주 경로를 계좌입금으로 전환했다. 체크아웃 응답/화면에 입금 계좌, 금액, 입금자명, 입금 기한, 현금영수증 안내를 추가하고, 관리자 주문 화면에 입금대기 필터와 입금확인/미입금취소/입금 불일치 메모 액션을 연결했다. 입금확인 시 `BANK_TRANSFER` payment를 생성하고 `PAYMENT_PENDING` 주문을 `SUPPLIER_ORDER_PENDING`으로 전환하며, 계좌입금 환불은 관리자 수동 환불 완료 액션으로 기록한다.
+- 문제·고민: 계좌입금은 PG 자동 승인/취소가 없어 운영자 확인과 이력 품질이 중요하다. 그래서 입금확인, 미입금취소, 수동환불 완료는 관리자 주체/시각/사유와 `OrderStatusHistory`를 남기게 했다.
+- 해결방안: `PaymentProvider.BANK_TRANSFER`, `PaymentMethod.BANK_TRANSFER`, `BANK-{checkoutNumber}` provider key를 사용해 기존 payment unique invariant를 유지했다. Toss 코드는 삭제하지 않고 deferred PG 경로로 남겼다.
+- 검증: `cd apps/api && ./gradlew test --tests '*Checkout*' --tests '*AdminOrder*' --tests '*Refund*'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`.
+- 후속작업: 실주문 전 실제 입금 계좌 env, 구매안전서비스 방식, 현금영수증 운영 절차, 중복 checkout/동시 상태 전이 방지(B-043), 배송 후 반품 환불 플로우(B-044)를 닫는다.
+
 ## 2026-07-03 08:44 KST
 
 - 관련 항목: B-041, B-043, B-030

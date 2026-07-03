@@ -83,6 +83,24 @@ public class Refund {
 	@Column(name = "reviewed_at")
 	private Instant reviewedAt;
 
+	@Column(name = "manual_refunded_by_admin_id")
+	private UUID manualRefundedByAdminId;
+
+	@Column(name = "manual_refunded_at")
+	private Instant manualRefundedAt;
+
+	@Column(name = "manual_refund_reason", columnDefinition = "TEXT")
+	private String manualRefundReason;
+
+	@Column(name = "manual_refund_bank_name", length = 100)
+	private String manualRefundBankName;
+
+	@Column(name = "manual_refund_account_number", length = 100)
+	private String manualRefundAccountNumber;
+
+	@Column(name = "manual_refund_account_holder", length = 100)
+	private String manualRefundAccountHolder;
+
 	@Column(name = "requested_at")
 	private Instant requestedAt;
 
@@ -169,6 +187,33 @@ public class Refund {
 		this.failedAt = null;
 	}
 
+	public void completeManualBankTransfer(
+		Payment payment,
+		UUID adminUserId,
+		String reason,
+		String bankName,
+		String accountNumber,
+		String accountHolder,
+		Instant completedAt
+	) {
+		if (status != RefundStatus.APPROVED) {
+			throw new IllegalStateException("Manual refund can be completed only after admin approval");
+		}
+		this.payment = payment;
+		this.providerPaymentKey = payment.getProviderPaymentKey();
+		this.status = RefundStatus.COMPLETED;
+		this.manualRefundedByAdminId = adminUserId;
+		this.manualRefundedAt = completedAt;
+		this.manualRefundReason = reason;
+		this.manualRefundBankName = bankName;
+		this.manualRefundAccountNumber = accountNumber;
+		this.manualRefundAccountHolder = accountHolder;
+		this.completedAt = completedAt;
+		this.failureCode = null;
+		this.failureMessage = null;
+		this.failedAt = null;
+	}
+
 	public void markRetryRequired(String failureCode, String failureMessage, Instant failedAt) {
 		this.status = RefundStatus.RETRY_REQUIRED;
 		this.failureCode = failureCode;
@@ -249,6 +294,30 @@ public class Refund {
 
 	public Instant getReviewedAt() {
 		return reviewedAt;
+	}
+
+	public UUID getManualRefundedByAdminId() {
+		return manualRefundedByAdminId;
+	}
+
+	public Instant getManualRefundedAt() {
+		return manualRefundedAt;
+	}
+
+	public String getManualRefundReason() {
+		return manualRefundReason;
+	}
+
+	public String getManualRefundBankName() {
+		return manualRefundBankName;
+	}
+
+	public String getManualRefundAccountNumber() {
+		return manualRefundAccountNumber;
+	}
+
+	public String getManualRefundAccountHolder() {
+		return manualRefundAccountHolder;
 	}
 
 	public Instant getRequestedAt() {

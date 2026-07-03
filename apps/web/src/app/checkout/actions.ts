@@ -70,6 +70,7 @@ export async function createCheckout(formData: FormData) {
         method: "POST",
         body: JSON.stringify({
           ...shippingAddress(formData),
+          depositorName: value(formData, "depositorName"),
           clientSubmittedTotalAmount: Number(value(formData, "clientSubmittedTotalAmount") || "0"),
         }),
       },

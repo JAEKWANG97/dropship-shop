@@ -42,7 +42,10 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
+import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
+import com.dropshipshop.api.payment.domain.PaymentProvider;
+import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
@@ -123,6 +126,124 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].supplierName".formatted(pending.getId()), hasItem("Supplier ADM-QUEUE-1")))
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].customerEmail".formatted(pending.getId()), hasItem("admin-order-customer-1@example.com")))
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].checkoutNumber".formatted(pending.getId()), hasItem("ADM-CO-1")));
+	}
+
+	@Test
+	void listsPaymentPendingOrdersWithStatusFilter() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-bank-list");
+		CustomerOrder paymentPending = createPaymentPendingOrder(customer, "ADM-BANK-LIST-1", "ADM-BANK-LIST-CO-1", 12000);
+		CustomerOrder supplierPending = createApprovedOrder(customer, "ADM-BANK-LIST-2", "ADM-BANK-LIST-CO-2", 21000);
+
+		mockMvc.perform(get("/api/admin/orders")
+				.param("status", "PAYMENT_PENDING")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')]".formatted(paymentPending.getId()), hasSize(1)))
+			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')]".formatted(supplierPending.getId()), hasSize(0)))
+			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].status".formatted(paymentPending.getId()), hasItem("PAYMENT_PENDING")));
+	}
+
+	@Test
+	void confirmsBankTransferDepositAndRejectsDuplicateConfirmation() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-bank-confirm");
+		CustomerOrder order = createPaymentPendingOrder(customer, "ADM-BANK-CONFIRM-1", "ADM-BANK-CONFIRM-CO-1", 45000);
+		order.getPaymentGroup().confirmPolicy(Instant.now());
+		paymentGroupRepository.saveAndFlush(order.getPaymentGroup());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Deposit amount and depositor name matched"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.orderId", is(order.getId().toString())))
+			.andExpect(jsonPath("$.status", is("SUPPLIER_ORDER_PENDING")));
+
+		CustomerOrder savedOrder = orderRepository.findById(order.getId()).orElseThrow();
+		PaymentGroup savedPaymentGroup = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
+		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(savedPaymentGroup.getId()).orElseThrow();
+		assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.SUPPLIER_ORDER_PENDING);
+		assertThat(savedPaymentGroup.getStatus()).isEqualTo(PaymentGroupStatus.APPROVED);
+		assertThat(savedPaymentGroup.getDepositConfirmedByAdminId()).isEqualTo(TestAuthentication.ADMIN_ID);
+		assertThat(savedPaymentGroup.getDepositConfirmationReason()).isEqualTo("Deposit amount and depositor name matched");
+		assertThat(payment.getProvider()).isEqualTo(PaymentProvider.BANK_TRANSFER);
+		assertThat(payment.getMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+		assertThat(payment.getProviderPaymentKey()).isEqualTo("BANK-ADM-BANK-CONFIRM-CO-1");
+		assertThat(orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()))
+			.extracting(OrderStatusHistory::getActionType)
+			.contains("BANK_TRANSFER_DEPOSIT_CONFIRMED");
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Duplicate confirmation"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void rejectsCustomerBankTransferDepositActions() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-bank-auth");
+		CustomerOrder order = createPaymentPendingOrder(customer, "ADM-BANK-AUTH-1", "ADM-BANK-AUTH-CO-1", 19000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Deposit confirmed"
+					}
+					"""))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void cancelsUnpaidBankTransferAndRecordsDepositMismatchMemo() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-bank-cancel");
+		CustomerOrder mismatchOrder = createPaymentPendingOrder(customer, "ADM-BANK-MISMATCH-1", "ADM-BANK-MISMATCH-CO-1", 22000);
+		CustomerOrder cancelOrder = createPaymentPendingOrder(customer, "ADM-BANK-CANCEL-1", "ADM-BANK-CANCEL-CO-1", 23000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/deposit-mismatch", mismatchOrder.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "memo": "Depositor name does not match"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("PAYMENT_PENDING")));
+
+		assertThat(paymentGroupRepository.findById(mismatchOrder.getPaymentGroup().getId()).orElseThrow().getDepositMismatchMemo())
+			.isEqualTo("Depositor name does not match");
+		assertThat(orderRepository.findById(mismatchOrder.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/unpaid-cancel", cancelOrder.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Deposit deadline passed"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("CANCELLED")));
+
+		PaymentGroup savedPaymentGroup = paymentGroupRepository.findById(cancelOrder.getPaymentGroup().getId()).orElseThrow();
+		assertThat(orderRepository.findById(cancelOrder.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		assertThat(savedPaymentGroup.getStatus()).isEqualTo(PaymentGroupStatus.CANCELLED);
+		assertThat(savedPaymentGroup.getUnpaidCancelledByAdminId()).isEqualTo(TestAuthentication.ADMIN_ID);
+		assertThat(savedPaymentGroup.getUnpaidCancelReason()).isEqualTo("Deposit deadline passed");
+		assertThat(orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(cancelOrder.getId()))
+			.extracting(OrderStatusHistory::getActionType)
+			.contains("BANK_TRANSFER_UNPAID_CANCELLED");
 	}
 
 	@Test

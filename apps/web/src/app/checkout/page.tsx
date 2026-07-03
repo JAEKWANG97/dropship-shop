@@ -234,8 +234,12 @@ function CreateCheckoutForm({
         상세 주소
         <input name="address2" defaultValue={defaultAddress?.address2 ?? ""} />
       </label>
+      <label>
+        입금자명
+        <input name="depositorName" placeholder="비워두면 받는 사람 이름으로 안내됩니다" />
+      </label>
       <button className="button primary" disabled={disabled} type="submit">
-        주문 결제하기
+        주문서 만들기
       </button>
     </form>
   );

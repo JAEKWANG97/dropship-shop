@@ -124,6 +124,21 @@ public class Payment {
 		return payment;
 	}
 
+	public static Payment bankTransferApproved(
+		PaymentGroup paymentGroup,
+		String providerPaymentKey,
+		long approvedAmount,
+		Instant approvedAt
+	) {
+		Payment payment = new Payment(paymentGroup, PaymentProvider.BANK_TRANSFER, providerPaymentKey,
+			PaymentMethod.BANK_TRANSFER, PaymentStatus.APPROVED, approvedAmount);
+		payment.approvedAmount = approvedAmount;
+		payment.approvedAt = approvedAt;
+		payment.rawProviderStatus = "MANUAL_DEPOSIT_CONFIRMED";
+		payment.lastSyncedAt = approvedAt;
+		return payment;
+	}
+
 	public static Payment cancelRequired(
 		PaymentGroup paymentGroup,
 		String providerPaymentKey,
@@ -200,6 +215,10 @@ public class Payment {
 
 	public PaymentGroup getPaymentGroup() {
 		return paymentGroup;
+	}
+
+	public PaymentProvider getProvider() {
+		return provider;
 	}
 
 	public String getProviderPaymentKey() {

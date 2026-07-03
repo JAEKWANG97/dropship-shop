@@ -12,6 +12,8 @@ import com.dropshipshop.api.order.domain.OrderStatus;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UUID> {
 
+	List<CustomerOrder> findAllByOrderByCreatedAtAsc();
+
 	List<CustomerOrder> findAllByPaymentGroup_IdOrderByCreatedAtAsc(UUID paymentGroupId);
 
 	List<CustomerOrder> findAllByStatusOrderByCreatedAtAsc(OrderStatus status);

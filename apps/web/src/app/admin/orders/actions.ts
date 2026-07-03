@@ -28,6 +28,13 @@ async function postShipmentAction(shipmentId: string, path: string, body: Record
   });
 }
 
+async function postRefundAction(refundId: string, path: string, body: Record<string, string>) {
+  await apiSendWithCookie(`/api/admin/refunds/${refundId}${path}`, (await cookies()).toString(), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function startSupplierWork(formData: FormData) {
   const orderId = value(formData, "orderId");
 
@@ -119,4 +126,62 @@ export async function correctShipmentDelivered(formData: FormData) {
 
   revalidatePath("/admin/orders");
   done(orderId, "수동 배송완료 보정을 반영했습니다.");
+}
+
+export async function confirmDeposit(formData: FormData) {
+  const orderId = value(formData, "orderId");
+
+  try {
+    await postOrderAction(orderId, "/confirm-deposit", { reason: value(formData, "reason") });
+  } catch {
+    done(orderId, "입금 확인 처리에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "입금 확인 처리했습니다.");
+}
+
+export async function cancelUnpaidDeposit(formData: FormData) {
+  const orderId = value(formData, "orderId");
+
+  try {
+    await postOrderAction(orderId, "/unpaid-cancel", { reason: value(formData, "reason") });
+  } catch {
+    done(orderId, "미입금 취소 처리에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "미입금 취소 처리했습니다.");
+}
+
+export async function recordDepositMismatch(formData: FormData) {
+  const orderId = value(formData, "orderId");
+
+  try {
+    await postOrderAction(orderId, "/deposit-mismatch", { memo: value(formData, "memo") });
+  } catch {
+    done(orderId, "입금 불일치 메모 저장에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "입금 불일치 메모를 저장했습니다.");
+}
+
+export async function completeManualRefund(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const refundId = value(formData, "refundId");
+
+  try {
+    await postRefundAction(refundId, "/manual-complete", {
+      reason: value(formData, "reason"),
+      bankName: value(formData, "bankName"),
+      accountNumber: value(formData, "accountNumber"),
+      accountHolder: value(formData, "accountHolder"),
+    });
+  } catch {
+    done(orderId, "수동 환불 완료 처리에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "수동 환불 완료를 기록했습니다.");
 }

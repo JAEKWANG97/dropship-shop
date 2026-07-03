@@ -60,4 +60,13 @@ class AdminRefundController {
 	) {
 		return refundService.markManualReview(refundId, currentUser.id(authentication), request);
 	}
+
+	@PostMapping("/{refundId}/manual-complete")
+	RefundDtos.AdminRefundResponse completeManualBankTransferRefund(
+		@PathVariable UUID refundId,
+		@Valid @RequestBody RefundDtos.ManualBankTransferRefundCompleteRequest request,
+		Authentication authentication
+	) {
+		return refundService.completeManualBankTransferRefund(refundId, currentUser.id(authentication), request);
+	}
 }

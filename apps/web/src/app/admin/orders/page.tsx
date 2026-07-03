@@ -9,10 +9,14 @@ import {
   shipmentStatusLabel,
 } from "@/lib/orders";
 import {
+  cancelUnpaidDeposit,
+  completeManualRefund,
   completeSupplierOrder,
+  confirmDeposit,
   correctShipmentDelivered,
   createOrderShipment,
   markOrderOutOfStock,
+  recordDepositMismatch,
   startSupplierWork,
   syncShipmentTracking,
 } from "./actions";
@@ -22,7 +26,8 @@ type AdminOrdersPageProps = {
 };
 
 export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
-  const [data, params] = await Promise.all([loadOrders(), searchParams]);
+  const params = await searchParams;
+  const data = await loadOrders(params.status);
   const orders = data.orders;
   const keyword = params.q?.trim().toLowerCase();
   const fromTime = params.from ? new Date(params.from).getTime() : undefined;
@@ -70,7 +75,8 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
           <input type="date" name="from" defaultValue={params.from ?? ""} aria-label="시작일" />
           <input type="date" name="to" defaultValue={params.to ?? ""} aria-label="종료일" />
           <select name="status" defaultValue={params.status ?? ""}>
-            <option value="">전체 주문상태</option>
+            <option value="">발주대기 기본</option>
+            <option value="PAYMENT_PENDING">입금대기</option>
             <option value="SUPPLIER_ORDER_PENDING">발주대기</option>
             <option value="SUPPLIER_ORDERED">발주완료</option>
             <option value="SHIPPED">배송중</option>
@@ -87,6 +93,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
 
       {!data.error ? (
         <div className="admin-metrics">
+          <Metric label="입금대기" value={filteredOrders.filter((order) => order.status === "PAYMENT_PENDING").length} />
           <Metric label="발주대기" value={filteredOrders.filter((order) => order.status === "SUPPLIER_ORDER_PENDING").length} />
           <Metric label="배송중" value={filteredOrders.filter((order) => order.status === "SHIPPED").length} />
           <Metric label="취소/환불" value={filteredOrders.filter((order) => order.status.includes("REFUND")).length} />
@@ -167,14 +174,15 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               <h3>결제 정보</h3>
               <div className="summary-list compact">
                 <div>
-                  <span>결제상태</span>
+                  <span>입금/결제상태</span>
                   <strong>{adminPaymentLabel(selectedOrder)}</strong>
                 </div>
                 <div>
-                  <span>결제금액</span>
+                  <span>주문금액</span>
                   <strong>{formatPrice(selectedOrder.totalAmount)}</strong>
                 </div>
               </div>
+              <BankTransferAdminPanel order={selectedOrder} />
               <h3>운영 상태</h3>
               <div className="summary-list compact">
                 <div>
@@ -199,9 +207,9 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
   );
 }
 
-async function loadOrders() {
+async function loadOrders(status?: string) {
   try {
-    return { error: false as const, orders: await getAdminOrders() };
+    return { error: false as const, orders: await getAdminOrders(status || undefined) };
   } catch {
     return { error: true as const, orders: [] };
   }
@@ -270,6 +278,25 @@ function adminPaymentLabel(order: AdminOrder) {
     return paymentGroupStatusLabel(order.paymentGroup.status);
   }
   return "확인 필요";
+}
+
+function BankTransferAdminPanel({ order }: { order: AdminOrder }) {
+  const deposit = order.paymentGroup?.bankTransferDeposit;
+  if (!deposit) {
+    return null;
+  }
+
+  return (
+    <div className="summary-list compact">
+      <SummaryItem label="입금 계좌" value={`${deposit.bankName ?? "-"} ${deposit.accountNumber ?? ""}`} />
+      <SummaryItem label="예금주" value={deposit.accountHolder ?? "-"} />
+      <SummaryItem label="입금자명" value={deposit.depositorName ?? "-"} />
+      <SummaryItem label="입금확인" value={formatDateTime(deposit.depositConfirmedAt)} />
+      <SummaryItem label="입금확인 사유" value={deposit.depositConfirmationReason ?? "-"} />
+      <SummaryItem label="불일치 메모" value={deposit.depositMismatchMemo ?? "-"} />
+      <SummaryItem label="미입금 취소" value={formatDateTime(deposit.unpaidCancelledAt)} />
+    </div>
+  );
 }
 
 function ShipmentPanel({ order }: { order: AdminOrder }) {
@@ -362,6 +389,46 @@ function formatDateTime(value: string | null) {
 }
 
 function AdminOrderActions({ order }: { order: AdminOrder }) {
+  if (order.status === "PAYMENT_PENDING") {
+    return (
+      <div className="admin-order-actions">
+        <h3>입금 처리</h3>
+        <form action={confirmDeposit} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label className="wide">
+            입금 확인 사유
+            <input name="reason" required placeholder="예: 입금액과 입금자명 확인" />
+          </label>
+          <button className="button primary" type="submit">
+            입금 확인
+          </button>
+        </form>
+
+        <form action={recordDepositMismatch} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label className="wide">
+            입금 불일치 메모
+            <input name="memo" required placeholder="예: 입금자명이 주문서와 다름" />
+          </label>
+          <button className="button" type="submit">
+            메모 저장
+          </button>
+        </form>
+
+        <form action={cancelUnpaidDeposit} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label className="wide">
+            미입금 취소 사유
+            <input name="reason" required placeholder="예: 입금 기한 경과" />
+          </label>
+          <button className="button" type="submit">
+            미입금 취소
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-order-actions">
       <h3>처리 액션</h3>
@@ -424,6 +491,32 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
           송장 입력
         </button>
       </form>
+
+      {order.refund?.status === "APPROVED" ? (
+        <form action={completeManualRefund} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="refundId" type="hidden" value={order.refund.refundId} />
+          <label>
+            환불 은행
+            <input name="bankName" placeholder="선택 입력" />
+          </label>
+          <label>
+            환불 계좌 메모
+            <input name="accountNumber" placeholder="선택 입력" />
+          </label>
+          <label>
+            예금주
+            <input name="accountHolder" placeholder="선택 입력" />
+          </label>
+          <label className="wide">
+            수동 환불 완료 사유
+            <input name="reason" required placeholder="예: 고객 계좌로 환불 이체 완료" />
+          </label>
+          <button className="button" type="submit">
+            수동 환불 완료
+          </button>
+        </form>
+      ) : null}
     </div>
   );
 }

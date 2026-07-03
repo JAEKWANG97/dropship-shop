@@ -1,5 +1,24 @@
 # Decision Log
 
+## 2026-07-03: MVP Payment Flow Changes To Direct Bank Transfer
+
+Decision:
+
+Use direct customer bank transfer and manual admin deposit confirmation as the current MVP payment flow. Keep existing Toss Payments code for a deferred PG reintroduction path, but remove Toss from the customer primary checkout path.
+
+Context:
+
+Toss Payments live review and PG activation add operational and contract work before the shop can accept initial test orders. The operator decided to start with direct bank transfer, where the customer deposits the checkout amount into the shop account and an admin confirms the deposit before supplier ordering.
+
+Consequences:
+
+- `PAYMENT_PENDING` is reused as deposit waiting state. Admin deposit confirmation moves orders to `SUPPLIER_ORDER_PENDING`.
+- Direct bank transfer payment records use `PaymentProvider.BANK_TRANSFER`, `PaymentMethod.BANK_TRANSFER`, and a server-generated `providerPaymentKey` such as `BANK-{checkoutNumber}` so the existing unique payment key invariant remains intact.
+- The checkout deposit deadline is 24 hours by default, not the old 30 minute Toss payment window.
+- Admin actions for deposit confirmation, unpaid cancellation, deposit mismatch memo, and manual refund completion must record actor, time, from/to state where applicable, and reason in order status/action history.
+- Purchase safety service for cash payment is not decided by code. The launch checklist must keep bank escrow, consumer damage compensation insurance, or PG/virtual-account reintroduction as unresolved operating choices before real sales.
+- Cash receipt issuance is required for cash-like payment when requested. The first operating method is manual issuance through Hometax; automatic API integration is deferred.
+
 ## 2026-06-27: Business Model
 
 Decision:

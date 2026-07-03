@@ -304,7 +304,8 @@ PATCH /api/cart/items/{cartItemId}
 Rules:
 
 - Order creation starts as `PAYMENT_PENDING`.
-- Payment-pending orders expire after 30 minutes.
+- `PAYMENT_PENDING` means bank-transfer deposit waiting in the current MVP flow.
+- Bank-transfer deposit deadline defaults to 24 hours.
 - Checkout creation requires current account terms/privacy agreement and completed required customer info.
 - DS-8 creates checkouts from cart only; direct-buy checkout is deferred.
 - Checkout request includes shipping address fields directly.
@@ -312,7 +313,8 @@ Rules:
 - Checkout creation groups cart items by supplier as the MVP delivery-group boundary.
 - Checkout creation empties the cart after payment group and orders are created.
 - Checkout create/read responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notice.
-- Policy confirmation is stored separately on the payment group before payment approval.
+- Checkout create/read responses include `bankTransferDeposit` with bank name, account number, account holder, depositor name, amount, deadline, and cash receipt notice.
+- Policy confirmation is stored separately on the payment group before admin deposit confirmation.
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
 - Customer order list and detail are scoped to the authenticated customer.
@@ -333,6 +335,7 @@ POST /api/checkouts
   "postalCode": "12345",
   "address1": "Base address",
   "address2": "Detail address",
+  "depositorName": "Receiver",
   "clientSubmittedTotalAmount": 1
 }
 
@@ -361,16 +364,18 @@ POST /api/checkouts/{checkoutNumber}/policy-confirmation
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented | Confirm Toss Payments approved payment server-side |
-| `POST` | `/api/payments/toss/webhook` | Provider verification | Implemented | Receive Toss Payments webhook and reconcile payment state |
+| `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented, deferred from primary path | Confirm Toss Payments approved payment server-side |
+| `POST` | `/api/payments/toss/webhook` | Provider verification | Implemented, deferred from primary path | Receive Toss Payments webhook and reconcile payment state |
 | `GET` | `/api/payments/{paymentId}` | Authenticated user | Planned | Customer-visible payment state |
 | `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Implemented | Retry failed payment exception cancel |
 | `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Implemented | List payment exception queue |
 
 Rules:
 
-- Provider is Toss Payments for MVP.
-- Enabled methods: card, easy payment, account transfer.
+- Current MVP primary provider is direct bank transfer.
+- Bank-transfer payment records use `PaymentProvider.BANK_TRANSFER`, `PaymentMethod.BANK_TRANSFER`, and `providerPaymentKey = BANK-{checkoutNumber}`.
+- Toss Payments remains implemented but deferred from the customer primary checkout path.
+- Deferred Toss methods: card, easy payment, account transfer.
 - Virtual account, mobile phone payment, and gift certificate payment are excluded.
 - Payment confirmation must verify amount, expiration, policy confirmation, PG key uniqueness, and product/option sellability.
 - PG-approved validation failure becomes payment exception and blocks supplier ordering.
@@ -406,8 +411,11 @@ POST /api/payments/toss/confirm
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Supplier order pending admin queue |
+| `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Supplier order pending admin queue by default; supports `status` filter |
 | `GET` | `/api/admin/orders/{orderId}` | `ADMIN` | Implemented | Admin order detail |
+| `POST` | `/api/admin/orders/{orderId}/confirm-deposit` | `ADMIN` | Implemented | Confirm direct bank-transfer deposit and move checkout orders to supplier order pending |
+| `POST` | `/api/admin/orders/{orderId}/unpaid-cancel` | `ADMIN` | Implemented | Cancel unpaid bank-transfer checkout |
+| `POST` | `/api/admin/orders/{orderId}/deposit-mismatch` | `ADMIN` | Implemented | Record bank-transfer deposit mismatch memo |
 | `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Implemented | Lock address and mark supplier work started |
 | `POST` | `/api/admin/orders/{orderId}/supplier-order-completed` | `ADMIN` | Implemented | Mark manual supplier order completed |
 | `POST` | `/api/admin/orders/{orderId}/out-of-stock` | `ADMIN` | Implemented | Mark supplier out-of-stock and prepare refund flow |
@@ -419,8 +427,13 @@ Rules:
 
 - Admin cannot write arbitrary order status values.
 - Admin actions must map to valid transition table actions.
-- Admin order queue currently returns `SUPPLIER_ORDER_PENDING` orders only.
+- Admin order queue defaults to `SUPPLIER_ORDER_PENDING` orders.
+- `GET /api/admin/orders?status=PAYMENT_PENDING` returns the bank-transfer deposit waiting queue.
 - `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
+- Admin deposit confirmation requires a reason, confirmed checkout policies, `PAYMENT_PENDING` checkout orders, and currently sellable products/options.
+- Admin deposit confirmation creates a `BANK_TRANSFER` payment row, marks the payment group `APPROVED`, and moves all checkout orders to `SUPPLIER_ORDER_PENDING`.
+- Admin unpaid cancellation requires a reason and moves all checkout orders to `CANCELLED`.
+- Admin deposit mismatch memo keeps checkout orders `PAYMENT_PENDING`.
 - Admin order detail exposes internal order/payment/fulfillment statuses plus supplier, product option, customer shipping, and payment summary fields.
 - Supplier work start requires a reason and records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId`.
 - Supplier order completion requires `supplierOrderNumber` and reason. `expectedShipDate` and `supplierResponseMemo` are optional evidence fields.
@@ -470,6 +483,7 @@ Rules:
 | `POST` | `/api/admin/refunds/{refundId}/request-pg-cancel` | `ADMIN` | Implemented | Request PG cancel/refund |
 | `POST` | `/api/admin/refunds/{refundId}/retry` | `ADMIN` | Implemented | Retry failed refund |
 | `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Implemented | Mark manual review result |
+| `POST` | `/api/admin/refunds/{refundId}/manual-complete` | `ADMIN` | Implemented | Complete actual manual bank-transfer refund |
 
 Rules:
 
@@ -480,12 +494,13 @@ Rules:
 - Simple change-of-mind return/exchange claims require delivery within 7 days.
 - Seller-fault return/exchange claims require delivery within 90 days in the DS-37 baseline; discovery-date and evidence file capture remain planned.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
-- Refund execution requires admin approval before PG cancel/refund request.
+- Refund execution requires admin approval before PG cancel/refund request or manual bank-transfer refund completion.
 - First PG cancel failure moves refund to `RETRY_REQUIRED`; retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
 - Manual review can approve the refund again or reject it with reason.
-- Refund completion requires PG cancel/refund success.
+- Bank-transfer refund completion requires actual manual refund completion by an admin.
+- Deferred PG refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
-- PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
+- Manual bank-transfer refund completion or PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
 - PG cancel failure leaves the order in `REFUND_REQUESTED`, marks the refund `RETRY_REQUIRED`, and does not expose refund completion.
 - Delivery-group order level partial refund is supported.
 - Product, option, and quantity-level partial refund inside one delivery-group order is excluded.

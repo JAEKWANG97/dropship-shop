@@ -8,8 +8,9 @@ Customer selects product option
 -> Customer creates payment group
 -> System creates one PAYMENT_PENDING order per delivery group
 -> Customer confirms order notice checkbox
--> Customer pays through PG
--> Server verifies payment
+-> Customer sees bank transfer account, amount, depositor name, and deposit deadline
+-> Customer deposits the checkout amount
+-> Admin confirms actual deposit
 -> Payment status: APPROVED
 -> All delivery-group orders in the payment group move to SUPPLIER_ORDER_PENDING
 -> Admin starts supplier order work
@@ -43,6 +44,17 @@ DS-9 backend implementation notes:
 - Duplicate confirmation with the same payment key and checkout returns the existing payment result.
 - Toss-approved amount mismatch records the payment exception path and blocks supplier ordering.
 - Automatic PG cancel execution remains planned.
+
+B-041 bank-transfer implementation notes:
+
+- The current MVP customer checkout path does not launch Toss Payments.
+- Checkout creation still creates one payment group and one `PAYMENT_PENDING` order per supplier-backed delivery group.
+- `PAYMENT_PENDING` means deposit waiting.
+- Checkout detail shows bank name, account number, account holder, total amount, depositor name, deposit deadline, and cash receipt notice.
+- Admin deposit confirmation creates a `BANK_TRANSFER` payment with `providerPaymentKey = BANK-{checkoutNumber}`, marks the payment group `APPROVED`, and moves included orders to `SUPPLIER_ORDER_PENDING`.
+- Admin unpaid cancellation moves pending orders to `CANCELLED`.
+- Admin deposit mismatch memo keeps the order pending and records the memo for operations.
+- Bank-transfer refunds are completed only after an admin records the actual manual refund completion.
 
 DS-10 backend implementation notes:
 
@@ -108,20 +120,21 @@ Order B supplier says out of stock
 
 ```text
 Order status: PAYMENT_PENDING
--> PG payment fails
--> Payment status: FAILED
--> Order remains unconfirmed
--> Customer can retry before order expiration or create a new order
+-> Customer does not deposit, or deposit cannot be matched
+-> Admin records deposit mismatch memo or unpaid cancellation
+-> Order remains unconfirmed or becomes CANCELLED
+-> Customer creates a new order if purchase is still wanted
 -> Order is not shown in customer order history
 ```
 
-## Payment Pending Expiration
+## Bank Transfer Pending Deadline
 
 ```text
 Order status: PAYMENT_PENDING
--> 30 minutes pass without verified payment approval
--> Order expires
--> Customer must create a new order to retry checkout
+-> 24 hours pass without confirmed deposit
+-> Admin cancels unpaid checkout with reason
+-> Order status: CANCELLED
+-> Customer must create a new order to purchase
 -> Order is not shown in customer order history
 ```
 
@@ -129,10 +142,10 @@ Order status: PAYMENT_PENDING
 
 ```text
 Order status: PAYMENT_PENDING
--> Customer reviews order items, amount, shipping address, shipping policy, cancellation/refund policy, out-of-stock notice
+-> Customer reviews order items, amount, shipping address, shipping policy, cancellation/refund policy, out-of-stock notice, bank-transfer notice
 -> Customer checks one integrated confirmation checkbox
 -> System records confirmed policy versions and confirmed time on the payment group
--> Payment request can start
+-> Bank-transfer account information can be used for deposit
 ```
 
 ## Payment Amount Mismatch
@@ -175,11 +188,11 @@ PG cancel fails
 -> Customer sees payment review or cancel processing status
 ```
 
-## Deferred Virtual Account Flow
+## Deferred Toss / Virtual Account Flow
 
 ```text
-Virtual account / bank-transfer-like async payment is not included in MVP.
-If added later, the order flow needs separate states for account issued, waiting for deposit, deposit completed, and deposit expired.
+Toss PG and virtual account payment are not the current MVP primary path.
+If Toss/virtual account is reintroduced later, server-side PG confirmation and webhook reconciliation must remain separate from the direct bank-transfer admin confirmation path.
 ```
 
 ## Customer Cancellation Before Supplier Order
@@ -195,20 +208,15 @@ supplierOrderStartedAt is empty
 -> Refund is requested for the cancelled order amount
 -> Admin approves refund
 -> Refund status: APPROVED
--> Refund status: PG_CANCEL_REQUESTED
--> If the payment group has no other active orders, PG full cancel/refund succeeds
--> If the payment group has other active orders, PG partial cancel/refund succeeds
+-> Admin manually transfers refund to the customer
+-> Admin records manual refund completion
 -> Refund status: COMPLETED
 -> Payment status: REFUNDED or PARTIALLY_REFUNDED
 -> Order status: REFUNDED
 
-PG cancel/refund fails
--> Refund status: RETRY_REQUIRED
+Manual refund cannot be confirmed
+-> Refund status stays APPROVED or requires manual review
 -> Order remains REFUND_REQUESTED
--> Admin retries PG cancel/refund
--> Retry fails again
--> Refund status: MANUAL_REVIEW_REQUIRED
--> Admin manual review approves or rejects the refund
 ```
 
 ## Customer Cancellation Claim After Supplier Order Work Starts
@@ -335,11 +343,12 @@ Admin detects wrong operational state or shipment information
 ## State Rules
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
-- `PAYMENT_PENDING` orders expire 30 minutes after creation.
-- Payment request requires checkout policy confirmation.
+- Current bank-transfer `PAYMENT_PENDING` orders have a 24-hour deposit deadline and require admin unpaid cancellation if not paid.
+- Deferred PG payment requests require checkout policy confirmation.
 - Checkout policy confirmation is recorded per payment group with policy versions and confirmation time.
-- Payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
-- Payment approval verification requires order status `PAYMENT_PENDING`, unexpired order, completed checkout policy confirmation, amount match, unused/conflict-free PG payment key, and sellable product/option status.
+- Bank-transfer deposit must be confirmed by an admin before an order leaves `PAYMENT_PENDING`.
+- Deferred PG payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
+- Confirmation requires order status `PAYMENT_PENDING`, completed checkout policy confirmation, amount match, unused/conflict-free payment key, and sellable product/option status.
 - If PG approves payment but order confirmation fails, the order moves to `PAYMENT_EXCEPTION` and supplier ordering is blocked.
 - Payment exceptions attempt immediate full PG cancel.
 - Immediate full PG cancel applies to payment exceptions before order confirmation, not to normal delivery-group order level refund after a payment group is confirmed.

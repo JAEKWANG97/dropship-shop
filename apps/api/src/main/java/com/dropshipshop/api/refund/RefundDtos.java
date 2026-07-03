@@ -47,6 +47,12 @@ public final class RefundDtos {
 		UUID reviewedByAdminId,
 		String adminReviewReason,
 		Instant reviewedAt,
+		UUID manualRefundedByAdminId,
+		Instant manualRefundedAt,
+		String manualRefundReason,
+		String manualRefundBankName,
+		String manualRefundAccountNumber,
+		String manualRefundAccountHolder,
 		Instant requestedAt,
 		Instant completedAt,
 		Instant failedAt,
@@ -68,6 +74,22 @@ public final class RefundDtos {
 		@NotBlank
 		@Size(max = 1000)
 		String reason
+	) {
+	}
+
+	public record ManualBankTransferRefundCompleteRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason,
+
+		@Size(max = 100)
+		String bankName,
+
+		@Size(max = 100)
+		String accountNumber,
+
+		@Size(max = 100)
+		String accountHolder
 	) {
 	}
 }

@@ -69,8 +69,24 @@ export type AdminOrder = {
     totalAmount: number;
     approvedAmount: number | null;
     approvedAt: string | null;
+    bankTransferDeposit: {
+      bankName: string | null;
+      accountNumber: string | null;
+      accountHolder: string | null;
+      depositorName: string | null;
+      cashReceiptNotice: string | null;
+      depositConfirmedByAdminId: string | null;
+      depositConfirmedAt: string | null;
+      depositConfirmationReason: string | null;
+      depositMismatchMemo: string | null;
+      depositMismatchRecordedByAdminId: string | null;
+      depositMismatchRecordedAt: string | null;
+      unpaidCancelledByAdminId: string | null;
+      unpaidCancelledAt: string | null;
+      unpaidCancelReason: string | null;
+    } | null;
   };
-  payment?: { status: string; method: string | null; approvedAmount: number | null };
+  payment?: { provider: string | null; status: string; method: string | null; approvedAmount: number | null };
   fulfillment?: {
     status: string;
     supplierOrderStartedAt: string | null;
@@ -91,7 +107,14 @@ export type AdminOrder = {
     manualCorrectedAt: string | null;
     manualCorrectionReason: string | null;
   } | null;
-  refund?: { status: string; refundAmount: number; failureMessage: string | null } | null;
+  refund?: {
+    refundId: string;
+    status: string;
+    refundAmount: number;
+    failureMessage: string | null;
+    manualRefundedAt?: string | null;
+    manualRefundReason?: string | null;
+  } | null;
   items?: { productName: string; optionName: string; quantity: number; unitPrice: number }[];
   shippingAddress?: string | {
     recipientName: string;
@@ -132,8 +155,9 @@ export async function getAdminSuppliers() {
 	return readAdmin<AdminSupplier[]>("/api/admin/suppliers");
 }
 
-export async function getAdminOrders() {
-	const data = await readAdmin<AdminOrderListResponse>("/api/admin/orders");
+export async function getAdminOrders(status?: string) {
+  const path = status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders";
+	const data = await readAdmin<AdminOrderListResponse>(path);
 	return data.orders;
 }
 
@@ -148,7 +172,7 @@ export function adminStatusLabel(status: string) {
       SOLD_OUT: "품절",
       HIDDEN: "숨김",
       STOPPED: "판매중지",
-      PAYMENT_PENDING: "결제대기",
+      PAYMENT_PENDING: "입금대기",
       SUPPLIER_ORDER_PENDING: "발주대기",
       SUPPLIER_ORDERED: "발주완료",
       SHIPPED: "배송중",

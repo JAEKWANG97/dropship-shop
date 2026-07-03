@@ -41,13 +41,16 @@ import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.domain.ShippingAddressSnapshot;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
+import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
@@ -98,6 +101,9 @@ class RefundApiIntegrationTest {
 
 	@Autowired
 	private OrderItemRepository orderItemRepository;
+
+	@Autowired
+	private OrderStatusHistoryRepository orderStatusHistoryRepository;
 
 	@Autowired
 	private RefundRepository refundRepository;
@@ -301,6 +307,55 @@ class RefundApiIntegrationTest {
 	}
 
 	@Test
+	void completesApprovedBankTransferRefundManually() throws Exception {
+		UserAccount customer = createCustomer("refund-customer-bank-1");
+		CustomerOrder order = createBankTransferApprovedOrder(customer, "REFUND-BANK-1", "REFUND-BANK-CO-1", 31000);
+
+		mockMvc.perform(post("/api/orders/{orderId}/cancel", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Changed mind"
+					}
+					"""))
+			.andExpect(status().isCreated());
+		UUID refundId = refundRepository.findByOrder_Id(order.getId()).orElseThrow().getId();
+		approveRefund(refundId, "Customer cancel approved");
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-complete", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Manual bank transfer refund completed",
+					  "bankName": "테스트은행",
+					  "accountNumber": "123-456",
+					  "accountHolder": "Receiver"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("COMPLETED")))
+			.andExpect(jsonPath("$.orderStatus", is("REFUNDED")))
+			.andExpect(jsonPath("$.paymentGroupStatus", is("REFUNDED")))
+			.andExpect(jsonPath("$.paymentStatus", is("REFUNDED")))
+			.andExpect(jsonPath("$.manualRefundedByAdminId", is(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.manualRefundReason", is("Manual bank transfer refund completed")))
+			.andExpect(jsonPath("$.manualRefundBankName", is("테스트은행")));
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUNDED);
+		assertThat(paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentGroupStatus.REFUNDED);
+		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentStatus.REFUNDED);
+		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId()).orElseThrow().getProvider())
+			.isEqualTo(PaymentProvider.BANK_TRANSFER);
+		assertThat(orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()))
+			.extracting(OrderStatusHistory::getActionType)
+			.contains("MANUAL_REFUND_COMPLETED");
+	}
+
+	@Test
 	void rejectsRefundManualReviewToUnsupportedStatus() throws Exception {
 		UserAccount customer = createCustomer("refund-customer-5");
 		CustomerOrder order = createApprovedOrder(customer, "REFUND-MANUAL-REJECT-1", "REFUND-MANUAL-REJECT-CO-1", 28000);
@@ -380,6 +435,23 @@ class RefundApiIntegrationTest {
 		PaymentGroup paymentGroup = createApprovedPaymentGroup(customer, checkoutNumber, amount);
 		CustomerOrder order = createOrderInPaymentGroup(customer, paymentGroup, orderNumber, amount);
 		approvePayment(paymentGroup, "pay-" + orderNumber, amount);
+		return orderRepository.saveAndFlush(order);
+	}
+
+	private CustomerOrder createBankTransferApprovedOrder(
+		UserAccount customer,
+		String orderNumber,
+		String checkoutNumber,
+		long amount
+	) {
+		PaymentGroup paymentGroup = createApprovedPaymentGroup(customer, checkoutNumber, amount);
+		CustomerOrder order = createOrderInPaymentGroup(customer, paymentGroup, orderNumber, amount);
+		paymentRepository.saveAndFlush(Payment.bankTransferApproved(
+			paymentGroup,
+			"BANK-" + checkoutNumber,
+			amount,
+			Instant.now()
+		));
 		return orderRepository.saveAndFlush(order);
 	}
 

@@ -575,7 +575,7 @@ Resolved decisions:
 - Cart items are grouped by supplier as the MVP delivery-group boundary.
 - One `PAYMENT_PENDING` order is created per supplier-backed delivery group.
 - `OrderItem` stores product name, product summary, option name, unit price, quantity, line amount, product detail version, and product notice version snapshots.
-- `PaymentGroup` and orders expire 30 minutes after checkout creation.
+- Current bank-transfer checkout uses a 24-hour deposit deadline; deferred PG checkout can retain the 30-minute expiration policy.
 - Server calculates all totals and ignores `clientSubmittedTotalAmount`.
 - Checkout creation empties the cart after successful order creation.
 - Policy confirmation is implemented as `POST /api/checkouts/{checkoutNumber}/policy-confirmation`.

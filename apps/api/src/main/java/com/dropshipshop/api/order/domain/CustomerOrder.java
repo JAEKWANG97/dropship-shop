@@ -136,6 +136,20 @@ public class CustomerOrder {
 		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
 	}
 
+	public void confirmBankTransferDeposit() {
+		if (status != OrderStatus.PAYMENT_PENDING) {
+			throw new IllegalStateException("Deposit can be confirmed only while payment is pending");
+		}
+		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
+	}
+
+	public void cancelUnpaidDeposit() {
+		if (status != OrderStatus.PAYMENT_PENDING) {
+			throw new IllegalStateException("Unpaid deposit can be cancelled only while payment is pending");
+		}
+		this.status = OrderStatus.CANCELLED;
+	}
+
 	public void startSupplierOrderWork(UUID adminUserId, Instant startedAt) {
 		if (status != OrderStatus.SUPPLIER_ORDER_PENDING || supplierOrderStartedAt != null || addressLockedAt != null) {
 			throw new IllegalStateException("Supplier order work can start only once from supplier order pending");

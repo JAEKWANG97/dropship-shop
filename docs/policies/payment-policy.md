@@ -4,7 +4,7 @@ Status: Confirmed
 
 ## Purpose
 
-결제 수단, PG 검증, 결제 실패, 금액 불일치, 환불 실행 기준을 정한다.
+결제 수단, 입금 확인, PG 검증, 결제 실패, 금액 불일치, 환불 실행 기준을 정한다.
 
 ## Policy Areas
 
@@ -19,69 +19,76 @@ Status: Confirmed
 - 복수 배송 그룹 결제 단위
 - 배송 그룹 주문 단위 부분 환불
 - PG 취소/환불 실패 처리
+- 계좌입금 안내, 입금 확인, 미입금 취소
+- 현금영수증 발급 운영
+- 구매안전서비스 확보 상태
 
 ## Initial Direction
 
-- 카드/간편결제 중심으로 시작한다.
-- 무통장입금과 가상계좌는 MVP에서 제외한다.
-- 결제 승인 검증은 Spring Boot 서버에서 수행한다.
-- 결제 금액 불일치 시 주문을 확정하지 않는다.
+- MVP 결제 주 경로는 고객 직접 계좌입금으로 시작한다.
+- Toss Payments 카드/간편결제/계좌이체 PG 연동은 코드에 남기되 고객 주 경로에서는 비활성화한다.
+- 입금 확인은 관리자가 실제 입금 내역을 확인한 뒤 수동으로 수행한다.
+- 입금 금액 불일치 시 주문을 확정하지 않고 관리자 메모와 고객 안내 대상으로 둔다.
 - 중복 결제 확인 요청은 idempotent하게 처리한다.
 - 공급처 품절 시 해당 배송 그룹 주문 금액 환불을 기본 정책으로 둔다.
-- 결제는 서버에 생성된 결제 그룹(PaymentGroup)과 `PAYMENT_PENDING` 주문들을 기준으로 요청한다.
+- 주문은 서버에 생성된 결제 그룹(PaymentGroup)과 `PAYMENT_PENDING` 주문들을 기준으로 생성한다.
 
 ## Confirmed Policy
 
-- MVP PG 제공자는 Toss Payments로 한다.
-- MVP에서 활성화할 Toss Payments 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
-- MVP에서는 가상계좌/무통장입금성 비동기 결제를 제외한다.
-- MVP에서는 휴대폰 결제와 상품권 결제를 제외한다.
-- 결제 요청 전에 서버 결제 그룹(PaymentGroup)과 배송 그룹별 `PAYMENT_PENDING` 주문을 생성한다.
+- MVP 고객 결제 주 경로는 직접 계좌입금이다.
+- Toss Payments PG 결제는 Deferred 상태다. 기존 Toss 구현은 보존하지만 고객 체크아웃 주 경로에서 사용하지 않는다.
+- 계좌입금 주문 생성 전에 서버 결제 그룹(PaymentGroup)과 배송 그룹별 `PAYMENT_PENDING` 주문을 생성한다.
+- `PAYMENT_PENDING`은 MVP에서 `입금대기`를 의미한다.
+- 고객 체크아웃 완료 화면에는 입금 계좌, 입금 금액, 입금자명, 입금 기한, 현금영수증 안내를 표시한다.
+- 기본 입금 기한은 주문 생성 후 24시간이다.
+- 입금 계좌 정보는 운영 환경 설정으로 관리하고 source control에 실제 계좌값을 커밋하지 않는다.
 - MVP에서는 장바구니 전체를 한 번에 결제할 수 있다.
-- PG 결제 1건은 여러 배송 그룹 주문을 포함할 수 있다.
+- 계좌입금 1건은 여러 배송 그룹 주문을 포함할 수 있다.
 - 결제 금액은 포함된 배송 그룹 주문들의 합산 금액이다.
-- 결제 승인 검증은 Spring Boot 서버에서 수행한다.
-- PG 승인 금액과 서버 결제 그룹(PaymentGroup) 총액이 일치해야 주문들을 확정한다.
-- 결제 검증 성공 후 결제 그룹(PaymentGroup)에 포함된 배송 그룹 주문들은 `SUPPLIER_ORDER_PENDING` 상태로 전환한다.
-- 결제 검증 실패 또는 금액 불일치 시 주문을 확정하지 않는다.
-- 결제 승인 검증은 다음 조건을 모두 만족해야 성공한다.
-  - 결제 그룹(PaymentGroup)과 포함 주문들의 상태가 `PAYMENT_PENDING`이다.
-  - 결제 그룹(PaymentGroup)과 포함 주문들의 만료 시간이 지나지 않았다.
+- 관리자 입금확인은 다음 조건을 모두 만족해야 성공한다.
+  - 결제 그룹(PaymentGroup)과 대상 주문의 상태가 `PAYMENT_PENDING`이다.
   - 결제 그룹(PaymentGroup)의 주문서 정책 확인이 완료되어 있다.
-  - PG 승인 금액과 서버 결제 그룹(PaymentGroup) 총액이 일치한다.
-  - 동일 PG 결제키가 이미 다른 결제 그룹(PaymentGroup) 또는 결제에 처리되지 않았다.
-  - 주문 상품과 옵션이 결제 승인 시점에도 판매 가능하다.
-- PG 결제가 승인됐지만 주문을 확정할 수 없는 경우는 결제 예외로 처리한다.
-- 결제 예외 사유는 다음 값으로 시작한다.
-  - `AMOUNT_MISMATCH`
-  - `APPROVED_AFTER_EXPIRED`
-  - `SELLABILITY_CHECK_FAILED`
-  - `DUPLICATE_OR_CONFLICTING_CONFIRMATION`
-  - `PG_CONFIRMATION_ERROR`
-- 결제 예외 주문은 공급처 발주 대상으로 절대 전환하지 않는다.
-- 결제 예외가 발생하면 시스템은 가능한 경우 즉시 PG 전액 취소를 시도한다.
-- 결제 예외 자동 취소가 성공하면 고객에게 결제 취소 완료 상태를 노출한다.
-- 결제 예외 자동 취소가 실패하면 관리자 긴급 확인 큐로 전환하고 고객에게 결제 확인 중 또는 결제 취소 처리 중 상태를 노출한다.
-- 자동 취소 실패 건은 PG 응답 코드, 실패 사유, 재시도 횟수, 최종 처리자를 기록한다.
-- MVP 결제 예외 큐는 별도 메시지 브로커가 아니라 DB 상태 기반 운영 큐로 관리한다.
-- 결제 예외 큐 대상은 `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, `REVIEW_REQUIRED` 결제 상태다.
-- 관리자 재시도는 저장된 동일 idempotency key를 재사용한다.
-- Toss webhook은 `paymentKey`로 Toss 결제조회 API를 다시 호출해 검증한다.
-- 중복 Toss webhook은 전송 ID 기반 idempotency key로 한 번만 처리한다.
-- 서버 confirm 결과와 Toss webhook 검증 결과가 충돌하면 자동 상태 보정하지 않고 `REVIEW_REQUIRED`로 분리해 운영 확인 대상으로 둔다.
-- 결제 완료 주문의 환불 완료 상태는 PG 취소/환불 성공 이후에만 확정한다.
-- PG 취소/환불 실패 시 고객에게 환불 완료로 노출하지 않는다.
+  - 관리자가 실제 입금액과 주문 금액 일치를 확인했다.
+  - 주문 상품과 옵션이 입금확인 시점에도 판매 가능하다.
+- 입금확인 성공 후 결제 그룹(PaymentGroup)에 포함된 배송 그룹 주문들은 `SUPPLIER_ORDER_PENDING` 상태로 전환한다.
+- 계좌입금 결제 레코드는 `PaymentProvider.BANK_TRANSFER`, `PaymentMethod.BANK_TRANSFER`, `providerPaymentKey = BANK-{checkoutNumber}`를 사용한다.
+- 입금 금액, 입금자명, 입금 시각이 불일치하거나 확인이 필요한 경우 관리자는 입금 불일치 메모를 남기고 주문을 `PAYMENT_PENDING` 상태로 유지한다.
+- 기한 내 입금이 확인되지 않으면 관리자가 미입금 취소 처리한다.
+- 미입금 취소 주문은 `CANCELLED` 상태가 되며 공급처 발주 대상으로 전환하지 않는다.
+- 입금확인, 미입금 취소, 입금 불일치 메모, 수동 환불 완료는 관리자 주체, 시각, 사유를 기록한다.
+- 계좌입금 환불은 PG 취소가 아니라 관리자가 실제 환불을 완료한 뒤 수동 환불 완료로 기록한다.
+- 고객에게 환불 완료로 노출하는 시점은 실제 환불 완료 기록 이후다.
+- 현금영수증은 고객 요청 시 발급해야 하며, 1차 운영은 홈택스 수동 발급으로 둔다. 자동 API 연동은 후속 작업이다.
+- 계좌입금은 현금성 결제이므로 실결제 오픈 전 구매안전서비스 방식을 확정해야 한다. 은행 에스크로, 소비자피해보상보험, PG/가상계좌 재도입 중 하나를 운영 선택지로 둔다.
 - MVP에서는 배송 그룹 주문 단위 부분 취소/부분 환불을 지원한다.
 - 배송 그룹 주문 단위 부분 환불은 하나의 PG 결제 중 특정 배송 그룹 주문 금액만 취소/환불하는 것을 의미한다.
 - 배송 그룹 주문 내부의 상품, 옵션, 수량 단위 부분 취소/부분 환불은 MVP에서 지원하지 않는다.
 - 특정 배송 그룹 주문이 공급처 품절이면 해당 배송 그룹 주문 금액만 부분 취소/환불한다.
 - 하나의 배송 그룹 주문 내부에서 일부 상품 또는 일부 수량만 품절이면 MVP에서는 해당 배송 그룹 주문 전체를 취소/환불한다.
-- 결제 실패, 결제 대기, 결제 만료 주문은 고객 주문 내역에 노출하지 않는다.
+- 입금대기, 미입금 취소 주문은 일반 고객 주문 내역에 노출하지 않고 체크아웃 화면 또는 고객 문의 대상으로 다룬다.
+- 입금확인 완료 주문부터 고객 주문 내역에 노출한다.
 - PG 승인이 발생한 결제 예외 주문은 고객 주문 내역 또는 별도 결제 확인 화면에 노출한다.
+
+## Deferred PG/Toss Policy
+
+Toss Payments integration remains available for future reintroduction, but it is not the primary customer checkout path for the current MVP.
+
+Deferred Toss policy:
+
+- Toss Payments PG 제공자는 향후 재도입 후보로 유지한다.
+- Toss 결제수단은 카드, 간편결제, 계좌이체로 제한한다.
+- 가상계좌/무통장입금성 비동기 PG 결제, 휴대폰 결제, 상품권 결제는 아직 사용하지 않는다.
+- PG 결제 승인 검증은 Spring Boot 서버에서 수행한다.
+- PG 승인 금액과 서버 결제 그룹(PaymentGroup) 총액이 일치해야 주문들을 확정한다.
+- Toss webhook은 `paymentKey`로 Toss 결제조회 API를 다시 호출해 검증한다.
+- 중복 Toss webhook은 전송 ID 기반 idempotency key로 한 번만 처리한다.
+- 서버 confirm 결과와 Toss webhook 검증 결과가 충돌하면 자동 상태 보정하지 않고 `REVIEW_REQUIRED`로 분리해 운영 확인 대상으로 둔다.
 
 ## Provider Selection
 
-Toss Payments is selected for MVP instead of PortOne.
+Direct bank transfer is selected for the current MVP customer checkout path.
+
+Toss Payments remains the deferred PG provider candidate instead of PortOne.
 
 Selection reasons:
 
@@ -120,17 +127,22 @@ Production readiness:
 ## System Impact
 
 - 서버에는 PG secret key가 필요하다.
-- 결제 성공 처리는 반드시 서버 검증 후 확정한다.
+- 계좌입금 MVP에서는 입금 계좌 설정과 관리자 입금확인 권한이 필요하다.
+- PG secret key는 Toss 재도입 시에만 필요하다.
+- 결제 성공 처리는 반드시 서버 검증 또는 관리자 입금확인 후 확정한다.
 - `Payment`와 `Order` 상태를 분리한다.
 - `PaymentGroup` 또는 동등한 checkout payment aggregate가 필요하다.
-- `PaymentGroup`은 PG 결제 1건과 여러 배송 그룹 주문을 연결한다.
+- `PaymentGroup`은 계좌입금 1건 또는 PG 결제 1건과 여러 배송 그룹 주문을 연결한다.
 - 환불 실행 결과를 별도 기록해야 한다.
 - 환불 실행 결과는 `refunds`에 PG 취소 거래 키, 멱등 키, 실패 코드/메시지, 완료/실패 시각으로 기록한다. Implemented by DS-15.
+- 계좌입금 환불 실행 결과는 `refunds`에 수동 환불 관리자, 완료 시각, 환불 사유, 환불 계좌 메모를 기록한다.
 - PG 승인 이벤트, 취소 요청, 취소 결과는 멱등 처리를 위해 별도 이벤트 이력으로 기록한다.
 - 결제 예외 큐가 관리자 화면에 필요하다. Implemented by DS-33 as a DB state-based queue.
 - 결제 예외 자동 취소는 idempotency key를 사용해야 한다. Implemented by DS-33.
 - 주문 확정 처리는 주문 단위 lock 또는 unique constraint로 한 번만 성공해야 한다.
-- 가상계좌/무통장입금성 결제를 제외하므로 MVP에서는 입금 대기, 입금 만료, 입금 webhook 상태를 구현하지 않는다.
+- 계좌입금 MVP에서는 `PAYMENT_PENDING`이 입금대기이며, 입금 webhook은 사용하지 않는다.
+- 미입금 취소는 관리자 수동 액션으로 처리한다.
+- 입금확인, 미입금취소, 수동환불 완료는 `OrderStatusHistory`와 관리자 action history에 남겨야 한다.
 - Toss 결제 상태 webhook은 서버 confirm 결과와 PG 상태 대사를 위한 보조 입력으로 처리한다. Implemented by DS-34.
 - 환불 모델은 결제 그룹(PaymentGroup) 안의 배송 그룹 주문 단위 환불을 지원해야 한다.
 - 환불 금액은 환불 대상 배송 그룹 주문 금액의 합계와 일치해야 한다.

@@ -19,8 +19,8 @@
 
 ## Step 3: Order
 
-1. 주문은 결제 전에 생성할 것인가? Confirmed: 결제 요청 전에 `PAYMENT_PENDING` 주문을 먼저 생성한다.
-2. 결제 대기 주문은 얼마 뒤 만료할 것인가? Confirmed: 생성 후 30분 뒤 만료 처리한다.
+1. 주문은 결제 전에 생성할 것인가? Confirmed: 입금 안내 전에 `PAYMENT_PENDING` 주문을 먼저 생성한다.
+2. 결제 대기 주문은 얼마 뒤 만료할 것인가? Confirmed: 계좌입금 MVP는 기본 24시간 입금 기한을 두고 관리자 미입금 취소로 종료한다. Deferred PG 경로는 30분 만료 정책을 유지할 수 있다.
 3. 배송지 변경은 어느 상태까지 허용할 것인가? Confirmed: 결제 후에는 `SUPPLIER_ORDER_PENDING` 상태이면서 `addressLockedAt`이 비어 있는 주문에만 고객 직접 변경을 허용한다.
 4. 고객에게 내부 주문 상태를 그대로 보여줄 것인가? Confirmed: API는 안정적인 상태 코드를 내려주고, 고객용 표시 문구는 프론트엔드에서 매핑한다.
 

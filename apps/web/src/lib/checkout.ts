@@ -31,6 +31,16 @@ export type CheckoutPolicyLink = {
   policyType: string;
 };
 
+export type BankTransferDeposit = {
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  depositorName: string;
+  amount: number;
+  deadline: string;
+  cashReceiptNotice: string;
+};
+
 export type Checkout = {
   paymentGroupId: string;
   checkoutNumber: string;
@@ -39,6 +49,7 @@ export type Checkout = {
   refundableAmount: number;
   expiresAt: string;
   policyConfirmedAt: string | null;
+  bankTransferDeposit: BankTransferDeposit;
   policyLinks: CheckoutPolicyLink[];
   orders: CheckoutOrder[];
 };

@@ -10,13 +10,20 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
+import com.dropshipshop.api.order.domain.AdminOrderActionType;
+import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
+import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentEvent;
 import com.dropshipshop.api.payment.domain.PaymentEventType;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
+import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.payment.toss.TossCancelledPayment;
@@ -34,6 +41,8 @@ public class RefundService {
 	private final PaymentRepository paymentRepository;
 	private final PaymentEventRepository paymentEventRepository;
 	private final CustomerOrderRepository orderRepository;
+	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final TossPaymentsClient tossPaymentsClient;
 	private final NotificationService notificationService;
 
@@ -42,6 +51,8 @@ public class RefundService {
 		PaymentRepository paymentRepository,
 		PaymentEventRepository paymentEventRepository,
 		CustomerOrderRepository orderRepository,
+		AdminOrderActionHistoryRepository actionHistoryRepository,
+		OrderStatusHistoryRepository statusHistoryRepository,
 		TossPaymentsClient tossPaymentsClient,
 		NotificationService notificationService
 	) {
@@ -49,6 +60,8 @@ public class RefundService {
 		this.paymentRepository = paymentRepository;
 		this.paymentEventRepository = paymentEventRepository;
 		this.orderRepository = orderRepository;
+		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 		this.tossPaymentsClient = tossPaymentsClient;
 		this.notificationService = notificationService;
 	}
@@ -117,6 +130,75 @@ public class RefundService {
 		}
 	}
 
+	@Transactional
+	RefundDtos.AdminRefundResponse completeManualBankTransferRefund(
+		UUID refundId,
+		UUID adminUserId,
+		RefundDtos.ManualBankTransferRefundCompleteRequest request
+	) {
+		Refund refund = findRefund(refundId);
+		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(refund.getPaymentGroup().getId())
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved payment not found"));
+		if (payment.getProvider() != PaymentProvider.BANK_TRANSFER) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manual refund completion is allowed only for bank transfer payments");
+		}
+		Instant now = Instant.now();
+		OrderStatus beforeStatus = refund.getOrder().getStatus();
+		try {
+			refund.getOrder().markRefundRequested();
+			refund.completeManualBankTransfer(
+				payment,
+				adminUserId,
+				request.reason(),
+				request.bankName(),
+				request.accountNumber(),
+				request.accountHolder(),
+				now
+			);
+			refund.getPaymentGroup().applyRefund(refund.getRefundAmount());
+			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
+			payment.markRefundCompleted(fullyRefunded);
+			refund.getOrder().markRefunded();
+			actionHistoryRepository.save(new AdminOrderActionHistory(
+				refund.getOrder(),
+				adminUserId,
+				AdminOrderActionType.MANUAL_REFUND_COMPLETED,
+				beforeStatus,
+				refund.getOrder().getStatus(),
+				request.reason()
+			));
+			statusHistoryRepository.save(new OrderStatusHistory(
+				refund.getOrder(),
+				adminUserId,
+				AdminOrderActionType.MANUAL_REFUND_COMPLETED.name(),
+				beforeStatus,
+				refund.getOrder().getStatus(),
+				"ALLOWED",
+				"Manual bank-transfer refund completed",
+				request.reason()
+			));
+			paymentEventRepository.save(new PaymentEvent(
+				payment,
+				refund.getPaymentGroup(),
+				payment.getProviderPaymentKey(),
+				PaymentEventType.MANUAL_REFUND_COMPLETED,
+				"Manual bank-transfer refund completed for order " + refund.getOrder().getOrderNumber(),
+				now
+			));
+			notificationService.email(
+				refund.getOrder().getUser(),
+				refund.getOrder(),
+				refund.getPaymentGroup(),
+				null,
+				refund,
+				NotificationType.REFUND_COMPLETED
+			);
+			return toAdminResponse(refund);
+		} catch (IllegalStateException | IllegalArgumentException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
 	@Transactional(readOnly = true)
 	public RefundDtos.AdminRefundResponse toAdminResponse(Refund refund) {
 		Payment payment = refund.getPayment();
@@ -142,6 +224,12 @@ public class RefundService {
 			refund.getReviewedByAdminId(),
 			refund.getAdminReviewReason(),
 			refund.getReviewedAt(),
+			refund.getManualRefundedByAdminId(),
+			refund.getManualRefundedAt(),
+			refund.getManualRefundReason(),
+			refund.getManualRefundBankName(),
+			refund.getManualRefundAccountNumber(),
+			refund.getManualRefundAccountHolder(),
 			refund.getRequestedAt(),
 			refund.getCompletedAt(),
 			refund.getFailedAt(),

@@ -10,6 +10,7 @@ import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
+import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundScope;
@@ -91,12 +92,32 @@ final class AdminOrderDtos {
 		PaymentGroupStatus status,
 		long totalAmount,
 		Long approvedAmount,
-		Instant approvedAt
+		Instant approvedAt,
+		AdminBankTransferDepositResponse bankTransferDeposit
+	) {
+	}
+
+	record AdminBankTransferDepositResponse(
+		String bankName,
+		String accountNumber,
+		String accountHolder,
+		String depositorName,
+		String cashReceiptNotice,
+		UUID depositConfirmedByAdminId,
+		Instant depositConfirmedAt,
+		String depositConfirmationReason,
+		String depositMismatchMemo,
+		UUID depositMismatchRecordedByAdminId,
+		Instant depositMismatchRecordedAt,
+		UUID unpaidCancelledByAdminId,
+		Instant unpaidCancelledAt,
+		String unpaidCancelReason
 	) {
 	}
 
 	record AdminPaymentResponse(
 		UUID paymentId,
+		PaymentProvider provider,
 		PaymentStatus status,
 		PaymentMethod method,
 		long requestedAmount,
@@ -247,6 +268,27 @@ final class AdminOrderDtos {
 		@NotBlank
 		@Size(max = 100)
 		String trackingNumber
+	) {
+	}
+
+	record BankTransferDepositConfirmRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
+	record BankTransferUnpaidCancelRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
+	record BankTransferDepositMismatchRequest(
+		@NotBlank
+		@Size(max = 2000)
+		String memo
 	) {
 	}
 }

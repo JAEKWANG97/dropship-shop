@@ -21,6 +21,7 @@ import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
+import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.refund.repository.RefundRepository;
@@ -62,8 +63,15 @@ class AdminOrderQueryService {
 
 	@Transactional(readOnly = true)
 	AdminOrderDtos.AdminOrderListResponse listSupplierOrderPendingOrders() {
-		List<AdminOrderDtos.AdminOrderSummaryResponse> orders = orderRepository
-			.findAllByStatusOrderByCreatedAtAsc(OrderStatus.SUPPLIER_ORDER_PENDING)
+		return listOrders(OrderStatus.SUPPLIER_ORDER_PENDING);
+	}
+
+	@Transactional(readOnly = true)
+	AdminOrderDtos.AdminOrderListResponse listOrders(OrderStatus status) {
+		List<CustomerOrder> source = status == null
+			? orderRepository.findAllByOrderByCreatedAtAsc()
+			: orderRepository.findAllByStatusOrderByCreatedAtAsc(status);
+		List<AdminOrderDtos.AdminOrderSummaryResponse> orders = source
 			.stream()
 			.map(this::toSummaryResponse)
 			.toList();
@@ -193,7 +201,8 @@ class AdminOrderQueryService {
 				order.getPaymentGroup().getStatus(),
 				order.getPaymentGroup().getTotalAmount(),
 				order.getPaymentGroup().getApprovedAmount(),
-				order.getPaymentGroup().getApprovedAt()
+				order.getPaymentGroup().getApprovedAt(),
+				toBankTransferDepositResponse(order.getPaymentGroup())
 			),
 			toPaymentResponse(payment),
 			toFulfillmentResponse(order, fulfillment),
@@ -209,11 +218,31 @@ class AdminOrderQueryService {
 		}
 		return new AdminOrderDtos.AdminPaymentResponse(
 			payment.getId(),
+			payment.getProvider(),
 			payment.getStatus(),
 			payment.getMethod(),
 			payment.getRequestedAmount(),
 			payment.getApprovedAmount(),
 			payment.getApprovedAt()
+		);
+	}
+
+	private AdminOrderDtos.AdminBankTransferDepositResponse toBankTransferDepositResponse(PaymentGroup paymentGroup) {
+		return new AdminOrderDtos.AdminBankTransferDepositResponse(
+			paymentGroup.getBankTransferBankName(),
+			paymentGroup.getBankTransferAccountNumber(),
+			paymentGroup.getBankTransferAccountHolder(),
+			paymentGroup.getBankTransferDepositorName(),
+			paymentGroup.getBankTransferCashReceiptNotice(),
+			paymentGroup.getDepositConfirmedByAdminId(),
+			paymentGroup.getDepositConfirmedAt(),
+			paymentGroup.getDepositConfirmationReason(),
+			paymentGroup.getDepositMismatchMemo(),
+			paymentGroup.getDepositMismatchRecordedByAdminId(),
+			paymentGroup.getDepositMismatchRecordedAt(),
+			paymentGroup.getUnpaidCancelledByAdminId(),
+			paymentGroup.getUnpaidCancelledAt(),
+			paymentGroup.getUnpaidCancelReason()
 		);
 	}
 

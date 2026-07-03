@@ -21,6 +21,7 @@
 - Policy document table: implemented in `apps/api/src/main/resources/db/migration/V17__create_policy_documents.sql`.
 - Business profile and privacy processing item tables: implemented in `apps/api/src/main/resources/db/migration/V18__create_legal_disclosures.sql`.
 - Customer required info and phone verification fields: implemented in `apps/api/src/main/resources/db/migration/V19__add_customer_required_info.sql`.
+- Bank-transfer checkout/deposit and manual refund fields: implemented in `apps/api/src/main/resources/db/migration/V23__add_bank_transfer_payment_fields.sql`.
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -543,7 +544,7 @@ Open note:
 
 ### payment_groups
 
-Implemented by DS-8 as the checkout payment aggregate. DS-9 adds PG approval transitions.
+Implemented by DS-8 as the checkout payment aggregate. DS-9 adds PG approval transitions. B-041 adds direct bank-transfer deposit metadata and manual admin deposit action fields.
 
 - `id`
 - `checkout_number`
@@ -555,6 +556,20 @@ Implemented by DS-8 as the checkout payment aggregate. DS-9 adds PG approval tra
 - `expires_at`
 - `approved_at`
 - `policy_confirmed_at`
+- `bank_transfer_bank_name`
+- `bank_transfer_account_number`
+- `bank_transfer_account_holder`
+- `bank_transfer_depositor_name`
+- `bank_transfer_cash_receipt_notice`
+- `deposit_confirmed_by_admin_id`
+- `deposit_confirmed_at`
+- `deposit_confirmation_reason`
+- `deposit_mismatch_memo`
+- `deposit_mismatch_recorded_by_admin_id`
+- `deposit_mismatch_recorded_at`
+- `unpaid_cancelled_by_admin_id`
+- `unpaid_cancelled_at`
+- `unpaid_cancel_reason`
 - `created_at`
 - `updated_at`
 
@@ -564,9 +579,9 @@ Implemented by DS-9.
 
 - `id`
 - `payment_group_id`
-- `provider`: `TOSS_PAYMENTS`
+- `provider`: `TOSS_PAYMENTS` / `BANK_TRANSFER`
 - `provider_payment_key`
-- `method`: `CARD` / `EASY_PAY` / `TRANSFER`
+- `method`: `CARD` / `EASY_PAY` / `TRANSFER` / `BANK_TRANSFER`
 - `status`
 - `requested_amount`
 - `approved_amount`
@@ -585,7 +600,7 @@ Implemented by DS-9.
 
 Relationship note:
 
-- One `payment_group` is intended to represent one PG payment. Keep `payments` as `1:N` to preserve retry/exception history without changing the aggregate.
+- One `payment_group` is intended to represent one bank-transfer deposit or PG payment. Keep `payments` as `1:N` to preserve retry/exception history without changing the aggregate.
 
 ### payment_events
 
@@ -633,7 +648,7 @@ Constraints and indexes:
 - `id`
 - `order_id`
 - `admin_user_id`
-- `action_type`: `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `SHIPMENT_MANUAL_CORRECTION`
+- `action_type`: `BANK_TRANSFER_DEPOSIT_CONFIRMED` / `BANK_TRANSFER_UNPAID_CANCELLED` / `BANK_TRANSFER_DEPOSIT_MISMATCH_RECORDED` / `MANUAL_REFUND_COMPLETED` / `SUPPLIER_WORK_START` / `SUPPLIER_ORDER_COMPLETED` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `SHIPMENT_MANUAL_CORRECTION`
 - `before_status`
 - `after_status`
 - `reason`
@@ -698,6 +713,12 @@ Constraints and indexes:
 - `reviewed_by_admin_id`
 - `admin_review_reason`
 - `reviewed_at`
+- `manual_refunded_by_admin_id`
+- `manual_refunded_at`
+- `manual_refund_reason`
+- `manual_refund_bank_name`
+- `manual_refund_account_number`
+- `manual_refund_account_holder`
 - `requested_at`
 - `completed_at`
 - `failed_at`
@@ -708,7 +729,7 @@ Implemented DS-15 scope:
 
 - One refund per delivery-group order in MVP.
 - Refunds are created for approved cancellation and supplier out-of-stock.
-- PG cancel result fields and retry failure fields are stored on the refund.
+- PG cancel result fields, retry failure fields, and bank-transfer manual refund completion fields are stored on the refund.
 
 ### claims
 

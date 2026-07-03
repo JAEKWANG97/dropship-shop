@@ -21,6 +21,7 @@ final class CheckoutDtos {
 		@NotBlank @Size(max = 20) String postalCode,
 		@NotBlank @Size(max = 300) String address1,
 		@Size(max = 300) String address2,
+		@Size(max = 100) String depositorName,
 		Long clientSubmittedTotalAmount
 	) {
 	}
@@ -52,8 +53,20 @@ final class CheckoutDtos {
 		long refundableAmount,
 		Instant expiresAt,
 		Instant policyConfirmedAt,
+		BankTransferDepositResponse bankTransferDeposit,
 		List<PolicyLinkResponse> policyLinks,
 		List<OrderResponse> orders
+	) {
+	}
+
+	record BankTransferDepositResponse(
+		String bankName,
+		String accountNumber,
+		String accountHolder,
+		String depositorName,
+		long amount,
+		Instant deadline,
+		String cashReceiptNotice
 	) {
 	}
 

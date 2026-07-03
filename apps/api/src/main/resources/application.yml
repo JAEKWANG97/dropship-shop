@@ -31,3 +31,9 @@ app:
   policies:
     required-terms-version: terms-2026-06-01
     required-privacy-version: privacy-2026-06-01
+  bank-transfer:
+    bank-name: ${APP_BANK_TRANSFER_BANK_NAME:입금 계좌 준비중}
+    account-number: ${APP_BANK_TRANSFER_ACCOUNT_NUMBER:입금 계좌 준비중}
+    account-holder: ${APP_BANK_TRANSFER_ACCOUNT_HOLDER:가라사니}
+    deposit-deadline-hours: ${APP_BANK_TRANSFER_DEPOSIT_DEADLINE_HOURS:24}
+    cash-receipt-notice: ${APP_BANK_TRANSFER_CASH_RECEIPT_NOTICE:현금영수증은 요청 시 홈택스 수동 발급으로 처리합니다.}

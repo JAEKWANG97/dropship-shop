@@ -11,7 +11,6 @@ import {
   confirmCheckoutPolicies,
   updateCheckoutShippingAddress,
 } from "../actions";
-import { TossPaymentLauncher } from "./toss-payment-launcher";
 
 type CheckoutDetailPageProps = {
   params: Promise<{ checkoutNumber: string }>;
@@ -89,7 +88,7 @@ export default async function CheckoutDetailPage({
       {paymentPending && !policyConfirmed ? (
         <PolicyConfirmationForm agreement={agreement} checkout={checkout} />
       ) : null}
-      {paymentPending && policyConfirmed ? <TossPaymentForm checkout={checkout} /> : null}
+      {paymentPending && policyConfirmed ? <BankTransferDepositPanel checkout={checkout} /> : null}
     </section>
   );
 }
@@ -112,7 +111,7 @@ function CheckoutSummary({ checkout }: { checkout: Checkout }) {
           <strong>{formatPrice(checkout.refundableAmount)}</strong>
         </div>
         <div>
-          <span>만료 시각</span>
+          <span>입금 기한</span>
           <strong>{new Date(checkout.expiresAt).toLocaleString("ko-KR")}</strong>
         </div>
         <div>
@@ -207,7 +206,7 @@ function CheckoutLockedNotice() {
   return (
     <div className="notice">
       <strong>주문서 수정이 제한됩니다</strong>
-      <span>결제 대기 상태가 아니므로 배송지 변경이나 결제 승인 재시도를 진행하지 않습니다.</span>
+      <span>입금대기 상태가 아니므로 배송지 변경을 진행하지 않습니다.</span>
     </div>
   );
 }
@@ -227,8 +226,8 @@ function PolicyConfirmationForm({
       <input name="privacyVersion" type="hidden" value={agreement.requiredPrivacyVersion} />
       <label className="checkbox-row">
         <input name="policyConfirmed" type="checkbox" required />
-        주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 시 배송 그룹 주문 금액 환불 안내를
-        확인했습니다.
+        주문 상품, 입금 금액, 배송지, 배송/취소/환불 정책, 품절 시 배송 그룹 주문 금액 환불 안내를
+        확인했습니다. 현금영수증은 요청 시 발급됩니다.
       </label>
       <button className="button" type="submit">
         정책 확인 저장
@@ -237,19 +236,46 @@ function PolicyConfirmationForm({
   );
 }
 
-function TossPaymentForm({ checkout }: { checkout: Checkout }) {
-  const firstItem = checkout.orders[0]?.items[0];
-  const itemCount = checkout.orders.reduce((sum, order) => sum + order.items.length, 0);
-  const orderName = firstItem
-    ? `${firstItem.productName}${itemCount > 1 ? ` 외 ${itemCount - 1}건` : ""}`
-    : `주문 ${checkout.checkoutNumber}`;
-
+function BankTransferDepositPanel({ checkout }: { checkout: Checkout }) {
+  const deposit = checkout.bankTransferDeposit;
   return (
-    <TossPaymentLauncher
-      amount={checkout.totalAmount}
-      checkoutNumber={checkout.checkoutNumber}
-      clientKey={process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? ""}
-      orderName={orderName}
-    />
+    <section className="checkout-form bank-transfer-panel">
+      <h2>계좌입금 안내</h2>
+      <p>
+        아래 금액을 입금해 주세요. 관리자가 입금 내역을 확인한 뒤 주문이 확정되고 공급처 발주가
+        시작됩니다.
+      </p>
+      <div className="summary-list">
+        <div>
+          <span>은행</span>
+          <strong>{deposit.bankName}</strong>
+        </div>
+        <div>
+          <span>계좌번호</span>
+          <strong>{deposit.accountNumber}</strong>
+        </div>
+        <div>
+          <span>예금주</span>
+          <strong>{deposit.accountHolder}</strong>
+        </div>
+        <div>
+          <span>입금자명</span>
+          <strong>{deposit.depositorName}</strong>
+        </div>
+        <div>
+          <span>입금 금액</span>
+          <strong>{formatPrice(deposit.amount)}</strong>
+        </div>
+        <div>
+          <span>입금 기한</span>
+          <strong>{new Date(deposit.deadline).toLocaleString("ko-KR")}</strong>
+        </div>
+      </div>
+      <div className="notice">
+        <strong>입금 확인 전에는 주문이 확정되지 않습니다</strong>
+        <span>입금자명이나 금액이 다르면 고객 문의로 확인이 필요할 수 있습니다.</span>
+        <span>{deposit.cashReceiptNotice}</span>
+      </div>
+    </section>
   );
 }

@@ -55,6 +55,48 @@ public class PaymentGroup {
 	@Column(name = "policy_confirmed_at")
 	private Instant policyConfirmedAt;
 
+	@Column(name = "bank_transfer_bank_name", length = 100)
+	private String bankTransferBankName;
+
+	@Column(name = "bank_transfer_account_number", length = 100)
+	private String bankTransferAccountNumber;
+
+	@Column(name = "bank_transfer_account_holder", length = 100)
+	private String bankTransferAccountHolder;
+
+	@Column(name = "bank_transfer_depositor_name", length = 100)
+	private String bankTransferDepositorName;
+
+	@Column(name = "bank_transfer_cash_receipt_notice", length = 500)
+	private String bankTransferCashReceiptNotice;
+
+	@Column(name = "deposit_confirmed_by_admin_id")
+	private UUID depositConfirmedByAdminId;
+
+	@Column(name = "deposit_confirmed_at")
+	private Instant depositConfirmedAt;
+
+	@Column(name = "deposit_confirmation_reason", columnDefinition = "TEXT")
+	private String depositConfirmationReason;
+
+	@Column(name = "deposit_mismatch_memo", columnDefinition = "TEXT")
+	private String depositMismatchMemo;
+
+	@Column(name = "deposit_mismatch_recorded_by_admin_id")
+	private UUID depositMismatchRecordedByAdminId;
+
+	@Column(name = "deposit_mismatch_recorded_at")
+	private Instant depositMismatchRecordedAt;
+
+	@Column(name = "unpaid_cancelled_by_admin_id")
+	private UUID unpaidCancelledByAdminId;
+
+	@Column(name = "unpaid_cancelled_at")
+	private Instant unpaidCancelledAt;
+
+	@Column(name = "unpaid_cancel_reason", columnDefinition = "TEXT")
+	private String unpaidCancelReason;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -88,14 +130,60 @@ public class PaymentGroup {
 		this.policyConfirmedAt = confirmedAt;
 	}
 
+	public void configureBankTransfer(
+		String bankName,
+		String accountNumber,
+		String accountHolder,
+		String depositorName,
+		String cashReceiptNotice
+	) {
+		this.bankTransferBankName = bankName;
+		this.bankTransferAccountNumber = accountNumber;
+		this.bankTransferAccountHolder = accountHolder;
+		this.bankTransferDepositorName = depositorName;
+		this.bankTransferCashReceiptNotice = cashReceiptNotice;
+	}
+
 	public void approve(long approvedAmount, Instant approvedAt) {
 		this.status = PaymentGroupStatus.APPROVED;
 		this.approvedAmount = approvedAmount;
 		this.approvedAt = approvedAt;
 	}
 
+	public void confirmBankTransferDeposit(UUID adminUserId, String reason, Instant confirmedAt) {
+		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
+			throw new IllegalStateException("Deposit can be confirmed only while payment is pending");
+		}
+		this.status = PaymentGroupStatus.APPROVED;
+		this.approvedAmount = totalAmount;
+		this.approvedAt = confirmedAt;
+		this.depositConfirmedByAdminId = adminUserId;
+		this.depositConfirmedAt = confirmedAt;
+		this.depositConfirmationReason = reason;
+	}
+
 	public void markPaymentException() {
 		this.status = PaymentGroupStatus.PAYMENT_EXCEPTION;
+	}
+
+	public void cancelUnpaidDeposit(UUID adminUserId, String reason, Instant cancelledAt) {
+		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
+			throw new IllegalStateException("Unpaid deposit can be cancelled only while payment is pending");
+		}
+		this.status = PaymentGroupStatus.CANCELLED;
+		this.refundableAmount = 0;
+		this.unpaidCancelledByAdminId = adminUserId;
+		this.unpaidCancelledAt = cancelledAt;
+		this.unpaidCancelReason = reason;
+	}
+
+	public void recordDepositMismatch(UUID adminUserId, String memo, Instant recordedAt) {
+		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
+			throw new IllegalStateException("Deposit mismatch can be recorded only while payment is pending");
+		}
+		this.depositMismatchMemo = memo;
+		this.depositMismatchRecordedByAdminId = adminUserId;
+		this.depositMismatchRecordedAt = recordedAt;
 	}
 
 	public void markCancelled() {
@@ -166,5 +254,61 @@ public class PaymentGroup {
 
 	public Instant getPolicyConfirmedAt() {
 		return policyConfirmedAt;
+	}
+
+	public String getBankTransferBankName() {
+		return bankTransferBankName;
+	}
+
+	public String getBankTransferAccountNumber() {
+		return bankTransferAccountNumber;
+	}
+
+	public String getBankTransferAccountHolder() {
+		return bankTransferAccountHolder;
+	}
+
+	public String getBankTransferDepositorName() {
+		return bankTransferDepositorName;
+	}
+
+	public String getBankTransferCashReceiptNotice() {
+		return bankTransferCashReceiptNotice;
+	}
+
+	public UUID getDepositConfirmedByAdminId() {
+		return depositConfirmedByAdminId;
+	}
+
+	public Instant getDepositConfirmedAt() {
+		return depositConfirmedAt;
+	}
+
+	public String getDepositConfirmationReason() {
+		return depositConfirmationReason;
+	}
+
+	public String getDepositMismatchMemo() {
+		return depositMismatchMemo;
+	}
+
+	public UUID getDepositMismatchRecordedByAdminId() {
+		return depositMismatchRecordedByAdminId;
+	}
+
+	public Instant getDepositMismatchRecordedAt() {
+		return depositMismatchRecordedAt;
+	}
+
+	public UUID getUnpaidCancelledByAdminId() {
+		return unpaidCancelledByAdminId;
+	}
+
+	public Instant getUnpaidCancelledAt() {
+		return unpaidCancelledAt;
+	}
+
+	public String getUnpaidCancelReason() {
+		return unpaidCancelReason;
 	}
 }

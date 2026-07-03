@@ -3,7 +3,6 @@ package com.dropshipshop.api.checkout;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +34,7 @@ import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderPolicyAgreementRepository;
+import com.dropshipshop.api.payment.BankTransferProperties;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
@@ -45,7 +45,6 @@ import com.dropshipshop.api.user.repository.UserAccountRepository;
 public class CheckoutService {
 
 	private static final SecureRandom RANDOM = new SecureRandom();
-	private static final int CHECKOUT_EXPIRATION_MINUTES = 30;
 
 	private final CartItemRepository cartItemRepository;
 	private final ProductNoticeRepository productNoticeRepository;
@@ -57,6 +56,7 @@ public class CheckoutService {
 	private final AccountAgreementService accountAgreementService;
 	private final AccountProfileService accountProfileService;
 	private final CustomerPolicyLinkService customerPolicyLinkService;
+	private final BankTransferProperties bankTransferProperties;
 	private final Clock clock;
 
 	public CheckoutService(
@@ -69,7 +69,8 @@ public class CheckoutService {
 		UserAccountRepository userAccountRepository,
 		AccountAgreementService accountAgreementService,
 		AccountProfileService accountProfileService,
-		CustomerPolicyLinkService customerPolicyLinkService
+		CustomerPolicyLinkService customerPolicyLinkService,
+		BankTransferProperties bankTransferProperties
 	) {
 		this.cartItemRepository = cartItemRepository;
 		this.productNoticeRepository = productNoticeRepository;
@@ -81,6 +82,7 @@ public class CheckoutService {
 		this.accountAgreementService = accountAgreementService;
 		this.accountProfileService = accountProfileService;
 		this.customerPolicyLinkService = customerPolicyLinkService;
+		this.bankTransferProperties = bankTransferProperties;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -102,7 +104,7 @@ public class CheckoutService {
 			request.address1(),
 			request.address2()
 		);
-		Instant expiresAt = Instant.now(clock).plus(CHECKOUT_EXPIRATION_MINUTES, ChronoUnit.MINUTES);
+		Instant expiresAt = Instant.now(clock).plus(bankTransferProperties.depositDeadline());
 		long totalAmount = cartItems.stream().mapToLong(this::lineAmount).sum();
 		PaymentGroup paymentGroup = paymentGroupRepository.save(new PaymentGroup(
 			nextCheckoutNumber(),
@@ -110,6 +112,13 @@ public class CheckoutService {
 			totalAmount,
 			expiresAt
 		));
+		paymentGroup.configureBankTransfer(
+			bankTransferProperties.bankName(),
+			bankTransferProperties.accountNumber(),
+			bankTransferProperties.accountHolder(),
+			depositorName(request),
+			bankTransferProperties.cashReceiptNotice()
+		);
 
 		for (List<CartItem> supplierItems : groupBySupplier(cartItems).values()) {
 			CustomerOrder order = orderRepository.save(new CustomerOrder(
@@ -253,9 +262,25 @@ public class CheckoutService {
 			paymentGroup.getRefundableAmount(),
 			paymentGroup.getExpiresAt(),
 			paymentGroup.getPolicyConfirmedAt(),
+			new CheckoutDtos.BankTransferDepositResponse(
+				paymentGroup.getBankTransferBankName(),
+				paymentGroup.getBankTransferAccountNumber(),
+				paymentGroup.getBankTransferAccountHolder(),
+				paymentGroup.getBankTransferDepositorName(),
+				paymentGroup.getTotalAmount(),
+				paymentGroup.getExpiresAt(),
+				paymentGroup.getBankTransferCashReceiptNotice()
+			),
 			policyLinks(),
 			orders
 		);
+	}
+
+	private String depositorName(CheckoutDtos.CreateCheckoutRequest request) {
+		if (request.depositorName() == null || request.depositorName().isBlank()) {
+			return request.recipientName();
+		}
+		return request.depositorName().trim();
 	}
 
 	private List<CheckoutDtos.PolicyLinkResponse> policyLinks() {

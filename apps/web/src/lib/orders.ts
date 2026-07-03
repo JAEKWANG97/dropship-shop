@@ -102,8 +102,8 @@ export function orderStatusLabel(status: string) {
 export function paymentGroupStatusLabel(status: string) {
   return (
     {
-      PAYMENT_PENDING: "결제 대기",
-      APPROVED: "결제 완료",
+      PAYMENT_PENDING: "입금 대기",
+      APPROVED: "입금 확인",
       PARTIALLY_REFUNDED: "부분 환불",
       REFUNDED: "환불 완료",
       PAYMENT_EXCEPTION: "결제 확인 중",
@@ -115,11 +115,11 @@ export function paymentGroupStatusLabel(status: string) {
 }
 
 export function paymentStatusLabel(status: string | null) {
-  if (!status) return "결제 정보 없음";
+  if (!status) return "입금 정보 없음";
   return (
     {
-      READY: "결제 대기",
-      APPROVED: "결제 완료",
+      READY: "입금 대기",
+      APPROVED: "입금 확인",
       FAILED: "결제 실패",
       CANCEL_REQUIRED: "결제 확인 중",
       CANCEL_REQUESTED: "결제 확인 중",

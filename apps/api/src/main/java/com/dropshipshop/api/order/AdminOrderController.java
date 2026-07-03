@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,24 +25,32 @@ class AdminOrderController {
 
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final AdminOrderFulfillmentService adminOrderFulfillmentService;
+	private final AdminOrderPaymentService adminOrderPaymentService;
 	private final AdminOrderShipmentService adminOrderShipmentService;
 	private final CurrentUser currentUser;
 
 	AdminOrderController(
 		AdminOrderQueryService adminOrderQueryService,
 		AdminOrderFulfillmentService adminOrderFulfillmentService,
+		AdminOrderPaymentService adminOrderPaymentService,
 		AdminOrderShipmentService adminOrderShipmentService,
 		CurrentUser currentUser
 	) {
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.adminOrderFulfillmentService = adminOrderFulfillmentService;
+		this.adminOrderPaymentService = adminOrderPaymentService;
 		this.adminOrderShipmentService = adminOrderShipmentService;
 		this.currentUser = currentUser;
 	}
 
 	@GetMapping
-	AdminOrderDtos.AdminOrderListResponse listSupplierOrderPendingOrders() {
-		return adminOrderQueryService.listSupplierOrderPendingOrders();
+	AdminOrderDtos.AdminOrderListResponse listSupplierOrderPendingOrders(
+		@RequestParam(required = false) com.dropshipshop.api.order.domain.OrderStatus status
+	) {
+		if (status == null) {
+			return adminOrderQueryService.listSupplierOrderPendingOrders();
+		}
+		return adminOrderQueryService.listOrders(status);
 	}
 
 	@GetMapping("/{orderId}")
@@ -92,5 +101,35 @@ class AdminOrderController {
 		Authentication authentication
 	) {
 		return adminOrderShipmentService.createShipment(orderId, currentUser.id(authentication), request);
+	}
+
+	@PostMapping("/{orderId}/confirm-deposit")
+	@ResponseStatus(HttpStatus.OK)
+	AdminOrderDtos.AdminOrderActionResponse confirmDeposit(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.BankTransferDepositConfirmRequest request,
+		Authentication authentication
+	) {
+		return adminOrderPaymentService.confirmBankTransferDeposit(orderId, currentUser.id(authentication), request);
+	}
+
+	@PostMapping("/{orderId}/unpaid-cancel")
+	@ResponseStatus(HttpStatus.OK)
+	AdminOrderDtos.AdminOrderActionResponse cancelUnpaid(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.BankTransferUnpaidCancelRequest request,
+		Authentication authentication
+	) {
+		return adminOrderPaymentService.cancelUnpaidBankTransfer(orderId, currentUser.id(authentication), request);
+	}
+
+	@PostMapping("/{orderId}/deposit-mismatch")
+	@ResponseStatus(HttpStatus.OK)
+	AdminOrderDtos.AdminOrderActionResponse recordDepositMismatch(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.BankTransferDepositMismatchRequest request,
+		Authentication authentication
+	) {
+		return adminOrderPaymentService.recordBankTransferDepositMismatch(orderId, currentUser.id(authentication), request);
 	}
 }
