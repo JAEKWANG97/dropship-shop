@@ -1,5 +1,6 @@
 package com.dropshipshop.api.checkout;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -10,17 +11,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.account.domain.UserPolicyAgreement;
 import com.dropshipshop.api.account.repository.UserPolicyAgreementRepository;
@@ -35,6 +44,8 @@ import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
@@ -66,6 +77,15 @@ class CheckoutApiIntegrationTest {
 
 	@Autowired
 	private ProductNoticeRepository productNoticeRepository;
+
+	@Autowired
+	private PaymentGroupRepository paymentGroupRepository;
+
+	@Autowired
+	private CustomerOrderRepository orderRepository;
+
+	@Autowired
+	private CheckoutService checkoutService;
 
 	@Test
 	void rejectsAnonymousAndAdminCheckoutCreation() throws Exception {
@@ -136,6 +156,17 @@ class CheckoutApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.items", hasSize(0)));
 
+		long paymentGroupCountBeforeDuplicate = paymentGroupRepository.count();
+		long orderCountBeforeDuplicate = orderRepository.count();
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Checkout was already submitted for this cart. Please check your checkout or cart.")));
+		assertThat(paymentGroupRepository.count()).isEqualTo(paymentGroupCountBeforeDuplicate);
+		assertThat(orderRepository.count()).isEqualTo(orderCountBeforeDuplicate);
+
 		mockMvc.perform(get("/api/checkouts/{checkoutNumber}", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
@@ -162,6 +193,34 @@ class CheckoutApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.policyConfirmedAt").exists());
+	}
+
+	@Test
+	void concurrentCheckoutCreationCreatesOnlyOnePaymentGroupAndOrderSet() throws Exception {
+		UserAccount customer = createCustomer("checkout-concurrent-customer");
+		ProductOption option = createOption("Checkout Concurrent Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 19000, 0, 1);
+		addCartItem(customer.getId(), option.getId(), 1);
+		long paymentGroupCountBefore = paymentGroupRepository.count();
+		long orderCountBefore = orderRepository.count();
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch start = new CountDownLatch(1);
+
+		try {
+			Future<Object> first = executor.submit(() -> createCheckoutWhenReleased(customer.getId(), ready, start));
+			Future<Object> second = executor.submit(() -> createCheckoutWhenReleased(customer.getId(), ready, start));
+
+			assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+			start.countDown();
+			List<Object> results = List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+
+			assertThat(results).filteredOn(CheckoutDtos.CheckoutResponse.class::isInstance).hasSize(1);
+			assertThat(results).filteredOn(this::isDuplicateCheckoutError).hasSize(1);
+			assertThat(paymentGroupRepository.count()).isEqualTo(paymentGroupCountBefore + 1);
+			assertThat(orderRepository.count()).isEqualTo(orderCountBefore + 1);
+		} finally {
+			executor.shutdownNow();
+		}
 	}
 
 	@Test
@@ -290,6 +349,36 @@ class CheckoutApiIntegrationTest {
 			  "address2": "101"
 			}
 			""";
+	}
+
+	private CheckoutDtos.CreateCheckoutRequest checkoutRequest() {
+		return new CheckoutDtos.CreateCheckoutRequest(
+			"Receiver",
+			"010-1111-2222",
+			"12345",
+			"Seoul test road",
+			"101",
+			null,
+			null
+		);
+	}
+
+	private Object createCheckoutWhenReleased(UUID userId, CountDownLatch ready, CountDownLatch start) throws Exception {
+		ready.countDown();
+		if (!start.await(5, TimeUnit.SECONDS)) {
+			throw new AssertionError("Concurrent checkout start was not released");
+		}
+		try {
+			return checkoutService.createCheckout(userId, checkoutRequest());
+		} catch (ResponseStatusException exception) {
+			return exception;
+		}
+	}
+
+	private boolean isDuplicateCheckoutError(Object result) {
+		return result instanceof ResponseStatusException exception
+			&& exception.getStatusCode() == HttpStatus.BAD_REQUEST
+			&& "Checkout was already submitted for this cart. Please check your checkout or cart.".equals(exception.getReason());
 	}
 
 	private String checkoutNumberFrom(MvcResult result) throws Exception {

@@ -12,17 +12,37 @@ export function publicApiUrl(path: string) {
   return `${PUBLIC_API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+type ApiErrorBody = {
+  message?: unknown;
+};
+
 export class ApiError extends Error {
-  constructor(public readonly status: number) {
-    super(`API request failed: ${status}`);
+  constructor(
+    public readonly status: number,
+    public readonly responseMessage = "",
+  ) {
+    super(responseMessage || `API request failed: ${status}`);
   }
+}
+
+async function apiError(response: Response) {
+  let responseMessage = "";
+  if (response.headers.get("content-type")?.includes("application/json")) {
+    try {
+      const body = (await response.json()) as ApiErrorBody;
+      responseMessage = typeof body.message === "string" ? body.message : "";
+    } catch {
+      responseMessage = "";
+    }
+  }
+  return new ApiError(response.status, responseMessage);
 }
 
 export async function apiGet<T>(path: string) {
   const response = await fetch(apiUrl(path), { cache: "no-store" });
 
   if (!response.ok) {
-    throw new ApiError(response.status);
+    throw await apiError(response);
   }
 
   return response.json() as Promise<T>;
@@ -35,7 +55,7 @@ export async function apiGetWithCookie<T>(path: string, cookieHeader: string) {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status);
+    throw await apiError(response);
   }
 
   return response.json() as Promise<T>;
@@ -57,7 +77,7 @@ export async function apiSendWithCookie<T>(
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status);
+    throw await apiError(response);
   }
 
   if (response.status === 204) {

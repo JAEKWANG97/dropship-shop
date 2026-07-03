@@ -3,6 +3,7 @@ package com.dropshipshop.api.common.error;
 import java.util.Comparator;
 import java.util.List;
 
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -83,6 +84,14 @@ class ApiExceptionHandler {
 		HttpServletRequest request
 	) {
 		return error(HttpStatus.FORBIDDEN, ApiErrorCode.FORBIDDEN, "Access is denied", request);
+	}
+
+	@ExceptionHandler(OptimisticLockingFailureException.class)
+	ResponseEntity<ApiErrorResponse> handleOptimisticLockingFailure(
+		OptimisticLockingFailureException exception,
+		HttpServletRequest request
+	) {
+		return error(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT, "Order state was just changed. Please refresh and try again.", request);
 	}
 
 	@ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

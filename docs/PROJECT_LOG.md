@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-03 10:01 KST
+
+- 관련 항목: B-043, B-041
+- 작업: 체크아웃 중복 제출과 주문/결제 상태 경합 방지를 구현했다. 체크아웃 생성은 고객 cart row를 비관적 잠금으로 잡은 뒤 cart item을 읽고, 첫 요청이 cart를 비운 뒤 들어오는 중복 요청은 추가 주문을 만들지 않고 명확한 오류로 반환한다. `orders`와 `payment_groups`에는 `version` 컬럼과 JPA `@Version`을 추가했다.
+- 문제·고민: 계좌입금 흐름에서는 중복 입금대기 주문이 생기면 고객 입금과 관리자 입금확인이 꼬인다. 또한 고객 취소와 관리자 입금확인/발주 시작이 동시에 들어오면 상태가 덮어써지는 lost update 위험이 있다.
+- 해결방안: 고객당 활성 checkout 1개 같은 강한 정책은 도입하지 않고, cart row 잠금으로 같은 cart 기반 중복 submit만 막았다. 주문/결제그룹 stale update는 자동 재시도하지 않고 `409 CONFLICT`로 알려 새로고침 후 다시 판단하게 했다.
+- 검증: `cd apps/api && ./gradlew test --tests '*Checkout*' --tests '*OrderOptimisticLocking*' --tests '*ApiExceptionHandlerTest*' --tests '*PostgresMigrationSmoke*'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`.
+- 후속작업: 실제 배포 smoke에서 checkout 더블클릭 UI 메시지와 관리자 주문 액션 충돌 안내가 운영자가 이해할 수 있는지 확인한다.
+
 ## 2026-07-03 09:42 KST
 
 - 관련 항목: B-042, B-039, B-016

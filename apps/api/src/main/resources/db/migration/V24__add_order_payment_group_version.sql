@@ -1,0 +1,5 @@
+ALTER TABLE orders
+    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+
+ALTER TABLE payment_groups
+    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

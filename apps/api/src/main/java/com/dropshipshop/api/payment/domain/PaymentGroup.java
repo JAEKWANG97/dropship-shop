@@ -17,6 +17,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "payment_groups")
@@ -102,6 +103,10 @@ public class PaymentGroup {
 
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
+
+	@Version
+	@Column(nullable = false)
+	private long version;
 
 	protected PaymentGroup() {
 	}
@@ -310,5 +315,9 @@ public class PaymentGroup {
 
 	public String getUnpaidCancelReason() {
 		return unpaidCancelReason;
+	}
+
+	public long getVersion() {
+		return version;
 	}
 }

@@ -67,6 +67,8 @@ Initial error codes:
 - `UPSTREAM_SERVICE_ERROR`: external provider or upstream service failed.
 - `INTERNAL_SERVER_ERROR`: unexpected server error.
 
+Order and payment state conflicts caused by optimistic locking return `409 CONFLICT` with code `CONFLICT` and the message `Order state was just changed. Please refresh and try again.` The client should not retry automatically; the user or admin should reload the latest state before submitting another action.
+
 ## Grouping Index
 
 - Customer: catalog browsing, cart, checkout, orders, shipment, claims, account profile.
@@ -311,7 +313,9 @@ Rules:
 - Checkout request includes shipping address fields directly.
 - Server calculates all totals and ignores client-submitted totals.
 - Checkout creation groups cart items by supplier as the MVP delivery-group boundary.
+- Checkout creation pessimistically locks the customer's cart row before reading cart items to prevent duplicate submit from creating two payment groups.
 - Checkout creation empties the cart after payment group and orders are created.
+- A duplicate checkout submit after the first transaction commits returns `400 BUSINESS_RULE_VIOLATION` with `Checkout was already submitted for this cart. Please check your checkout or cart.`
 - Checkout create/read responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notice.
 - Checkout create/read responses include `bankTransferDeposit` with bank name, account number, account holder, depositor name, amount, deadline, and cash receipt notice.
 - Policy confirmation is stored separately on the payment group before admin deposit confirmation.
@@ -434,6 +438,7 @@ Rules:
 - Admin deposit confirmation creates a `BANK_TRANSFER` payment row, marks the payment group `APPROVED`, and moves all checkout orders to `SUPPLIER_ORDER_PENDING`.
 - Admin unpaid cancellation requires a reason and moves all checkout orders to `CANCELLED`.
 - Admin deposit mismatch memo keeps checkout orders `PAYMENT_PENDING`.
+- Stale customer/admin order or payment group updates are rejected with `409 CONFLICT` instead of overwriting the latest state.
 - Admin order detail exposes internal order/payment/fulfillment statuses plus supplier, product option, customer shipping, and payment summary fields.
 - Supplier work start requires a reason and records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId`.
 - Supplier order completion requires `supplierOrderNumber` and reason. `expectedShipDate` and `supplierResponseMemo` are optional evidence fields.

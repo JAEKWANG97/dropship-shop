@@ -483,6 +483,7 @@ Open note:
 - `supplier_order_started_at`
 - `address_locked_at`
 - `address_locked_by_admin_id`
+- `version`
 - `created_at`
 - `updated_at`
 
@@ -570,6 +571,7 @@ Implemented by DS-8 as the checkout payment aggregate. DS-9 adds PG approval tra
 - `unpaid_cancelled_by_admin_id`
 - `unpaid_cancelled_at`
 - `unpaid_cancel_reason`
+- `version`
 - `created_at`
 - `updated_at`
 

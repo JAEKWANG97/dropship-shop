@@ -1,5 +1,23 @@
 # Decision Log
 
+## 2026-07-03: Checkout And Order State Concurrency Guard
+
+Decision:
+
+Use a pessimistic write lock on the customer's cart row during checkout creation, and use optimistic locking on `orders` and `payment_groups` for order/payment state changes. Do not auto-retry optimistic lock conflicts; return `409 CONFLICT` and require the user or admin to refresh and retry the action.
+
+Context:
+
+The MVP payment flow is direct bank transfer. If a checkout submit is duplicated, two payment-pending order sets can be created for the same cart and one becomes a ghost order. Separately, order and payment state transitions are read-check-write operations, so concurrent customer cancellation and admin deposit/supplier actions can otherwise overwrite each other.
+
+Consequences:
+
+- Checkout creation locks the cart row first, then reads cart items. A duplicate request waits for the first transaction and then sees an empty cart.
+- Duplicate checkout submission returns a clear business-rule error instead of creating a second payment group.
+- `orders.version` and `payment_groups.version` reject stale commits.
+- A stale order/payment action returns the standard API error body with HTTP `409` and code `CONFLICT`.
+- Automatic retry is intentionally excluded because these conflicts represent state decisions that should be rechecked by a customer or operator.
+
 ## 2026-07-03: MVP Payment Flow Changes To Direct Bank Transfer
 
 Decision:

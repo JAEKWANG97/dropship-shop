@@ -16,8 +16,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.account.AccountAgreementService;
 import com.dropshipshop.api.account.AccountProfileService;
+import com.dropshipshop.api.cart.domain.Cart;
 import com.dropshipshop.api.cart.domain.CartItem;
 import com.dropshipshop.api.cart.repository.CartItemRepository;
+import com.dropshipshop.api.cart.repository.CartRepository;
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
 import com.dropshipshop.api.catalog.domain.ProductOption;
@@ -46,6 +48,7 @@ public class CheckoutService {
 
 	private static final SecureRandom RANDOM = new SecureRandom();
 
+	private final CartRepository cartRepository;
 	private final CartItemRepository cartItemRepository;
 	private final ProductNoticeRepository productNoticeRepository;
 	private final PaymentGroupRepository paymentGroupRepository;
@@ -60,6 +63,7 @@ public class CheckoutService {
 	private final Clock clock;
 
 	public CheckoutService(
+		CartRepository cartRepository,
 		CartItemRepository cartItemRepository,
 		ProductNoticeRepository productNoticeRepository,
 		PaymentGroupRepository paymentGroupRepository,
@@ -72,6 +76,7 @@ public class CheckoutService {
 		CustomerPolicyLinkService customerPolicyLinkService,
 		BankTransferProperties bankTransferProperties
 	) {
+		this.cartRepository = cartRepository;
 		this.cartItemRepository = cartItemRepository;
 		this.productNoticeRepository = productNoticeRepository;
 		this.paymentGroupRepository = paymentGroupRepository;
@@ -91,9 +96,14 @@ public class CheckoutService {
 		UserAccount user = findUser(userId);
 		accountAgreementService.requireCurrentAgreement(userId);
 		accountProfileService.requireRequiredInfo(userId);
-		List<CartItem> cartItems = cartItemRepository.findAllByCart_User_IdOrderByCreatedAtAsc(userId);
+		Cart cart = cartRepository.findByUserIdForUpdate(userId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty"));
+		List<CartItem> cartItems = cartItemRepository.findAllByCart_IdOrderByCreatedAtAsc(cart.getId());
 		if (cartItems.isEmpty()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");
+			throw new ResponseStatusException(
+				HttpStatus.BAD_REQUEST,
+				"Checkout was already submitted for this cart. Please check your checkout or cart."
+			);
 		}
 		validateSellability(cartItems);
 
