@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -31,6 +32,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
+import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
 import jakarta.servlet.http.Cookie;
@@ -201,6 +203,45 @@ class OAuthLoginApiIntegrationTest {
 				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.userId", is(admin.getId().toString())));
+	}
+
+	@Test
+	void rejoiningWithDeletedSocialAccountCreatesNewCustomer() throws Exception {
+		UserAccount deleted = userAccountRepository.save(new UserAccount(
+			SocialProvider.GOOGLE,
+			"deleted-google-user",
+			"deleted-before@example.com",
+			"Deleted",
+			UserRole.CUSTOMER
+		));
+		deleted.deleteAndAnonymize(Instant.now());
+		userAccountRepository.saveAndFlush(deleted);
+		fakeOAuthProviderClient.profile(
+			SocialProvider.GOOGLE,
+			"rejoin-code",
+			new OAuthProfile("deleted-google-user", "rejoin@example.com", "Rejoin")
+		);
+
+		Cookie stateCookie = stateCookie();
+
+		MvcResult callbackResult = mockMvc.perform(get("/api/auth/oauth2/google/callback")
+				.param("code", "rejoin-code")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie))
+			.andExpect(status().isFound())
+			.andExpect(cookie().exists("ACCESS_TOKEN"))
+			.andReturn();
+
+		UserAccount rejoined = userAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, "deleted-google-user")
+			.orElseThrow();
+		assertThat(rejoined.getId()).isNotEqualTo(deleted.getId());
+		assertThat(rejoined.getStatus()).isEqualTo(UserStatus.ACTIVE);
+		assertThat(rejoined.getEmail()).isEqualTo("rejoin@example.com");
+
+		mockMvc.perform(get("/api/me")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId", is(rejoined.getId().toString())));
 	}
 
 	@Test

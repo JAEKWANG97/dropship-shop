@@ -63,6 +63,12 @@ public class UserAccount {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
+
+	@Column(name = "anonymized_at")
+	private Instant anonymizedAt;
+
 	protected UserAccount() {
 	}
 
@@ -138,11 +144,34 @@ public class UserAccount {
 		this.phoneVerifiedAt = verifiedAt;
 	}
 
+	public void deleteAndAnonymize(Instant processedAt) {
+		if (status == UserStatus.DELETED) {
+			throw new IllegalStateException("User account is already deleted");
+		}
+		String deletedToken = "deleted-" + id;
+		this.status = UserStatus.DELETED;
+		this.providerUserId = deletedToken;
+		this.email = deletedToken + "@deleted.local";
+		this.displayName = "탈퇴회원";
+		this.phoneNumber = null;
+		this.phoneVerifiedAt = null;
+		this.deletedAt = processedAt;
+		this.anonymizedAt = processedAt;
+	}
+
 	public Instant getCreatedAt() {
 		return createdAt;
 	}
 
 	public Instant getUpdatedAt() {
 		return updatedAt;
+	}
+
+	public Instant getDeletedAt() {
+		return deletedAt;
+	}
+
+	public Instant getAnonymizedAt() {
+		return anonymizedAt;
 	}
 }

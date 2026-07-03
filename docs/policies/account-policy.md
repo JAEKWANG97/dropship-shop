@@ -79,6 +79,11 @@ Status: Confirmed
 - 회원 탈퇴 시 `User.status`를 `DELETED`로 바꾸고 고객 프로필과 소셜 계정 연결은 삭제 또는 비식별화해야 한다.
 - 법정 보존이 필요한 주문, 결제, 배송, 클레임 기록은 탈퇴 후에도 분리 보관해야 한다.
 - 탈퇴 후 같은 소셜 계정으로 재가입하면 새 고객 계정으로 생성하고 기존 주문 내역은 고객 화면에 자동 복구하지 않는다.
+- MVP 회원 탈퇴는 즉시 완전 삭제가 아니라 `status=DELETED`, `deleted_at`, `anonymized_at` 기록과 개인식별정보 비식별화로 처리한다.
+- 탈퇴 시 `email`은 `deleted-{userId}@deleted.local`, `display_name`은 `탈퇴회원`, `phone_number`와 `phone_verified_at`은 null로 바꾼다.
+- MVP 소셜 연결은 별도 `social_accounts` 테이블이 아니라 `users.provider/provider_user_id`에 저장되어 있으므로, 탈퇴 시 `provider_user_id`를 `deleted-{userId}`로 비식별화한다. 이로써 같은 소셜 계정 재로그인은 새 계정을 만든다.
+- 진행 중 주문, 환불, 클레임이 하나라도 있으면 회원 탈퇴를 즉시 처리하지 않고 400으로 거부한다. 진행 중 주문은 `DELIVERED`, `CANCELLED`, `REFUNDED`, `EXPIRED`가 아닌 주문이다. 진행 중 환불은 `COMPLETED`, `REJECTED`가 아닌 환불이고, 진행 중 클레임은 `COMPLETED`, `REJECTED`, `WITHDRAWN`이 아닌 클레임이다.
+- 이번 MVP에서는 별도 `LegalRetentionRecord` 색인 테이블을 만들지 않는다. 주문, 결제, 배송, 환불, 클레임, 약관 동의 기록은 비식별화된 유저 row를 참조한 채 보존해 참조 무결성과 법정 보존 근거를 유지한다.
 
 ## Open Questions
 

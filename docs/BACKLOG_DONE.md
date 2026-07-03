@@ -4,6 +4,10 @@
 
 ## 2026-07-03
 
+- B-014 회원 탈퇴 요청 흐름
+  - 커밋: `feat: add account deletion flow`
+  - 완료 내용: `users.deleted_at`, `users.anonymized_at` 컬럼을 추가하고, `POST /api/me/deletion-request` 고객 API를 구현했다. 탈퇴 시 개인정보와 소셜 provider user id를 비식별화하고 `ACCESS_TOKEN` 쿠키를 삭제한다. 진행 중 주문/환불/클레임이 있으면 사유와 주문번호를 포함해 400으로 거부한다. 계정 화면에는 되돌릴 수 없는 탈퇴 안내와 확인 체크박스를 추가했다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*AccountDeletionApiIntegrationTest' --tests '*OAuthLoginApiIntegrationTest'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`
 - B-046 sanitizer/업로드 검증 강화
   - 커밋: `feat: harden catalog content validation`, `test: cover webp image upload validation`
   - 완료 내용: 상품 상세 HTML sanitizer를 regex blacklist에서 jsoup safelist로 교체하고, 허용 태그/속성/protocol만 보존하게 했다. 이미지 업로드는 확장자 검증에 더해 `jpg/jpeg`, `png`, `webp` 매직 바이트를 확인하고, `/uploads/products/**` 응답에 `X-Content-Type-Options: nosniff`를 앱 레벨에서 적용했다.

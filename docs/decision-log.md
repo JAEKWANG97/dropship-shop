@@ -849,3 +849,25 @@ Consequences:
 - Customer inquiries are accepted without login through `/support` and listed for admins at `/admin/inquiries`.
 - Reply workflow, inquiry assignment, and customer center SLA are deferred until inquiry volume requires them.
 - Legal text remains an MVP draft and requires final launch review.
+
+## 2026-07-03: B-014 Account Deletion And Legal Retention Boundary
+
+Decision:
+
+회원 탈퇴는 즉시 물리 삭제가 아니라 `users.status=DELETED`, `deleted_at`, `anonymized_at` 기록과 개인식별정보 비식별화로 처리한다. 이메일은 `deleted-{userId}@deleted.local`, 표시 이름은 `탈퇴회원`, 휴대폰 번호와 인증 시각은 null로 바꾸고, 현재 MVP 소셜 연결 값인 `provider_user_id`는 `deleted-{userId}`로 바꾼다.
+
+진행 중 주문, 환불, 클레임이 있으면 탈퇴를 400으로 거부한다. 종결 주문은 `DELIVERED`, `CANCELLED`, `REFUNDED`, `EXPIRED`이며, 종결 환불은 `COMPLETED`, `REJECTED`, 종결 클레임은 `COMPLETED`, `REJECTED`, `WITHDRAWN`이다.
+
+별도 `LegalRetentionRecord` 색인 테이블은 이번 범위에서 만들지 않는다. 주문, 결제, 배송, 환불, 클레임, 약관 동의 기록은 비식별화된 유저 row를 참조한 채 보존한다. 법정 보존 기간 만료 후 자동 완전 삭제와 보존 색인은 후속 운영 이슈로 둔다.
+
+Context:
+
+탈퇴 후 같은 소셜 계정 재가입은 새 고객 계정으로 시작해야 하지만, 현재 구현은 별도 `social_accounts` 테이블 없이 `users.provider/provider_user_id` unique 제약으로 소셜 식별자를 저장한다. 또한 주문/환불/클레임 기록은 참조 무결성과 법정 보존이 필요하다.
+
+Consequences:
+
+- `users.deleted_at`, `users.anonymized_at` 컬럼을 추가한다.
+- OAuth 로그인은 `ACTIVE` 유저의 provider identity만 재사용한다.
+- 탈퇴 성공 후 기존 JWT는 DB status 검사에서 인증되지 않는다.
+- 고객 화면에는 되돌릴 수 없는 탈퇴 안내와 확인 체크박스를 둔다.
+- 별도 법정 보존 색인과 보존 기간 만료 자동 삭제는 후속 범위로 남긴다.

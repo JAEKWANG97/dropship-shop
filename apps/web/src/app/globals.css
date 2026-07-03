@@ -472,6 +472,15 @@ p {
   font-weight: 800;
 }
 
+.account-form .checkbox-label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.account-form .checkbox-label input {
+  margin-top: 3px;
+}
+
 .login-panel {
   display: grid;
   gap: 16px;

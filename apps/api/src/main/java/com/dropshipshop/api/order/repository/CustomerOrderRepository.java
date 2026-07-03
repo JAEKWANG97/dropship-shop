@@ -20,6 +20,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UU
 
 	List<CustomerOrder> findAllByUser_IdAndStatusInOrderByCreatedAtDesc(UUID userId, Collection<OrderStatus> statuses);
 
+	List<CustomerOrder> findTop5ByUser_IdAndStatusNotInOrderByCreatedAtDesc(UUID userId, Collection<OrderStatus> statuses);
+
 	Optional<CustomerOrder> findByIdAndUser_Id(UUID id, UUID userId);
 
 	boolean existsByOrderNumber(String orderNumber);

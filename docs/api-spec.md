@@ -112,7 +112,7 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 | `POST` | `/api/me/addresses` | `CUSTOMER` | Implemented | Create shipping address |
 | `PATCH` | `/api/me/addresses/{addressId}` | `CUSTOMER` | Implemented | Update shipping address |
 | `DELETE` | `/api/me/addresses/{addressId}` | `CUSTOMER` | Implemented | Delete shipping address |
-| `POST` | `/api/me/deletion-request` | Authenticated user | Planned | Request account deletion |
+| `POST` | `/api/me/deletion-request` | `CUSTOMER` | Implemented | Delete/anonymize current customer account and clear access token cookie. Rejects while any order/refund/claim is still in progress. |
 
 Notes:
 

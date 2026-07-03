@@ -23,6 +23,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
+import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
 import jakarta.servlet.http.Cookie;
@@ -95,7 +96,11 @@ class OAuthLoginService {
 		SocialProvider provider = provider(providerValue);
 		configuredSettings(provider);
 		OAuthProfile profile = fetchProfile(provider, code);
-		UserAccount user = userAccountRepository.findByProviderAndProviderUserId(provider, profile.providerUserId())
+		UserAccount user = userAccountRepository.findByProviderAndProviderUserIdAndStatus(
+				provider,
+				profile.providerUserId(),
+				UserStatus.ACTIVE
+			)
 			.orElseGet(() -> userAccountRepository.save(new UserAccount(
 				provider,
 				profile.providerUserId(),

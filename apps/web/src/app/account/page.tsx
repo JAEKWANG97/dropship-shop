@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { getProfileCompletion } from "@/lib/account";
 import { getCurrentUser } from "@/lib/session";
-import { confirmPhoneVerification, requestPhoneVerification, updateProfile } from "./actions";
+import {
+  confirmPhoneVerification,
+  requestAccountDeletion,
+  requestPhoneVerification,
+  updateProfile,
+} from "./actions";
 
 type AccountPageProps = {
   searchParams: Promise<{ message?: string }>;
@@ -111,6 +116,23 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       <form action="/auth/logout" method="post">
         <button className="button" type="submit">
           로그아웃
+        </button>
+      </form>
+      <form action={requestAccountDeletion} className="account-form">
+        <h2>회원 탈퇴</h2>
+        <div className="notice danger">
+          <strong>탈퇴 전 확인</strong>
+          <span>
+            탈퇴하면 로그인 정보와 연락처가 비식별화되고, 진행 중인 주문·환불·클레임이 있으면 처리할 수 없습니다.
+            법정 보존이 필요한 거래 기록은 분쟁 대응과 법령 준수를 위해 보관됩니다.
+          </span>
+        </div>
+        <label className="checkbox-label">
+          <input name="confirmDeletion" required type="checkbox" value="yes" />
+          <span>위 내용을 확인했으며 회원 탈퇴를 요청합니다.</span>
+        </label>
+        <button className="button" type="submit">
+          회원 탈퇴 요청
         </button>
       </form>
     </section>

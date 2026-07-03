@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-03 13:31 KST
+
+- 관련 항목: B-014
+- 작업: 고객 회원 탈퇴 요청 흐름을 구현했다. `users.deleted_at`, `users.anonymized_at` 컬럼을 추가하고, `POST /api/me/deletion-request`에서 진행 중 주문/환불/클레임 가드 후 `status=DELETED`와 개인정보 비식별화를 처리한다. 계정 화면에는 탈퇴 안내와 확인 체크박스를 추가했다.
+- 문제·고민: 탈퇴는 개인정보 삭제 요구와 전자상거래 법정 보존 기록이 충돌할 수 있다. 또한 현재 구현은 별도 `SocialAccount` 테이블 없이 `users.provider/provider_user_id` unique 제약으로 소셜 식별자를 관리한다.
+- 해결방안: MVP에서는 별도 `LegalRetentionRecord` 색인 테이블을 만들지 않고, 주문·결제·배송·환불·클레임·약관 동의 기록은 비식별화된 유저 row 참조로 보존한다. 탈퇴 시 `provider_user_id`를 `deleted-{userId}`로 바꾸고 OAuth 로그인은 `ACTIVE` 유저만 재사용하도록 해 같은 소셜 계정 재가입이 새 계정으로 생성되게 했다.
+- 결정: 진행 중 주문은 `DELIVERED`, `CANCELLED`, `REFUNDED`, `EXPIRED`가 아닌 주문으로 본다. 진행 중 환불은 `COMPLETED`, `REJECTED`가 아닌 환불, 진행 중 클레임은 `COMPLETED`, `REJECTED`, `WITHDRAWN`이 아닌 클레임으로 보고 탈퇴를 막는다.
+- 후속작업: 법정 보존 기간 만료 후 자동 완전 삭제, `LegalRetentionRecord` 색인, 관리자 탈퇴 회원 조회는 후속 운영 이슈로 분리한다.
+
 ## 2026-07-03 11:34 KST
 
 - 관련 항목: B-046

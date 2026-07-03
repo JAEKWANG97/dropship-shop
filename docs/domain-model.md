@@ -46,12 +46,14 @@ CustomerInquiry
 Implemented fields:
 
 - id
+- provider
+- providerUserId
 - email
-- name
-- phone
+- displayName
+- phoneNumber
 - phoneVerifiedAt
 - role: CUSTOMER / ADMIN
-- status: ACTIVE / SUSPENDED / DELETED
+- status: ACTIVE / DELETED
 - deletedAt
 - anonymizedAt
 - createdAt
@@ -72,11 +74,18 @@ B-017 implementation notes:
 - 소셜 로그인 placeholder 이메일은 고객 연락 주소로 보지 않는다.
 - 휴대폰 번호는 SMS OTP 성공 후 `phone`/`phoneVerifiedAt`에 저장한다.
 
+B-014 implementation notes:
+
+- 회원 탈퇴는 `status=DELETED`, `deletedAt`, `anonymizedAt` 기록과 개인식별정보 비식별화로 처리한다.
+- `email`은 `deleted-{userId}@deleted.local`, `displayName`은 `탈퇴회원`, `phoneNumber`/`phoneVerifiedAt`은 null로 바꾼다.
+- 현재 구현은 별도 `SocialAccount` 테이블 없이 `User.provider/providerUserId`를 소셜 연결로 사용한다. 탈퇴 시 `providerUserId`를 `deleted-{userId}`로 바꿔 같은 소셜 계정 재가입이 새 계정을 만들게 한다.
+- 진행 중 주문, 환불, 클레임이 있으면 탈퇴를 거부한다. 법정 보존 대상 거래 기록은 비식별화된 유저 참조로 보존한다.
+
 ## SocialAccount
 
 카카오, 구글, 네이버 소셜 로그인 식별 정보를 나타낸다.
 
-Implemented fields:
+Planned fields:
 
 - id
 - userId
@@ -88,6 +97,10 @@ Implemented fields:
 - unlinkedAt
 - createdAt
 - updatedAt
+
+MVP implementation note:
+
+- B-014 기준 현재 구현은 `SocialAccount` 테이블을 만들지 않고 `users.provider/provider_user_id`를 사용한다. 복수 provider 연결, 계정 병합, 소셜 연결 해제가 필요해질 때 별도 테이블로 분리한다.
 
 ## UserAddress
 
@@ -1048,8 +1061,8 @@ Suggested fields:
 - 소셜 제공자가 이메일을 내려주는 경우 이메일을 저장할 수 있지만, 소셜 이메일은 필수 항목으로 두지 않는다.
 - 이메일 또는 전화번호 같은 고객 연락처는 소셜 로그인 필수 항목이 아니라 주문, 배송, 클레임에 필요한 시점에 서비스 화면에서 수집한다.
 - 회원 탈퇴 시 고객 프로필과 소셜 계정 연결은 삭제 또는 비식별화한다.
-- 법정 보존 대상 주문, 결제, 배송, 클레임, 정책 동의 기록은 탈퇴 후에도 분리 보관한다.
-- 법정 보존 기록은 보존 사유와 보존 만료일을 저장한다.
+- 법정 보존 대상 주문, 결제, 배송, 클레임, 정책 동의 기록은 탈퇴 후에도 보존한다.
+- MVP에서는 별도 `LegalRetentionRecord` 색인 테이블을 만들지 않고 비식별화된 유저 참조로 거래 기록을 보존한다. 보존 사유와 보존 만료일 색인은 후속 법정 보존 자동화 범위에서 추가한다.
 - 전자상거래 표시/광고 기록은 6개월, 계약/청약철회 기록은 5년, 대금결제/재화 공급 기록은 5년, 소비자 불만/분쟁 처리 기록은 3년 보존 기준으로 시작한다.
 - 탈퇴 후 같은 소셜 계정으로 재가입하면 새 고객 계정으로 생성하고 기존 주문 내역은 고객 화면에 자동 복구하지 않는다.
 - 푸터와 고객센터/회사 정보 페이지에는 사업자 정보, 통신판매업 신고 정보, 고객센터, 개인정보 보호책임자 정보를 표시한다.

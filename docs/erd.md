@@ -22,6 +22,7 @@
 - Business profile and privacy processing item tables: implemented in `apps/api/src/main/resources/db/migration/V18__create_legal_disclosures.sql`.
 - Customer required info and phone verification fields: implemented in `apps/api/src/main/resources/db/migration/V19__add_customer_required_info.sql`.
 - Bank-transfer checkout/deposit and manual refund fields: implemented in `apps/api/src/main/resources/db/migration/V23__add_bank_transfer_payment_fields.sql`.
+- User deletion timestamp fields: implemented in `apps/api/src/main/resources/db/migration/V26__add_user_deletion_fields.sql`.
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -54,6 +55,8 @@ erDiagram
         varchar status
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
+        timestamptz anonymized_at
     }
 
     USER_POLICY_AGREEMENTS {
@@ -108,9 +111,9 @@ Additional implemented table groups:
 
 Deletion/rejoin note:
 
-- Current `users(provider, provider_user_id)` uniqueness blocks rejoining with the same social account unless deletion anonymizes or tombstones provider identity.
-- Before account deletion is implemented, add a migration strategy: either split `social_accounts` with active-only uniqueness, or update deleted rows so provider identity no longer conflicts with a new account.
-- Add `deleted_at` and `anonymized_at` or equivalent fields before implementing account deletion.
+- B-014 implements account deletion by setting `users.status=DELETED`, recording `deleted_at` and `anonymized_at`, and anonymizing `provider_user_id` to `deleted-{userId}`.
+- Same-provider rejoin creates a new active `users` row because OAuth lookup only reuses `ACTIVE` social identity rows.
+- Legal-retention commerce records remain linked to the anonymized user row in MVP. A separate `LegalRetentionRecord` index remains planned for future retention-period automation.
 
 ## MVP Planned ERD
 

@@ -13,5 +13,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
 	Optional<UserAccount> findByProviderAndProviderUserId(SocialProvider provider, String providerUserId);
 
+	Optional<UserAccount> findByProviderAndProviderUserIdAndStatus(
+		SocialProvider provider,
+		String providerUserId,
+		UserStatus status
+	);
+
 	Optional<UserAccount> findByIdAndStatus(UUID id, UserStatus status);
 }
