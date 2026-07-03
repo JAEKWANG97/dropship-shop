@@ -1,8 +1,11 @@
 export const API_BASE_URL =
   process.env.DROPSHIP_API_BASE_URL ?? "http://localhost:8080";
 
+const DEFAULT_PUBLIC_API_BASE_URL =
+  process.env.NODE_ENV === "development" ? "http://localhost:8080" : "";
+
 export const PUBLIC_API_BASE_URL =
-  process.env.NEXT_PUBLIC_DROPSHIP_API_BASE_URL ?? "";
+  process.env.NEXT_PUBLIC_DROPSHIP_API_BASE_URL ?? DEFAULT_PUBLIC_API_BASE_URL;
 
 export function apiUrl(path: string) {
   return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
