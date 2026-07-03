@@ -1,12 +1,15 @@
 package com.dropshipshop.api.catalog;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.safety.Safelist;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,11 +46,24 @@ import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 @Service
 public class CatalogService {
 
-	private static final Pattern SCRIPT_TAG = Pattern.compile("(?is)<script.*?</script>");
-	private static final Pattern EVENT_ATTRIBUTE = Pattern.compile("(?i)\\son[a-z]+\\s*=\\s*(['\"]).*?\\1");
-	private static final Pattern JAVASCRIPT_URL = Pattern.compile("(?i)javascript:");
 	private static final List<String> ALLOWED_IMAGE_EXTENSIONS = List.of(".jpg", ".jpeg", ".png", ".webp");
 	private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+	private static final Safelist PRODUCT_DETAIL_HTML_SAFELIST = Safelist.none()
+		.addTags(
+			"p", "br", "b", "strong", "i", "em",
+			"ul", "ol", "li",
+			"h1", "h2", "h3", "h4",
+			"span", "div",
+			"table", "tr", "td", "th",
+			"a", "img"
+		)
+		.addAttributes("a", "href")
+		.addAttributes("img", "src", "alt")
+		.addProtocols("a", "href", "http", "https")
+		.addProtocols("img", "src", "http", "https")
+		.preserveRelativeLinks(true);
+	private static final Document.OutputSettings PRODUCT_DETAIL_HTML_OUTPUT = new Document.OutputSettings()
+		.prettyPrint(false);
 	private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("5.00");
 	private static final BigDecimal DEFAULT_TAX_BUFFER_RATE = new BigDecimal("10.00");
 	private static final BigDecimal DEFAULT_OVERHEAD_RATE = new BigDecimal("5.00");
@@ -284,6 +300,7 @@ public class CatalogService {
 		if (!ALLOWED_IMAGE_EXTENSIONS.contains(extension)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported image extension");
 		}
+		validateImageContent(file, extension);
 		String objectKey = productId + "/" + UUID.randomUUID() + extension;
 		StoredFile storedFile;
 		try {
@@ -491,9 +508,56 @@ public class CatalogService {
 		if (html == null) {
 			return null;
 		}
-		String withoutScripts = SCRIPT_TAG.matcher(html).replaceAll("");
-		String withoutEventAttributes = EVENT_ATTRIBUTE.matcher(withoutScripts).replaceAll("");
-		return JAVASCRIPT_URL.matcher(withoutEventAttributes).replaceAll("");
+		return Jsoup.clean(html, "https://coreable-saf.com", PRODUCT_DETAIL_HTML_SAFELIST, PRODUCT_DETAIL_HTML_OUTPUT);
+	}
+
+	private void validateImageContent(MultipartFile file, String extension) {
+		byte[] header;
+		try (var inputStream = file.getInputStream()) {
+			header = inputStream.readNBytes(12);
+		} catch (IOException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file");
+		}
+		boolean valid = switch (extension) {
+			case ".jpg", ".jpeg" -> isJpeg(header);
+			case ".png" -> isPng(header);
+			case ".webp" -> isWebp(header);
+			default -> false;
+		};
+		if (!valid) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file");
+		}
+	}
+
+	private boolean isJpeg(byte[] header) {
+		return header.length >= 3
+			&& (header[0] & 0xFF) == 0xFF
+			&& (header[1] & 0xFF) == 0xD8
+			&& (header[2] & 0xFF) == 0xFF;
+	}
+
+	private boolean isPng(byte[] header) {
+		return header.length >= 8
+			&& (header[0] & 0xFF) == 0x89
+			&& header[1] == 0x50
+			&& header[2] == 0x4E
+			&& header[3] == 0x47
+			&& header[4] == 0x0D
+			&& header[5] == 0x0A
+			&& header[6] == 0x1A
+			&& header[7] == 0x0A;
+	}
+
+	private boolean isWebp(byte[] header) {
+		return header.length >= 12
+			&& header[0] == 0x52
+			&& header[1] == 0x49
+			&& header[2] == 0x46
+			&& header[3] == 0x46
+			&& header[8] == 0x57
+			&& header[9] == 0x45
+			&& header[10] == 0x42
+			&& header[11] == 0x50;
 	}
 
 	private String thumbnailUrl(List<ProductImage> images) {

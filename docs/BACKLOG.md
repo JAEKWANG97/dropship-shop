@@ -149,20 +149,6 @@ Tasks:
 - [x] 취소/환불 정책 문서와 API 문서를 함께 갱신한다.
 - [x] 배송완료 후 반품 환불 회귀 테스트를 추가한다.
 
-### B-046 sanitizer/업로드 검증 강화
-
-Status: Todo
-
-Notes:
-- 관리자 입력 상세 HTML과 업로드 이미지는 고객 공개 화면으로 노출되므로 출시 전 방어선을 강화한다.
-
-Tasks:
-- [ ] 상세 HTML sanitizer를 safelist 기반으로 강화하거나 검증된 sanitizer로 교체한다.
-- [ ] 이미지 업로드에서 확장자뿐 아니라 magic byte를 확인한다.
-- [ ] 업로드 응답에 `X-Content-Type-Options: nosniff`를 적용한다.
-- [ ] HTML 상세 블록 XSS 회귀 테스트를 추가한다.
-- [ ] 미지원 파일 업로드 회귀 테스트를 추가한다.
-
 ### B-013 출시 전 모바일/디자인 QA 정리
 
 Status: Todo

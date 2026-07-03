@@ -926,7 +926,7 @@ Implement admin product image binary upload with local file storage.
 Acceptance criteria:
 
 - `POST /api/admin/products/{productId}/images/upload` accepts multipart image file upload for admins.
-- Upload validates non-empty file, max 5MB size, and allowed extensions `jpg`, `jpeg`, `png`, `webp`.
+- Upload validates non-empty file, max 10MB size, allowed extensions `jpg`, `jpeg`, `png`, `webp`, and actual image file signature.
 - Uploaded files are stored under local product image storage and exposed through `/uploads/products/**`.
 - Upload response returns `imageUrl`, `objectKey`, size, and content type.
 - Existing product image metadata API can use the uploaded `imageUrl`.

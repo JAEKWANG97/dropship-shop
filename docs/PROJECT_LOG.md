@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-03 11:34 KST
+
+- 관련 항목: B-046
+- 작업: 상품 상세 HTML과 업로드 이미지 방어선을 강화했다. `CatalogService`의 정규식 blacklist sanitizer를 jsoup safelist로 교체하고, 이미지 업로드에 확장자별 매직 바이트 검증을 추가했으며 `/uploads/products/**` 응답에 `X-Content-Type-Options: nosniff`를 적용했다.
+- 문제·고민: HTML 상세는 고객 화면에서 `dangerouslySetInnerHTML`로 렌더링되므로 저장 시점 sanitize가 실패하면 저장형 XSS가 된다. `ImageIO` 디코딩은 PNG/JPEG에는 단순하지만 기본 JDK에서 WebP 지원이 불확실하다.
+- 해결방안: jsoup `Safelist`로 허용 태그/속성/protocol만 통과시키고 이벤트 속성, `javascript:`/`data:` URL, `script`, `iframe`, `svg`를 제거했다. 이미지는 새 의존성 없이 `jpg/jpeg`, `png`, `webp` 파일 시그니처를 직접 확인한다.
+- 결정: 이미지 크기 제한은 현재 구현 기준인 10MB로 문서화하고, 바이러스 스캔/리사이징/CDN 전환은 이번 범위에서 제외한다. B-042~B-046 외부 리뷰 후속 보안/운영 이슈 큐는 이번 작업으로 모두 마무리한다.
+- 후속작업: 배포 URL 기준 Playwright smoke와 실주문 전 운영 readiness 점검(B-016)을 이어서 닫는다.
+
 ## 2026-07-03 11:17 KST
 
 - 관련 항목: B-045

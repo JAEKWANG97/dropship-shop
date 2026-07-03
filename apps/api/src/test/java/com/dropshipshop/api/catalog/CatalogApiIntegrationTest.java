@@ -11,10 +11,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+
+import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +30,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -32,6 +40,7 @@ import com.dropshipshop.api.catalog.repository.ProductChangeHistoryRepository;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 class CatalogApiIntegrationTest {
 
 	@Autowired
@@ -78,11 +87,12 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.totalMarkupRate", is(25.0)));
 
 		UUID productId = createProduct(supplierId);
+		byte[] pngImage = imageBytes("png");
 		MockMultipartFile imageFile = new MockMultipartFile(
 			"file",
-			"thumbnail.webp",
-			"image/webp",
-			"fake-image".getBytes()
+			"thumbnail.png",
+			"image/png",
+			pngImage
 		);
 		MvcResult uploadResult = mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
 				.file(imageFile)
@@ -90,7 +100,7 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageUrl", containsString("/uploads/products/" + productId)))
 			.andExpect(jsonPath("$.objectKey", containsString(productId.toString())))
-			.andExpect(jsonPath("$.size", is(10)))
+			.andExpect(jsonPath("$.size", is(pngImage.length)))
 			.andReturn();
 		String uploadedImageUrl = fieldFrom(uploadResult, "imageUrl");
 
@@ -217,6 +227,81 @@ class CatalogApiIntegrationTest {
 		org.assertj.core.api.Assertions.assertThat(productChangeHistoryRepository.count()).isGreaterThanOrEqualTo(4);
 	}
 
+	@Test
+	void sanitizesProductDetailHtmlWithSafelist() throws Exception {
+		UUID productId = createProduct(createSupplier());
+
+		mockMvc.perform(put("/api/admin/products/{productId}/detail-blocks", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "XSS regression",
+					  "detailBlocks": [
+					    {
+					      "type": "HTML",
+					      "htmlContent": "<div><p>Safe <b>Bold</b></p><img src=x onerror=alert(1)><svg onload=alert(2)></svg><a href='javascript:alert(3)'>bad-js</a><a href='data:text/html;base64,PHNjcmlwdD4='>bad-data</a><a href='https://example.com/ok'>good-link</a><iframe src='https://evil.example'></iframe><script>alert(4)</script><span onclick='bad()' style='color:red'>plain</span><img src='https://cdn.example.com/ok.png' alt='ok' onload='bad()'></div>",
+					      "sortOrder": 1
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", containsString("<p>Safe <b>Bold</b></p>")))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", containsString("href=\"https://example.com/ok\"")))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", containsString("src=\"https://cdn.example.com/ok.png\"")))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", containsString("alt=\"ok\"")))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("onerror"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("onload"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("onclick"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("style="))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("javascript:"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("data:"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("<svg"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("<iframe"))))
+			.andExpect(jsonPath("$.detailBlocks[0].htmlContent", not(containsString("<script"))));
+	}
+
+	@Test
+	void rejectsDisguisedImageUpload() throws Exception {
+		UUID productId = createProduct(createSupplier());
+		MockMultipartFile fakeImage = new MockMultipartFile(
+			"file",
+			"fake.png",
+			"image/png",
+			"<script>alert(1)</script>".getBytes(StandardCharsets.UTF_8)
+		);
+
+		mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
+				.file(fakeImage)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void uploadsValidPngAndJpegAndServesNosniffHeader() throws Exception {
+		UUID productId = createProduct(createSupplier());
+		byte[] pngImage = imageBytes("png");
+		byte[] jpegImage = imageBytes("jpeg");
+
+		MvcResult pngUpload = mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
+				.file(new MockMultipartFile("file", "safe.png", "image/png", pngImage))
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.size", is(pngImage.length)))
+			.andReturn();
+
+		mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
+				.file(new MockMultipartFile("file", "safe.jpg", "image/jpeg", jpegImage))
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.size", is(jpegImage.length)));
+
+		mockMvc.perform(get(fieldFrom(pngUpload, "imageUrl")))
+			.andExpect(status().isOk())
+			.andExpect(header().string("X-Content-Type-Options", "nosniff"));
+	}
+
 	private UUID createSupplier() throws Exception {
 		MvcResult result = mockMvc.perform(post("/api/admin/suppliers")
 				.with(authentication(TestAuthentication.admin()))
@@ -271,5 +356,15 @@ class CatalogApiIntegrationTest {
 		int idStart = idKeyIndex + marker.length();
 		int idEnd = json.indexOf('"', idStart);
 		return json.substring(idStart, idEnd);
+	}
+
+	private byte[] imageBytes(String formatName) throws Exception {
+		BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+		image.setRGB(0, 0, Color.WHITE.getRGB());
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		if (!ImageIO.write(image, formatName, output)) {
+			throw new IllegalStateException("Unsupported test image format: " + formatName);
+		}
+		return output.toByteArray();
 	}
 }

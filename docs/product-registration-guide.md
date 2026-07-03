@@ -7,7 +7,8 @@
 - 대표 이미지: 1:1 정사각형, 1200x1200px, webp 권장
 - 상세 이미지 블록: 16:9, 1600x900px 또는 1920x1080px, webp 권장
 - 허용 파일: jpg, jpeg, png, webp
-- 최대 용량: 5MB
+- 최대 용량: 10MB
+- 파일명 확장자와 실제 이미지 파일 시그니처가 모두 맞아야 업로드된다.
 - 파일명 예시:
   - `ppe-safety-helmet-k2-think-thumb.webp`
   - `ppe-safety-helmet-k2-think-detail-01.webp`

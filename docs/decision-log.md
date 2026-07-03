@@ -128,7 +128,7 @@ Consequences:
 
 Decision:
 
-Use fixed MVP image limits: one thumbnail image, up to ten gallery images, up to fifty detail block images, max 5MB per image, and allowed extensions `jpg`, `jpeg`, `png`, and `webp`.
+Use fixed MVP image limits: one thumbnail image, up to ten gallery images, up to fifty detail block images, max 10MB per image, and allowed extensions `jpg`, `jpeg`, `png`, and `webp`. Upload validation checks both filename extension and actual image file signature.
 
 Context:
 

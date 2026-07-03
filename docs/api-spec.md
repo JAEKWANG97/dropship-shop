@@ -644,7 +644,8 @@ Validation:
 - Up to ten `GALLERY` images per product.
 - Detail block image count follows the detail image policy limit of fifty.
 - Allowed image extensions: `jpg`, `jpeg`, `png`, `webp`.
-- Image size limit: 5MB per image.
+- Image size limit: 10MB per image.
+- Upload validates both filename extension and actual image file signature.
 
 ### Product Detail Blocks Request
 
@@ -662,7 +663,7 @@ Validation:
 
 Validation:
 
-- `HTML` blocks must be sanitized.
+- `HTML` blocks are sanitized by a server-side safelist before storage.
 - `IMAGE` blocks store an image URL or object key.
 - Shipping, cancellation/refund, AS, return/exchange, and out-of-stock notices must not exist only inside arbitrary detail HTML/images.
 
