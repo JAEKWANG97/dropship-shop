@@ -1,16 +1,19 @@
 package com.dropshipshop.api.claim;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -66,6 +70,10 @@ import com.dropshipshop.api.user.repository.UserAccountRepository;
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CustomerCancellationApiIntegrationTest {
+
+	private static final byte[] PNG_BYTES = Base64.getDecoder().decode(
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+	);
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -352,8 +360,8 @@ class CustomerCancellationApiIntegrationTest {
 				.content("""
 					{
 					  "claimType": "EXCHANGE",
-					  "claimReason": "DEFECT",
-					  "customerMemo": "Please exchange defective item"
+					  "claimReason": "SIMPLE_CHANGE_OF_MIND",
+					  "customerMemo": "Please exchange item"
 					}
 					"""))
 			.andExpect(status().isCreated())
@@ -370,12 +378,115 @@ class CustomerCancellationApiIntegrationTest {
 	}
 
 	@Test
+	void listsAndShowsClaimEvidenceForCustomerAndAdmin() throws Exception {
+		UserAccount customer = createCustomer("return-evidence-customer-1");
+		UserAccount otherCustomer = createCustomer("return-evidence-other-customer");
+		CustomerOrder order = createDeliveredOrder(customer, "RETURN-EVIDENCE-1", "RETURN-EVIDENCE-CO-1", 26010, Instant.now());
+		MockMultipartFile evidence = new MockMultipartFile(
+			"evidenceFiles",
+			"defect.png",
+			"image/png",
+			PNG_BYTES
+		);
+
+		MvcResult created = mockMvc.perform(multipart("/api/orders/{orderId}/claims", order.getId())
+				.file(evidence)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.param("claimType", "RETURN")
+				.param("claimReason", "DEFECT")
+				.param("customerMemo", "Product arrived broken"))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.claimReason", is("DEFECT")))
+			.andExpect(jsonPath("$.customerStatus", is("REVIEWING")))
+			.andExpect(jsonPath("$.evidenceFiles", hasSize(1)))
+			.andExpect(jsonPath("$.evidenceFiles[0].originalFilename", is("defect.png")))
+			.andReturn();
+		String claimId = fieldFrom(created, "claimId");
+
+		mockMvc.perform(get("/api/orders/{orderId}/claims", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.claims", hasSize(1)))
+			.andExpect(jsonPath("$.claims[0].claimId", is(claimId)))
+			.andExpect(jsonPath("$.claims[0].evidenceFiles", hasSize(1)));
+
+		mockMvc.perform(get("/api/orders/{orderId}/claims/{claimId}", order.getId(), claimId)
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.claimId", is(claimId)))
+			.andExpect(jsonPath("$.evidenceFiles[0].fileUrl", containsString("/uploads/products/claims/" + claimId)));
+
+		mockMvc.perform(get("/api/orders/{orderId}/claims/{claimId}", order.getId(), claimId)
+				.with(authentication(TestAuthentication.customer(otherCustomer.getId()))))
+			.andExpect(status().isNotFound());
+
+		mockMvc.perform(get("/api/orders/{orderId}/claims", order.getId()))
+			.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.claims", hasSize(1)))
+			.andExpect(jsonPath("$.claims[0].evidenceFiles", hasSize(1)));
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.claim.evidenceFiles", hasSize(1)))
+			.andExpect(jsonPath("$.claim.evidenceFiles[0].originalFilename", is("defect.png")));
+	}
+
+	@Test
+	void requiresValidEvidenceForSellerFaultClaims() throws Exception {
+		UserAccount customer = createCustomer("return-evidence-customer-2");
+		CustomerOrder orderWithoutEvidence = createDeliveredOrder(
+			customer,
+			"RETURN-EVIDENCE-REQUIRED-1",
+			"RETURN-EVIDENCE-REQUIRED-CO-1",
+			26020,
+			Instant.now()
+		);
+		CustomerOrder orderWithFakeEvidence = createDeliveredOrder(
+			customer,
+			"RETURN-EVIDENCE-FAKE-1",
+			"RETURN-EVIDENCE-FAKE-CO-1",
+			26030,
+			Instant.now()
+		);
+
+		mockMvc.perform(post("/api/orders/{orderId}/claims", orderWithoutEvidence.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "RETURN",
+					  "claimReason": "DEFECT",
+					  "customerMemo": "Product arrived broken"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(multipart("/api/orders/{orderId}/claims", orderWithFakeEvidence.getId())
+				.file(new MockMultipartFile(
+					"evidenceFiles",
+					"fake.png",
+					"image/png",
+					"not image".getBytes()
+				))
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.param("claimType", "RETURN")
+				.param("claimReason", "DEFECT")
+				.param("customerMemo", "Product arrived broken"))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void adminReviewsReturnAndExchangeClaimsWithoutChangingOrderStatus() throws Exception {
 		UserAccount customer = createCustomer("return-customer-2");
 		CustomerOrder returnOrder = createDeliveredOrder(customer, "RETURN-REVIEW-1", "RETURN-REVIEW-CO-1", 28000, Instant.now());
 		CustomerOrder exchangeOrder = createDeliveredOrder(customer, "EXCHANGE-REVIEW-1", "EXCHANGE-REVIEW-CO-1", 29000, Instant.now());
-		String returnClaimId = createClaim(customer, returnOrder, "RETURN", "DEFECT", "Broken item");
-		String exchangeClaimId = createClaim(customer, exchangeOrder, "EXCHANGE", "WRONG_DELIVERY", "Wrong item delivered");
+		String returnClaimId = createClaim(customer, returnOrder, "RETURN", "SIMPLE_CHANGE_OF_MIND", "Return item");
+		String exchangeClaimId = createClaim(customer, exchangeOrder, "EXCHANGE", "SIMPLE_CHANGE_OF_MIND", "Exchange item");
 
 		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", returnClaimId)
 				.with(authentication(TestAuthentication.admin()))
@@ -510,7 +621,7 @@ class CustomerCancellationApiIntegrationTest {
 			33000,
 			Instant.now()
 		);
-		String claimId = createClaim(customer, order, "RETURN", "DEFECT", "Return guard claim");
+		String claimId = createClaim(customer, order, "RETURN", "SIMPLE_CHANGE_OF_MIND", "Return guard claim");
 
 		mockMvc.perform(post("/api/orders/{orderId}/claims", order.getId())
 				.with(authentication(TestAuthentication.customer(otherCustomer.getId())))
@@ -626,7 +737,7 @@ class CustomerCancellationApiIntegrationTest {
 	void rejectsApprovedReturnAndKeepsDeliveredOrder() throws Exception {
 		UserAccount customer = createCustomer("return-refund-customer-3");
 		CustomerOrder order = createDeliveredOrder(customer, "RETURN-REJECT-1", "RETURN-REJECT-CO-1", 34000, Instant.now());
-		String claimId = createClaim(customer, order, "RETURN", "DEFECT", "Return for inspection");
+		String claimId = createClaim(customer, order, "RETURN", "SIMPLE_CHANGE_OF_MIND", "Return for inspection");
 
 		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", claimId)
 				.with(authentication(TestAuthentication.admin()))

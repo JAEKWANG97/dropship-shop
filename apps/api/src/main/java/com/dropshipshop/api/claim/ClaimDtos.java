@@ -61,6 +61,8 @@ final class ClaimDtos {
 		ClaimType claimType,
 		ClaimReason claimReason,
 		ClaimStatus status,
+		String customerStatus,
+		String customerStatusLabel,
 		RequestedAction requestedAction,
 		String customerMemo,
 		UUID reviewedByAdminId,
@@ -71,7 +73,23 @@ final class ClaimDtos {
 		String returnReceivedMemo,
 		UUID refundId,
 		Instant completedAt,
-		Instant createdAt
+		Instant createdAt,
+		List<ClaimEvidenceResponse> evidenceFiles
+	) {
+	}
+
+	record ClaimEvidenceResponse(
+		UUID evidenceId,
+		String fileUrl,
+		String originalFilename,
+		String contentType,
+		long sizeBytes,
+		Instant uploadedAt
+	) {
+	}
+
+	record CustomerClaimListResponse(
+		List<ClaimResponse> claims
 	) {
 	}
 

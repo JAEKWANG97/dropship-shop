@@ -236,7 +236,18 @@ final class AdminOrderDtos {
 		String returnReceivedMemo,
 		UUID refundId,
 		Instant completedAt,
-		Instant createdAt
+		Instant createdAt,
+		List<AdminClaimEvidenceResponse> evidenceFiles
+	) {
+	}
+
+	record AdminClaimEvidenceResponse(
+		UUID evidenceId,
+		String fileUrl,
+		String originalFilename,
+		String contentType,
+		long sizeBytes,
+		Instant uploadedAt
 	) {
 	}
 

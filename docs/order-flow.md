@@ -312,8 +312,9 @@ Simple change of mind
 -> Return or exchange shipping cost bearer: CUSTOMER
 
 Seller fault claim
--> Request must be within 3 months from deliveredAt and within 30 days from discovery
--> Photo evidence is required
+-> Request must be within 3 months from deliveredAt in the current implementation
+-> Policy also requires 30 days from discovery; discovery-date input remains planned
+-> Photo evidence is required and stored as claim evidence
 -> Return or exchange shipping cost bearer: SELLER
 
 Admin approves claim

@@ -10,6 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.claim.domain.Claim;
+import com.dropshipshop.api.claim.domain.ClaimEvidence;
+import com.dropshipshop.api.claim.domain.ClaimStatus;
+import com.dropshipshop.api.claim.repository.ClaimEvidenceRepository;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
 import com.dropshipshop.api.order.domain.CustomerOrder;
@@ -46,6 +49,7 @@ public class CustomerOrderQueryService {
 	private final ShipmentRepository shipmentRepository;
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
+	private final ClaimEvidenceRepository claimEvidenceRepository;
 
 	public CustomerOrderQueryService(
 		CustomerOrderRepository orderRepository,
@@ -53,7 +57,8 @@ public class CustomerOrderQueryService {
 		PaymentRepository paymentRepository,
 		ShipmentRepository shipmentRepository,
 		RefundRepository refundRepository,
-		ClaimRepository claimRepository
+		ClaimRepository claimRepository,
+		ClaimEvidenceRepository claimEvidenceRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
@@ -61,6 +66,7 @@ public class CustomerOrderQueryService {
 		this.shipmentRepository = shipmentRepository;
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
+		this.claimEvidenceRepository = claimEvidenceRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -108,6 +114,10 @@ public class CustomerOrderQueryService {
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
 		Claim claim = claimRepository.findFirstByOrder_IdOrderByCreatedAtDesc(order.getId()).orElse(null);
+		List<OrderDtos.ClaimSummaryResponse> claims = claimRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId())
+			.stream()
+			.map(this::toClaimSummary)
+			.toList();
 		return new OrderDtos.OrderDetailResponse(
 			order.getId(),
 			order.getOrderNumber(),
@@ -137,6 +147,7 @@ public class CustomerOrderQueryService {
 			new OrderDtos.FulfillmentSummaryResponse(FulfillmentStatus.PENDING),
 			toShipmentSummary(shipment),
 			toRefundSummary(refund),
+			claims,
 			toClaimSummary(claim)
 		);
 	}
@@ -150,6 +161,8 @@ public class CustomerOrderQueryService {
 			claim.getClaimType(),
 			claim.getClaimReason(),
 			claim.getStatus(),
+			customerStatus(claim.getStatus()),
+			customerStatusLabel(claim.getStatus()),
 			claim.getRequestedAction(),
 			claim.getCustomerMemo(),
 			claim.getAdminReviewReason(),
@@ -158,7 +171,21 @@ public class CustomerOrderQueryService {
 			claim.getReturnReceivedMemo(),
 			claim.getRefundId(),
 			claim.getCompletedAt(),
-			claim.getCreatedAt()
+			claim.getCreatedAt(),
+			claimEvidenceRepository.findAllByClaim_IdOrderByUploadedAtAsc(claim.getId()).stream()
+				.map(this::toClaimEvidenceResponse)
+				.toList()
+		);
+	}
+
+	private OrderDtos.ClaimEvidenceResponse toClaimEvidenceResponse(ClaimEvidence evidence) {
+		return new OrderDtos.ClaimEvidenceResponse(
+			evidence.getId(),
+			evidence.getFileUrl(),
+			evidence.getOriginalFilename(),
+			evidence.getContentType(),
+			evidence.getSizeBytes(),
+			evidence.getUploadedAt()
 		);
 	}
 
@@ -207,5 +234,35 @@ public class CustomerOrderQueryService {
 			item.getProductDetailVersion(),
 			item.getProductNoticeVersion()
 		);
+	}
+
+	private String customerStatus(ClaimStatus status) {
+		return switch (status) {
+			case REQUESTED, UNDER_REVIEW -> "REVIEWING";
+			case EVIDENCE_REQUESTED -> "EVIDENCE_REQUESTED";
+			case APPROVED -> "APPROVED";
+			case REJECTED -> "REJECTED";
+			case RETURN_WAITING -> "RETURN_WAITING";
+			case RETURN_RECEIVED -> "RETURN_RECEIVED";
+			case REFUND_PROCESSING -> "REFUND_PROCESSING";
+			case EXCHANGE_SHIPPING -> "EXCHANGE_SHIPPING";
+			case COMPLETED -> "COMPLETED";
+			case WITHDRAWN -> "WITHDRAWN";
+		};
+	}
+
+	private String customerStatusLabel(ClaimStatus status) {
+		return switch (status) {
+			case REQUESTED, UNDER_REVIEW -> "검토 중";
+			case EVIDENCE_REQUESTED -> "증빙 요청";
+			case APPROVED -> "승인됨";
+			case REJECTED -> "거부됨";
+			case RETURN_WAITING -> "반송 대기";
+			case RETURN_RECEIVED -> "반품 수령됨";
+			case REFUND_PROCESSING -> "환불 처리 중";
+			case EXCHANGE_SHIPPING -> "교환 배송 중";
+			case COMPLETED -> "완료";
+			case WITHDRAWN -> "철회됨";
+		};
 	}
 }

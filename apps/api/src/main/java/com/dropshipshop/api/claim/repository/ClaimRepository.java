@@ -19,6 +19,8 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 
 	List<Claim> findTop5ByUser_IdAndStatusInOrderByCreatedAtDesc(UUID userId, Collection<ClaimStatus> statuses);
 
+	List<Claim> findAllByOrder_IdOrderByCreatedAtAsc(UUID orderId);
+
 	Optional<Claim> findByIdAndUser_Id(UUID id, UUID userId);
 
 	Optional<Claim> findFirstByOrder_IdOrderByCreatedAtDesc(UUID orderId);

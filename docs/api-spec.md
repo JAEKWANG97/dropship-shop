@@ -474,9 +474,10 @@ Rules:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/orders/{orderId}/cancel` | `CUSTOMER` | Implemented | Self-service cancel when eligible |
-| `POST` | `/api/orders/{orderId}/claims` | `CUSTOMER` | Implemented | Create cancellation, return, or exchange claim |
-| `GET` | `/api/orders/{orderId}/claims` | `CUSTOMER` | Planned | Customer claim list for an order |
-| `GET` | `/api/claims/{claimId}` | `CUSTOMER` | Planned | Customer claim detail |
+| `POST` | `/api/orders/{orderId}/claims` | `CUSTOMER` | Implemented | Create cancellation, return, or exchange claim. Supports JSON for simple claims and multipart `evidenceFiles` for claims with photo evidence. |
+| `GET` | `/api/orders/{orderId}/claims` | `CUSTOMER` | Implemented | Customer claim list for an order |
+| `GET` | `/api/orders/{orderId}/claims/{claimId}` | `CUSTOMER` | Implemented | Customer claim detail |
+| `POST` | `/api/orders/{orderId}/claims/{claimId}/evidence` | `CUSTOMER` | Implemented | Add evidence image files to an existing customer claim |
 | `GET` | `/api/admin/claims` | `ADMIN` | Implemented | Admin claim queue |
 | `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve claim |
 | `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject claim |
@@ -498,7 +499,9 @@ Rules:
 - After supplier work starts, cancellation becomes a `CANCEL` claim that admin can approve or reject.
 - After delivery, customers can submit `RETURN` or `EXCHANGE` claims.
 - Simple change-of-mind return/exchange claims require delivery within 7 days.
-- Seller-fault return/exchange claims require delivery within 90 days in the DS-37 baseline; discovery-date and evidence file capture remain planned.
+- Seller-fault return/exchange claims require delivery within 90 days in the current implementation. The policy still requires 30 days from discovery, but discovery-date input remains planned.
+- Seller-fault claim reasons (`DEFECT`, `WRONG_DELIVERY`, `DIFFERENT_FROM_PRODUCT_INFO`, `DELIVERY_ISSUE`) require at least one image evidence file at customer claim creation.
+- Evidence upload accepts `jpg/jpeg`, `png`, and `webp` images using the shared upload extension and magic-byte validation, and stores metadata in `claim_evidences`.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
 - `return-received` requires a `RETURN_WAITING` return claim and records return received memo/time.
 - `return-refund` requires a `RETURN_RECEIVED` return claim, creates a `RETURN_REQUESTED` refund, links it to the claim, moves the order to `REFUND_REQUESTED`, and moves the claim to `REFUND_PROCESSING`.
@@ -507,7 +510,7 @@ Rules:
 - First PG cancel failure moves refund to `RETRY_REQUIRED`; retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
 - Manual review can approve the refund again or reject it with reason.
 - Bank-transfer refund completion requires actual manual refund completion by an admin.
-- `GET /api/orders/{orderId}` and `GET /api/admin/orders/{orderId}` include the latest claim summary when an order has a claim.
+- `GET /api/orders/{orderId}` includes `claims` plus the latest `claim` summary for compatibility. `GET /api/admin/orders/{orderId}` includes the latest claim summary and claim evidence metadata.
 - Deferred PG refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
 - Manual bank-transfer refund completion or PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.

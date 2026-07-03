@@ -388,6 +388,7 @@ function ClaimPanel({ order }: { order: AdminOrder }) {
   if (!claim) {
     return null;
   }
+  const evidenceFiles = claim.evidenceFiles ?? [];
 
   return (
     <section className="admin-claim-panel">
@@ -402,6 +403,21 @@ function ClaimPanel({ order }: { order: AdminOrder }) {
         <SummaryItem label="수령 메모" value={claim.returnReceivedMemo ?? "-"} />
         <SummaryItem label="완료 시각" value={formatDateTime(claim.completedAt)} />
       </div>
+      {evidenceFiles.length > 0 ? (
+        <div className="evidence-grid admin-evidence-grid" aria-label="클레임 증빙">
+          {evidenceFiles.map((file) => (
+            <a href={file.fileUrl} key={file.evidenceId} target="_blank" rel="noreferrer">
+              <img alt={file.originalFilename ?? "클레임 증빙 사진"} src={file.fileUrl} />
+              <span>{file.originalFilename ?? "증빙 사진"}</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div className="admin-empty compact">
+          <strong>등록된 증빙 사진이 없습니다</strong>
+          <span>단순 변심이 아닌 클레임은 고객 접수 시 사진 증빙이 필요합니다.</span>
+        </div>
+      )}
 
       {claim.status === "RETURN_WAITING" ? (
         <div className="admin-order-actions">

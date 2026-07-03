@@ -43,11 +43,11 @@ Status: Confirmed
 - 배송 그룹 주문 내부에서 일부 상품 또는 일부 수량만 품절이면 MVP에서는 해당 배송 그룹 주문 전체를 취소/환불한다.
 - 배송 후 반품/교환은 MVP에서 자동 처리하지 않고 클레임 접수와 관리자 수동 심사로 처리한다. Implemented by DS-37.
 - 단순 변심 반품/교환 클레임은 배송 완료일로부터 7일 이내 접수된 건만 심사한다. Implemented by DS-37.
-- 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 배송 완료일로부터 3개월 이내이면서 고객이 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내 접수된 건만 심사한다. DS-37 enforces delivered-at baseline; discovery-date input remains planned.
+- 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 배송 완료일로부터 3개월 이내이면서 고객이 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내 접수된 건만 심사한다. 현재 구현은 배송 완료일 기준 3개월을 강제하며, 인지일 입력은 planned로 남긴다.
 - 단순 변심 반품/교환의 반환 또는 재배송 비용은 고객 부담을 기본으로 한다.
 - 상품 하자, 오배송, 상품 정보와 다름, 판매자 또는 배송 귀책 배송 문제의 반환 또는 재배송 비용은 운영자 부담을 기본으로 한다.
 - 단순 변심 클레임에서는 고객에게 별도 취소 위약금, 손해배상, 포장비, 보관비를 청구하지 않는다.
-- 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 사진 증빙을 필수로 받고, 필요 시 운송장, 포장 상태 사진, 동영상, 추가 설명을 요청할 수 있다.
+- 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 사진 증빙을 필수로 받고, 필요 시 운송장, 포장 상태 사진, 동영상, 추가 설명을 요청할 수 있다. 이미지 증빙 저장은 B-015에서 구현했다.
 - 단순 변심 클레임은 사진 증빙을 기본 필수로 하지 않지만, 상품 상태 확인이 필요한 경우 관리자가 추가 증빙을 요청할 수 있다.
 - 발주 후 취소, 관리자 환불, 반품/교환 승인 건의 PG 환불은 관리자 승인 후 배송 그룹 주문 단위 환불을 기본으로 한다. Implemented by DS-38.
 - 고객 셀프서비스 취소 조건을 만족하는 `SUPPLIER_ORDER_PENDING` 주문은 고객 셀프서비스 취소 흐름으로 처리하되, PG 취소/환불 성공 전까지 최종 환불 완료로 표시하지 않는다.
@@ -78,7 +78,7 @@ Status: Confirmed
 - 클레임 승인 후 실제 환불은 `Refund` 모델과 PG 취소/환불 성공 기준을 따른다.
 - 배송 그룹 주문 단위 환불을 허용하되, 상품/옵션/수량 단위 환불을 제외해 주문/결제/환불 모델 복잡도를 제한한다.
 - 고객 취소 버튼 노출 여부는 주문 상태로 판단해야 한다.
-- 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다. Cancellation claim flow is implemented by DS-14; return/exchange claim creation and review are implemented by DS-37; delivered return receive/refund completion flow is implemented by B-044.
+- 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다. Cancellation claim flow is implemented by DS-14; return/exchange claim creation and review are implemented by DS-37; delivered return receive/refund completion flow is implemented by B-044; customer claim list/detail and image evidence storage are implemented by B-015.
 - 환불 사유 enum이 필요하다. Implemented by DS-15.
 - 환불 상태는 PG 요청/성공/실패/재시도를 구분해야 한다. Implemented by DS-15.
 - 환불 실패 건을 처리하는 관리자 큐가 필요하다. Refund queue and retry are implemented by DS-15.

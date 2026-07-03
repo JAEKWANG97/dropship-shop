@@ -4,6 +4,10 @@
 
 ## 2026-07-03
 
+- B-015 고객 클레임 조회/증빙/교환 흐름 고도화
+  - 커밋: `feat: add claim evidence flow`
+  - 완료 내용: 고객 주문별 클레임 목록/상세 API를 추가하고, 상품 하자·오배송·상품 정보와 다름·배송 문제 클레임은 사진 증빙을 필수로 받도록 했다. 증빙 파일은 기존 업로드 검증을 재사용해 이미지 매직 바이트를 확인하고 `claim_evidences` 테이블에 URL/파일명/크기/콘텐츠 타입을 저장한다. 고객 주문 상세는 클레임 목록과 증빙 사진을 표시하고, 관리자 주문 상세도 증빙을 확인할 수 있게 했다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*CustomerCancellationApiIntegrationTest'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`
 - B-014 회원 탈퇴 요청 흐름
   - 커밋: `feat: add account deletion flow`
   - 완료 내용: `users.deleted_at`, `users.anonymized_at` 컬럼을 추가하고, `POST /api/me/deletion-request` 고객 API를 구현했다. 탈퇴 시 개인정보와 소셜 provider user id를 비식별화하고 `ACCESS_TOKEN` 쿠키를 삭제한다. 진행 중 주문/환불/클레임이 있으면 사유와 주문번호를 포함해 400으로 거부한다. 계정 화면에는 되돌릴 수 없는 탈퇴 안내와 확인 체크박스를 추가했다.

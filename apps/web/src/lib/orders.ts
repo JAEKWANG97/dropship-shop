@@ -70,7 +70,17 @@ export type OrderDetail = {
     status: string | null;
     amount: number | null;
   };
+  claims: ClaimSummary[];
   claim: ClaimSummary | null;
+};
+
+export type ClaimEvidence = {
+  evidenceId: string;
+  fileUrl: string;
+  originalFilename: string | null;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
 };
 
 export type ClaimSummary = {
@@ -78,6 +88,8 @@ export type ClaimSummary = {
   claimType: string;
   claimReason: string;
   status: string;
+  customerStatus: string;
+  customerStatusLabel: string;
   requestedAction: string;
   customerMemo: string;
   adminReviewReason: string | null;
@@ -87,6 +99,7 @@ export type ClaimSummary = {
   refundId: string | null;
   completedAt: string | null;
   createdAt: string;
+  evidenceFiles: ClaimEvidence[];
 };
 
 export async function getCustomerOrders() {

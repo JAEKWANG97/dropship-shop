@@ -1,5 +1,24 @@
 # Decision Log
 
+## 2026-07-03: Customer Claim Evidence MVP Scope
+
+Decision:
+
+Store customer claim evidence as separate `ClaimEvidence` rows connected to `Claim`, and require at least one image evidence file when the claim reason is seller-fault: defect, wrong delivery, different from product information, or delivery issue. Keep discovery-date input and exchange shipment handling as policy/planned work, not B-015 implementation work.
+
+Context:
+
+The refund/claim policy already requires photo evidence for seller-fault return/exchange claims, but the previous implementation only stored a latest claim summary and had no evidence persistence. The customer also needs to see submitted claim status/evidence, while admins need evidence inside the order operation screen before approving or rejecting a claim.
+
+Consequences:
+
+- Customer claim creation supports multipart image evidence and rejects seller-fault claims without evidence.
+- Evidence files reuse the same extension and magic-byte validation as product images and are served through the existing upload URL path.
+- Customer order detail now exposes both `claims` and a latest `claim` field for compatibility.
+- Admin order detail exposes latest claim evidence for review.
+- The 30-day discovery-date policy remains documented but is not yet enforced because no discovery-date input exists.
+- Exchange shipment completion remains deferred; exchange claim approval is still review-only until that flow is explicitly built.
+
 ## 2026-07-03: Checkout And Order State Concurrency Guard
 
 Decision:

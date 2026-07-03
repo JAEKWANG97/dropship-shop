@@ -757,13 +757,31 @@ Implemented DS-15 scope:
 - `created_at`
 - `updated_at`
 
-Implemented DS-14 scope:
+### claim_evidences
+
+- `id`
+- `claim_id` -> `claims.id`
+- `file_url`
+- `object_key`
+- `original_filename`
+- `content_type`
+- `size_bytes`
+- `uploaded_at`
+
+Rule:
+
+- One claim can have multiple evidence image files.
+- Evidence files use the same upload extension and image magic-byte validation as product images.
+- Evidence is required at creation for seller-fault claim reasons: `DEFECT`, `WRONG_DELIVERY`, `DIFFERENT_FROM_PRODUCT_INFO`, `DELIVERY_ISSUE`.
+
+Implemented claim scope:
 
 - Self-service eligible cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
 - Post-supplier-work cancellation creates a requested `CANCEL` claim for admin review.
 - Post-delivery return/exchange claims create requested `RETURN` or `EXCHANGE` claims. Implemented by DS-37.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps `APPROVED` until exchange shipment handling.
 - Delivered return refund completion links `claims.refund_id` to the created refund, moves `RETURN_RECEIVED -> REFUND_PROCESSING -> COMPLETED`, and keeps rejected return claims on `DELIVERED` orders. Implemented by B-044.
+- Customer claim list/detail and evidence image storage are implemented by B-015.
 
 Rule:
 

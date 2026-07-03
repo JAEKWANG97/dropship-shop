@@ -10,6 +10,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.claim.domain.Claim;
+import com.dropshipshop.api.claim.domain.ClaimEvidence;
+import com.dropshipshop.api.claim.repository.ClaimEvidenceRepository;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
@@ -41,6 +43,7 @@ class AdminOrderQueryService {
 	private final ShipmentRepository shipmentRepository;
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
+	private final ClaimEvidenceRepository claimEvidenceRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 
@@ -52,6 +55,7 @@ class AdminOrderQueryService {
 		ShipmentRepository shipmentRepository,
 		RefundRepository refundRepository,
 		ClaimRepository claimRepository,
+		ClaimEvidenceRepository claimEvidenceRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository
 	) {
@@ -62,6 +66,7 @@ class AdminOrderQueryService {
 		this.shipmentRepository = shipmentRepository;
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
+		this.claimEvidenceRepository = claimEvidenceRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 	}
@@ -313,7 +318,21 @@ class AdminOrderQueryService {
 			claim.getReturnReceivedMemo(),
 			claim.getRefundId(),
 			claim.getCompletedAt(),
-			claim.getCreatedAt()
+			claim.getCreatedAt(),
+			claimEvidenceRepository.findAllByClaim_IdOrderByUploadedAtAsc(claim.getId()).stream()
+				.map(this::toClaimEvidenceResponse)
+				.toList()
+		);
+	}
+
+	private AdminOrderDtos.AdminClaimEvidenceResponse toClaimEvidenceResponse(ClaimEvidence evidence) {
+		return new AdminOrderDtos.AdminClaimEvidenceResponse(
+			evidence.getId(),
+			evidence.getFileUrl(),
+			evidence.getOriginalFilename(),
+			evidence.getContentType(),
+			evidence.getSizeBytes(),
+			evidence.getUploadedAt()
 		);
 	}
 

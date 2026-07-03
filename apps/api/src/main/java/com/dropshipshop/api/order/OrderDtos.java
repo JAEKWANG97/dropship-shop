@@ -55,6 +55,7 @@ final class OrderDtos {
 		FulfillmentSummaryResponse fulfillment,
 		ShipmentSummaryResponse shipment,
 		RefundSummaryResponse refund,
+		List<ClaimSummaryResponse> claims,
 		ClaimSummaryResponse claim
 	) {
 	}
@@ -131,6 +132,8 @@ final class OrderDtos {
 		ClaimType claimType,
 		ClaimReason claimReason,
 		ClaimStatus status,
+		String customerStatus,
+		String customerStatusLabel,
 		RequestedAction requestedAction,
 		String customerMemo,
 		String adminReviewReason,
@@ -139,7 +142,18 @@ final class OrderDtos {
 		String returnReceivedMemo,
 		UUID refundId,
 		Instant completedAt,
-		Instant createdAt
+		Instant createdAt,
+		List<ClaimEvidenceResponse> evidenceFiles
+	) {
+	}
+
+	record ClaimEvidenceResponse(
+		UUID evidenceId,
+		String fileUrl,
+		String originalFilename,
+		String contentType,
+		long sizeBytes,
+		Instant uploadedAt
 	) {
 	}
 }

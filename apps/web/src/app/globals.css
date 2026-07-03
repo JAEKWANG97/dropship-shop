@@ -1201,6 +1201,67 @@ textarea {
   border-radius: 6px;
 }
 
+.claim-list {
+  display: grid;
+  gap: 14px;
+}
+
+.claim-card {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.claim-card:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.form-help {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.evidence-grid,
+.evidence-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.evidence-grid a,
+.evidence-preview {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.evidence-grid img,
+.evidence-preview img {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-soft);
+}
+
+.evidence-grid span,
+.evidence-preview figcaption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-evidence-grid {
+  margin-top: 12px;
+}
+
 .order-group-list {
   display: grid;
   gap: 12px;

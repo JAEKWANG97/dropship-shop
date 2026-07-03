@@ -132,6 +132,14 @@ export type AdminOrder = {
     refundId: string | null;
     completedAt: string | null;
     createdAt: string;
+    evidenceFiles: {
+      evidenceId: string;
+      fileUrl: string;
+      originalFilename: string | null;
+      contentType: string;
+      sizeBytes: number;
+      uploadedAt: string;
+    }[];
   } | null;
   items?: { productName: string; optionName: string; quantity: number; unitPrice: number }[];
   shippingAddress?: string | {

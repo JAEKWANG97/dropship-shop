@@ -655,13 +655,24 @@ Implemented fields:
 - createdAt
 - updatedAt
 
+Related implemented model:
+
+- `ClaimEvidence`
+  - id
+  - claimId
+  - fileUrl
+  - objectKey
+  - originalFilename
+  - contentType
+  - sizeBytes
+  - uploadedAt
+
 Planned fields:
 
 - paymentGroupId
 - shippingCostBearer: CUSTOMER / SELLER / UNDECIDED
 - returnShippingFeeAmount
 - exchangeShippingFeeAmount
-- evidenceUrls
 - adminMemo
 - rejectionReason
 - requestedAt
@@ -683,7 +694,8 @@ Rules:
 - After supplier work starts or after `SUPPLIER_ORDERED`, the customer can submit a `CANCEL` claim for admin review before shipment.
 - After delivery, the customer can submit a `RETURN` claim with requested action `REFUND` or an `EXCHANGE` claim with requested action `EXCHANGE`.
 - Simple change-of-mind return/exchange claims are accepted only within 7 days from `deliveredAt`.
-- Seller-fault return/exchange claims use a 90-day delivered-at baseline in DS-37; discovery date and evidence URLs remain planned fields.
+- Seller-fault return/exchange claims use a 90-day delivered-at baseline in the current implementation. Discovery date input remains planned.
+- Seller-fault claim reasons require at least one image evidence file at customer claim creation. Evidence metadata is stored in `ClaimEvidence`.
 - Admin approval of a cancellation claim moves the order to `REFUND_REQUESTED`.
 - Admin approval of a return claim moves the claim to `RETURN_WAITING` and keeps the order `DELIVERED`.
 - Admin return received action moves the claim to `RETURN_RECEIVED`.

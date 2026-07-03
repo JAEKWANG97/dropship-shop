@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { apiSendWithCookie } from "@/lib/api";
+import { apiSendWithCookie, apiUrl } from "@/lib/api";
 import type { OrderDetail } from "@/lib/orders";
 
 function value(formData: FormData, name: string) {
@@ -63,20 +63,47 @@ export async function cancelOrder(formData: FormData) {
 
 export async function createClaim(formData: FormData) {
   const orderId = value(formData, "orderId");
+  const cookieHeader = (await cookies()).toString();
+  const request = new FormData();
+  request.set("claimType", value(formData, "claimType"));
+  request.set("claimReason", value(formData, "claimReason"));
+  request.set("customerMemo", value(formData, "customerMemo"));
+
+  formData.getAll("evidenceFiles").forEach((file) => {
+    if (file instanceof File && file.size > 0) {
+      request.append("evidenceFiles", file);
+    }
+  });
 
   try {
-    await apiSendWithCookie(`/api/orders/${orderId}/claims`, (await cookies()).toString(), {
+    const response = await fetch(apiUrl(`/api/orders/${orderId}/claims`), {
       method: "POST",
-      body: JSON.stringify({
-        claimType: value(formData, "claimType"),
-        claimReason: value(formData, "claimReason"),
-        customerMemo: value(formData, "customerMemo"),
-      }),
+      headers: cookieHeader ? { Cookie: cookieHeader } : {},
+      body: request,
+      cache: "no-store",
     });
-  } catch {
-    redirect(orderMessage(orderId, "클레임을 접수하지 못했습니다."));
+    if (!response.ok) {
+      throw new Error(await responseMessage(response));
+    }
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message : "클레임을 접수하지 못했습니다.";
+    redirect(orderMessage(orderId, message));
   }
 
   revalidatePath(`/orders/${orderId}`);
   redirect(orderMessage(orderId, "클레임을 접수했습니다."));
+}
+
+async function responseMessage(response: Response) {
+  if (response.headers.get("content-type")?.includes("application/json")) {
+    try {
+      const body = (await response.json()) as { message?: unknown };
+      if (typeof body.message === "string" && body.message) {
+        return body.message;
+      }
+    } catch {
+      return "클레임을 접수하지 못했습니다.";
+    }
+  }
+  return "클레임을 접수하지 못했습니다.";
 }
