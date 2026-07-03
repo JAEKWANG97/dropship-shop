@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { apiSendWithCookie } from "@/lib/api";
+import { ApiError, apiSendWithCookie } from "@/lib/api";
 
 function value(formData: FormData, name: string) {
   const raw = formData.get(name);
@@ -12,6 +12,10 @@ function value(formData: FormData, name: string) {
 
 function done(orderId: string, message: string) {
   redirect(`/admin/orders?orderId=${encodeURIComponent(orderId)}&message=${encodeURIComponent(message)}`);
+}
+
+function failureMessage(error: unknown, fallback: string) {
+  return error instanceof ApiError && error.message.trim() ? error.message : fallback;
 }
 
 async function postOrderAction(orderId: string, path: string, body: Record<string, string>) {
@@ -47,8 +51,8 @@ export async function startSupplierWork(formData: FormData) {
 
   try {
     await postOrderAction(orderId, "/supplier-work-start", { reason: value(formData, "reason") });
-  } catch {
-    done(orderId, "발주 시작 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "발주 시작 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -65,8 +69,8 @@ export async function completeSupplierOrder(formData: FormData) {
       supplierResponseMemo: value(formData, "supplierResponseMemo"),
       reason: value(formData, "reason"),
     });
-  } catch {
-    done(orderId, "공급처 발주 완료 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "공급처 발주 완료 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -78,8 +82,8 @@ export async function markOrderOutOfStock(formData: FormData) {
 
   try {
     await postOrderAction(orderId, "/out-of-stock", { reason: value(formData, "reason") });
-  } catch {
-    done(orderId, "공급처 품절 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "공급처 품절 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -94,8 +98,8 @@ export async function createOrderShipment(formData: FormData) {
       carrier: value(formData, "carrier"),
       trackingNumber: value(formData, "trackingNumber"),
     });
-  } catch {
-    done(orderId, "송장 입력에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "송장 입력에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -110,8 +114,8 @@ export async function syncShipmentTracking(formData: FormData) {
 
   try {
     await postShipmentAction(shipmentId, "/tracking-sync", failureReason ? { failureReason } : { trackingStatus });
-  } catch {
-    done(orderId, "배송조회 결과 반영에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "배송조회 결과 반영에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -127,8 +131,8 @@ export async function correctShipmentDelivered(formData: FormData) {
       status: "DELIVERED",
       reason: value(formData, "reason"),
     });
-  } catch {
-    done(orderId, "수동 배송완료 보정에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "수동 배송완료 보정에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -140,8 +144,8 @@ export async function confirmDeposit(formData: FormData) {
 
   try {
     await postOrderAction(orderId, "/confirm-deposit", { reason: value(formData, "reason") });
-  } catch {
-    done(orderId, "입금 확인 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "입금 확인 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -153,8 +157,8 @@ export async function cancelUnpaidDeposit(formData: FormData) {
 
   try {
     await postOrderAction(orderId, "/unpaid-cancel", { reason: value(formData, "reason") });
-  } catch {
-    done(orderId, "미입금 취소 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "미입금 취소 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -166,8 +170,8 @@ export async function recordDepositMismatch(formData: FormData) {
 
   try {
     await postOrderAction(orderId, "/deposit-mismatch", { memo: value(formData, "memo") });
-  } catch {
-    done(orderId, "입금 불일치 메모 저장에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "입금 불일치 메모 저장에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -185,8 +189,8 @@ export async function completeManualRefund(formData: FormData) {
       accountNumber: value(formData, "accountNumber"),
       accountHolder: value(formData, "accountHolder"),
     });
-  } catch {
-    done(orderId, "수동 환불 완료 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "수동 환불 완료 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -199,8 +203,8 @@ export async function recordReturnReceived(formData: FormData) {
 
   try {
     await postClaimAction(claimId, "/return-received", { memo: value(formData, "memo") });
-  } catch {
-    done(orderId, "반품 수령 기록에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "반품 수령 기록에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -213,8 +217,8 @@ export async function startReturnRefund(formData: FormData) {
 
   try {
     await postClaimAction(claimId, "/return-refund", { reason: value(formData, "reason") });
-  } catch {
-    done(orderId, "반품 환불 시작에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "반품 환불 시작에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");
@@ -227,8 +231,8 @@ export async function rejectClaim(formData: FormData) {
 
   try {
     await postClaimAction(claimId, "/reject", { reason: value(formData, "reason") });
-  } catch {
-    done(orderId, "클레임 거부 처리에 실패했습니다.");
+  } catch (error) {
+    done(orderId, failureMessage(error, "클레임 거부 처리에 실패했습니다."));
   }
 
   revalidatePath("/admin/orders");

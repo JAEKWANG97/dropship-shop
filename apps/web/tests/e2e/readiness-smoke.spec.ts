@@ -2,6 +2,10 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 const API_BASE_URL = process.env.E2E_API_BASE_URL ?? "http://localhost:8080";
 const WEB_BASE_URL = process.env.E2E_WEB_BASE_URL ?? "http://localhost:3000";
+const REQUIRE_ADMIN_SEED_ORDERS_VALUE =
+  process.env.E2E_REQUIRE_ADMIN_SEED_ORDERS ??
+  (API_BASE_URL.includes("localhost") || API_BASE_URL.includes("127.0.0.1") ? "true" : "false");
+const REQUIRE_ADMIN_SEED_ORDERS = ["1", "true", "yes"].includes(REQUIRE_ADMIN_SEED_ORDERS_VALUE.toLowerCase());
 
 type ProductSummary = {
   id: string;
@@ -62,6 +66,16 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(result, JSON.stringify(result, null, 2)).toMatchObject({ hasOverflow: false });
 }
 
+async function firstAdminOrderLink(page: Page) {
+  const orderLink = page.locator("a[href^='/admin/orders?orderId=']").first();
+  if (REQUIRE_ADMIN_SEED_ORDERS) {
+    await expect(orderLink, "Local/dev admin order seed data is required").toHaveCount(1);
+  } else {
+    test.skip((await orderLink.count()) === 0, "No admin order exists for this smoke target.");
+  }
+  return orderLink;
+}
+
 test("public customer pages render without horizontal overflow", async ({ page }) => {
   const productId = await activeProductId();
   const routes = [
@@ -120,11 +134,44 @@ test("admin order detail renders through selected order query", async ({ page, c
 
   await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
   await page.goto("/admin/orders");
-  const orderLink = page.locator("a[href^='/admin/orders?orderId=']").first();
-  test.skip((await orderLink.count()) === 0, "No admin order exists for order detail smoke.");
+  const orderLink = await firstAdminOrderLink(page);
 
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("admin order action refreshes detail after successful memo update", async ({ page, context }) => {
+  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin order action smoke.");
+
+  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
+  await page.goto("/admin/orders?status=PAYMENT_PENDING");
+  const orderLink = await firstAdminOrderLink(page);
+  await orderLink.click();
+
+  const memo = `E2E 입금 불일치 메모 ${Date.now()}`;
+  await page.getByLabel("입금 불일치 메모").fill(memo);
+  await page.getByRole("button", { name: "메모 저장" }).click();
+
+  await expect(page.locator(".notice").first()).toContainText("입금 불일치 메모를 저장했습니다.");
+  await expect(page.locator("body")).toContainText(memo);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("admin order action failure shows backend reason", async ({ page, context }) => {
+  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin order action smoke.");
+
+  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
+  await page.goto("/admin/orders?status=DELIVERED");
+  const orderLink = await firstAdminOrderLink(page);
+  await orderLink.click();
+
+  await page.getByLabel("발주 시작 사유").fill("E2E 실패 메시지 확인");
+  await page.getByRole("button", { name: "발주 시작" }).click();
+
+  await expect(page.locator(".notice").first()).toContainText(
+    "Supplier order work can start only once from supplier order pending",
+  );
   await expectNoHorizontalOverflow(page);
 });
 
@@ -150,8 +197,7 @@ test("mobile admin smoke screenshots remain stable", async ({ page, context }, t
   await expect(page).toHaveScreenshot("mobile-admin-products.png", { fullPage: true });
 
   await page.goto("/admin/orders");
-  const orderLink = page.locator("a[href^='/admin/orders?orderId=']").first();
-  test.skip((await orderLink.count()) === 0, "No admin order exists for order detail screenshot.");
+  const orderLink = await firstAdminOrderLink(page);
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);

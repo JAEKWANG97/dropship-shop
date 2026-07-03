@@ -1,5 +1,22 @@
 # Project Log
 
+## 2026-07-03 16:00 KST
+
+- 관련 항목: B-047
+- 작업: Playwright E2E 페이지 커버리지 gap 분석 결과를 백로그에 반영했다. 전체 24개 페이지 중 `/login`, `/auth/callback/success`, `/checkout/[checkoutNumber]`, `/orders/[orderId]`, `/policies/[slug]`가 테스트 커버리지 없이 남아 있음을 확인했다.
+- 문제·고민: `/checkout/[checkoutNumber]`(계좌입금 안내)와 `/orders/[orderId]`(클레임 접수/조회)는 실제 결제·CS와 직결되는 화면인데 자동 회귀 테스트가 없다. 데스크톱 스크린샷 baseline도 전혀 없다.
+- 해결방안: B-013(수동 디자인 QA)과 역할을 분리해 B-047을 신설했다. 빈 페이지 커버 추가, 데스크톱 스크린샷 baseline, 빈 상태/오류 상태 렌더링 확인을 Tasks로 남겼다.
+- 후속작업: B-047 착수 시 B-003에서 추가한 `LocalOrderSeedData`를 재사용해 checkout/orders 상세 테스트를 만든다.
+
+## 2026-07-03 15:50 KST
+
+- 관련 항목: B-003
+- 작업: 관리자 주문 처리 액션 최종 검증을 마무리했다. local/dev 시드에 관리자 주문 6종과 시드 고객/관리자 계정을 추가하고, 관리자 주문 서버 액션 실패 시 백엔드 오류 메시지를 그대로 배너에 전달하도록 했다.
+- 문제·고민: 기존 Playwright smoke는 주문이 없으면 관리자 주문 상세 검증을 스킵해서 실제 액션 검증이 비어 있었다. 또 프론트 서버 액션이 `ApiError.message`를 버리고 고정 실패 문구만 보여 상태 가드 실패와 권한 실패를 운영자가 구분하기 어려웠다.
+- 해결방안: 카탈로그 시드 뒤에 실행되는 `LocalOrderSeedData`를 추가해 `PAYMENT_PENDING`, `SUPPLIER_ORDER_PENDING`, `SUPPLIER_ORDERED`, `SHIPPED`, `DELIVERED`, `OUT_OF_STOCK` 주문을 만들었다. Playwright는 로컬 API 기준에서 시드 주문이 없으면 실패하게 하고, 입금 불일치 메모 저장 후 상세 갱신과 배송완료 주문의 발주 시작 실패 메시지를 확인한다. 로컬 API를 시드 활성화 상태로 띄운 뒤 시드 관리자 JWT 쿠키로 관리자 액션 smoke 2건을 실제 실행했다.
+- 결정: E2E 성공 상태 변경은 반복 실행 가능한 입금 불일치 메모 갱신으로 검증한다. 주문 상태를 파괴적으로 전환하는 발주/입금확인 성공 시나리오는 브라우저 수동 검증과 백엔드 통합 테스트로 보완한다.
+- 후속작업: 배포 URL smoke에서는 실제 운영 데이터가 없을 수 있으므로 `E2E_REQUIRE_ADMIN_SEED_ORDERS=false` 또는 기본 non-local 동작으로 주문 없음 스킵을 유지한다.
+
 ## 2026-07-03 15:40 KST
 
 - 관련 항목: B-011

@@ -4,6 +4,10 @@
 
 ## 2026-07-03
 
+- B-003 관리자 주문 처리 액션을 실제 운영 흐름에 연결하기
+  - 커밋: `feat: finalize admin order action smoke`
+  - 완료 내용: local/dev 시드에 관리자 주문 검증용 주문 6종(`PAYMENT_PENDING`, `SUPPLIER_ORDER_PENDING`, `SUPPLIER_ORDERED`, `SHIPPED`, `DELIVERED`, `OUT_OF_STOCK`)과 시드 고객/관리자 계정을 추가했다. 관리자 주문 서버 액션은 백엔드 `ApiError` 메시지를 보존해 상태 가드/validation/권한 실패 사유가 배너에 표시되도록 했다. Playwright smoke는 로컬 시드 주문이 없으면 실패하고, 성공 후 상세 갱신과 실패 시 서버 오류 이유 노출을 검증한다.
+  - 검증: `cd apps/api && ./gradlew test --tests 'com.dropshipshop.api.dev.LocalOrderSeedDataTest'`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test`, `E2E_ADMIN_COOKIE=... npx playwright test --project=desktop -g 'admin order action'`, `git diff --check`
 - B-011 알림/메일/문자 발송
   - 커밋: `feat: add sms notification dispatch`
   - 완료 내용: 거래 알림을 SMS 우선으로 전환하고, `NotificationLog`가 `PENDING`에서 실제 dispatch 결과에 따라 `SENT`/`FAILED`/`SKIPPED`로 바뀌도록 했다. 기존 인증번호 SMS는 유지하면서 SENS HTTP 호출을 공용 클라이언트로 분리했다. 체크아웃 생성 시 입금대기 안내를 만들고, 주문 관련 알림은 주문 수령인 전화번호로 보낸다. 관리자 알림 조회는 status filter를 지원하며, 실패 알림 retry API와 수동 공급처 지연 안내 액션을 추가했다.

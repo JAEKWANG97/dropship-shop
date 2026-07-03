@@ -19,6 +19,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,7 @@ import com.dropshipshop.api.catalog.repository.SupplierRepository;
 @Component
 @Profile({"local", "dev"})
 @ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true")
+@Order(1)
 public class LocalCatalogSeedData implements ApplicationRunner {
 
 	private static final String SEED_SUPPLIER = "세이프허브 산업안전";
