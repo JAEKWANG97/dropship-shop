@@ -19,6 +19,7 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
@@ -279,10 +280,11 @@ class CatalogApiIntegrationTest {
 	}
 
 	@Test
-	void uploadsValidPngAndJpegAndServesNosniffHeader() throws Exception {
+	void uploadsValidPngJpegAndWebpAndServesNosniffHeader() throws Exception {
 		UUID productId = createProduct(createSupplier());
 		byte[] pngImage = imageBytes("png");
 		byte[] jpegImage = imageBytes("jpeg");
+		byte[] webpImage = webpImageBytes();
 
 		MvcResult pngUpload = mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
 				.file(new MockMultipartFile("file", "safe.png", "image/png", pngImage))
@@ -296,6 +298,12 @@ class CatalogApiIntegrationTest {
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.size", is(jpegImage.length)));
+
+		mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
+				.file(new MockMultipartFile("file", "safe.webp", "image/webp", webpImage))
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.size", is(webpImage.length)));
 
 		mockMvc.perform(get(fieldFrom(pngUpload, "imageUrl")))
 			.andExpect(status().isOk())
@@ -366,5 +374,9 @@ class CatalogApiIntegrationTest {
 			throw new IllegalStateException("Unsupported test image format: " + formatName);
 		}
 		return output.toByteArray();
+	}
+
+	private byte[] webpImageBytes() {
+		return Base64.getDecoder().decode("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAgA0JaQAA3AA/vuUAAA=");
 	}
 }

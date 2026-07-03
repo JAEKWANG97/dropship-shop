@@ -5,9 +5,9 @@
 ## 2026-07-03
 
 - B-046 sanitizer/업로드 검증 강화
-  - 커밋: `feat: harden catalog content validation`
+  - 커밋: `feat: harden catalog content validation`, `test: cover webp image upload validation`
   - 완료 내용: 상품 상세 HTML sanitizer를 regex blacklist에서 jsoup safelist로 교체하고, 허용 태그/속성/protocol만 보존하게 했다. 이미지 업로드는 확장자 검증에 더해 `jpg/jpeg`, `png`, `webp` 매직 바이트를 확인하고, `/uploads/products/**` 응답에 `X-Content-Type-Options: nosniff`를 앱 레벨에서 적용했다.
-  - 검증: 따옴표 없는 `onerror`, `svg onload`, `javascript:`/`data:` URL, `iframe`, `script` 제거 회귀 테스트 추가. HTML로 위장한 `.png` 업로드 400 거부, 정상 PNG/JPEG 업로드 성공, 업로드 이미지 nosniff 헤더 회귀 테스트 추가. `cd apps/api && ./gradlew test --tests '*CatalogApiIntegrationTest'`, `cd apps/api && ./gradlew test`, `git diff --check`
+  - 검증: 따옴표 없는 `onerror`, `svg onload`, `javascript:`/`data:` URL, `iframe`, `script` 제거 회귀 테스트 추가. HTML로 위장한 `.png` 업로드 400 거부, 정상 PNG/JPEG/WebP 업로드 성공, 업로드 이미지 nosniff 헤더 회귀 테스트 추가. `cd apps/api && ./gradlew test --tests '*CatalogApiIntegrationTest'`, `cd apps/api && ./gradlew test`, `git diff --check`
   - 비고: B-042~B-046 외부 리뷰 후속 보안/운영 이슈 큐를 모두 완료했다.
 - B-045 백업/복구 최소 운영
   - 커밋: `feat: add backup and restore operations`
