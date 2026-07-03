@@ -72,9 +72,11 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 운영 profile은 Flyway migration을 활성화한다.
 - 운영 profile은 Hibernate `ddl-auto=validate`를 사용한다. 운영 DB schema 변경은 migration 파일로만 반영한다.
 - 배포 전 `./gradlew test --rerun-tasks`와 prod 환경 staging DB migration dry run을 확인한다.
-- PostgreSQL은 managed database의 daily automated backup을 기본으로 사용한다.
-- 결제/주문 운영 전 point-in-time recovery 사용 가능 여부를 확인한다.
-- 주요 배포 전에는 수동 snapshot을 생성하고 복구 절차를 문서화한다.
+- 현재 저비용 EC2 baseline은 `/opt/coreable/backup.sh`가 `pg_dump -Fc` dump를 `s3://coreable-backups-prod/db/`에 업로드한다.
+- 상품 업로드 이미지는 `/var/lib/coreable/uploads/products`에서 `s3://coreable-backups-prod/uploads/products/`로 sync한다.
+- EC2 root volume은 DLM weekly snapshot retain 4로 보호한다.
+- 복구 절차는 [Backup And Restore Runbook](backup-restore.md)를 따른다.
+- 장기 운영에서 RDS로 전환하면 managed database daily automated backup과 point-in-time recovery를 다시 기본 기준으로 둔다.
 - 복구 리허설은 최소 월 1회 수행한다.
 
 ## Product Image Storage
@@ -91,7 +93,7 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 서버에서 애플리케이션 소스 빌드는 하지 않는다.
 - PostgreSQL data, 상품 이미지, Cloudflare Origin Certificate는 EC2 local persistent path에 둔다.
 - Cloudflare SSL/TLS는 nginx origin TLS가 준비된 뒤 `Full (strict)`를 사용한다.
-- 실결제 오픈 전에는 RDS, S3-compatible object storage, backup/restore 리허설을 다시 검토한다.
+- 실결제 오픈 전에는 RDS와 S3-compatible image serving 전환 필요성을 다시 검토한다. Backup/restore 리허설은 [Backup And Restore Runbook](backup-restore.md) 기준으로 수행한다.
 
 ## CORS And Security
 

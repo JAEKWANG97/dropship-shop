@@ -61,11 +61,12 @@ Tasks:
 - [ ] production/staging env 변수 목록을 배포 서버에 등록한다.
 - [ ] 상품 이미지 local volume 경로와 `APP_STORAGE_*` 값을 확정한다.
 - [x] `/api/health`, readiness를 배포 환경에서 확인한다.
-- [ ] DB migration dry run과 backup/snapshot 상태를 확인한다.
+- [ ] DB migration dry run을 확인한다.
+- [x] DB backup과 root volume snapshot 상태를 확인한다.
 - [x] Web/API 도메인과 HTTPS를 연결한다.
 - [ ] 배포 URL 기준 Playwright smoke를 실행한다.
 - [ ] 계좌입금 주문/입금확인 플로우 기준 공개 정책, 회사 정보, 고객센터 접근 경로를 확인한다.
-- [ ] 실주문 전 DB와 업로드 이미지 backup/restore 방법을 확인한다.
+- [x] 실주문 전 DB와 업로드 이미지 backup/restore 방법을 확인한다.
 
 ### B-002 소셜 로그인 실브라우저 검증
 
@@ -147,21 +148,6 @@ Tasks:
 - [x] 고객 주문 상세에서 반품/환불 처리 상태를 확인할 수 있게 한다.
 - [x] 취소/환불 정책 문서와 API 문서를 함께 갱신한다.
 - [x] 배송완료 후 반품 환불 회귀 테스트를 추가한다.
-
-### B-045 백업/복구 최소 운영
-
-Status: Todo
-
-Notes:
-- 현재 EC2 local Postgres와 upload volume은 단일 서버 장애나 termination에 취약하다.
-- 실주문을 받기 전 최소한 DB dump와 업로드 이미지 백업, 복구 리허설 기준을 만든다.
-
-Tasks:
-- [ ] `pg_dump` backup 주기, 보관 기간, 저장 위치를 정한다.
-- [ ] 업로드 이미지 backup 방식을 정한다.
-- [ ] S3 또는 S3 호환 저장소에 백업을 업로드하는 운영 절차를 만든다.
-- [ ] restore rehearsal 절차를 문서화한다.
-- [ ] EC2 root volume DeleteOnTermination 설정과 snapshot 정책을 재검토한다.
 
 ### B-046 sanitizer/업로드 검증 강화
 

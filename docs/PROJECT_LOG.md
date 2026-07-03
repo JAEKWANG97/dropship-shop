@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-03 11:17 KST
+
+- 관련 항목: B-045
+- 작업: 단일 EC2 운영 기준의 DB/업로드 이미지 백업과 복구 리허설 절차를 실제 AWS 리소스로 구성했다. `coreable-backups-prod` S3 버킷, `coreable-backup-writer` 최소권한 IAM user, EC2 `/opt/coreable/backup.sh`, 매일 03:10 KST cron, DLM weekly snapshot retain 4 정책을 준비했다.
+- 문제·고민: 초저비용 구성을 유지하려면 RDS/S3 이미지 서빙으로 바로 올리지 않고도 EC2 local Postgres와 upload volume 장애 리스크를 줄여야 한다. 또 root/admin AWS credential을 EC2에 남기면 백업 자동화보다 보안 리스크가 더 커진다.
+- 해결방안: 백업 전용 IAM user는 `s3://coreable-backups-prod/db/*`, `s3://coreable-backups-prod/uploads/*` read/write와 제한된 list만 허용했다. EC2에는 root cron용 최소권한 credential만 두고 `/opt/coreable`과 `ubuntu` home에는 AWS credential을 남기지 않았다. 최신 dump는 임시 PostgreSQL 컨테이너에 `pg_restore --no-owner`로 복구 리허설했다.
+- 결정: 현재 운영 baseline은 DB dump 30일 S3 보관, local dump 3개 보관, uploads S3 sync, EC2 root volume `DeleteOnTermination=false`, 주 1회 root volume snapshot retain 4로 둔다. uploads sync는 삭제 전파 없이 보수적으로 보관한다.
+- 후속작업: 실주문 전 DB migration dry run, 배포 URL Playwright smoke, sanitizer/업로드 검증 강화(B-046)를 이어서 닫는다.
+
 ## 2026-07-03 10:31 KST
 
 - 관련 항목: B-044

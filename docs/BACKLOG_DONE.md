@@ -4,6 +4,10 @@
 
 ## 2026-07-03
 
+- B-045 백업/복구 최소 운영
+  - 커밋: `feat: add backup and restore operations`
+  - 완료 내용: EC2 local PostgreSQL과 업로드 이미지 백업을 `s3://coreable-backups-prod`로 업로드하는 `/opt/coreable/backup.sh`와 설치 스크립트를 추가했다. `coreable-backup-writer` IAM user는 백업 버킷의 `db/*`, `uploads/*` 읽기/쓰기와 제한된 list 권한만 갖도록 구성했다. EC2 root volume은 `DeleteOnTermination=false`로 바꾸고, DLM weekly snapshot retain 4 정책을 생성했다.
+  - 검증: 수동 백업 실행, S3 DB dump와 uploads 91개 확인, EC2 credential hygiene 확인, 임시 PostgreSQL 컨테이너에 최신 dump `pg_restore --no-owner` 복구 리허설 성공, `git diff --check`
 - B-044 배송 후 반품/환불 플로우 완성
   - 커밋: `feat: complete delivered return refund flow`
   - 완료 내용: 배송완료 주문의 RETURN 클레임을 승인 후 `RETURN_WAITING`, 반품 수령 후 `RETURN_RECEIVED`, 환불 시작 후 `REFUND_PROCESSING`, 수동 계좌환불 완료 후 `COMPLETED`까지 연결했다. `claims.refund_id`로 환불과 클레임을 연결하고, 관리자 반품 수령/환불 시작/거부 액션과 고객 주문 상세의 반품 진행 상태 표시를 추가했다.

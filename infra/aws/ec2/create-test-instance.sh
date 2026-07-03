@@ -67,7 +67,7 @@ if [[ "$instance_id" == "None" ]]; then
       --key-name "$KEY_NAME" \
       --subnet-id "$SUBNET_ID" \
       --security-group-ids "$security_group_id" \
-      --block-device-mappings "DeviceName=/dev/sda1,Ebs={VolumeSize=${VOLUME_SIZE},VolumeType=gp3,DeleteOnTermination=true}" \
+      --block-device-mappings "DeviceName=/dev/sda1,Ebs={VolumeSize=${VOLUME_SIZE},VolumeType=gp3,DeleteOnTermination=false}" \
       --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${NAME}}]" \
       --query 'Instances[0].InstanceId' \
       --output text

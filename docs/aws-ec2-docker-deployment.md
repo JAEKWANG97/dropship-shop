@@ -15,7 +15,7 @@ Status: single-EC2 Docker deployment baseline for B-039
 - Edge TLS: Cloudflare proxy with SSL/TLS mode `Full (strict)`
 - Origin TLS: nginx with a Cloudflare Origin Certificate
 
-This is the low-cost first production-style deployment shape. RDS, S3, CloudFront, and a load balancer are deferred until traffic, backup, or operational requirements justify the added cost.
+This is the low-cost first production-style deployment shape. S3 is used for backup storage. RDS, S3-backed application image serving, CloudFront, and a load balancer are deferred until traffic or operational requirements justify the added cost.
 
 ## One-Time AWS Setup
 
@@ -58,6 +58,15 @@ ssh ubuntu@<elastic-ip> 'sudo cp /tmp/compose.prod.yml /opt/coreable/compose.pro
 ```
 
 Create `/opt/coreable/.env` from `infra/aws/ec2/env.example` and replace all `change-me` or blank values. Keep this file only on the server.
+
+Install the backup script after Docker and the AWS CLI are available:
+
+```sh
+scp infra/aws/ec2/backup.sh infra/aws/ec2/install-backup.sh ubuntu@<elastic-ip>:/tmp/
+ssh ubuntu@<elastic-ip> 'sudo mkdir -p /tmp/coreable-backup-install && sudo mv /tmp/backup.sh /tmp/install-backup.sh /tmp/coreable-backup-install/ && sudo bash /tmp/coreable-backup-install/install-backup.sh'
+```
+
+The scheduled backup uses the least-privilege IAM user `coreable-backup-writer` and uploads DB dumps and product uploads to `s3://coreable-backups-prod`. See `docs/backup-restore.md` for restore commands and verification.
 
 Install the Cloudflare Origin Certificate and private key on the server. Do not commit or print the key:
 
@@ -179,6 +188,6 @@ Browser smoke:
 
 ## Current Deferrals
 
-- S3/RDS/CloudFront are deferred.
+- S3-backed application image serving, RDS, and CloudFront are deferred. S3 is already used for DB/upload backups.
 - Live Toss key switch is deferred until the test URL and legal/customer notice pages are verified.
 - Real SMS provider activation is deferred unless phone verification is required before live launch. Production default is `SMS_SENS_ENABLED=false`; set it explicitly to `true` only after real Naver SENS credentials are installed.
