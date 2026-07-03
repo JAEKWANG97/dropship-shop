@@ -1,6 +1,7 @@
 package com.dropshipshop.api.notification.domain;
 
 public enum NotificationType {
+	PAYMENT_PENDING,
 	PAYMENT_COMPLETED,
 	PAYMENT_EXCEPTION,
 	OUT_OF_STOCK,

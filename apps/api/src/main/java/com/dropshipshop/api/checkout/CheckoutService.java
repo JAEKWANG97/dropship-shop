@@ -27,6 +27,7 @@ import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
+import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
@@ -60,6 +61,7 @@ public class CheckoutService {
 	private final AccountProfileService accountProfileService;
 	private final CustomerPolicyLinkService customerPolicyLinkService;
 	private final BankTransferProperties bankTransferProperties;
+	private final NotificationService notificationService;
 	private final Clock clock;
 
 	public CheckoutService(
@@ -74,7 +76,8 @@ public class CheckoutService {
 		AccountAgreementService accountAgreementService,
 		AccountProfileService accountProfileService,
 		CustomerPolicyLinkService customerPolicyLinkService,
-		BankTransferProperties bankTransferProperties
+		BankTransferProperties bankTransferProperties,
+		NotificationService notificationService
 	) {
 		this.cartRepository = cartRepository;
 		this.cartItemRepository = cartItemRepository;
@@ -88,6 +91,7 @@ public class CheckoutService {
 		this.accountProfileService = accountProfileService;
 		this.customerPolicyLinkService = customerPolicyLinkService;
 		this.bankTransferProperties = bankTransferProperties;
+		this.notificationService = notificationService;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -130,6 +134,7 @@ public class CheckoutService {
 			bankTransferProperties.cashReceiptNotice()
 		);
 
+		List<CustomerOrder> createdOrders = new ArrayList<>();
 		for (List<CartItem> supplierItems : groupBySupplier(cartItems).values()) {
 			CustomerOrder order = orderRepository.save(new CustomerOrder(
 				nextOrderNumber(),
@@ -140,10 +145,14 @@ public class CheckoutService {
 				supplierItems.stream().mapToLong(this::lineAmount).sum(),
 				expiresAt
 			));
+			createdOrders.add(order);
 			orderItemRepository.saveAll(snapshotItems(order, supplierItems));
 		}
 
 		cartItemRepository.deleteAll(cartItems);
+		if (!createdOrders.isEmpty()) {
+			notificationService.paymentPending(user, createdOrders.getFirst(), paymentGroup);
+		}
 		return toCheckoutResponse(paymentGroup);
 	}
 

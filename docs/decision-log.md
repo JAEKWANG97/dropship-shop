@@ -890,3 +890,21 @@ Consequences:
 - 탈퇴 성공 후 기존 JWT는 DB status 검사에서 인증되지 않는다.
 - 고객 화면에는 되돌릴 수 없는 탈퇴 안내와 확인 체크박스를 둔다.
 - 별도 법정 보존 색인과 보존 기간 만료 자동 삭제는 후속 범위로 남긴다.
+
+## 2026-07-03: B-011 Transactional Notifications Use SMS First
+
+Decision:
+
+거래 알림의 1차 실제 발송 채널은 SMS로 한다. 이메일 SMTP와 카카오 알림톡은 구조와 enum은 유지하되 이번 범위에서는 실제 연동하지 않는다.
+
+Context:
+
+코어블SAF는 앱이 없는 웹 쇼핑몰이고, 주문/입금/배송/환불 안내는 고객 도달률이 중요하다. 이미 휴대폰 인증용 Naver SENS SMS 설정과 fallback sender가 있으므로, 별도 SMTP/알림톡 계약보다 SMS를 먼저 운영 채널로 확장하는 편이 작고 실질적이다. 기존 `NotificationLog`는 실제 발송 없이 `EMAIL/SENT`를 남겨 운영 이력으로 신뢰할 수 없었다.
+
+Consequences:
+
+- `NotificationLog`는 `PENDING`으로 생성되고 발송 결과에 따라 `SENT`, `FAILED`, `SKIPPED`로 바뀐다.
+- `sms.sens.enabled=false` 또는 자격증명 없는 기본 환경은 거래 SMS를 발송하지 않고 `SKIPPED`로 기록한다.
+- 주문 관련 알림 수신자는 계정 휴대폰 번호가 아니라 해당 주문의 `recipientPhone`을 사용한다.
+- SMS 발송은 주문/결제 트랜잭션 커밋 이후 실행해 SENS 장애가 입금확인, 배송, 환불 처리를 롤백하지 않게 한다.
+- 이메일 SMTP와 카카오 알림톡은 도달률, 비용, 계약 상태를 다시 판단한 뒤 후속 이슈로 붙인다.

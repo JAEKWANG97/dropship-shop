@@ -97,7 +97,7 @@ class CustomerClaimService {
 			request.reason()
 		));
 		refundService.createCustomerCancelRefund(order);
-		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
+		notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 
@@ -175,7 +175,7 @@ class CustomerClaimService {
 			request.customerMemo()
 		));
 		storeEvidenceFiles(claim, evidenceFiles);
-		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
+		notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 
@@ -201,7 +201,7 @@ class CustomerClaimService {
 			request.customerMemo()
 		));
 		storeEvidenceFiles(claim, evidenceFiles);
-		notificationService.email(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
+		notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), claim, null, NotificationType.CLAIM_STATUS_CHANGED);
 		return toResponse(claim);
 	}
 

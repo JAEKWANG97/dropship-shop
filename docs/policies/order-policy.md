@@ -167,13 +167,14 @@ Initial transaction notification triggers:
 
 | Trigger | Channel | Required log |
 | --- | --- | --- |
-| Payment completed | Email, order detail status | `NotificationLog` |
-| Payment exception or cancel processing | Email, order detail status | `NotificationLog` |
-| Supplier out of stock | Email, order detail status | `NotificationLog` |
-| Shipment started | Email, order detail status | `NotificationLog` |
-| Delivery completed | Email, order detail status | `NotificationLog` |
-| Delay notice | Email, order detail status | `NotificationLog` |
-| Claim status changed | Email, order detail status | `NotificationLog` |
-| Refund completed | Email, order detail status | `NotificationLog` |
+| Payment pending | SMS, checkout detail status | `NotificationLog` |
+| Payment completed | SMS, order detail status | `NotificationLog` |
+| Payment exception or cancel processing | SMS, order detail status | `NotificationLog` |
+| Supplier out of stock | SMS, order detail status | `NotificationLog` |
+| Shipment started | SMS, order detail status | `NotificationLog` |
+| Delivery completed | SMS, order detail status | `NotificationLog` |
+| Delay notice | SMS, order detail status | `NotificationLog` |
+| Claim status changed | SMS, order detail status | `NotificationLog` |
+| Refund completed | SMS, order detail status | `NotificationLog` |
 
-DS-39 implements transactional email notification logs for payment completed, payment exception, supplier out-of-stock, shipment started, delivery completed, claim status changed, and refund completed. Delay notice remains a trigger without automated sender logic.
+B-011 implements transactional SMS notification logs for payment pending, payment completed, payment exception, supplier out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed. Delay notice is sent by manual admin action; automatic scheduler logic is deferred.

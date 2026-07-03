@@ -24,6 +24,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.dropshipshop.api.auth.security.TestAuthentication;
+import com.dropshipshop.api.sms.SmsSendResult;
+import com.dropshipshop.api.sms.SmsSender;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
@@ -159,6 +161,11 @@ class AccountProfileApiIntegrationTest {
 		@Override
 		public void sendVerificationCode(String phoneNumber, String code) {
 			codes.put(phoneNumber, code);
+		}
+
+		@Override
+		public SmsSendResult sendTransactional(String phoneNumber, String message) {
+			return SmsSendResult.sent();
 		}
 
 		String codeFor(String phoneNumber) {

@@ -98,7 +98,7 @@ class AdminOrderPaymentService {
 					"Bank transfer deposit confirmed",
 					request.reason()
 				);
-				notificationService.email(order.getUser(), order, paymentGroup, null, null, NotificationType.PAYMENT_COMPLETED);
+				notificationService.transactionalSms(order.getUser(), order, paymentGroup, null, null, NotificationType.PAYMENT_COMPLETED);
 			}
 			paymentEventRepository.save(new PaymentEvent(
 				payment,

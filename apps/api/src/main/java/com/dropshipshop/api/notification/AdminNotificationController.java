@@ -1,37 +1,56 @@
 package com.dropshipshop.api.notification;
 
+import java.util.UUID;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.dropshipshop.api.notification.domain.NotificationLog;
+import com.dropshipshop.api.notification.domain.NotificationStatus;
 
 @RestController
 @RequestMapping("/api/admin/notifications")
 @PreAuthorize("hasRole('ADMIN')")
 class AdminNotificationController {
 
-	private final NotificationLogRepository notificationLogRepository;
+	private final AdminNotificationService adminNotificationService;
 
-	AdminNotificationController(NotificationLogRepository notificationLogRepository) {
-		this.notificationLogRepository = notificationLogRepository;
+	AdminNotificationController(AdminNotificationService adminNotificationService) {
+		this.adminNotificationService = adminNotificationService;
 	}
 
 	@GetMapping
-	NotificationDtos.AdminNotificationListResponse listNotifications() {
+	NotificationDtos.AdminNotificationListResponse listNotifications(@RequestParam(required = false) NotificationStatus status) {
 		return new NotificationDtos.AdminNotificationListResponse(
-			notificationLogRepository.findAllByOrderByCreatedAtAsc()
+			adminNotificationService.list(status)
 				.stream()
-				.map(log -> new NotificationDtos.AdminNotificationResponse(
-					log.getId(),
-					log.getOrderId(),
-					log.getType(),
-					log.getStatus(),
-					log.getRecipient(),
-					log.getTemplateKey(),
-					log.getSentAt(),
-					log.getCreatedAt()
-				))
+				.map(this::toResponse)
 				.toList()
+		);
+	}
+
+	@PostMapping("/{notificationId}/retry")
+	NotificationDtos.AdminNotificationResponse retry(@PathVariable UUID notificationId) {
+		return toResponse(adminNotificationService.retry(notificationId));
+	}
+
+	private NotificationDtos.AdminNotificationResponse toResponse(NotificationLog log) {
+		return new NotificationDtos.AdminNotificationResponse(
+			log.getId(),
+			log.getOrderId(),
+			log.getType(),
+			log.getChannel(),
+			log.getStatus(),
+			log.getRecipient(),
+			log.getTemplateKey(),
+			log.getFailureReason(),
+			log.getSentAt(),
+			log.getCreatedAt()
 		);
 	}
 }

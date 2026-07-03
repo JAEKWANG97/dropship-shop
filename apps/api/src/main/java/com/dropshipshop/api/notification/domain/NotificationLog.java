@@ -82,6 +82,7 @@ public class NotificationLog {
 		UUID claimId,
 		UUID refundId,
 		NotificationType type,
+		NotificationChannel channel,
 		String recipient,
 		String templateKey,
 		String payloadSnapshot
@@ -92,13 +93,12 @@ public class NotificationLog {
 		this.claimId = claimId;
 		this.refundId = refundId;
 		this.type = type;
-		this.channel = NotificationChannel.EMAIL;
+		this.channel = channel;
 		this.transactional = true;
-		this.status = NotificationStatus.SENT;
+		this.status = NotificationStatus.PENDING;
 		this.recipient = recipient;
 		this.templateKey = templateKey;
 		this.payloadSnapshot = payloadSnapshot;
-		this.sentAt = Instant.now();
 	}
 
 	@PrePersist
@@ -121,8 +121,32 @@ public class NotificationLog {
 		return type;
 	}
 
+	public UUID getUserId() {
+		return userId;
+	}
+
 	public UUID getOrderId() {
 		return orderId;
+	}
+
+	public UUID getPaymentGroupId() {
+		return paymentGroupId;
+	}
+
+	public UUID getClaimId() {
+		return claimId;
+	}
+
+	public UUID getRefundId() {
+		return refundId;
+	}
+
+	public NotificationChannel getChannel() {
+		return channel;
+	}
+
+	public boolean isTransactional() {
+		return transactional;
 	}
 
 	public NotificationStatus getStatus() {
@@ -137,11 +161,47 @@ public class NotificationLog {
 		return templateKey;
 	}
 
+	public String getPayloadSnapshot() {
+		return payloadSnapshot;
+	}
+
+	public String getFailureReason() {
+		return failureReason;
+	}
+
 	public Instant getSentAt() {
 		return sentAt;
 	}
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public Instant getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void markSent(Instant sentAt) {
+		this.status = NotificationStatus.SENT;
+		this.failureReason = null;
+		this.sentAt = sentAt;
+	}
+
+	public void markSkipped(String reason) {
+		this.status = NotificationStatus.SKIPPED;
+		this.failureReason = reason;
+		this.sentAt = null;
+	}
+
+	public void markFailed(String reason) {
+		this.status = NotificationStatus.FAILED;
+		this.failureReason = reason;
+		this.sentAt = null;
+	}
+
+	public void markPendingForRetry() {
+		this.status = NotificationStatus.PENDING;
+		this.failureReason = null;
+		this.sentAt = null;
 	}
 }

@@ -200,7 +200,7 @@ public class RefundService {
 				"Manual bank-transfer refund completed for order " + refund.getOrder().getOrderNumber(),
 				now
 			));
-			notificationService.email(
+			notificationService.transactionalSms(
 				refund.getOrder().getUser(),
 				refund.getOrder(),
 				refund.getPaymentGroup(),
@@ -304,7 +304,7 @@ public class RefundService {
 				"Refund completed for order " + refund.getOrder().getOrderNumber(),
 				completedAt
 			));
-			notificationService.email(
+			notificationService.transactionalSms(
 				refund.getOrder().getUser(),
 				refund.getOrder(),
 				refund.getPaymentGroup(),

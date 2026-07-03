@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.dropshipshop.api.notification.domain.NotificationChannel;
 import com.dropshipshop.api.notification.domain.NotificationStatus;
 import com.dropshipshop.api.notification.domain.NotificationType;
 
@@ -19,9 +20,11 @@ final class NotificationDtos {
 		UUID notificationId,
 		UUID orderId,
 		NotificationType type,
+		NotificationChannel channel,
 		NotificationStatus status,
 		String recipient,
 		String templateKey,
+		String failureReason,
 		Instant sentAt,
 		Instant createdAt
 	) {

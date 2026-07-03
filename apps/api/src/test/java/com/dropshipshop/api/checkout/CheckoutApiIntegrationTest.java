@@ -44,6 +44,10 @@ import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.notification.NotificationLogRepository;
+import com.dropshipshop.api.notification.domain.NotificationChannel;
+import com.dropshipshop.api.notification.domain.NotificationStatus;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
@@ -83,6 +87,9 @@ class CheckoutApiIntegrationTest {
 
 	@Autowired
 	private CustomerOrderRepository orderRepository;
+
+	@Autowired
+	private NotificationLogRepository notificationLogRepository;
 
 	@Autowired
 	private CheckoutService checkoutService;
@@ -150,6 +157,17 @@ class CheckoutApiIntegrationTest {
 			.andReturn();
 
 		String checkoutNumber = checkoutNumberFrom(result);
+		var paymentGroup = paymentGroupRepository.findByCheckoutNumberAndUser_Id(checkoutNumber, customer.getId()).orElseThrow();
+		assertThat(notificationLogRepository.findAllByOrderByCreatedAtAsc())
+			.filteredOn(log -> paymentGroup.getId().equals(log.getPaymentGroupId()))
+			.filteredOn(log -> log.getType() == NotificationType.PAYMENT_PENDING)
+			.singleElement()
+			.satisfies(log -> {
+				assertThat(log.getChannel()).isEqualTo(NotificationChannel.SMS);
+				assertThat(log.getStatus()).isEqualTo(NotificationStatus.SKIPPED);
+				assertThat(log.getRecipient()).isEqualTo("010-1111-2222");
+				assertThat(log.getPayloadSnapshot()).contains("입금대기", "141,000원");
+			});
 
 		mockMvc.perform(get("/api/cart")
 				.with(authentication(TestAuthentication.customer(customer.getId()))))

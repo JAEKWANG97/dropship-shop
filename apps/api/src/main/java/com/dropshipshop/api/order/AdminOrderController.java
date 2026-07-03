@@ -93,6 +93,16 @@ class AdminOrderController {
 		return adminOrderFulfillmentService.markOutOfStock(orderId, currentUser.id(authentication), request);
 	}
 
+	@PostMapping("/{orderId}/delay-notice")
+	@ResponseStatus(HttpStatus.OK)
+	AdminOrderDtos.AdminOrderActionResponse sendDelayNotice(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.DelayNoticeRequest request,
+		Authentication authentication
+	) {
+		return adminOrderFulfillmentService.sendDelayNotice(orderId, currentUser.id(authentication), request);
+	}
+
 	@PostMapping("/{orderId}/shipments")
 	@ResponseStatus(HttpStatus.OK)
 	AdminOrderDtos.AdminOrderActionResponse createShipment(

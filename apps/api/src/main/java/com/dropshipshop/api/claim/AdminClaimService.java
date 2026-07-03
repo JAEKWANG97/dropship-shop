@@ -77,7 +77,7 @@ class AdminClaimService {
 				claim.getOrder().markRefundRequested();
 				refundService.createCustomerCancelRefund(claim.getOrder());
 			}
-			notificationService.email(
+			notificationService.transactionalSms(
 				claim.getUser(),
 				claim.getOrder(),
 				claim.getOrder().getPaymentGroup(),
@@ -115,7 +115,7 @@ class AdminClaimService {
 			} else {
 				claim.reject(adminUserId, request.reason(), Instant.now());
 			}
-			notificationService.email(
+			notificationService.transactionalSms(
 				claim.getUser(),
 				claim.getOrder(),
 				claim.getOrder().getPaymentGroup(),
@@ -231,7 +231,7 @@ class AdminClaimService {
 	}
 
 	private void notifyClaimChanged(Claim claim, Refund refund) {
-		notificationService.email(
+		notificationService.transactionalSms(
 			claim.getUser(),
 			claim.getOrder(),
 			claim.getOrder().getPaymentGroup(),

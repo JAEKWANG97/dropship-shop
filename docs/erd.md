@@ -893,7 +893,7 @@ Audit/notification tables:
 - `payment_group_id`
 - `claim_id`
 - `refund_id`
-- `type`: `PAYMENT_COMPLETED` / `PAYMENT_EXCEPTION` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `DELIVERY_COMPLETED` / `DELAY_NOTICE` / `CLAIM_STATUS_CHANGED` / `REFUND_COMPLETED` / `MARKETING`
+- `type`: `PAYMENT_PENDING` / `PAYMENT_COMPLETED` / `PAYMENT_EXCEPTION` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `DELIVERY_COMPLETED` / `DELAY_NOTICE` / `CLAIM_STATUS_CHANGED` / `REFUND_COMPLETED` / `MARKETING`
 - `channel`: `EMAIL` / `ORDER_DETAIL` / `SMS` / `KAKAO_ALIMTALK` / `PUSH`
 - `transactional`
 - `status`: `PENDING` / `SENT` / `FAILED` / `SKIPPED`
@@ -908,6 +908,8 @@ Audit/notification tables:
 Rules:
 
 - Transactional notifications are not marketing notifications.
+- Transactional SMS logs start as `PENDING` and then record `SENT`, `FAILED`, or `SKIPPED`.
+- Order-related notification recipients come from `orders.recipient_phone`.
 - Admin order actions must be action-based, not arbitrary status mutation.
 - DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
 - Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.

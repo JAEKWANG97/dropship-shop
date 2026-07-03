@@ -80,8 +80,8 @@ Status: Confirmed
 - 결제 그룹(PaymentGroup) 생성 시점에 고객이 확인한 정책 버전과 확인 시각을 기록한다.
 - 정책 문서는 버전 단위로 초안 작성, 수정, 활성화할 수 있어야 한다. Implemented by DS-41.
 - 정책 페이지는 버전과 시행일을 가진다.
-- MVP 고객 알림은 이메일과 주문 상세 상태 표시로 시작한다. Implemented by DS-39 as transactional email notification logs.
-- SMS는 휴대폰 번호 인증번호 발송에만 사용하고, 주문/배송 알림 문자와 카카오 알림톡, 앱 푸시는 MVP 이후로 미룬다.
+- MVP 고객 알림은 SMS와 주문 상세 상태 표시로 시작한다. Implemented by B-011 as transactional SMS notification logs with safe `SKIPPED` fallback when SENS is disabled.
+- SMS는 휴대폰 번호 인증번호와 주문/입금/배송/환불 거래 알림에 사용한다. 카카오 알림톡과 앱 푸시는 MVP 이후로 미룬다.
 - 실제 법률 문구는 출시 전 별도 법률 검토를 거친다.
 - B-012 MVP 운영 고지에는 다음 실제 사업자 정보를 사용한다.
   - 상호: 가라사니

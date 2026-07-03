@@ -295,6 +295,13 @@ final class AdminOrderDtos {
 	) {
 	}
 
+	record DelayNoticeRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
 	record ShipmentCreateRequest(
 		@NotBlank
 		@Size(max = 100)

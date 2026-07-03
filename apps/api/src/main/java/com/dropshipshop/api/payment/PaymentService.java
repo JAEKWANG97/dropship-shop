@@ -117,7 +117,7 @@ public class PaymentService {
 				exception.getMessage(),
 				now
 			));
-			orders(paymentGroup).forEach(order -> notificationService.email(
+			orders(paymentGroup).forEach(order -> notificationService.transactionalSms(
 				order.getUser(),
 				order,
 				paymentGroup,
@@ -148,7 +148,7 @@ public class PaymentService {
 				"Approved amount mismatch",
 				now
 			));
-			orders(paymentGroup).forEach(order -> notificationService.email(
+			orders(paymentGroup).forEach(order -> notificationService.transactionalSms(
 				order.getUser(),
 				order,
 				paymentGroup,
@@ -181,7 +181,7 @@ public class PaymentService {
 			"Confirm approved",
 			now
 		));
-		orders.forEach(order -> notificationService.email(
+		orders.forEach(order -> notificationService.transactionalSms(
 			order.getUser(),
 			order,
 			paymentGroup,

@@ -114,12 +114,35 @@ class AdminOrderFulfillmentService {
 			fulfillment.markOutOfStock(request.reason());
 			fulfillmentRepository.save(fulfillment);
 			refundService.createOutOfStockRefund(order);
-			notificationService.email(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.OUT_OF_STOCK);
+			notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.OUT_OF_STOCK);
 			recordHistory(order, adminUserId, AdminOrderActionType.OUT_OF_STOCK, beforeStatus, request.reason());
 			return actionResponse(order, fulfillment);
 		} catch (IllegalStateException ex) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
 		}
+	}
+
+	@Transactional
+	AdminOrderDtos.AdminOrderActionResponse sendDelayNotice(
+		UUID orderId,
+		UUID adminUserId,
+		AdminOrderDtos.DelayNoticeRequest request
+	) {
+		CustomerOrder order = findOrder(orderId);
+		if (order.getStatus() != OrderStatus.SUPPLIER_ORDER_PENDING && order.getStatus() != OrderStatus.SUPPLIER_ORDERED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Delay notice can be sent only before shipment");
+		}
+		notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.DELAY_NOTICE);
+		actionHistoryRepository.save(new AdminOrderActionHistory(
+			order,
+			adminUserId,
+			AdminOrderActionType.DELAY_NOTICE_SENT,
+			order.getStatus(),
+			order.getStatus(),
+			request.reason()
+		));
+		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
+		return actionResponse(order, fulfillment);
 	}
 
 	private CustomerOrder findOrder(UUID orderId) {

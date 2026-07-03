@@ -32,6 +32,10 @@ import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.notification.NotificationLogRepository;
+import com.dropshipshop.api.notification.domain.NotificationChannel;
+import com.dropshipshop.api.notification.domain.NotificationStatus;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
@@ -97,6 +101,9 @@ class AdminOrderApiIntegrationTest {
 
 	@Autowired
 	private ShipmentRepository shipmentRepository;
+
+	@Autowired
+	private NotificationLogRepository notificationLogRepository;
 
 	@Test
 	void rejectsAnonymousAndCustomerAdminOrderQueueAccess() throws Exception {
@@ -176,6 +183,15 @@ class AdminOrderApiIntegrationTest {
 		assertThat(orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()))
 			.extracting(OrderStatusHistory::getActionType)
 			.contains("BANK_TRANSFER_DEPOSIT_CONFIRMED");
+		assertThat(notificationLogRepository.findAllByOrderByCreatedAtAsc())
+			.filteredOn(log -> order.getId().equals(log.getOrderId()))
+			.filteredOn(log -> log.getType() == NotificationType.PAYMENT_COMPLETED)
+			.singleElement()
+			.satisfies(log -> {
+				assertThat(log.getChannel()).isEqualTo(NotificationChannel.SMS);
+				assertThat(log.getStatus()).isEqualTo(NotificationStatus.SKIPPED);
+				assertThat(log.getRecipient()).isEqualTo("010-1111-2222");
+			});
 
 		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
 				.with(authentication(TestAuthentication.admin()))
@@ -186,6 +202,37 @@ class AdminOrderApiIntegrationTest {
 					}
 					"""))
 			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void sendsManualDelayNoticeBeforeShipment() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-delay-notice");
+		CustomerOrder order = createApprovedOrder(customer, "ADM-DELAY-1", "ADM-DELAY-CO-1", 28000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/delay-notice", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Supplier has not confirmed expected shipment date"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("SUPPLIER_ORDER_PENDING")));
+
+		assertThat(notificationLogRepository.findAllByOrderByCreatedAtAsc())
+			.filteredOn(log -> order.getId().equals(log.getOrderId()))
+			.filteredOn(log -> log.getType() == NotificationType.DELAY_NOTICE)
+			.singleElement()
+			.satisfies(log -> {
+				assertThat(log.getChannel()).isEqualTo(NotificationChannel.SMS);
+				assertThat(log.getStatus()).isEqualTo(NotificationStatus.SKIPPED);
+				assertThat(log.getRecipient()).isEqualTo("010-1111-2222");
+			});
+		mockMvc.perform(get("/api/admin/actions")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("DELAY_NOTICE_SENT")));
 	}
 
 	@Test

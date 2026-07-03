@@ -71,7 +71,7 @@ class AdminOrderShipmentService {
 		}
 
 		Shipment shipment = shipmentRepository.save(new Shipment(order, request.carrier(), request.trackingNumber(), Instant.now()));
-		notificationService.email(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.SHIPMENT_STARTED);
+		notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.SHIPMENT_STARTED);
 		actionHistoryRepository.save(new AdminOrderActionHistory(
 			order,
 			adminUserId,

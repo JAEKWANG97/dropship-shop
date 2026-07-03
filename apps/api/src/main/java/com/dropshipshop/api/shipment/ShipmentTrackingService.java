@@ -180,7 +180,7 @@ class ShipmentTrackingService {
 
 	private void notifyDelivered(Shipment shipment) {
 		if (!notificationService.exists(shipment.getOrder(), NotificationType.DELIVERY_COMPLETED)) {
-			notificationService.email(
+			notificationService.transactionalSms(
 				shipment.getOrder().getUser(),
 				shipment.getOrder(),
 				shipment.getOrder().getPaymentGroup(),

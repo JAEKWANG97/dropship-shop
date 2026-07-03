@@ -416,7 +416,11 @@ Admin detects wrong operational state or shipment information
 - Automatic state rollback is excluded from MVP.
 - Wrong state changes are handled by admin correction actions with required reason and history.
 - State transitions are validated by from status, actor, action, guard, side effect, and target status.
-- Required transaction notifications are recorded in `NotificationLog`.
+- Required transaction notifications are recorded in `NotificationLog` as SMS attempts.
+- Checkout creation sends one bank-transfer payment pending 안내 per payment group using the order recipient phone number.
+- Admin deposit confirmation, payment exception, out-of-stock, shipment started, delivery completed, claim status change, and refund completed create transactional notification logs.
+- Supplier delay notice is a manual admin action before shipment; automatic delay scheduler is deferred.
+- SMS dispatch runs after the main order/payment transaction commits, so provider failure must not roll back the operational action.
 
 ## Risk Points
 

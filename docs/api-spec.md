@@ -557,14 +557,16 @@ Rules:
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Implemented | Order status transition history |
 | `GET` | `/api/admin/actions` | `ADMIN` | Implemented | Admin order action history |
-| `GET` | `/api/admin/notifications` | `ADMIN` | Implemented | Notification log search |
-| `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Planned | Retry failed notification |
+| `GET` | `/api/admin/notifications?status=FAILED` | `ADMIN` | Implemented | Notification log search, optionally filtered by status |
+| `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Implemented | Retry failed notification |
+| `POST` | `/api/admin/orders/{orderId}/delay-notice` | `ADMIN` | Implemented | Send manual supplier delay notice before shipment |
 
 Rules:
 
 - Transactional notifications are separate from marketing consent.
-- Payment completed, payment exception, out-of-stock, shipment started, delivered, delay notice, claim changed, and refund completed should create notification logs.
-- DS-39 records transactional email notification logs with `SENT` status as the MVP email baseline.
+- Payment pending, payment completed, payment exception, out-of-stock, shipment started, delivered, delay notice, claim changed, and refund completed should create notification logs.
+- B-011 sends transactional notifications through SMS first. Logs start as `PENDING` and become `SENT`, `FAILED`, or `SKIPPED`.
+- `sms.sens.enabled=false` is the default safe fallback and records logs as `SKIPPED`.
 - DS-44 exposes order status history and admin order action history read APIs.
 
 ## DS-6 Catalog Request And Response Expectations

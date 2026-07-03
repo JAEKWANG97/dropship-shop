@@ -4,6 +4,10 @@
 
 ## 2026-07-03
 
+- B-011 알림/메일/문자 발송
+  - 커밋: `feat: add sms notification dispatch`
+  - 완료 내용: 거래 알림을 SMS 우선으로 전환하고, `NotificationLog`가 `PENDING`에서 실제 dispatch 결과에 따라 `SENT`/`FAILED`/`SKIPPED`로 바뀌도록 했다. 기존 인증번호 SMS는 유지하면서 SENS HTTP 호출을 공용 클라이언트로 분리했다. 체크아웃 생성 시 입금대기 안내를 만들고, 주문 관련 알림은 주문 수령인 전화번호로 보낸다. 관리자 알림 조회는 status filter를 지원하며, 실패 알림 retry API와 수동 공급처 지연 안내 액션을 추가했다.
+  - 검증: `cd apps/api && ./gradlew test --tests 'com.dropshipshop.api.checkout.CheckoutApiIntegrationTest' --tests 'com.dropshipshop.api.order.AdminOrderApiIntegrationTest' --tests 'com.dropshipshop.api.notification.AdminNotificationApiIntegrationTest'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`
 - B-015 고객 클레임 조회/증빙/교환 흐름 고도화
   - 커밋: `feat: add claim evidence flow`
   - 완료 내용: 고객 주문별 클레임 목록/상세 API를 추가하고, 상품 하자·오배송·상품 정보와 다름·배송 문제 클레임은 사진 증빙을 필수로 받도록 했다. 증빙 파일은 기존 업로드 검증을 재사용해 이미지 매직 바이트를 확인하고 `claim_evidences` 테이블에 URL/파일명/크기/콘텐츠 타입을 저장한다. 고객 주문 상세는 클레임 목록과 증빙 사진을 표시하고, 관리자 주문 상세도 증빙을 확인할 수 있게 했다.

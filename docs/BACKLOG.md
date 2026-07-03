@@ -264,16 +264,6 @@ Tasks:
 - [ ] 상품/주문/환불/정책 관리 권한 분리가 필요한 시점을 정한다.
 - [ ] 권한 세분화가 필요하면 DB role/permission 모델을 설계한다.
 
-### B-011 알림/메일/문자 발송
-
-Status: Todo
-
-Tasks:
-- [ ] 현재 notification log trigger가 필요한 이벤트를 모두 남기는지 확인한다.
-- [ ] 실제 메일/SMS/알림톡 provider 선택을 보류 또는 확정한다.
-- [ ] 실패 알림 retry API와 관리자 화면 연결 범위를 정한다.
-- [ ] 공급처 지연 안내 trigger와 고객 안내 문구를 정리한다.
-
 ### B-037 배포 환경 부하 smoke
 
 Status: Todo

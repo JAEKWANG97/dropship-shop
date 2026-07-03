@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.account.domain.PhoneVerificationCode;
 import com.dropshipshop.api.account.repository.PhoneVerificationCodeRepository;
+import com.dropshipshop.api.sms.SmsSender;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
