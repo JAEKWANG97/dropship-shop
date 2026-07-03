@@ -4,6 +4,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.dropshipshop.api.claim.domain.ClaimReason;
+import com.dropshipshop.api.claim.domain.ClaimStatus;
+import com.dropshipshop.api.claim.domain.ClaimType;
+import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
@@ -50,7 +54,8 @@ final class OrderDtos {
 		List<OrderItemResponse> items,
 		FulfillmentSummaryResponse fulfillment,
 		ShipmentSummaryResponse shipment,
-		RefundSummaryResponse refund
+		RefundSummaryResponse refund,
+		ClaimSummaryResponse claim
 	) {
 	}
 
@@ -118,6 +123,23 @@ final class OrderDtos {
 	record RefundSummaryResponse(
 		RefundStatus status,
 		Long amount
+	) {
+	}
+
+	record ClaimSummaryResponse(
+		UUID claimId,
+		ClaimType claimType,
+		ClaimReason claimReason,
+		ClaimStatus status,
+		RequestedAction requestedAction,
+		String customerMemo,
+		String adminReviewReason,
+		Instant reviewedAt,
+		Instant returnReceivedAt,
+		String returnReceivedMemo,
+		UUID refundId,
+		Instant completedAt,
+		Instant createdAt
 	) {
 	}
 }

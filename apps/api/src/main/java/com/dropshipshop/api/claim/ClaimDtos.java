@@ -46,6 +46,13 @@ final class ClaimDtos {
 	) {
 	}
 
+	record AdminReturnReceivedRequest(
+		@NotBlank
+		@Size(max = 1000)
+		String memo
+	) {
+	}
+
 	record ClaimResponse(
 		UUID claimId,
 		UUID orderId,
@@ -59,6 +66,11 @@ final class ClaimDtos {
 		UUID reviewedByAdminId,
 		String adminReviewReason,
 		Instant reviewedAt,
+		UUID returnReceivedByAdminId,
+		Instant returnReceivedAt,
+		String returnReceivedMemo,
+		UUID refundId,
+		Instant completedAt,
 		Instant createdAt
 	) {
 	}

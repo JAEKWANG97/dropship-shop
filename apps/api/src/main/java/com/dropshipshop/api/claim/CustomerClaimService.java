@@ -147,6 +147,11 @@ class CustomerClaimService {
 			claim.getReviewedByAdminId(),
 			claim.getAdminReviewReason(),
 			claim.getReviewedAt(),
+			claim.getReturnReceivedByAdminId(),
+			claim.getReturnReceivedAt(),
+			claim.getReturnReceivedMemo(),
+			claim.getRefundId(),
+			claim.getCompletedAt(),
 			claim.getCreatedAt()
 		);
 	}

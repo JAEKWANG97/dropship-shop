@@ -33,17 +33,27 @@ import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
+import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
+import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.domain.ShippingAddressSnapshot;
+import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.payment.domain.Payment;
+import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
+import com.dropshipshop.api.payment.domain.PaymentProvider;
+import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.refund.domain.RefundStatus;
+import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
@@ -88,7 +98,16 @@ class CustomerCancellationApiIntegrationTest {
 	private ClaimRepository claimRepository;
 
 	@Autowired
+	private RefundRepository refundRepository;
+
+	@Autowired
 	private ShipmentRepository shipmentRepository;
+
+	@Autowired
+	private OrderStatusHistoryRepository orderStatusHistoryRepository;
+
+	@Autowired
+	private AdminOrderActionHistoryRepository adminOrderActionHistoryRepository;
 
 	@Test
 	void rejectsAnonymousAndAdminCustomerCancelAccess() throws Exception {
@@ -387,6 +406,260 @@ class CustomerCancellationApiIntegrationTest {
 	}
 
 	@Test
+	void completesDeliveredReturnRefundFlowWithManualBankTransferRefund() throws Exception {
+		UserAccount customer = createCustomer("return-refund-customer-1");
+		CustomerOrder order = createDeliveredBankTransferOrder(
+			customer,
+			"RETURN-REFUND-1",
+			"RETURN-REFUND-CO-1",
+			32000,
+			Instant.now()
+		);
+		String claimId = createClaim(customer, order, "RETURN", "SIMPLE_CHANGE_OF_MIND", "Return after delivery");
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Return approved"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETURN_WAITING")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")));
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/return-received", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "memo": "Returned product received and inspected"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETURN_RECEIVED")))
+			.andExpect(jsonPath("$.returnReceivedByAdminId", is(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.returnReceivedMemo", is("Returned product received and inspected")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")));
+
+		MvcResult refundStart = mockMvc.perform(post("/api/admin/claims/{claimId}/return-refund", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Start refund after return inspection"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("REFUND_PROCESSING")))
+			.andExpect(jsonPath("$.orderStatus", is("REFUND_REQUESTED")))
+			.andReturn();
+		String refundId = fieldFrom(refundStart, "refundId");
+
+		assertThat(refundRepository.findById(UUID.fromString(refundId)).orElseThrow().getStatus()).isEqualTo(RefundStatus.REQUESTED);
+
+		approveRefund(UUID.fromString(refundId), "Return refund approved");
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-complete", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Manual bank transfer refund completed",
+					  "bankName": "테스트은행",
+					  "accountNumber": "123-456",
+					  "accountHolder": "Receiver"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("COMPLETED")))
+			.andExpect(jsonPath("$.orderStatus", is("REFUNDED")))
+			.andExpect(jsonPath("$.paymentGroupStatus", is("REFUNDED")))
+			.andExpect(jsonPath("$.paymentStatus", is("REFUNDED")));
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUNDED);
+		assertThat(claimRepository.findById(UUID.fromString(claimId)).orElseThrow().getStatus().name()).isEqualTo("COMPLETED");
+		assertThat(paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentGroupStatus.REFUNDED);
+		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentStatus.REFUNDED);
+		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId()).orElseThrow().getProvider())
+			.isEqualTo(PaymentProvider.BANK_TRANSFER);
+		assertThat(orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()))
+			.extracting(OrderStatusHistory::getActionType)
+			.contains("RETURN_RECEIVED", "RETURN_REFUND_REQUESTED", "MANUAL_REFUND_COMPLETED");
+		assertThat(adminOrderActionHistoryRepository.findAllByOrderByCreatedAtDesc())
+			.filteredOn(action -> action.getOrder().getId().equals(order.getId()))
+			.extracting(AdminOrderActionHistory::getActionType)
+			.contains(
+				AdminOrderActionType.RETURN_RECEIVED,
+				AdminOrderActionType.RETURN_REFUND_REQUESTED,
+				AdminOrderActionType.MANUAL_REFUND_COMPLETED
+			);
+	}
+
+	@Test
+	void guardsDeliveredReturnRefundTransitions() throws Exception {
+		UserAccount customer = createCustomer("return-refund-customer-2");
+		UserAccount otherCustomer = createCustomer("return-refund-other-customer");
+		CustomerOrder order = createDeliveredBankTransferOrder(
+			customer,
+			"RETURN-GUARD-1",
+			"RETURN-GUARD-CO-1",
+			33000,
+			Instant.now()
+		);
+		String claimId = createClaim(customer, order, "RETURN", "DEFECT", "Return guard claim");
+
+		mockMvc.perform(post("/api/orders/{orderId}/claims", order.getId())
+				.with(authentication(TestAuthentication.customer(otherCustomer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "RETURN",
+					  "claimReason": "DEFECT",
+					  "customerMemo": "Other customer cannot claim this order"
+					}
+					"""))
+			.andExpect(status().isNotFound());
+
+		mockMvc.perform(post("/api/orders/{orderId}/cancel", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Direct refund without return claim path"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/return-received", claimId)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "memo": "Customer cannot mark return received"
+					}
+					"""))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/return-refund", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Refund before approval"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Return approved"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETURN_WAITING")));
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/return-refund", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Refund before return received"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/return-received", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "memo": "Return received"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETURN_RECEIVED")));
+
+		MvcResult refundStart = mockMvc.perform(post("/api/admin/claims/{claimId}/return-refund", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Start refund"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("REFUND_PROCESSING")))
+			.andReturn();
+		String refundId = fieldFrom(refundStart, "refundId");
+		approveRefund(UUID.fromString(refundId), "Return refund approved");
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-complete", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Manual bank transfer refund completed"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("COMPLETED")));
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/return-refund", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Reprocess completed claim"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void rejectsApprovedReturnAndKeepsDeliveredOrder() throws Exception {
+		UserAccount customer = createCustomer("return-refund-customer-3");
+		CustomerOrder order = createDeliveredOrder(customer, "RETURN-REJECT-1", "RETURN-REJECT-CO-1", 34000, Instant.now());
+		String claimId = createClaim(customer, order, "RETURN", "DEFECT", "Return for inspection");
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Return approved for inspection"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("RETURN_WAITING")));
+
+		mockMvc.perform(post("/api/admin/claims/{claimId}/reject", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Return item is not eligible after inspection"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("REJECTED")))
+			.andExpect(jsonPath("$.orderStatus", is("DELIVERED")))
+			.andExpect(jsonPath("$.adminReviewReason", is("Return item is not eligible after inspection")));
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.DELIVERED);
+		assertThat(adminOrderActionHistoryRepository.findAllByOrderByCreatedAtDesc())
+			.filteredOn(action -> action.getOrder().getId().equals(order.getId()))
+			.extracting(AdminOrderActionHistory::getActionType)
+			.contains(AdminOrderActionType.RETURN_REJECTED);
+	}
+
+	@Test
 	void rejectsReturnExchangeClaimsBeforeDeliveryAndAfterSimpleChangeWindow() throws Exception {
 		UserAccount customer = createCustomer("return-customer-3");
 		CustomerOrder supplierOrdered = createSupplierOrderedOrder(customer, "RETURN-NOT-DELIVERED-1", "RETURN-NOT-DELIVERED-CO-1", 30000);
@@ -451,6 +724,25 @@ class CustomerCancellationApiIntegrationTest {
 		return orderRepository.saveAndFlush(order);
 	}
 
+	private CustomerOrder createBankTransferApprovedOrder(
+		UserAccount customer,
+		String orderNumber,
+		String checkoutNumber,
+		long amount
+	) {
+		CustomerOrder order = createPaymentPendingOrder(customer, orderNumber, checkoutNumber, amount);
+		order.getPaymentGroup().approve(amount, Instant.now());
+		paymentGroupRepository.save(order.getPaymentGroup());
+		order.markSupplierOrderPending();
+		paymentRepository.save(Payment.bankTransferApproved(
+			order.getPaymentGroup(),
+			"BANK-" + checkoutNumber,
+			amount,
+			Instant.now()
+		));
+		return orderRepository.saveAndFlush(order);
+	}
+
 	private CustomerOrder createSupplierOrderedOrder(
 		UserAccount customer,
 		String orderNumber,
@@ -478,6 +770,38 @@ class CustomerCancellationApiIntegrationTest {
 		orderRepository.saveAndFlush(order);
 		shipmentRepository.saveAndFlush(shipment);
 		return order;
+	}
+
+	private CustomerOrder createDeliveredBankTransferOrder(
+		UserAccount customer,
+		String orderNumber,
+		String checkoutNumber,
+		long amount,
+		Instant deliveredAt
+	) {
+		CustomerOrder order = createBankTransferApprovedOrder(customer, orderNumber, checkoutNumber, amount);
+		order.startSupplierOrderWork(TestAuthentication.ADMIN_ID, Instant.now());
+		order.markSupplierOrdered();
+		order.markShipped();
+		order.markDeliveredByTracking();
+		Shipment shipment = new Shipment(order, "CJ대한통운", "TRACK-" + orderNumber, deliveredAt.minusSeconds(3600));
+		shipment.markDeliveredByTracking(deliveredAt);
+		orderRepository.saveAndFlush(order);
+		shipmentRepository.saveAndFlush(shipment);
+		return order;
+	}
+
+	private void approveRefund(UUID refundId, String reason) throws Exception {
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/approve", refundId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "%s"
+					}
+					""".formatted(reason)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("APPROVED")));
 	}
 
 	private String createClaim(

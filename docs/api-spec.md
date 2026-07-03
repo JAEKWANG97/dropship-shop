@@ -481,7 +481,8 @@ Rules:
 | `POST` | `/api/admin/claims/{claimId}/approve` | `ADMIN` | Implemented | Approve claim |
 | `POST` | `/api/admin/claims/{claimId}/reject` | `ADMIN` | Implemented | Reject claim |
 | `POST` | `/api/admin/claims/{claimId}/request-evidence` | `ADMIN` | Planned | Request evidence |
-| `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Planned | Mark return received |
+| `POST` | `/api/admin/claims/{claimId}/return-received` | `ADMIN` | Implemented | Mark return received |
+| `POST` | `/api/admin/claims/{claimId}/return-refund` | `ADMIN` | Implemented | Start return refund after return received |
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
 | `GET` | `/api/admin/refunds` | `ADMIN` | Implemented | Refund queue |
 | `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Implemented | Approve refund execution |
@@ -499,10 +500,14 @@ Rules:
 - Simple change-of-mind return/exchange claims require delivery within 7 days.
 - Seller-fault return/exchange claims require delivery within 90 days in the DS-37 baseline; discovery-date and evidence file capture remain planned.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
+- `return-received` requires a `RETURN_WAITING` return claim and records return received memo/time.
+- `return-refund` requires a `RETURN_RECEIVED` return claim, creates a `RETURN_REQUESTED` refund, links it to the claim, moves the order to `REFUND_REQUESTED`, and moves the claim to `REFUND_PROCESSING`.
+- Bank-transfer refund completion moves the linked return claim to `COMPLETED`.
 - Refund execution requires admin approval before PG cancel/refund request or manual bank-transfer refund completion.
 - First PG cancel failure moves refund to `RETRY_REQUIRED`; retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
 - Manual review can approve the refund again or reject it with reason.
 - Bank-transfer refund completion requires actual manual refund completion by an admin.
+- `GET /api/orders/{orderId}` and `GET /api/admin/orders/{orderId}` include the latest claim summary when an order has a claim.
 - Deferred PG refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
 - Manual bank-transfer refund completion or PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.

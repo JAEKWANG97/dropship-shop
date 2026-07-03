@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { formatPrice } from "@/lib/catalog";
+import { BUSINESS_PROFILE } from "@/lib/legal";
 import {
+  claimReasonLabel,
+  claimStatusLabel,
+  claimTypeLabel,
   fulfillmentStatusLabel,
   getCustomerOrder,
   orderStatusLabel,
@@ -84,6 +88,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
       ) : null}
 
       <OrderSummaryPanel order={order} />
+      <ClaimProgressPanel order={order} />
       <OrderItems order={order} />
       <OrderShippingAddressForm order={order} />
       <CancelOrderForm orderId={order.orderId} />
@@ -155,6 +160,69 @@ function OrderSummaryPanel({ order }: { order: OrderDetail }) {
           <strong>{formatPrice(order.totalAmount)}</strong>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ClaimProgressPanel({ order }: { order: OrderDetail }) {
+  const claim = order.claim;
+  if (!claim) {
+    return null;
+  }
+
+  return (
+    <section className="detail-section">
+      <h2>{claimTypeLabel(claim.claimType)} 처리 상태</h2>
+      <div className="summary-list">
+        <div>
+          <span>접수 상태</span>
+          <strong>{claimStatusLabel(claim.status)}</strong>
+        </div>
+        <div>
+          <span>접수 사유</span>
+          <strong>{claimReasonLabel(claim.claimReason)}</strong>
+        </div>
+        <div>
+          <span>고객 메모</span>
+          <strong>{claim.customerMemo}</strong>
+        </div>
+        {claim.adminReviewReason ? (
+          <div>
+            <span>처리 사유</span>
+            <strong>{claim.adminReviewReason}</strong>
+          </div>
+        ) : null}
+        {claim.returnReceivedAt ? (
+          <div>
+            <span>반품 수령</span>
+            <strong>{new Date(claim.returnReceivedAt).toLocaleString("ko-KR")}</strong>
+          </div>
+        ) : null}
+        {claim.completedAt ? (
+          <div>
+            <span>완료 시각</span>
+            <strong>{new Date(claim.completedAt).toLocaleString("ko-KR")}</strong>
+          </div>
+        ) : null}
+      </div>
+      {claim.claimType === "RETURN" && claim.status === "RETURN_WAITING" ? (
+        <div className="notice">
+          <strong>반송 안내</strong>
+          <span>반송지: {BUSINESS_PROFILE.returnAddress}</span>
+        </div>
+      ) : null}
+      {claim.status === "REFUND_PROCESSING" ? (
+        <div className="notice">
+          <strong>환불 처리 중</strong>
+          <span>관리자 확인 후 계좌 환불 완료 시 주문 상태가 환불 완료로 변경됩니다.</span>
+        </div>
+      ) : null}
+      {claim.status === "REJECTED" ? (
+        <div className="notice">
+          <strong>클레임이 거부되었습니다</strong>
+          <span>{claim.adminReviewReason ?? "거부 사유는 고객센터 문의로 확인해 주세요."}</span>
+        </div>
+      ) : null}
     </section>
   );
 }

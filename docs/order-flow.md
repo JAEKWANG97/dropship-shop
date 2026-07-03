@@ -320,12 +320,21 @@ Admin approves claim
 -> If return is needed, customer sends product back
 -> Claim status: RETURN_WAITING (implemented by DS-37 for return approval)
 -> Admin receives and inspects returned product
--> Claim status: RETURN_RECEIVED
--> Refund request starts within 3 business days if refund is needed
+-> Claim status: RETURN_RECEIVED (implemented by B-044)
+-> Admin starts return refund after inspection
+-> Refund status: REQUESTED
+-> Order status: REFUND_REQUESTED
+-> Claim status: REFUND_PROCESSING
+-> Admin approves refund execution
+-> Admin completes the actual bank-transfer refund
+-> Refund status: COMPLETED
+-> Order status: REFUNDED
+-> Claim status: COMPLETED
 -> Exchange proceeds if exchange is approved (approval implemented by DS-37; exchange shipment remains planned)
 
 Admin rejects claim
 -> Claim status: REJECTED
+-> Order status remains DELIVERED for rejected return claims
 -> Customer sees rejection reason
 ```
 

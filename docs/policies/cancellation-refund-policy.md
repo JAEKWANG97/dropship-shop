@@ -52,8 +52,11 @@ Status: Confirmed
 - 발주 후 취소, 관리자 환불, 반품/교환 승인 건의 PG 환불은 관리자 승인 후 배송 그룹 주문 단위 환불을 기본으로 한다. Implemented by DS-38.
 - 고객 셀프서비스 취소 조건을 만족하는 `SUPPLIER_ORDER_PENDING` 주문은 고객 셀프서비스 취소 흐름으로 처리하되, PG 취소/환불 성공 전까지 최종 환불 완료로 표시하지 않는다.
 - 반품이 필요한 환불은 반품 상품 입고와 관리자 검수 후 PG 취소/환불을 요청한다.
+- 계좌입금 MVP에서 반품이 필요한 환불은 반품 상품 입고와 관리자 검수 후 `Refund: REQUESTED`, `Order: REFUND_REQUESTED`, `Claim: REFUND_PROCESSING`으로 전환하고, 실제 이체 완료를 관리자가 수동 환불 완료로 기록한다. Implemented by B-044.
 - 상품 미출고 취소처럼 반환받을 상품이 없는 환불은 취소 승인 후 PG 취소/환불을 요청한다.
 - 반품 상품 입고가 필요한 환불은 반품 상품 입고 확인일로부터 3영업일 이내 PG 취소/환불 요청을 목표로 한다.
+- 계좌입금 MVP에서 반품 상품 입고가 필요한 환불은 반품 상품 입고 확인일로부터 3영업일 이내 수동 계좌환불 완료를 목표로 한다.
+- B-044 범위에서는 반품 배송비 차감 자동 계산을 하지 않는다. 배송비 부담 또는 차감이 필요한 건은 관리자가 고객 안내와 처리 메모로 별도 관리한다.
 - 반환받을 상품이 없는 취소 환불은 취소 승인일로부터 3영업일 이내 PG 취소/환불 요청을 목표로 한다. Admin refund approval implemented by DS-38.
 - 결제 승인 완료 주문은 PG 취소/환불 성공 전까지 최종 취소 또는 환불 완료 상태로 전환하지 않는다.
 - 결제 승인 완료 주문의 고객 취소 또는 관리자 환불은 `REFUND_REQUESTED` 상태를 거쳐 처리한다.
@@ -75,7 +78,7 @@ Status: Confirmed
 - 클레임 승인 후 실제 환불은 `Refund` 모델과 PG 취소/환불 성공 기준을 따른다.
 - 배송 그룹 주문 단위 환불을 허용하되, 상품/옵션/수량 단위 환불을 제외해 주문/결제/환불 모델 복잡도를 제한한다.
 - 고객 취소 버튼 노출 여부는 주문 상태로 판단해야 한다.
-- 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다. Cancellation claim flow is implemented by DS-14; return/exchange claim creation and review are implemented by DS-37.
+- 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다. Cancellation claim flow is implemented by DS-14; return/exchange claim creation and review are implemented by DS-37; delivered return receive/refund completion flow is implemented by B-044.
 - 환불 사유 enum이 필요하다. Implemented by DS-15.
 - 환불 상태는 PG 요청/성공/실패/재시도를 구분해야 한다. Implemented by DS-15.
 - 환불 실패 건을 처리하는 관리자 큐가 필요하다. Refund queue and retry are implemented by DS-15.

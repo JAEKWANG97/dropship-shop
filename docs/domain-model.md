@@ -634,6 +634,11 @@ Implemented fields:
 - reviewedByAdminId
 - adminReviewReason
 - reviewedAt
+- returnReceivedByAdminId
+- returnReceivedAt
+- returnReceivedMemo
+- refundId
+- completedAt
 - createdAt
 - updatedAt
 
@@ -646,18 +651,6 @@ Planned fields:
 - evidenceUrls
 - adminMemo
 - rejectionReason
-
-Rules:
-
-- DS-14 implements `CANCEL` claim creation and admin review.
-- DS-37 implements `RETURN` and `EXCHANGE` claim creation after delivery and admin approve/reject review.
-- Customer self-service cancellation is allowed only for `SUPPLIER_ORDER_PENDING` orders whose supplier work and address lock fields are empty.
-- Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
-- After supplier work starts or after `SUPPLIER_ORDERED`, the customer can submit a `CANCEL` claim for admin review before shipment.
-- After delivery, the customer can submit a `RETURN` claim with requested action `REFUND` or an `EXCHANGE` claim with requested action `EXCHANGE`.
-- Simple change-of-mind return/exchange claims are accepted only within 7 days from `deliveredAt`.
-- Seller-fault return/exchange claims use a 90-day delivered-at baseline in DS-37; discovery date and evidence URLs remain planned fields.
-- Admin approval moves the order to `REFUND_REQUESTED`; admin rejection keeps the order status unchanged.
 - requestedAt
 - deliveredAtAtRequest
 - discoveryDate
@@ -665,11 +658,25 @@ Rules:
 - approvedAt
 - returnCarrier
 - returnTrackingNumber
-- returnReceivedAt
 - inspectedAt
-- refundId
-- createdAt
-- updatedAt
+
+Rules:
+
+- DS-14 implements `CANCEL` claim creation and admin review.
+- DS-37 implements `RETURN` and `EXCHANGE` claim creation after delivery and admin approve/reject review.
+- B-044 implements delivered return receive, return refund start, manual refund completion linkage, and approved return rejection after inspection.
+- Customer self-service cancellation is allowed only for `SUPPLIER_ORDER_PENDING` orders whose supplier work and address lock fields are empty.
+- Eligible self-service cancellation creates an approved `CANCEL` claim and moves the order to `REFUND_REQUESTED`.
+- After supplier work starts or after `SUPPLIER_ORDERED`, the customer can submit a `CANCEL` claim for admin review before shipment.
+- After delivery, the customer can submit a `RETURN` claim with requested action `REFUND` or an `EXCHANGE` claim with requested action `EXCHANGE`.
+- Simple change-of-mind return/exchange claims are accepted only within 7 days from `deliveredAt`.
+- Seller-fault return/exchange claims use a 90-day delivered-at baseline in DS-37; discovery date and evidence URLs remain planned fields.
+- Admin approval of a cancellation claim moves the order to `REFUND_REQUESTED`.
+- Admin approval of a return claim moves the claim to `RETURN_WAITING` and keeps the order `DELIVERED`.
+- Admin return received action moves the claim to `RETURN_RECEIVED`.
+- Admin return refund start requires a `RETURN_RECEIVED` return claim, creates a `RETURN_REQUESTED` refund, moves the order to `REFUND_REQUESTED`, links the refund to the claim, and moves the claim to `REFUND_PROCESSING`.
+- Manual bank-transfer refund completion moves the order to `REFUNDED`, refund to `COMPLETED`, and linked return claim to `COMPLETED`.
+- Admin rejection keeps the order status unchanged; approved return rejection after inspection keeps the order `DELIVERED`.
 
 ## NotificationLog
 

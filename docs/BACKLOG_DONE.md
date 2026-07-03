@@ -4,6 +4,10 @@
 
 ## 2026-07-03
 
+- B-044 배송 후 반품/환불 플로우 완성
+  - 커밋: `feat: complete delivered return refund flow`
+  - 완료 내용: 배송완료 주문의 RETURN 클레임을 승인 후 `RETURN_WAITING`, 반품 수령 후 `RETURN_RECEIVED`, 환불 시작 후 `REFUND_PROCESSING`, 수동 계좌환불 완료 후 `COMPLETED`까지 연결했다. `claims.refund_id`로 환불과 클레임을 연결하고, 관리자 반품 수령/환불 시작/거부 액션과 고객 주문 상세의 반품 진행 상태 표시를 추가했다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*CustomerCancellationApiIntegrationTest'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`
 - B-041 계좌입금 주문/입금확인 플로우 전환
   - 커밋: 미커밋
   - 완료 내용: 고객 체크아웃 주 경로를 Toss 결제창에서 계좌입금 안내로 전환했다. 체크아웃 응답에 입금 계좌, 입금자명, 금액, 기한, 현금영수증 안내를 포함하고, 관리자 주문 화면에 입금대기 필터, 입금확인, 미입금취소, 입금 불일치 메모 액션을 연결했다. 입금확인 시 `BANK_TRANSFER` payment를 만들고 주문을 `SUPPLIER_ORDER_PENDING`으로 넘기며, 수동 환불 완료 액션은 `Refund`, `Payment`, `PaymentGroup`, `OrderStatusHistory`를 함께 갱신한다.

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.user.domain.UserAccount;
 
 import jakarta.persistence.Column;
@@ -15,6 +16,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -62,6 +64,22 @@ public class Claim {
 
 	@Column(name = "reviewed_at")
 	private Instant reviewedAt;
+
+	@Column(name = "return_received_by_admin_id")
+	private UUID returnReceivedByAdminId;
+
+	@Column(name = "return_received_at")
+	private Instant returnReceivedAt;
+
+	@Column(name = "return_received_memo", columnDefinition = "TEXT")
+	private String returnReceivedMemo;
+
+	@OneToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "refund_id")
+	private Refund refund;
+
+	@Column(name = "completed_at")
+	private Instant completedAt;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
@@ -113,6 +131,9 @@ public class Claim {
 	}
 
 	public void approveReturn(UUID adminUserId, String reason, Instant reviewedAt) {
+		if (claimType != ClaimType.RETURN) {
+			throw new IllegalStateException("Only return claims can move to return waiting");
+		}
 		if (status != ClaimStatus.REQUESTED && status != ClaimStatus.UNDER_REVIEW) {
 			throw new IllegalStateException("Only requested return claims can be approved");
 		}
@@ -130,6 +151,54 @@ public class Claim {
 		this.reviewedByAdminId = adminUserId;
 		this.adminReviewReason = reason;
 		this.reviewedAt = reviewedAt;
+	}
+
+	public void markReturnReceived(UUID adminUserId, String memo, Instant receivedAt) {
+		if (claimType != ClaimType.RETURN) {
+			throw new IllegalStateException("Only return claims can be marked as received");
+		}
+		if (status != ClaimStatus.RETURN_WAITING) {
+			throw new IllegalStateException("Return can be received only from return waiting");
+		}
+		this.status = ClaimStatus.RETURN_RECEIVED;
+		this.returnReceivedByAdminId = adminUserId;
+		this.returnReceivedAt = receivedAt;
+		this.returnReceivedMemo = memo;
+	}
+
+	public void markRefundProcessing(Refund refund, UUID adminUserId, String reason, Instant processedAt) {
+		if (claimType != ClaimType.RETURN) {
+			throw new IllegalStateException("Only return claims can start refund processing");
+		}
+		if (status != ClaimStatus.RETURN_RECEIVED) {
+			throw new IllegalStateException("Return refund can start only after return received");
+		}
+		this.status = ClaimStatus.REFUND_PROCESSING;
+		this.reviewedByAdminId = adminUserId;
+		this.adminReviewReason = reason;
+		this.reviewedAt = processedAt;
+		this.refund = refund;
+	}
+
+	public void complete(Instant completedAt) {
+		if (status != ClaimStatus.REFUND_PROCESSING) {
+			throw new IllegalStateException("Claim can be completed only from refund processing");
+		}
+		this.status = ClaimStatus.COMPLETED;
+		this.completedAt = completedAt;
+	}
+
+	public void rejectReturnAfterApproval(UUID adminUserId, String reason, Instant rejectedAt) {
+		if (claimType != ClaimType.RETURN) {
+			throw new IllegalStateException("Only return claims can be rejected after approval");
+		}
+		if (status != ClaimStatus.RETURN_WAITING && status != ClaimStatus.RETURN_RECEIVED) {
+			throw new IllegalStateException("Approved return claims can be rejected only before refund processing");
+		}
+		this.status = ClaimStatus.REJECTED;
+		this.reviewedByAdminId = adminUserId;
+		this.adminReviewReason = reason;
+		this.reviewedAt = rejectedAt;
 	}
 
 	public UUID getId() {
@@ -174,6 +243,30 @@ public class Claim {
 
 	public Instant getReviewedAt() {
 		return reviewedAt;
+	}
+
+	public UUID getReturnReceivedByAdminId() {
+		return returnReceivedByAdminId;
+	}
+
+	public Instant getReturnReceivedAt() {
+		return returnReceivedAt;
+	}
+
+	public String getReturnReceivedMemo() {
+		return returnReceivedMemo;
+	}
+
+	public Refund getRefund() {
+		return refund;
+	}
+
+	public UUID getRefundId() {
+		return refund == null ? null : refund.getId();
+	}
+
+	public Instant getCompletedAt() {
+		return completedAt;
 	}
 
 	public Instant getCreatedAt() {

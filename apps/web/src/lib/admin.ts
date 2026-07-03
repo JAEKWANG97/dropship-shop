@@ -109,11 +109,29 @@ export type AdminOrder = {
   } | null;
   refund?: {
     refundId: string;
+    reason?: string;
     status: string;
     refundAmount: number;
     failureMessage: string | null;
     manualRefundedAt?: string | null;
     manualRefundReason?: string | null;
+  } | null;
+  claim?: {
+    claimId: string;
+    claimType: string;
+    claimReason: string;
+    status: string;
+    requestedAction: string;
+    customerMemo: string;
+    reviewedByAdminId: string | null;
+    adminReviewReason: string | null;
+    reviewedAt: string | null;
+    returnReceivedByAdminId: string | null;
+    returnReceivedAt: string | null;
+    returnReceivedMemo: string | null;
+    refundId: string | null;
+    completedAt: string | null;
+    createdAt: string;
   } | null;
   items?: { productName: string; optionName: string; quantity: number; unitPrice: number }[];
   shippingAddress?: string | {

@@ -35,6 +35,13 @@ async function postRefundAction(refundId: string, path: string, body: Record<str
   });
 }
 
+async function postClaimAction(claimId: string, path: string, body: Record<string, string>) {
+  await apiSendWithCookie(`/api/admin/claims/${claimId}${path}`, (await cookies()).toString(), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function startSupplierWork(formData: FormData) {
   const orderId = value(formData, "orderId");
 
@@ -184,4 +191,46 @@ export async function completeManualRefund(formData: FormData) {
 
   revalidatePath("/admin/orders");
   done(orderId, "수동 환불 완료를 기록했습니다.");
+}
+
+export async function recordReturnReceived(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const claimId = value(formData, "claimId");
+
+  try {
+    await postClaimAction(claimId, "/return-received", { memo: value(formData, "memo") });
+  } catch {
+    done(orderId, "반품 수령 기록에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "반품 수령을 기록했습니다.");
+}
+
+export async function startReturnRefund(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const claimId = value(formData, "claimId");
+
+  try {
+    await postClaimAction(claimId, "/return-refund", { reason: value(formData, "reason") });
+  } catch {
+    done(orderId, "반품 환불 시작에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "반품 환불을 시작했습니다.");
+}
+
+export async function rejectClaim(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const claimId = value(formData, "claimId");
+
+  try {
+    await postClaimAction(claimId, "/reject", { reason: value(formData, "reason") });
+  } catch {
+    done(orderId, "클레임 거부 처리에 실패했습니다.");
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "클레임을 거부 처리했습니다.");
 }

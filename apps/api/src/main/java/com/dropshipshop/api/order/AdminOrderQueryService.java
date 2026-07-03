@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.claim.domain.Claim;
+import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
@@ -38,6 +40,7 @@ class AdminOrderQueryService {
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
 	private final RefundRepository refundRepository;
+	private final ClaimRepository claimRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 
@@ -48,6 +51,7 @@ class AdminOrderQueryService {
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
 		RefundRepository refundRepository,
+		ClaimRepository claimRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository
 	) {
@@ -57,6 +61,7 @@ class AdminOrderQueryService {
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
 		this.refundRepository = refundRepository;
+		this.claimRepository = claimRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 	}
@@ -92,7 +97,8 @@ class AdminOrderQueryService {
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
-		return toDetailResponse(order, payment, fulfillment, shipment, refund, items);
+		Claim claim = claimRepository.findFirstByOrder_IdOrderByCreatedAtDesc(order.getId()).orElse(null);
+		return toDetailResponse(order, payment, fulfillment, shipment, refund, claim, items);
 	}
 
 	@Transactional(readOnly = true)
@@ -167,6 +173,7 @@ class AdminOrderQueryService {
 		Fulfillment fulfillment,
 		Shipment shipment,
 		Refund refund,
+		Claim claim,
 		List<AdminOrderDtos.AdminOrderItemResponse> items
 	) {
 		UserAccount customer = order.getUser();
@@ -208,6 +215,7 @@ class AdminOrderQueryService {
 			toFulfillmentResponse(order, fulfillment),
 			toShipmentResponse(shipment),
 			toRefundResponse(refund),
+			toClaimResponse(claim),
 			items
 		);
 	}
@@ -283,6 +291,29 @@ class AdminOrderQueryService {
 			refund.getRequestedAt(),
 			refund.getCompletedAt(),
 			refund.getFailedAt()
+		);
+	}
+
+	AdminOrderDtos.AdminClaimResponse toClaimResponse(Claim claim) {
+		if (claim == null) {
+			return null;
+		}
+		return new AdminOrderDtos.AdminClaimResponse(
+			claim.getId(),
+			claim.getClaimType(),
+			claim.getClaimReason(),
+			claim.getStatus(),
+			claim.getRequestedAction(),
+			claim.getCustomerMemo(),
+			claim.getReviewedByAdminId(),
+			claim.getAdminReviewReason(),
+			claim.getReviewedAt(),
+			claim.getReturnReceivedByAdminId(),
+			claim.getReturnReceivedAt(),
+			claim.getReturnReceivedMemo(),
+			claim.getRefundId(),
+			claim.getCompletedAt(),
+			claim.getCreatedAt()
 		);
 	}
 

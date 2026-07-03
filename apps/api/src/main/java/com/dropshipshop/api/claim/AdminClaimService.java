@@ -14,7 +14,15 @@ import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.notification.domain.NotificationType;
+import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
+import com.dropshipshop.api.order.domain.AdminOrderActionType;
+import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.order.domain.OrderStatus;
+import com.dropshipshop.api.order.domain.OrderStatusHistory;
+import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
+import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.refund.RefundService;
+import com.dropshipshop.api.refund.domain.Refund;
 
 @Service
 class AdminClaimService {
@@ -23,17 +31,23 @@ class AdminClaimService {
 	private final CustomerClaimService customerClaimService;
 	private final RefundService refundService;
 	private final NotificationService notificationService;
+	private final AdminOrderActionHistoryRepository actionHistoryRepository;
+	private final OrderStatusHistoryRepository statusHistoryRepository;
 
 	AdminClaimService(
 		ClaimRepository claimRepository,
 		CustomerClaimService customerClaimService,
 		RefundService refundService,
-		NotificationService notificationService
+		NotificationService notificationService,
+		AdminOrderActionHistoryRepository actionHistoryRepository,
+		OrderStatusHistoryRepository statusHistoryRepository
 	) {
 		this.claimRepository = claimRepository;
 		this.customerClaimService = customerClaimService;
 		this.refundService = refundService;
 		this.notificationService = notificationService;
+		this.actionHistoryRepository = actionHistoryRepository;
+		this.statusHistoryRepository = statusHistoryRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -83,9 +97,24 @@ class AdminClaimService {
 		UUID adminUserId,
 		ClaimDtos.AdminClaimReviewRequest request
 	) {
-		Claim claim = findReviewableClaim(claimId);
+		Claim claim = findClaim(claimId);
 		try {
-			claim.reject(adminUserId, request.reason(), Instant.now());
+			if (claim.getClaimType() == ClaimType.RETURN
+				&& (claim.getStatus() == ClaimStatus.RETURN_WAITING || claim.getStatus() == ClaimStatus.RETURN_RECEIVED)) {
+				OrderStatus beforeStatus = claim.getOrder().getStatus();
+				claim.rejectReturnAfterApproval(adminUserId, request.reason(), Instant.now());
+				recordAdminTransition(
+					claim.getOrder(),
+					adminUserId,
+					AdminOrderActionType.RETURN_REJECTED,
+					beforeStatus,
+					claim.getOrder().getStatus(),
+					"Return rejected after approval",
+					request.reason()
+				);
+			} else {
+				claim.reject(adminUserId, request.reason(), Instant.now());
+			}
 			notificationService.email(
 				claim.getUser(),
 				claim.getOrder(),
@@ -100,12 +129,115 @@ class AdminClaimService {
 		}
 	}
 
+	@Transactional
+	ClaimDtos.ClaimResponse recordReturnReceived(
+		UUID claimId,
+		UUID adminUserId,
+		ClaimDtos.AdminReturnReceivedRequest request
+	) {
+		Claim claim = findClaim(claimId);
+		try {
+			OrderStatus beforeStatus = claim.getOrder().getStatus();
+			claim.markReturnReceived(adminUserId, request.memo(), Instant.now());
+			recordAdminTransition(
+				claim.getOrder(),
+				adminUserId,
+				AdminOrderActionType.RETURN_RECEIVED,
+				beforeStatus,
+				claim.getOrder().getStatus(),
+				"Return product received and inspected",
+				request.memo()
+			);
+			notifyClaimChanged(claim, null);
+			return customerClaimService.toResponse(claim);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
+	@Transactional
+	ClaimDtos.ClaimResponse startReturnRefund(
+		UUID claimId,
+		UUID adminUserId,
+		ClaimDtos.AdminClaimReviewRequest request
+	) {
+		Claim claim = findClaim(claimId);
+		try {
+			if (claim.getClaimType() != ClaimType.RETURN || claim.getStatus() != ClaimStatus.RETURN_RECEIVED) {
+				throw new IllegalStateException("Return refund can start only after return received");
+			}
+			CustomerOrder order = claim.getOrder();
+			OrderStatus beforeStatus = order.getStatus();
+			order.markRefundRequested();
+			Refund refund = refundService.createReturnRefund(order);
+			claim.markRefundProcessing(refund, adminUserId, request.reason(), Instant.now());
+			recordAdminTransition(
+				order,
+				adminUserId,
+				AdminOrderActionType.RETURN_REFUND_REQUESTED,
+				beforeStatus,
+				order.getStatus(),
+				"Return refund requested",
+				request.reason()
+			);
+			notifyClaimChanged(claim, refund);
+			return customerClaimService.toResponse(claim);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
 	private Claim findReviewableClaim(UUID claimId) {
-		Claim claim = claimRepository.findById(claimId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		Claim claim = findClaim(claimId);
 		if (claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Claim has already been reviewed");
 		}
 		return claim;
+	}
+
+	private Claim findClaim(UUID claimId) {
+		Claim claim = claimRepository.findById(claimId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		return claim;
+	}
+
+	private void recordAdminTransition(
+		CustomerOrder order,
+		UUID adminUserId,
+		AdminOrderActionType actionType,
+		OrderStatus beforeStatus,
+		OrderStatus afterStatus,
+		String sideEffectSummary,
+		String reason
+	) {
+		actionHistoryRepository.save(new AdminOrderActionHistory(
+			order,
+			adminUserId,
+			actionType,
+			beforeStatus,
+			afterStatus,
+			reason
+		));
+		statusHistoryRepository.save(new OrderStatusHistory(
+			order,
+			adminUserId,
+			actionType.name(),
+			beforeStatus,
+			afterStatus,
+			"ALLOWED",
+			sideEffectSummary,
+			reason
+		));
+	}
+
+	private void notifyClaimChanged(Claim claim, Refund refund) {
+		notificationService.email(
+			claim.getUser(),
+			claim.getOrder(),
+			claim.getOrder().getPaymentGroup(),
+			claim,
+			refund,
+			NotificationType.CLAIM_STATUS_CHANGED
+		);
 	}
 }

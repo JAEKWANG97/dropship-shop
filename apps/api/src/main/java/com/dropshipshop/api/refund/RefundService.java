@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
@@ -38,6 +39,7 @@ import com.dropshipshop.api.refund.repository.RefundRepository;
 public class RefundService {
 
 	private final RefundRepository refundRepository;
+	private final ClaimRepository claimRepository;
 	private final PaymentRepository paymentRepository;
 	private final PaymentEventRepository paymentEventRepository;
 	private final CustomerOrderRepository orderRepository;
@@ -48,6 +50,7 @@ public class RefundService {
 
 	RefundService(
 		RefundRepository refundRepository,
+		ClaimRepository claimRepository,
 		PaymentRepository paymentRepository,
 		PaymentEventRepository paymentEventRepository,
 		CustomerOrderRepository orderRepository,
@@ -57,6 +60,7 @@ public class RefundService {
 		NotificationService notificationService
 	) {
 		this.refundRepository = refundRepository;
+		this.claimRepository = claimRepository;
 		this.paymentRepository = paymentRepository;
 		this.paymentEventRepository = paymentEventRepository;
 		this.orderRepository = orderRepository;
@@ -74,6 +78,15 @@ public class RefundService {
 	@Transactional
 	public Refund createOutOfStockRefund(CustomerOrder order) {
 		return createRefund(order, RefundReason.SUPPLIER_OUT_OF_STOCK);
+	}
+
+	@Transactional
+	public Refund createReturnRefund(CustomerOrder order) {
+		Refund refund = createRefund(order, RefundReason.RETURN_REQUESTED);
+		if (refund.getReason() != RefundReason.RETURN_REQUESTED) {
+			throw new IllegalStateException("Order already has another refund");
+		}
+		return refund;
 	}
 
 	@Transactional(readOnly = true)
@@ -159,6 +172,8 @@ public class RefundService {
 			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
 			payment.markRefundCompleted(fullyRefunded);
 			refund.getOrder().markRefunded();
+			claimRepository.findByRefund_Id(refund.getId())
+				.ifPresent(claim -> claim.complete(now));
 			actionHistoryRepository.save(new AdminOrderActionHistory(
 				refund.getOrder(),
 				adminUserId,
@@ -279,6 +294,8 @@ public class RefundService {
 			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
 			payment.markRefundCompleted(fullyRefunded);
 			refund.getOrder().markRefunded();
+			claimRepository.findByRefund_Id(refund.getId())
+				.ifPresent(claim -> claim.complete(completedAt));
 			paymentEventRepository.save(new PaymentEvent(
 				payment,
 				refund.getPaymentGroup(),

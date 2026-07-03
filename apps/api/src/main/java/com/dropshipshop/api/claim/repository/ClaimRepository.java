@@ -19,6 +19,10 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 
 	Optional<Claim> findByIdAndUser_Id(UUID id, UUID userId);
 
+	Optional<Claim> findFirstByOrder_IdOrderByCreatedAtDesc(UUID orderId);
+
+	Optional<Claim> findByRefund_Id(UUID refundId);
+
 	boolean existsByOrder_IdAndClaimTypeAndStatusIn(
 		UUID orderId,
 		ClaimType claimType,

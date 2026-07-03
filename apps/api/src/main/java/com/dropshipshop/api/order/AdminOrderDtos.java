@@ -5,6 +5,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.dropshipshop.api.claim.domain.ClaimReason;
+import com.dropshipshop.api.claim.domain.ClaimStatus;
+import com.dropshipshop.api.claim.domain.ClaimType;
+import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.OrderStatus;
@@ -57,6 +61,7 @@ final class AdminOrderDtos {
 		AdminFulfillmentResponse fulfillment,
 		AdminShipmentResponse shipment,
 		AdminRefundResponse refund,
+		AdminClaimResponse claim,
 		List<AdminOrderItemResponse> items
 	) {
 	}
@@ -213,6 +218,25 @@ final class AdminOrderDtos {
 		Instant requestedAt,
 		Instant completedAt,
 		Instant failedAt
+	) {
+	}
+
+	record AdminClaimResponse(
+		UUID claimId,
+		ClaimType claimType,
+		ClaimReason claimReason,
+		ClaimStatus status,
+		RequestedAction requestedAction,
+		String customerMemo,
+		UUID reviewedByAdminId,
+		String adminReviewReason,
+		Instant reviewedAt,
+		UUID returnReceivedByAdminId,
+		Instant returnReceivedAt,
+		String returnReceivedMemo,
+		UUID refundId,
+		Instant completedAt,
+		Instant createdAt
 	) {
 	}
 

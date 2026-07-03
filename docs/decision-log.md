@@ -37,6 +37,23 @@ Consequences:
 - Purchase safety service for cash payment is not decided by code. The launch checklist must keep bank escrow, consumer damage compensation insurance, or PG/virtual-account reintroduction as unresolved operating choices before real sales.
 - Cash receipt issuance is required for cash-like payment when requested. The first operating method is manual issuance through Hometax; automatic API integration is deferred.
 
+## 2026-07-03: Delivered Return Refund MVP Scope
+
+Decision:
+
+Complete delivered return refunds through admin-managed return received and manual bank-transfer refund actions. Do not implement automatic return-shipping-fee deduction in B-044.
+
+Context:
+
+The MVP payment flow is bank transfer. Delivered return claims need a complete operational path from customer request to admin return receipt, refund request, and actual refund completion, but the shipping-cost deduction policy still needs more operational detail.
+
+Consequences:
+
+- A `RETURN_RECEIVED` return claim is required before a delivered order can enter `REFUND_REQUESTED` for a return refund.
+- The created refund uses `RefundReason.RETURN_REQUESTED` and is linked back to the claim.
+- Manual bank-transfer refund completion moves the order to `REFUNDED`, refund to `COMPLETED`, and linked claim to `COMPLETED`.
+- Simple change-of-mind return shipping cost remains customer-burden by policy, but automatic refund deduction is deferred; admins must handle any deduction/customer notice manually for now.
+
 ## 2026-06-27: Business Model
 
 Decision:

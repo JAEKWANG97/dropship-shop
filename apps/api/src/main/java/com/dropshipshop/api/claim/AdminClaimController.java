@@ -50,4 +50,22 @@ class AdminClaimController {
 	) {
 		return adminClaimService.rejectCancellationClaim(claimId, currentUser.id(authentication), request);
 	}
+
+	@PostMapping("/{claimId}/return-received")
+	ClaimDtos.ClaimResponse recordReturnReceived(
+		@PathVariable UUID claimId,
+		@Valid @RequestBody ClaimDtos.AdminReturnReceivedRequest request,
+		Authentication authentication
+	) {
+		return adminClaimService.recordReturnReceived(claimId, currentUser.id(authentication), request);
+	}
+
+	@PostMapping("/{claimId}/return-refund")
+	ClaimDtos.ClaimResponse startReturnRefund(
+		@PathVariable UUID claimId,
+		@Valid @RequestBody ClaimDtos.AdminClaimReviewRequest request,
+		Authentication authentication
+	) {
+		return adminClaimService.startReturnRefund(claimId, currentUser.id(authentication), request);
+	}
 }

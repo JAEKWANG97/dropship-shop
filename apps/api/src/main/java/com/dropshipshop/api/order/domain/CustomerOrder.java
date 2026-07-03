@@ -216,7 +216,8 @@ public class CustomerOrder {
 		}
 		if (status != OrderStatus.SUPPLIER_ORDER_PENDING
 			&& status != OrderStatus.SUPPLIER_ORDERED
-			&& status != OrderStatus.OUT_OF_STOCK) {
+			&& status != OrderStatus.OUT_OF_STOCK
+			&& status != OrderStatus.DELIVERED) {
 			throw new IllegalStateException("Refund can be requested only before refund completion");
 		}
 		this.status = OrderStatus.REFUND_REQUESTED;

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.dropshipshop.api.claim.domain.Claim;
+import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
@@ -43,19 +45,22 @@ public class CustomerOrderQueryService {
 	private final PaymentRepository paymentRepository;
 	private final ShipmentRepository shipmentRepository;
 	private final RefundRepository refundRepository;
+	private final ClaimRepository claimRepository;
 
 	public CustomerOrderQueryService(
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		PaymentRepository paymentRepository,
 		ShipmentRepository shipmentRepository,
-		RefundRepository refundRepository
+		RefundRepository refundRepository,
+		ClaimRepository claimRepository
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
 		this.shipmentRepository = shipmentRepository;
 		this.refundRepository = refundRepository;
+		this.claimRepository = claimRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -102,6 +107,7 @@ public class CustomerOrderQueryService {
 			.orElse(null);
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
+		Claim claim = claimRepository.findFirstByOrder_IdOrderByCreatedAtDesc(order.getId()).orElse(null);
 		return new OrderDtos.OrderDetailResponse(
 			order.getId(),
 			order.getOrderNumber(),
@@ -130,7 +136,29 @@ public class CustomerOrderQueryService {
 			items,
 			new OrderDtos.FulfillmentSummaryResponse(FulfillmentStatus.PENDING),
 			toShipmentSummary(shipment),
-			toRefundSummary(refund)
+			toRefundSummary(refund),
+			toClaimSummary(claim)
+		);
+	}
+
+	private OrderDtos.ClaimSummaryResponse toClaimSummary(Claim claim) {
+		if (claim == null) {
+			return null;
+		}
+		return new OrderDtos.ClaimSummaryResponse(
+			claim.getId(),
+			claim.getClaimType(),
+			claim.getClaimReason(),
+			claim.getStatus(),
+			claim.getRequestedAction(),
+			claim.getCustomerMemo(),
+			claim.getAdminReviewReason(),
+			claim.getReviewedAt(),
+			claim.getReturnReceivedAt(),
+			claim.getReturnReceivedMemo(),
+			claim.getRefundId(),
+			claim.getCompletedAt(),
+			claim.getCreatedAt()
 		);
 	}
 

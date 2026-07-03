@@ -2,6 +2,9 @@ import Link from "next/link";
 import { adminStatusLabel, getAdminOrder, getAdminOrders, type AdminOrder } from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
 import {
+  claimReasonLabel,
+  claimStatusLabel,
+  claimTypeLabel,
   fulfillmentStatusLabel,
   paymentGroupStatusLabel,
   paymentStatusLabel,
@@ -17,7 +20,10 @@ import {
   createOrderShipment,
   markOrderOutOfStock,
   recordDepositMismatch,
+  recordReturnReceived,
+  rejectClaim,
   startSupplierWork,
+  startReturnRefund,
   syncShipmentTracking,
 } from "./actions";
 
@@ -197,7 +203,12 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                   <span>환불</span>
                   <strong>{selectedOrder.refund ? refundStatusLabel(selectedOrder.refund.status) : "없음"}</strong>
                 </div>
+                <div>
+                  <span>클레임</span>
+                  <strong>{selectedOrder.claim ? claimStatusLabel(selectedOrder.claim.status) : "없음"}</strong>
+                </div>
               </div>
+              <ClaimPanel order={selectedOrder} />
               <AdminOrderActions order={selectedOrder} />
             </aside>
           ) : null}
@@ -369,6 +380,85 @@ function ShipmentPanel({ order }: { order: AdminOrder }) {
         </form>
       </div>
     </div>
+  );
+}
+
+function ClaimPanel({ order }: { order: AdminOrder }) {
+  const claim = order.claim;
+  if (!claim) {
+    return null;
+  }
+
+  return (
+    <section className="admin-claim-panel">
+      <h3>클레임</h3>
+      <div className="summary-list compact">
+        <SummaryItem label="유형" value={claimTypeLabel(claim.claimType)} />
+        <SummaryItem label="사유" value={claimReasonLabel(claim.claimReason)} />
+        <SummaryItem label="상태" value={claimStatusLabel(claim.status)} />
+        <SummaryItem label="고객 메모" value={claim.customerMemo} />
+        <SummaryItem label="심사 사유" value={claim.adminReviewReason ?? "-"} />
+        <SummaryItem label="반품 수령" value={formatDateTime(claim.returnReceivedAt)} />
+        <SummaryItem label="수령 메모" value={claim.returnReceivedMemo ?? "-"} />
+        <SummaryItem label="완료 시각" value={formatDateTime(claim.completedAt)} />
+      </div>
+
+      {claim.status === "RETURN_WAITING" ? (
+        <div className="admin-order-actions">
+          <form action={recordReturnReceived} className="admin-inline-form">
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <input name="claimId" type="hidden" value={claim.claimId} />
+            <label className="wide">
+              반품 수령/검수 메모
+              <input name="memo" required placeholder="예: 반품 상품 입고 및 구성품 확인" />
+            </label>
+            <button className="button primary" type="submit">
+              반품 수령 기록
+            </button>
+          </form>
+
+          <form action={rejectClaim} className="admin-inline-form">
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <input name="claimId" type="hidden" value={claim.claimId} />
+            <label className="wide">
+              반품 거부 사유
+              <input name="reason" required placeholder="예: 상품 사용 흔적 확인" />
+            </label>
+            <button className="button" type="submit">
+              반품 거부
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {claim.status === "RETURN_RECEIVED" ? (
+        <div className="admin-order-actions">
+          <form action={startReturnRefund} className="admin-inline-form">
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <input name="claimId" type="hidden" value={claim.claimId} />
+            <label className="wide">
+              환불 시작 사유
+              <input name="reason" required placeholder="예: 반품 검수 완료 후 계좌 환불 진행" />
+            </label>
+            <button className="button primary" type="submit">
+              환불 시작
+            </button>
+          </form>
+
+          <form action={rejectClaim} className="admin-inline-form">
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <input name="claimId" type="hidden" value={claim.claimId} />
+            <label className="wide">
+              검수 불합격 사유
+              <input name="reason" required placeholder="예: 반품 불가 상태로 입고" />
+            </label>
+            <button className="button" type="submit">
+              검수 불합격
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

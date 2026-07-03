@@ -746,6 +746,11 @@ Implemented DS-15 scope:
 - `reviewed_by_admin_id`
 - `admin_review_reason`
 - `reviewed_at`
+- `return_received_by_admin_id`
+- `return_received_at`
+- `return_received_memo`
+- `refund_id` -> `refunds.id`
+- `completed_at`
 - `created_at`
 - `updated_at`
 
@@ -755,6 +760,7 @@ Implemented DS-14 scope:
 - Post-supplier-work cancellation creates a requested `CANCEL` claim for admin review.
 - Post-delivery return/exchange claims create requested `RETURN` or `EXCHANGE` claims. Implemented by DS-37.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps `APPROVED` until exchange shipment handling.
+- Delivered return refund completion links `claims.refund_id` to the created refund, moves `RETURN_RECEIVED -> REFUND_PROCESSING -> COMPLETED`, and keeps rejected return claims on `DELIVERED` orders. Implemented by B-044.
 
 Rule:
 

@@ -70,6 +70,23 @@ export type OrderDetail = {
     status: string | null;
     amount: number | null;
   };
+  claim: ClaimSummary | null;
+};
+
+export type ClaimSummary = {
+  claimId: string;
+  claimType: string;
+  claimReason: string;
+  status: string;
+  requestedAction: string;
+  customerMemo: string;
+  adminReviewReason: string | null;
+  reviewedAt: string | null;
+  returnReceivedAt: string | null;
+  returnReceivedMemo: string | null;
+  refundId: string | null;
+  completedAt: string | null;
+  createdAt: string;
 };
 
 export async function getCustomerOrders() {
@@ -155,6 +172,40 @@ export function refundStatusLabel(status: string | null) {
       RETRY_REQUIRED: "환불 확인 중",
       MANUAL_REVIEW_REQUIRED: "환불 확인 중",
       REJECTED: "환불 거절",
+    }[status] ?? status
+  );
+}
+
+export function claimTypeLabel(type: string) {
+  return ({ CANCEL: "취소", RETURN: "반품", EXCHANGE: "교환" }[type] ?? type);
+}
+
+export function claimReasonLabel(reason: string) {
+  return (
+    {
+      SIMPLE_CHANGE_OF_MIND: "단순 변심",
+      DEFECT: "상품 하자",
+      WRONG_DELIVERY: "오배송",
+      DIFFERENT_FROM_PRODUCT_INFO: "상품 정보와 다름",
+      DELIVERY_ISSUE: "배송 문제",
+    }[reason] ?? reason
+  );
+}
+
+export function claimStatusLabel(status: string) {
+  return (
+    {
+      REQUESTED: "접수됨",
+      UNDER_REVIEW: "검토 중",
+      EVIDENCE_REQUESTED: "증빙 요청",
+      APPROVED: "승인됨",
+      REJECTED: "거부됨",
+      RETURN_WAITING: "반송 대기",
+      RETURN_RECEIVED: "반품 수령됨",
+      REFUND_PROCESSING: "환불 처리 중",
+      EXCHANGE_SHIPPING: "교환 배송 중",
+      COMPLETED: "완료",
+      WITHDRAWN: "철회됨",
     }[status] ?? status
   );
 }
