@@ -32,6 +32,8 @@ sms:
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}
+  dev-login:
+    enabled: true
   storage:
     public-base-url: ${APP_STORAGE_PUBLIC_BASE_URL:/uploads/products}
     local:

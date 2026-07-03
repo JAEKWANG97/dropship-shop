@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-04 01:10 KST
+
+- 관련 항목: B-048
+- 작업: 로컬 개발용 seed 고객/관리자 간편 로그인 엔드포인트를 추가했다. `/api/dev/login?role=CUSTOMER|ADMIN` 또는 JSON `providerUserId` 요청으로 기존 local seed 사용자를 찾아 OAuth 로그인과 같은 `ACCESS_TOKEN` HttpOnly cookie를 발급한다.
+- 문제·고민: B-013 수동 QA와 Playwright smoke를 반복할 때마다 JWT를 직접 만들고 브라우저 쿠키를 심는 방식은 비효율적이고 실수 가능성이 높다. 반대로 이 기능이 운영에 노출되면 인증 우회 백도어가 된다.
+- 해결방안: controller bean은 `@Profile({"local","dev"})`와 `app.dev-login.enabled=true`를 둘 다 만족해야만 로드되게 했다. `application-local.yml`에만 flag를 두고, prod 프로필 테스트는 flag를 강제로 true로 줘도 `/api/dev/login`이 404인지 확인한다.
+- 결정: seed 로그인은 기존 사용자만 대상으로 하며 사용자 생성이나 권한 변경은 하지 않는다. Playwright helper는 로컬에서 명시 쿠키 env가 없으면 dev login API를 호출하고, 배포/비로컬 smoke는 기존처럼 cookie env를 명시할 수 있다.
+- 후속작업: 배포 URL smoke에서는 dev login을 사용하지 않고 실제 인증 쿠키 또는 OAuth 실브라우저 검증(B-002)으로 확인한다.
+
 ## 2026-07-04 00:20 KST
 
 - 관련 항목: B-047

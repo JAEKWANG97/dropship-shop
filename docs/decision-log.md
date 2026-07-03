@@ -1,5 +1,23 @@
 # Decision Log
 
+## 2026-07-04: Local Seed Dev Login Guard
+
+Decision:
+
+Expose `/api/dev/login` only for local/dev development sessions, and guard it with both `@Profile({"local","dev"})` and `app.dev-login.enabled=true`. The endpoint may issue a normal access-token cookie only for existing seed users; it must not create users or change production authentication policy.
+
+Context:
+
+Manual QA and Playwright smoke checks repeatedly need the local seed customer and admin accounts. The previous workflow required generating JWTs by hand from database user ids and injecting browser cookies, which was slow and easy to do incorrectly.
+
+Consequences:
+
+- `application-local.yml` enables `app.dev-login.enabled`; common, test, and prod configuration files do not define it.
+- The endpoint reuses `JwtAccessTokenService` and the same `ACCESS_TOKEN` HttpOnly, `SameSite=Lax`, path `/` cookie attributes as OAuth login.
+- `DevLoginProdProfileIntegrationTest` intentionally sets `app.dev-login.enabled=true` under the prod profile and expects `/api/dev/login` to remain unmapped with 404.
+- `DevLoginApiIntegrationTest` verifies local seed customer/admin cookie issuance and authenticated access to `/api/me` and `/api/admin/me`.
+- Playwright local auth smoke may call the dev login endpoint when explicit `E2E_CUSTOMER_COOKIE` or `E2E_ADMIN_COOKIE` values are not supplied.
+
 ## 2026-07-03: Customer Claim Evidence MVP Scope
 
 Decision:

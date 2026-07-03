@@ -108,13 +108,17 @@ export async function firstAdminOrderLink(page: Page) {
 }
 
 export async function requireAdminCookie() {
-  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin smoke.");
-  return process.env.E2E_ADMIN_COOKIE!;
+  if (process.env.E2E_ADMIN_COOKIE) {
+    return process.env.E2E_ADMIN_COOKIE;
+  }
+  return devLoginCookie("ADMIN");
 }
 
 export async function requireCustomerCookie() {
-  test.skip(!process.env.E2E_CUSTOMER_COOKIE, "Set E2E_CUSTOMER_COOKIE to run customer smoke.");
-  return process.env.E2E_CUSTOMER_COOKIE!;
+  if (process.env.E2E_CUSTOMER_COOKIE) {
+    return process.env.E2E_CUSTOMER_COOKIE;
+  }
+  return devLoginCookie("CUSTOMER");
 }
 
 export async function requireSeedOrderByStatus(status: string) {
@@ -169,4 +173,19 @@ async function apiGet<T>(path: string, cookieHeader: string) {
     expect(response.ok, await response.text()).toBeTruthy();
   }
   return response.json() as Promise<T>;
+}
+
+async function devLoginCookie(role: "ADMIN" | "CUSTOMER") {
+  const response = await fetch(`${API_BASE_URL}/api/dev/login?role=${role}`);
+  if (!response.ok) {
+    test.skip(true, `Set E2E_${role}_COOKIE or enable local app.dev-login for ${role} smoke.`);
+    throw new Error(`Dev login failed with ${response.status}`);
+  }
+
+  const cookieHeader = response.headers.get("set-cookie") ?? "";
+  if (!accessTokenValue(cookieHeader)) {
+    test.skip(true, `Dev login did not return ACCESS_TOKEN for ${role} smoke.`);
+    throw new Error("Dev login did not return ACCESS_TOKEN");
+  }
+  return cookieHeader;
 }

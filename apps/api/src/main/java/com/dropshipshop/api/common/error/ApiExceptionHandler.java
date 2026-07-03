@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -76,6 +77,14 @@ class ApiExceptionHandler {
 	) {
 		HttpStatus status = httpStatus(exception.getStatusCode());
 		return error(status, codeFor(status), message(exception.getReason(), status.getReasonPhrase()), request);
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ApiErrorResponse> handleNoResourceFound(
+		NoResourceFoundException exception,
+		HttpServletRequest request
+	) {
+		return error(HttpStatus.NOT_FOUND, ApiErrorCode.RESOURCE_NOT_FOUND, "Resource not found", request);
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)

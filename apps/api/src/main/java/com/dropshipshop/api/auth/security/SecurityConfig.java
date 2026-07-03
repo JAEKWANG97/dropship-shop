@@ -62,6 +62,7 @@ public class SecurityConfig {
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/api/health", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
 				.requestMatchers("/api/auth/oauth2/**").permitAll()
+				.requestMatchers("/api/dev/login", "/api/dev/login/**").permitAll()
 				.requestMatchers("/api/payments/toss/webhook").permitAll()
 				.requestMatchers("/api/internal/**").permitAll()
 				.requestMatchers("/api/products", "/api/products/**").permitAll()

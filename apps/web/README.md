@@ -44,25 +44,29 @@ SPRING_PROFILES_ACTIVE=local APP_SEED_ENABLED=true ./gradlew bootRun
 If your local PostgreSQL container exposes a non-default host port, pass it to
 the API command, for example `DB_PORT=55432`.
 
-Generate local JWT cookies for the B-003 seed customer/admin. Use the same
-`APP_AUTH_JWT_SECRET` value that the API uses; if it is not set, the local
-profile default is used.
+The local profile exposes a dev-only login endpoint for the B-003 seed
+customer/admin. Open these URLs in the browser when you want to switch the
+current local session:
 
 ```bash
-export JWT_SECRET="${APP_AUTH_JWT_SECRET:-local-dev-jwt-secret-change-before-production}"
-export CUSTOMER_ID="$(docker exec dropship-shop-postgres psql -U dropship -d dropship_shop -Atc "select id from users where provider_user_id='local-b003-customer';")"
-export ADMIN_ID="$(docker exec dropship-shop-postgres psql -U dropship -d dropship_shop -Atc "select id from users where provider_user_id='local-b003-admin';")"
-
-make_token() {
-  node -e 'const crypto=require("crypto"); const sub=process.argv[1]; const secret=process.env.JWT_SECRET; const now=Math.floor(Date.now()/1000); const b64=(value)=>Buffer.from(value).toString("base64url"); const header=b64(JSON.stringify({alg:"HS256",typ:"JWT"})); const payload=b64(JSON.stringify({iss:"dropship-shop-api",sub,iat:now,exp:now+7200})); const sig=crypto.createHmac("sha256",secret).update(`${header}.${payload}`).digest("base64url"); console.log(`${header}.${payload}.${sig}`);' "$1"
-}
-
-export E2E_CUSTOMER_COOKIE="ACCESS_TOKEN=$(make_token "$CUSTOMER_ID")"
-export E2E_ADMIN_COOKIE="ACCESS_TOKEN=$(make_token "$ADMIN_ID")"
+open "http://localhost:8080/api/dev/login?role=CUSTOMER"
+open "http://localhost:8080/api/dev/login?role=ADMIN"
 ```
 
-Run smoke tests from `apps/web`. Playwright starts `npm run dev` automatically
-when `http://localhost:3000` is not already running.
+For curl-based checks, capture the `Set-Cookie` header from the same endpoint:
+
+```bash
+curl -i "http://localhost:8080/api/dev/login?role=CUSTOMER"
+curl -i -X POST "http://localhost:8080/api/dev/login" \
+  -H "Content-Type: application/json" \
+  -d '{"providerUserId":"local-b003-admin"}'
+```
+
+Run smoke tests from `apps/web`. When `E2E_CUSTOMER_COOKIE` or
+`E2E_ADMIN_COOKIE` is omitted, Playwright gets the local seed cookie from
+`/api/dev/login`. For non-local targets, pass the cookie explicitly. Playwright
+starts `npm run dev` automatically when `http://localhost:3000` is not already
+running.
 
 ```bash
 npm run test:e2e

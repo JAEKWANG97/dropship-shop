@@ -4,7 +4,6 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Locale;
@@ -41,19 +40,22 @@ class OAuthLoginService {
 	private final UserAccountRepository userAccountRepository;
 	private final JwtAccessTokenService jwtAccessTokenService;
 	private final AuthProperties authProperties;
+	private final AuthCookieFactory authCookieFactory;
 
 	OAuthLoginService(
 		OAuthProviderProperties oauthProviderProperties,
 		OAuthProviderClient oauthProviderClient,
 		UserAccountRepository userAccountRepository,
 		JwtAccessTokenService jwtAccessTokenService,
-		AuthProperties authProperties
+		AuthProperties authProperties,
+		AuthCookieFactory authCookieFactory
 	) {
 		this.oauthProviderProperties = oauthProviderProperties;
 		this.oauthProviderClient = oauthProviderClient;
 		this.userAccountRepository = userAccountRepository;
 		this.jwtAccessTokenService = jwtAccessTokenService;
 		this.authProperties = authProperties;
+		this.authCookieFactory = authCookieFactory;
 	}
 
 	ResponseEntity<Void> authorize(String providerValue, String redirectTo) {
@@ -73,7 +75,9 @@ class OAuthLoginService {
 
 		return ResponseEntity.status(HttpStatus.FOUND)
 			.location(location)
-			.header(HttpHeaders.SET_COOKIE, cookie(authProperties.stateCookieName(), state, authProperties.stateTtl()).toString())
+			.header(HttpHeaders.SET_COOKIE, authCookieFactory
+				.cookie(authProperties.stateCookieName(), state, authProperties.stateTtl())
+				.toString())
 			.header(HttpHeaders.SET_COOKIE, redirectToCookie(redirectTo).toString())
 			.build();
 	}
@@ -112,15 +116,15 @@ class OAuthLoginService {
 		String token = jwtAccessTokenService.issue(user);
 		return ResponseEntity.status(HttpStatus.FOUND)
 			.location(successRedirectUri(request))
-			.header(HttpHeaders.SET_COOKIE, cookie(authProperties.accessTokenCookieName(), token, authProperties.accessTokenTtl()).toString())
-			.header(HttpHeaders.SET_COOKIE, deleteCookie(authProperties.stateCookieName()).toString())
-			.header(HttpHeaders.SET_COOKIE, deleteCookie(REDIRECT_TO_COOKIE_NAME).toString())
+			.header(HttpHeaders.SET_COOKIE, authCookieFactory.accessToken(token).toString())
+			.header(HttpHeaders.SET_COOKIE, authCookieFactory.delete(authProperties.stateCookieName()).toString())
+			.header(HttpHeaders.SET_COOKIE, authCookieFactory.delete(REDIRECT_TO_COOKIE_NAME).toString())
 			.build();
 	}
 
 	ResponseEntity<Void> logout() {
 		return ResponseEntity.noContent()
-			.header(HttpHeaders.SET_COOKIE, deleteCookie(authProperties.accessTokenCookieName()).toString())
+			.header(HttpHeaders.SET_COOKIE, authCookieFactory.delete(authProperties.accessTokenCookieName()).toString())
 			.build();
 	}
 
@@ -168,24 +172,10 @@ class OAuthLoginService {
 			.findFirst();
 	}
 
-	private ResponseCookie cookie(String name, String value, Duration maxAge) {
-		return ResponseCookie.from(name, value)
-			.httpOnly(true)
-			.secure(authProperties.cookieSecure())
-			.sameSite("Lax")
-			.path("/")
-			.maxAge(maxAge)
-			.build();
-	}
-
-	private ResponseCookie deleteCookie(String name) {
-		return cookie(name, "", Duration.ZERO);
-	}
-
 	private ResponseCookie redirectToCookie(String redirectTo) {
 		return safeRedirectTo(redirectTo)
-			.map(value -> cookie(REDIRECT_TO_COOKIE_NAME, encode(value), authProperties.stateTtl()))
-			.orElseGet(() -> deleteCookie(REDIRECT_TO_COOKIE_NAME));
+			.map(value -> authCookieFactory.cookie(REDIRECT_TO_COOKIE_NAME, encode(value), authProperties.stateTtl()))
+			.orElseGet(() -> authCookieFactory.delete(REDIRECT_TO_COOKIE_NAME));
 	}
 
 	private URI successRedirectUri(HttpServletRequest request) {

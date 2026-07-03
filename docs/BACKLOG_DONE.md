@@ -4,6 +4,11 @@
 
 ## 2026-07-04
 
+- B-048 로컬 개발용 시드 계정 간편 로그인 도구
+  - 커밋: `feat: add local seed dev login`
+  - 완료 내용: local/dev 프로필과 `app.dev-login.enabled`를 모두 만족할 때만 `/api/dev/login`을 노출한다. 기존 시드 고객/관리자(`local-b003-customer`, `local-b003-admin`)를 찾아 `JwtAccessTokenService`로 JWT를 발급하고, OAuth 로그인과 같은 `ACCESS_TOKEN` HttpOnly cookie 속성을 재사용한다. Playwright E2E helper는 로컬에서 쿠키 env가 없으면 이 엔드포인트로 seed 쿠키를 받아온다.
+  - 결정: 이 엔드포인트는 로컬 개발/QA 편의 전용이다. 사용자 생성, 운영 계정 관리, 관리자 권한 정책에는 관여하지 않는다. prod 프로필에서는 `app.dev-login.enabled=true`가 주입돼도 controller bean이 로드되지 않아 404를 반환한다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*DevLogin*'`, local API `curl -i http://localhost:8080/api/dev/login?role=CUSTOMER`, local API `curl -i http://localhost:8080/api/dev/login?role=ADMIN`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `git diff --check`
 - B-047 Playwright E2E 페이지 커버리지 확장
   - 커밋: `test: expand playwright page coverage`
   - 완료 내용: E2E 공통 헬퍼를 분리하고 `/login`, `/auth/callback/success` 리다이렉트, 계좌입금 `/checkout/[checkoutNumber]`, 고객 `/orders/[orderId]` 상세/클레임 폼/클레임 상태, `/policies/[slug]`, 상품 검색 빈 상태, 404, 비로그인 관리자 접근 상태를 Playwright로 커버했다. 데스크톱 홈, 상품 상세, 체크아웃 계좌입금, 관리자 주문 상세 스크린샷 baseline을 추가했다.
