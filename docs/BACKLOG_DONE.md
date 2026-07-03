@@ -2,6 +2,14 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-04
+
+- B-047 Playwright E2E 페이지 커버리지 확장
+  - 커밋: `test: expand playwright page coverage`
+  - 완료 내용: E2E 공통 헬퍼를 분리하고 `/login`, `/auth/callback/success` 리다이렉트, 계좌입금 `/checkout/[checkoutNumber]`, 고객 `/orders/[orderId]` 상세/클레임 폼/클레임 상태, `/policies/[slug]`, 상품 검색 빈 상태, 404, 비로그인 관리자 접근 상태를 Playwright로 커버했다. 데스크톱 홈, 상품 상세, 체크아웃 계좌입금, 관리자 주문 상세 스크린샷 baseline을 추가했다.
+  - 결정: 클레임 증빙 파일은 실제 업로드 제출까지 E2E에서 수행하지 않고, 파일 input 노출까지만 확인한다. 업로드 저장/검증은 B-015/B-046 API 회귀 테스트와 수동 QA로 분리해 스토리지 상태에 따른 flaky를 피한다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run test:e2e`, 데스크톱 스크린샷 2회 안정성 확인, `git diff --check`
+
 ## 2026-07-03
 
 - B-003 관리자 주문 처리 액션을 실제 운영 흐름에 연결하기

@@ -141,25 +141,6 @@ Tasks:
 - [ ] 로그인/계정/주문/관리자 주요 화면의 빈 상태와 오류 상태를 점검한다.
 - [ ] 실제 상품 사진 fixture가 준비되면 local seed 이미지를 교체한다.
 
-### B-047 Playwright E2E 페이지 커버리지 확장
-
-Status: Todo
-
-Notes:
-- 현재 `apps/web/tests/e2e/readiness-smoke.spec.ts`는 전체 24개 페이지 중 렌더링 확인만 하는 페이지가 대부분이고, `/login`, `/auth/callback/success`, `/checkout/[checkoutNumber]`, `/orders/[orderId]`, `/policies/[slug]`는 테스트가 전혀 없다.
-- B-013(모바일/디자인 QA)은 사람이 눈으로 보는 수동 점검이고, 이 항목은 그걸 자동화된 회귀 테스트로 못 박는 것이다. 서로 대체하지 않고 보완 관계로 둔다 — B-013에서 발견한 문제를 이 항목의 스크린샷 baseline으로 고정한다.
-- `/checkout/[checkoutNumber]`(계좌입금 안내 화면)와 `/orders/[orderId]`(클레임 접수/조회 화면)가 우선순위가 가장 높다 — 실제 돈과 고객 문의가 걸린 화면인데 지금 테스트가 없다.
-- 스크린샷 시각 회귀는 현재 모바일 4개뿐이고 데스크톱은 전혀 없다.
-- `/checkout/payment/{success,fail,exception}`(Toss PG deferred 경로)은 이번 범위에서 낮은 우선순위로 둔다.
-
-Tasks:
-- [ ] `/login` 렌더링과 소셜 로그인 버튼 노출을 확인하는 테스트를 추가한다.
-- [ ] `/checkout/[checkoutNumber]`에 입금 계좌/금액/입금자명/기한이 표시되는지 확인하는 테스트를 추가한다 (B-003 시드 데이터의 `PAYMENT_PENDING` 주문 재사용).
-- [ ] `/orders/[orderId]`에서 주문 상세, 클레임 접수 폼, 클레임 상태 표시를 확인하는 테스트를 추가한다.
-- [ ] `/policies/[slug]` 최소 1개 정책 문서 렌더링을 확인하는 테스트를 추가한다.
-- [ ] 데스크톱 프로젝트에도 핵심 화면(홈, 상품 상세, 체크아웃, 관리자 주문 상세) 스크린샷 baseline을 추가한다.
-- [ ] 빈 상태(주문 없음, 클레임 없음, 검색 결과 없음)와 오류 상태(404, 권한 없음) 렌더링을 커버하는 테스트를 추가한다.
-
 ### B-026 초기 판매 상품 데이터 준비
 
 Status: In Progress

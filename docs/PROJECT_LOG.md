@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-04 00:20 KST
+
+- 관련 항목: B-047
+- 작업: Playwright E2E 페이지 커버리지를 확장했다. 공통 helper를 분리하고 로그인/콜백 리다이렉트, 계좌입금 주문서, 고객 주문 상세와 클레임 화면, 정책 상세, 빈 상태/404/권한 없음 상태, 데스크톱 스크린샷 baseline을 추가했다.
+- 문제·고민: 주문/체크아웃 화면은 B-003 local seed 주문을 써야 안정적으로 검증할 수 있고, 스크린샷은 생성 시각/입금 기한 같은 동적 값이 그대로 찍히면 flaky해진다. 클레임 증빙 파일 제출까지 E2E에 넣으면 업로드 저장소와 validation 상태에 따라 UI smoke가 불안정해질 수 있다.
+- 해결방안: `apps/web/tests/e2e/helpers.ts`에 시드 주문 조회, 인증 쿠키 주입, overflow 검사를 모으고 B-003 seed 주문을 재사용했다. 스크린샷은 desktop project만 baseline을 추가하고 입금 기한/생성 시각 등 동적 영역을 `mask`로 가렸다.
+- 결정: 증빙 파일 업로드 E2E는 제출하지 않고 input 노출까지만 확인한다. 실제 파일 저장/검증은 B-015/B-046 API 테스트와 수동 QA에서 확인한다. `/auth/callback/success`는 독립 화면이 아니라 safe redirect 흐름으로만 확인한다.
+- 후속작업: B-013 수동 디자인 QA에서 발견되는 화면 깨짐은 Playwright screenshot baseline 또는 별도 UI 수정 이슈로 이어서 고정한다.
+
 ## 2026-07-03 16:00 KST
 
 - 관련 항목: B-047

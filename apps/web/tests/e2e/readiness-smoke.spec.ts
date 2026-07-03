@@ -1,80 +1,10 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-
-const API_BASE_URL = process.env.E2E_API_BASE_URL ?? "http://localhost:8080";
-const WEB_BASE_URL = process.env.E2E_WEB_BASE_URL ?? "http://localhost:3000";
-const REQUIRE_ADMIN_SEED_ORDERS_VALUE =
-  process.env.E2E_REQUIRE_ADMIN_SEED_ORDERS ??
-  (API_BASE_URL.includes("localhost") || API_BASE_URL.includes("127.0.0.1") ? "true" : "false");
-const REQUIRE_ADMIN_SEED_ORDERS = ["1", "true", "yes"].includes(REQUIRE_ADMIN_SEED_ORDERS_VALUE.toLowerCase());
-
-type ProductSummary = {
-  id: string;
-  name: string;
-};
-
-async function activeProductId() {
-  const response = await fetch(`${API_BASE_URL}/api/products`);
-  expect(response.ok).toBeTruthy();
-  const products = (await response.json()) as ProductSummary[];
-  expect(products.length).toBeGreaterThan(0);
-  return products[0].id;
-}
-
-async function addCookie(context: BrowserContext, cookieHeader: string) {
-  const host = new URL(WEB_BASE_URL).hostname;
-  const accessToken = cookieHeader
-    .split(";")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith("ACCESS_TOKEN="))
-    ?.slice("ACCESS_TOKEN=".length);
-
-  expect(accessToken, "ACCESS_TOKEN cookie is required").toBeTruthy();
-  await context.addCookies([
-    {
-      name: "ACCESS_TOKEN",
-      value: accessToken!,
-      domain: host,
-      path: "/",
-      httpOnly: true,
-      sameSite: "Lax",
-    },
-  ]);
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const result = await page.evaluate(() => {
-    const offenders = [...document.querySelectorAll("body *")]
-      .filter((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && (rect.left < -1 || rect.right > innerWidth + 1);
-      })
-      .slice(0, 5)
-      .map((element) => ({
-        tag: element.tagName,
-        className: String(element.className),
-        text: element.textContent?.trim().slice(0, 80),
-      }));
-
-    return {
-      hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-      offenders,
-    };
-  });
-
-  expect(result, JSON.stringify(result, null, 2)).toMatchObject({ hasOverflow: false });
-}
-
-async function firstAdminOrderLink(page: Page) {
-  const orderLink = page.locator("a[href^='/admin/orders?orderId=']").first();
-  if (REQUIRE_ADMIN_SEED_ORDERS) {
-    await expect(orderLink, "Local/dev admin order seed data is required").toHaveCount(1);
-  } else {
-    test.skip((await orderLink.count()) === 0, "No admin order exists for this smoke target.");
-  }
-  return orderLink;
-}
+import { expect, test } from "@playwright/test";
+import {
+  activeProductId,
+  addCookie,
+  expectNoHorizontalOverflow,
+  firstAdminOrderLink,
+} from "./helpers";
 
 test("public customer pages render without horizontal overflow", async ({ page }) => {
   const productId = await activeProductId();
@@ -180,11 +110,17 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
 
   await page.goto("/");
   await expectNoHorizontalOverflow(page);
-  await expect(page).toHaveScreenshot("mobile-home.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("mobile-home.png");
 
   await page.goto("/products");
   await expectNoHorizontalOverflow(page);
-  await expect(page).toHaveScreenshot("mobile-products.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("mobile-products.png", {
+    mask: [
+      page.locator(".catalog-heading > span"),
+      page.locator(".catalog-tools > span"),
+      page.locator(".product-grid"),
+    ],
+  });
 });
 
 test("mobile admin smoke screenshots remain stable", async ({ page, context }, testInfo) => {
@@ -194,12 +130,23 @@ test("mobile admin smoke screenshots remain stable", async ({ page, context }, t
   await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
   await page.goto("/admin/products");
   await expectNoHorizontalOverflow(page);
-  await expect(page).toHaveScreenshot("mobile-admin-products.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("mobile-admin-products.png", {
+    mask: [page.locator(".admin-table.products")],
+  });
 
   await page.goto("/admin/orders");
   const orderLink = await firstAdminOrderLink(page);
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expect(page).toHaveScreenshot("mobile-admin-order-detail.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("mobile-admin-order-detail.png", {
+    mask: [
+      page.locator(".admin-order-detail > span").first(),
+      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "입금확인" }),
+      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "미입금 취소" }),
+      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "출고시각" }),
+      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "배송완료시각" }),
+      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "마지막 조회" }),
+    ],
+  });
 });
