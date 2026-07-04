@@ -106,6 +106,8 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 | `PATCH` | `/api/me/profile` | Authenticated user | Implemented | Update display name and contact email |
 | `POST` | `/api/me/phone-verifications` | Authenticated user | Implemented | Request SMS OTP phone verification |
 | `POST` | `/api/me/phone-verifications/confirm` | Authenticated user | Implemented | Confirm SMS OTP phone verification |
+| `GET` | `/api/me/referral` | Authenticated user | Implemented | Return current user's referral code and whether a referrer is registered. Lazily creates a code if missing. |
+| `POST` | `/api/me/referral` | Authenticated user | Implemented | Register a referrer by referral code once |
 | `GET` | `/api/me/agreements` | Authenticated user | Implemented | Current user policy agreement state |
 | `POST` | `/api/me/agreements` | Authenticated user | Implemented | Agree to required terms/privacy policies |
 | `GET` | `/api/me/addresses` | `CUSTOMER` | Implemented | List saved shipping addresses |
@@ -128,6 +130,9 @@ Notes:
 - Reposting the same current versions is idempotent and returns the existing agreement record.
 - Required customer info is display name, reachable contact email, and verified phone number.
 - Phone verification uses SMS OTP with hashed code storage, expiration, resend cooldown, and attempt limits.
+- Referral code collection runs after first social-login account creation through web onboarding. `GET /api/me` remains unchanged; referral state is only exposed through `/api/me/referral`.
+- Referrer registration rejects unknown codes, inactive referrer accounts, self referral, and duplicate registration.
+- Customer referral responses never expose the referrer's name or email.
 - `POST /api/checkouts` requires current account terms/privacy agreement and completed required customer info before order creation.
 - Saved shipping addresses belong to the authenticated customer only.
 - The first saved address becomes the default address automatically.
@@ -173,6 +178,17 @@ POST /api/me/phone-verifications/confirm
 {
   "phoneNumber": "01012345678",
   "code": "123456"
+}
+
+GET /api/me/referral
+{
+  "myReferralCode": "2ABCD789",
+  "referrerRegistered": false
+}
+
+POST /api/me/referral
+{
+  "code": "2ABCD789"
 }
 
 POST /api/me/addresses
@@ -536,6 +552,7 @@ Rules:
 | `PATCH` | `/api/admin/business-profile` | `ADMIN` | Planned | Update business disclosure |
 | `PUT` | `/api/admin/privacy-processing-items` | `ADMIN` | Planned | Replace privacy processing table |
 | `GET` | `/api/admin/customer-inquiries` | `ADMIN` | Implemented | List customer support inquiries |
+| `GET` | `/api/admin/referrals` | `ADMIN` | Implemented | List registered referral relationships |
 
 Rules:
 

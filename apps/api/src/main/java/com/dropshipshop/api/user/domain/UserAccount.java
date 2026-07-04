@@ -7,8 +7,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -21,6 +24,10 @@ import jakarta.persistence.UniqueConstraint;
 		@UniqueConstraint(
 			name = "uk_users_provider_provider_user_id",
 			columnNames = {"provider", "provider_user_id"}
+		),
+		@UniqueConstraint(
+			name = "uk_users_referral_code",
+			columnNames = {"referral_code"}
 		)
 	}
 )
@@ -48,6 +55,16 @@ public class UserAccount {
 
 	@Column(name = "phone_verified_at")
 	private Instant phoneVerifiedAt;
+
+	@Column(name = "referral_code", length = 20)
+	private String referralCode;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "referred_by_user_id")
+	private UserAccount referredBy;
+
+	@Column(name = "referred_at")
+	private Instant referredAt;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
@@ -134,9 +151,36 @@ public class UserAccount {
 		return phoneVerifiedAt;
 	}
 
+	public String getReferralCode() {
+		return referralCode;
+	}
+
+	public UserAccount getReferredBy() {
+		return referredBy;
+	}
+
+	public Instant getReferredAt() {
+		return referredAt;
+	}
+
 	public void updateProfile(String displayName, String email) {
 		this.displayName = displayName;
 		this.email = email;
+	}
+
+	public void assignReferralCode(String referralCode) {
+		if (this.referralCode != null) {
+			throw new IllegalStateException("Referral code is already assigned");
+		}
+		this.referralCode = referralCode;
+	}
+
+	public void registerReferrer(UserAccount referrer, Instant referredAt) {
+		if (referredBy != null) {
+			throw new IllegalStateException("Referrer is already registered");
+		}
+		this.referredBy = referrer;
+		this.referredAt = referredAt;
 	}
 
 	public void verifyPhone(String phoneNumber, Instant verifiedAt) {

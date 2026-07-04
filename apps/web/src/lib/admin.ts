@@ -48,8 +48,21 @@ export type AdminProductChange = {
   createdAt: string;
 };
 
+export type AdminReferral = {
+  referrerUserId: string;
+  referrerDisplayName: string;
+  referralCode: string;
+  referredUserId: string;
+  referredDisplayName: string;
+  referredAt: string;
+};
+
 type AdminProductChangesResponse = {
   changes: AdminProductChange[];
+};
+
+type AdminReferralListResponse = {
+  referrals: AdminReferral[];
 };
 
 export type AdminOrder = {
@@ -185,6 +198,11 @@ export async function getAdminOrders(status?: string) {
   const path = status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders";
 	const data = await readAdmin<AdminOrderListResponse>(path);
 	return data.orders;
+}
+
+export async function getAdminReferrals() {
+	const data = await readAdmin<AdminReferralListResponse>("/api/admin/referrals");
+	return data.referrals;
 }
 
 export async function getAdminOrder(orderId: string) {

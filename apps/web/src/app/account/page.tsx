@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProfileCompletion } from "@/lib/account";
+import { getProfileCompletion, getReferralState } from "@/lib/account";
 import { getCurrentUser } from "@/lib/session";
 import {
   confirmPhoneVerification,
@@ -29,7 +29,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     );
   }
 
-  const profile = await loadProfileCompletion();
+  const [profile, referral] = await Promise.all([loadProfileCompletion(), loadReferralState()]);
 
   return (
     <section className="narrow-page">
@@ -109,6 +109,32 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </form>
         </>
       )}
+      {referral.error ? (
+        <div className="notice">
+          <strong>추천 정보를 불러오지 못했습니다</strong>
+          <span>로그인 상태를 확인한 뒤 다시 시도해 주세요.</span>
+        </div>
+      ) : (
+        <section className="account-form">
+          <h2>추천 코드</h2>
+          <p className="field-help">지인에게 공유할 수 있는 내 고유 추천 코드입니다.</p>
+          <dl className="summary-list">
+            <div>
+              <dt>내 추천 코드</dt>
+              <dd>{referral.data.myReferralCode}</dd>
+            </div>
+            <div>
+              <dt>추천인 등록</dt>
+              <dd>{referral.data.referrerRegistered ? "등록됨" : "미등록"}</dd>
+            </div>
+          </dl>
+          {!referral.data.referrerRegistered ? (
+            <Link className="button" href="/welcome?redirectTo=/account">
+              추천인 코드 등록
+            </Link>
+          ) : null}
+        </section>
+      )}
       <div className="link-list">
         <Link href="/products">상품 보기</Link>
         <Link href="/orders">주문 내역</Link>
@@ -142,6 +168,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 async function loadProfileCompletion() {
   try {
     return { error: false as const, data: await getProfileCompletion() };
+  } catch {
+    return { error: true as const, data: null };
+  }
+}
+
+async function loadReferralState() {
+  try {
+    return { error: false as const, data: await getReferralState() };
   } catch {
     return { error: true as const, data: null };
   }

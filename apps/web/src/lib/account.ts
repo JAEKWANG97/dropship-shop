@@ -38,6 +38,11 @@ export type ProfileCompletion = {
   requiredInfoComplete: boolean;
 };
 
+export type ReferralState = {
+  myReferralCode: string;
+  referrerRegistered: boolean;
+};
+
 export async function getAgreementState() {
   return apiGetWithCookie<AgreementState>(
     "/api/me/agreements",
@@ -48,6 +53,13 @@ export async function getAgreementState() {
 export async function getProfileCompletion() {
   return apiGetWithCookie<ProfileCompletion>(
     "/api/me/profile-completion",
+    (await cookies()).toString(),
+  );
+}
+
+export async function getReferralState() {
+  return apiGetWithCookie<ReferralState>(
+    "/api/me/referral",
     (await cookies()).toString(),
   );
 }

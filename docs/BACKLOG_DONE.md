@@ -4,6 +4,11 @@
 
 ## 2026-07-04
 
+- B-050 추천인 코드 수집 (첫 로그인 온보딩)
+  - 커밋: `feat: add referral onboarding`
+  - 완료 내용: `users`에 `referral_code`, `referred_by_user_id`, `referred_at`을 추가하고 추천 코드를 lazy 생성한다. 신규 소셜 로그인 계정만 `/welcome` 온보딩으로 보내 추천인 코드를 선택 등록하거나 건너뛸 수 있게 했다. 고객 계정 화면에는 내 추천 코드와 추천인 등록 여부만 표시하고, 관리자에는 읽기 전용 추천 관계 목록을 추가했다.
+  - 결정: 1차 범위는 추천 관계 기록/추적만이며 적립금, 포인트, 추천 보상 정산은 후속 이슈로 미룬다. 고객 화면에는 추천인의 이름이나 이메일을 노출하지 않는다.
+  - 검증: `cd apps/api && ./gradlew test --tests '*AccountReferral*' --tests '*OAuthLogin*'`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/web && npx playwright test tests/e2e/referral-onboarding.spec.ts`, `cd apps/api && ./gradlew test`, `git diff --check`
 - B-049 상품 상세 비로그인 구매 진입 개선
   - 커밋: `feat: improve guest product purchase entry`
   - 완료 내용: 상품 상세에서 비로그인 사용자도 옵션, 수량, 장바구니, 바로구매 버튼을 볼 수 있게 했다. 장바구니 서버 액션 초입에서 `getCurrentUser()`로 세션을 먼저 확인하고, 비로그인 제출은 `/login?redirectTo=/products/{productId}`로 이동시킨다. 게스트 장바구니는 만들지 않는다.

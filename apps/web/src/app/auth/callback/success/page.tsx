@@ -1,22 +1,16 @@
 import { redirect } from "next/navigation";
+import { isTruthyQueryFlag, safeRedirectTo } from "@/lib/redirect";
 
 type OAuthSuccessPageProps = {
-  searchParams: Promise<{ redirectTo?: string | string[] }>;
+  searchParams: Promise<{ onboarding?: string | string[]; redirectTo?: string | string[] }>;
 };
 
 export default async function OAuthSuccessPage({ searchParams }: OAuthSuccessPageProps) {
   const params = await searchParams;
-  redirect(safeRedirectTo(params.redirectTo) || "/account");
-}
-
-function safeRedirectTo(value: string | string[] | undefined) {
-  const redirectTo = Array.isArray(value) ? value[0] : value;
-  if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
-    return "";
+  const redirectTo = safeRedirectTo(params.redirectTo);
+  if (isTruthyQueryFlag(params.onboarding)) {
+    const query = redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : "";
+    redirect(`/welcome${query}`);
   }
-  const normalized = redirectTo.toLowerCase();
-  if (redirectTo.includes("\\") || normalized.includes("%5c") || /[\r\n]/.test(redirectTo)) {
-    return "";
-  }
-  return redirectTo;
+  redirect(redirectTo || "/account");
 }

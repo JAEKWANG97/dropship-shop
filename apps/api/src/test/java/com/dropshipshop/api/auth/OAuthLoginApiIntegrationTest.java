@@ -101,7 +101,7 @@ class OAuthLoginApiIntegrationTest {
 				.param("state", stateCookie.getValue())
 				.cookie(stateCookie))
 			.andExpect(status().isFound())
-			.andExpect(header().string(HttpHeaders.LOCATION, is("http://localhost:3000/auth/callback/success")))
+			.andExpect(header().string(HttpHeaders.LOCATION, is("http://localhost:3000/auth/callback/success?onboarding=1")))
 			.andExpect(cookie().exists("ACCESS_TOKEN"))
 			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("ACCESS_TOKEN=")))
 			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
@@ -147,8 +147,9 @@ class OAuthLoginApiIntegrationTest {
 				.cookie(stateCookie, redirectToCookie))
 			.andExpect(status().isFound())
 			.andExpect(header().string(HttpHeaders.LOCATION, containsString("http://localhost:3000/auth/callback/success")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("onboarding=1")))
 			.andExpect(header().string(HttpHeaders.LOCATION, containsString("redirectTo=")))
-			.andExpect(header().string(HttpHeaders.LOCATION, containsString("%2Fproducts%2Fproduct-1%3Ffrom%3Ddetail")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("products")))
 			.andExpect(cookie().maxAge("OAUTH2_REDIRECT_TO", 0));
 	}
 
@@ -196,6 +197,7 @@ class OAuthLoginApiIntegrationTest {
 				.param("state", stateCookie.getValue())
 				.cookie(stateCookie))
 			.andExpect(status().isFound())
+			.andExpect(header().string(HttpHeaders.LOCATION, not(containsString("onboarding=1"))))
 			.andExpect(cookie().exists("ACCESS_TOKEN"))
 			.andReturn();
 

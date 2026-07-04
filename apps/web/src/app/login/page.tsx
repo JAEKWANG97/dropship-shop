@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { publicApiUrl } from "@/lib/api";
+import { safeRedirectTo } from "@/lib/redirect";
 import { getCurrentUser } from "@/lib/session";
 
 const providers = [
@@ -47,16 +48,4 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </div>
     </section>
   );
-}
-
-function safeRedirectTo(value: string | string[] | undefined) {
-  const redirectTo = Array.isArray(value) ? value[0] : value;
-  if (!redirectTo || !redirectTo.startsWith("/") || redirectTo.startsWith("//")) {
-    return "";
-  }
-  const normalized = redirectTo.toLowerCase();
-  if (redirectTo.includes("\\") || normalized.includes("%5c") || /[\r\n]/.test(redirectTo)) {
-    return "";
-  }
-  return redirectTo;
 }

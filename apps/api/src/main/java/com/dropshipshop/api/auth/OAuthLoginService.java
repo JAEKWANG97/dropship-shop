@@ -1,7 +1,6 @@
 package com.dropshipshop.api.auth;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -100,12 +99,13 @@ class OAuthLoginService {
 		SocialProvider provider = provider(providerValue);
 		configuredSettings(provider);
 		OAuthProfile profile = fetchProfile(provider, code);
-		UserAccount user = userAccountRepository.findByProviderAndProviderUserIdAndStatus(
-				provider,
-				profile.providerUserId(),
-				UserStatus.ACTIVE
-			)
-			.orElseGet(() -> userAccountRepository.save(new UserAccount(
+		Optional<UserAccount> existingUser = userAccountRepository.findByProviderAndProviderUserIdAndStatus(
+			provider,
+			profile.providerUserId(),
+			UserStatus.ACTIVE
+		);
+		boolean newUser = existingUser.isEmpty();
+		UserAccount user = existingUser.orElseGet(() -> userAccountRepository.save(new UserAccount(
 				provider,
 				profile.providerUserId(),
 				profile.email(),
@@ -115,7 +115,7 @@ class OAuthLoginService {
 
 		String token = jwtAccessTokenService.issue(user);
 		return ResponseEntity.status(HttpStatus.FOUND)
-			.location(successRedirectUri(request))
+			.location(successRedirectUri(request, newUser))
 			.header(HttpHeaders.SET_COOKIE, authCookieFactory.accessToken(token).toString())
 			.header(HttpHeaders.SET_COOKIE, authCookieFactory.delete(authProperties.stateCookieName()).toString())
 			.header(HttpHeaders.SET_COOKIE, authCookieFactory.delete(REDIRECT_TO_COOKIE_NAME).toString())
@@ -178,16 +178,16 @@ class OAuthLoginService {
 			.orElseGet(() -> authCookieFactory.delete(REDIRECT_TO_COOKIE_NAME));
 	}
 
-	private URI successRedirectUri(HttpServletRequest request) {
-		Optional<String> redirectTo = cookieValue(request, REDIRECT_TO_COOKIE_NAME)
-			.flatMap(this::decode)
-			.flatMap(this::safeRedirectTo);
-		if (redirectTo.isEmpty()) {
-			return URI.create(authProperties.successRedirectUri());
+	private URI successRedirectUri(HttpServletRequest request, boolean newUser) {
+		UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(authProperties.successRedirectUri());
+		if (newUser) {
+			builder.queryParam("onboarding", "1");
 		}
-		String separator = authProperties.successRedirectUri().contains("?") ? "&" : "?";
-		String encodedRedirectTo = URLEncoder.encode(redirectTo.get(), StandardCharsets.UTF_8);
-		return URI.create(authProperties.successRedirectUri() + separator + "redirectTo=" + encodedRedirectTo);
+		cookieValue(request, REDIRECT_TO_COOKIE_NAME)
+			.flatMap(this::decode)
+			.flatMap(this::safeRedirectTo)
+			.ifPresent(value -> builder.queryParam("redirectTo", value));
+		return builder.build().encode().toUri();
 	}
 
 	private Optional<String> safeRedirectTo(String value) {

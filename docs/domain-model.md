@@ -52,6 +52,9 @@ Implemented fields:
 - displayName
 - phoneNumber
 - phoneVerifiedAt
+- referralCode
+- referredByUserId
+- referredAt
 - role: CUSTOMER / ADMIN
 - status: ACTIVE / DELETED
 - deletedAt
@@ -80,6 +83,13 @@ B-014 implementation notes:
 - `email`은 `deleted-{userId}@deleted.local`, `displayName`은 `탈퇴회원`, `phoneNumber`/`phoneVerifiedAt`은 null로 바꾼다.
 - 현재 구현은 별도 `SocialAccount` 테이블 없이 `User.provider/providerUserId`를 소셜 연결로 사용한다. 탈퇴 시 `providerUserId`를 `deleted-{userId}`로 바꿔 같은 소셜 계정 재가입이 새 계정을 만들게 한다.
 - 진행 중 주문, 환불, 클레임이 있으면 탈퇴를 거부한다. 법정 보존 대상 거래 기록은 비식별화된 유저 참조로 보존한다.
+
+B-050 implementation notes:
+
+- `referralCode`는 모든 회원에게 lazy 생성되는 고유 추천 코드다.
+- `referredByUserId`와 `referredAt`은 첫 로그인 온보딩에서 선택 등록한 추천 관계를 한 번만 기록한다.
+- 고객 화면/API는 내 추천 코드와 추천인 등록 여부만 노출하고, 추천인의 이름이나 이메일은 노출하지 않는다.
+- 추천 포인트, 보상, 정산은 아직 모델링하지 않는다.
 
 ## SocialAccount
 

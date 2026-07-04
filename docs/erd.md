@@ -23,6 +23,7 @@
 - Customer required info and phone verification fields: implemented in `apps/api/src/main/resources/db/migration/V19__add_customer_required_info.sql`.
 - Bank-transfer checkout/deposit and manual refund fields: implemented in `apps/api/src/main/resources/db/migration/V23__add_bank_transfer_payment_fields.sql`.
 - User deletion timestamp fields: implemented in `apps/api/src/main/resources/db/migration/V26__add_user_deletion_fields.sql`.
+- User referral fields: implemented in `apps/api/src/main/resources/db/migration/V28__add_user_referral_fields.sql`.
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -197,6 +198,9 @@ Current fields:
 - `display_name`
 - `phone_number`
 - `phone_verified_at`
+- `referral_code`: nullable, unique, lazily generated from first referral state read.
+- `referred_by_user_id`: nullable self-reference to `users(id)`.
+- `referred_at`: timestamp when the referrer code was registered.
 - `role`: `CUSTOMER` / `ADMIN`
 - `status`: `ACTIVE` / `DELETED`
 - `created_at`
@@ -205,6 +209,7 @@ Current fields:
 Open note:
 
 - `docs/domain-model.md` mentions `SUSPENDED`, but current code has only `ACTIVE` and `DELETED`. Treat suspension as post-MVP until a decision adds it.
+- B-050 referral tracking records only the referrer relationship. Reward, point, settlement, and fraud prevention models are future scope.
 
 ### user_policy_agreements
 

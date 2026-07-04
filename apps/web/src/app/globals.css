@@ -1192,9 +1192,20 @@ textarea {
   border-bottom: 0;
 }
 
+.summary-list dt,
+.summary-list dd {
+  margin: 0;
+}
+
+.summary-list dt,
 .summary-list span {
   overflow-wrap: anywhere;
   color: var(--muted);
+}
+
+.summary-list dd {
+  overflow-wrap: anywhere;
+  font-weight: 800;
 }
 
 .summary-list.compact {
