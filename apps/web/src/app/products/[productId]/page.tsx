@@ -11,6 +11,7 @@ import {
   type ProductSummary,
 } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
+import { SubmitButton } from "@/app/submit-button";
 import { ProductImage } from "../product-image";
 
 type ProductPageProps = {
@@ -48,7 +49,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <section className="narrow-page">
         <p className="eyebrow">상품</p>
         <h1>상품을 불러오지 못했습니다</h1>
-        <p>백엔드 API 연결 상태를 확인해 주세요.</p>
+        <div className="notice danger">
+          <strong>API 연결 오류</strong>
+          <span>백엔드 API 연결 상태를 확인해 주세요.</span>
+        </div>
       </section>
     );
   }
@@ -92,42 +96,59 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         <div className="product-hero-copy">
           <h1>{product.name}</h1>
           <p>{product.summary}</p>
-          <strong className="product-price">{formatPrice(product.basePrice)}</strong>
-          <div className="product-buy-info">
-            <span>카테고리</span>
-            <strong>{categoryLabel(product.categoryCode)}</strong>
-            <span>최소 주문</span>
-            <strong>옵션별 1개</strong>
-            <span>판매 상태</span>
-            <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
-          </div>
-          {purchasable ? (
-            <form action={addCartItem} className="cart-add-form">
-              <input name="productId" type="hidden" value={product.id} />
-              <label>
-                옵션
-                <select name="productOptionId" required>
-                  {activeOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name} {formatOptionPrice(option.additionalPrice)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                수량
-                <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
-              </label>
-              <div className="product-action-row">
-                <button className="button" name="intent" value="cart" type="submit">
-                  장바구니
-                </button>
-                <button className="button primary" name="intent" value="checkout" type="submit">
-                  바로구매
-                </button>
+          <div className="product-purchase-panel">
+            <strong className="product-price">{formatPrice(product.basePrice)}</strong>
+            <div className="product-buy-info">
+              <span>카테고리</span>
+              <strong>{categoryLabel(product.categoryCode)}</strong>
+              <span>최소 주문</span>
+              <strong>옵션별 1개</strong>
+              <span>판매 상태</span>
+              <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
+            </div>
+            {purchasable ? (
+              <form action={addCartItem} className="cart-add-form">
+                <input name="productId" type="hidden" value={product.id} />
+                <label>
+                  옵션
+                  <select name="productOptionId" required>
+                    {activeOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name} {formatOptionPrice(option.additionalPrice)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  수량
+                  <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
+                </label>
+                <div className="product-action-row">
+                  <SubmitButton
+                    className="button"
+                    name="intent"
+                    pendingLabel="담는 중..."
+                    value="cart"
+                  >
+                    장바구니
+                  </SubmitButton>
+                  <SubmitButton
+                    className="button primary"
+                    name="intent"
+                    pendingLabel="이동 중..."
+                    value="checkout"
+                  >
+                    바로구매
+                  </SubmitButton>
+                </div>
+              </form>
+            ) : (
+              <div className="notice empty">
+                <strong>현재 구매할 수 없습니다</strong>
+                <span>판매 상태 또는 선택 가능한 옵션을 확인해 주세요.</span>
               </div>
-            </form>
-          ) : null}
+            )}
+          </div>
         </div>
       </section>
 

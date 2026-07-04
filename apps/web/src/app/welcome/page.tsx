@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getReferralState } from "@/lib/account";
 import { safeRedirectTo } from "@/lib/redirect";
 import { getCurrentUser } from "@/lib/session";
+import { SubmitButton } from "../submit-button";
 import { registerReferral, skipReferral } from "./actions";
 
 type WelcomePageProps = {
@@ -34,7 +35,7 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
       ) : null}
 
       {referral.error ? (
-        <div className="notice">
+        <div className="notice danger">
           <strong>추천 정보를 불러오지 못했습니다</strong>
           <span>잠시 후 다시 시도하거나 계정 페이지로 이동해 주세요.</span>
         </div>
@@ -57,17 +58,17 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
               required
             />
           </label>
-          <button className="button primary" type="submit">
+          <SubmitButton className="button primary" pendingLabel="등록 중...">
             등록
-          </button>
+          </SubmitButton>
         </form>
       )}
 
       <form action={skipReferral}>
         <input name="redirectTo" type="hidden" value={redirectTo} />
-        <button className="button" type="submit">
+        <SubmitButton className="button" pendingLabel="이동 중...">
           건너뛰기
-        </button>
+        </SubmitButton>
       </form>
       <Link className="admin-text-link" href={redirectTo}>
         계속하기

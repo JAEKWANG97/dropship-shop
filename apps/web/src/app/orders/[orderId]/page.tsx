@@ -17,6 +17,7 @@ import {
   type OrderDetail,
 } from "@/lib/orders";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
+import { SubmitButton } from "../../submit-button";
 import { cancelOrder, createClaim, updateOrderShippingAddress } from "../actions";
 import { ClaimEvidenceInput } from "../claim-evidence-input";
 
@@ -70,7 +71,10 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
       <section className="narrow-page">
         <p className="eyebrow">주문</p>
         <h1>주문을 불러오지 못했습니다</h1>
-        <p>백엔드 API 연결 상태를 확인해 주세요.</p>
+        <div className="notice danger">
+          <strong>API 연결 오류</strong>
+          <span>백엔드 API 연결 상태를 확인해 주세요.</span>
+        </div>
       </section>
     );
   }
@@ -309,9 +313,9 @@ function OrderShippingAddressForm({ order }: { order: OrderDetail }) {
         상세 주소
         <input name="address2" defaultValue={address.address2 ?? ""} />
       </label>
-      <button className="button" type="submit">
+      <SubmitButton className="button" pendingLabel="변경 중...">
         배송지 변경
-      </button>
+      </SubmitButton>
     </form>
   );
 }
@@ -325,9 +329,9 @@ function CancelOrderForm({ orderId }: { orderId: string }) {
         사유
         <textarea name="reason" required />
       </label>
-      <button className="button" type="submit">
+      <SubmitButton className="button" pendingLabel="요청 중...">
         취소 요청
-      </button>
+      </SubmitButton>
     </form>
   );
 }
@@ -360,9 +364,9 @@ function ClaimForm({ orderId }: { orderId: string }) {
         <textarea name="customerMemo" required />
       </label>
       <ClaimEvidenceInput />
-      <button className="button" type="submit">
+      <SubmitButton className="button" pendingLabel="접수 중...">
         클레임 접수
-      </button>
+      </SubmitButton>
     </form>
   );
 }

@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api";
 import { getCart, type Cart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
+import { SubmitButton } from "../submit-button";
 import { ProductImage } from "../products/product-image";
 import { removeCartItem, updateCartItem, validateCart } from "./actions";
 
@@ -51,7 +52,10 @@ export default async function CartPage({ searchParams }: CartPageProps) {
       <section className="narrow-page">
         <p className="eyebrow">장바구니</p>
         <h1>장바구니를 불러오지 못했습니다</h1>
-        <p>백엔드 API 연결 상태를 확인해 주세요.</p>
+        <div className="notice danger">
+          <strong>API 연결 오류</strong>
+          <span>백엔드 API 연결 상태를 확인해 주세요.</span>
+        </div>
       </section>
     );
   }
@@ -96,7 +100,7 @@ function AdminCustomerFlowNotice({ eyebrow }: { eyebrow: string }) {
 
 function EmptyCart() {
   return (
-    <div className="notice">
+    <div className="notice empty">
       <strong>장바구니가 비어 있습니다</strong>
       <span>상품을 선택해 장바구니에 담아 주세요.</span>
       <Link className="button primary" href="/products">
@@ -146,15 +150,15 @@ function CartContents({ cart }: { cart: Cart }) {
                     type="number"
                     defaultValue={item.quantity}
                   />
-                  <button className="button" type="submit">
+                  <SubmitButton className="button" pendingLabel="변경 중...">
                     변경
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={removeCartItem}>
                   <input name="cartItemId" type="hidden" value={item.id} />
-                  <button className="button" type="submit">
+                  <SubmitButton className="button" pendingLabel="삭제 중...">
                     삭제
-                  </button>
+                  </SubmitButton>
                 </form>
                 <strong>{formatPrice(item.lineAmount)}</strong>
               </div>
@@ -163,7 +167,7 @@ function CartContents({ cart }: { cart: Cart }) {
         </div>
 
         {cart.issues.length > 0 ? (
-          <div className="notice">
+          <div className="notice danger">
             <strong>주문 불가 항목</strong>
             {cart.issues.map((issue) => (
               <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
@@ -191,9 +195,9 @@ function CartContents({ cart }: { cart: Cart }) {
           <strong>{cart.checkoutAvailable ? "가능" : "불가"}</strong>
         </div>
         <form action={validateCart}>
-          <button className="button" type="submit">
+          <SubmitButton className="button" pendingLabel="확인 중...">
             주문 가능 상태 확인
-          </button>
+          </SubmitButton>
         </form>
         {cart.checkoutAvailable ? (
           <Link className="button primary" href="/checkout">

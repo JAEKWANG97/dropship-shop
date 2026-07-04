@@ -71,3 +71,43 @@ test("desktop admin order detail screenshot remains stable", async ({ page, cont
     ],
   });
 });
+
+test("mobile home screenshot remains stable", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile baselines run only in the mobile project.");
+
+  await page.goto("/");
+
+  await expectNoHorizontalOverflow(page);
+  await expect(page).toHaveScreenshot("mobile-home.png", { fullPage: true });
+});
+
+test("mobile product detail screenshot remains stable", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile baselines run only in the mobile project.");
+
+  const productId = await activeProductId();
+  await page.goto(`/products/${productId}`);
+
+  await expectNoHorizontalOverflow(page);
+  await expect(page).toHaveScreenshot("mobile-product-detail.png", { fullPage: true });
+});
+
+test("mobile checkout bank-transfer screenshot remains stable", async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile baselines run only in the mobile project.");
+  const [customerCookie, paymentPendingOrder] = await Promise.all([
+    requireCustomerCookie(),
+    requireSeedOrderByStatus("PAYMENT_PENDING"),
+  ]);
+
+  await addCookie(context, customerCookie);
+  await page.goto(`/checkout/${paymentPendingOrder.checkoutNumber}`);
+
+  await expect(page.getByRole("heading", { name: "계좌입금 안내" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expect(page).toHaveScreenshot("mobile-checkout-bank-transfer.png", {
+    fullPage: true,
+    mask: [
+      page.locator(".summary-list div").filter({ hasText: "입금 기한" }),
+      page.locator(".summary-list div").filter({ hasText: "정책 확인" }),
+    ],
+  });
+});

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BUSINESS_PROFILE } from "@/lib/legal";
+import { SubmitButton } from "../submit-button";
 import { createCustomerInquiry } from "./actions";
 
 type SupportPageProps = {
@@ -52,9 +53,9 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
             문의 처리를 위해 입력한 개인정보를 수집·이용하는 데 동의합니다.
           </label>
           <div className="admin-form-actions wide">
-            <button className="button primary" type="submit">
+            <SubmitButton className="button primary" pendingLabel="접수 중...">
               문의 접수
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </section>

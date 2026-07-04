@@ -40,7 +40,10 @@ export default async function OrdersPage() {
       <section className="narrow-page">
         <p className="eyebrow">주문</p>
         <h1>주문을 불러오지 못했습니다</h1>
-        <p>백엔드 API 연결 상태를 확인해 주세요.</p>
+        <div className="notice danger">
+          <strong>API 연결 오류</strong>
+          <span>백엔드 API 연결 상태를 확인해 주세요.</span>
+        </div>
       </section>
     );
   }
@@ -53,7 +56,7 @@ export default async function OrdersPage() {
       </div>
 
       {data.orders.length === 0 ? (
-        <div className="notice">
+        <div className="notice empty">
           <strong>주문 내역이 없습니다</strong>
           <Link className="button primary" href="/products">
             상품 보기

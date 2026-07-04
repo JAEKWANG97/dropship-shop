@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getProfileCompletion, getReferralState } from "@/lib/account";
 import { getCurrentUser } from "@/lib/session";
+import { SubmitButton } from "../submit-button";
 import {
   confirmPhoneVerification,
   requestAccountDeletion,
@@ -46,7 +47,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <span>현재 계정으로 로그인되어 있습니다.</span>
       </div>
       {profile.error ? (
-        <div className="notice">
+        <div className="notice danger">
           <strong>필수 정보를 불러오지 못했습니다</strong>
           <span>API 서버와 로그인 상태를 확인해 주세요.</span>
         </div>
@@ -65,9 +66,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               이메일
               <input name="email" required type="email" defaultValue={profile.data.email} />
             </label>
-            <button className="button" type="submit">
+            <SubmitButton className="button" pendingLabel="저장 중...">
               기본 정보 저장
-            </button>
+            </SubmitButton>
           </form>
           <form action={requestPhoneVerification} className="account-form">
             <h2>휴대폰 번호 인증</h2>
@@ -82,9 +83,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 defaultValue={profile.data.phoneNumber ?? ""}
               />
             </label>
-            <button className="button" type="submit">
+            <SubmitButton className="button" pendingLabel="발송 중...">
               인증번호 받기
-            </button>
+            </SubmitButton>
           </form>
           <form action={confirmPhoneVerification} className="account-form">
             <h2>인증번호 입력</h2>
@@ -103,14 +104,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               인증번호
               <input name="code" required inputMode="numeric" minLength={6} maxLength={6} />
             </label>
-            <button className="button primary" type="submit">
+            <SubmitButton className="button primary" pendingLabel="확인 중...">
               휴대폰 인증 완료
-            </button>
+            </SubmitButton>
           </form>
         </>
       )}
       {referral.error ? (
-        <div className="notice">
+        <div className="notice danger">
           <strong>추천 정보를 불러오지 못했습니다</strong>
           <span>로그인 상태를 확인한 뒤 다시 시도해 주세요.</span>
         </div>
@@ -140,9 +141,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <Link href="/orders">주문 내역</Link>
       </div>
       <form action="/auth/logout" method="post">
-        <button className="button" type="submit">
+        <SubmitButton className="button" pendingLabel="로그아웃 중...">
           로그아웃
-        </button>
+        </SubmitButton>
       </form>
       <form action={requestAccountDeletion} className="account-form">
         <h2>회원 탈퇴</h2>
@@ -157,9 +158,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <input name="confirmDeletion" required type="checkbox" value="yes" />
           <span>위 내용을 확인했으며 회원 탈퇴를 요청합니다.</span>
         </label>
-        <button className="button" type="submit">
+        <SubmitButton className="button" pendingLabel="요청 중...">
           회원 탈퇴 요청
-        </button>
+        </SubmitButton>
       </form>
     </section>
   );

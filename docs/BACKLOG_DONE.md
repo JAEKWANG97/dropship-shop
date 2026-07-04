@@ -4,6 +4,11 @@
 
 ## 2026-07-04
 
+- B-051 UX/UI 폴리싱 (리뷰 잔여 항목)
+  - 커밋: `feat: polish mobile commerce ux`
+  - 완료 내용: 상품 상세 구매 영역을 가격/구매조건/옵션/수량/장바구니/바로구매 순서의 구매 패널로 정리하고 `바로구매`를 primary CTA로 두었다. 모바일 홈/상품목록/관련상품 카드는 390px에서 읽히도록 1열 리스트 밀도로 보정하고, header/search/footer/forms/summary list가 좁은 화면에서 overflow를 만들지 않게 했다. 고객 핵심 form에는 `useFormStatus` 기반 `SubmitButton`을 적용해 제출 중 비활성/문구 피드백을 제공한다. 빈 상태와 API 오류는 기존 `.notice` 안에서 `empty`/`danger`로 구분했다.
+  - 결정: 실제 상품 사진 교체, SKU/MOQ 필드 추가, 실제 사업자/고객센터 값 보강은 각각 B-026/B-030/후속 API 이슈로 남긴다. 이번 범위는 코드로 해결 가능한 모바일/상태/구매영역 폴리싱만 닫는다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/web && npx playwright test --workers=2`, `git diff --check`
 - B-050 추천인 코드 수집 (첫 로그인 온보딩)
   - 커밋: `feat: add referral onboarding`
   - 완료 내용: `users`에 `referral_code`, `referred_by_user_id`, `referred_at`을 추가하고 추천 코드를 lazy 생성한다. 신규 소셜 로그인 계정만 `/welcome` 온보딩으로 보내 추천인 코드를 선택 등록하거나 건너뛸 수 있게 했다. 고객 계정 화면에는 내 추천 코드와 추천인 등록 여부만 표시하고, 관리자에는 읽기 전용 추천 관계 목록을 추가했다.

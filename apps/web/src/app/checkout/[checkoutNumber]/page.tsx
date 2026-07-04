@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
 import { orderStatusLabel, paymentGroupStatusLabel } from "@/lib/orders";
 import { getCurrentUser } from "@/lib/session";
+import { SubmitButton } from "../../submit-button";
 import {
   confirmCheckoutPolicies,
   updateCheckoutShippingAddress,
@@ -61,7 +62,10 @@ export default async function CheckoutDetailPage({
       <section className="narrow-page">
         <p className="eyebrow">주문서</p>
         <h1>주문서를 불러오지 못했습니다</h1>
-        <p>백엔드 API 연결 상태를 확인해 주세요.</p>
+        <div className="notice danger">
+          <strong>API 연결 오류</strong>
+          <span>백엔드 API 연결 상태를 확인해 주세요.</span>
+        </div>
       </section>
     );
   }
@@ -195,9 +199,9 @@ function ShippingAddressForm({ checkout }: { checkout: Checkout }) {
         상세 주소
         <input name="address2" />
       </label>
-      <button className="button" type="submit">
+      <SubmitButton className="button" pendingLabel="변경 중...">
         배송지 변경
-      </button>
+      </SubmitButton>
     </form>
   );
 }
@@ -229,9 +233,9 @@ function PolicyConfirmationForm({
         주문 상품, 입금 금액, 배송지, 배송/취소/환불 정책, 품절 시 배송 그룹 주문 금액 환불 안내를
         확인했습니다. 현금영수증은 요청 시 발급됩니다.
       </label>
-      <button className="button" type="submit">
+      <SubmitButton className="button" pendingLabel="저장 중...">
         정책 확인 저장
-      </button>
+      </SubmitButton>
     </form>
   );
 }

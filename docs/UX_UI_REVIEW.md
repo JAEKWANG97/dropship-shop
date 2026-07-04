@@ -168,11 +168,16 @@ Implemented on 2026-06-29:
 - Coupang-style benchmarking is applied as structure only: utility links, logo/search/account actions, category bar, product-first content, and policy-rich footer.
 - Local seed product images use generated PNG files served through `/uploads/products/local-seed/**` instead of data URI SVG label placeholders.
 
+Implemented on 2026-07-04:
+- Mobile customer pages now have overflow checks and refreshed screenshot baselines for home, product detail, products, and checkout bank-transfer screens.
+- The product detail purchase area is grouped into a purchase panel with price, purchase conditions, option, quantity, secondary cart action, and primary direct-buy action.
+- Empty states and API failure states are visually separated with existing `.notice.empty` and `.notice.danger` styles.
+- Key customer forms now show submit-pending labels and disabled button states through a small shared `SubmitButton`.
+
 Remaining:
 1. Replace generated local seed illustrations with photo-grade product assets when real fixture sources are available.
 2. Add SKU/model/MOQ when the product API exposes those fields.
 3. Add footer business/trust information after real business registration/customer-center values are available.
-4. Run mobile viewport review for header wrapping, card density, and checkout forms.
 
 ## Bottom Line
 

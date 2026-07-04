@@ -4,6 +4,7 @@ import { getAddresses, getAgreementState, type Address } from "@/lib/account";
 import { getCart, type Cart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
+import { SubmitButton } from "../submit-button";
 import { agreeRequiredPolicies, createCheckout } from "./actions";
 
 type CheckoutPageProps = {
@@ -56,7 +57,10 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
       <section className="narrow-page">
         <p className="eyebrow">주문서</p>
         <h1>주문서를 시작하지 못했습니다</h1>
-        <p>백엔드 API 연결 상태를 확인해 주세요.</p>
+        <div className="notice danger">
+          <strong>API 연결 오류</strong>
+          <span>백엔드 API 연결 상태를 확인해 주세요.</span>
+        </div>
       </section>
     );
   }
@@ -79,7 +83,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
       ) : null}
 
       {data.cart.items.length === 0 ? (
-        <div className="notice">
+        <div className="notice empty">
           <strong>장바구니가 비어 있습니다</strong>
           <Link className="button primary" href="/products">
             상품 보기
@@ -145,9 +149,9 @@ function RequiredAgreementForm({
         <input name="privacyAgreed" type="checkbox" required />
         개인정보처리방침 {privacyVersion}에 동의합니다.
       </label>
-      <button className="button" type="submit">
+      <SubmitButton className="button" pendingLabel="저장 중...">
         필수 약관 동의 저장
-      </button>
+      </SubmitButton>
     </form>
   );
 }
@@ -182,7 +186,7 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
         </div>
       </div>
       {!cart.checkoutAvailable ? (
-        <div className="notice">
+        <div className="notice danger">
           <strong>주문 불가</strong>
           {cart.issues.map((issue) => (
             <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
@@ -238,9 +242,9 @@ function CreateCheckoutForm({
         입금자명
         <input name="depositorName" placeholder="비워두면 받는 사람 이름으로 안내됩니다" />
       </label>
-      <button className="button primary" disabled={disabled} type="submit">
+      <SubmitButton className="button primary" disabled={disabled} pendingLabel="주문서 생성 중...">
         주문서 만들기
-      </button>
+      </SubmitButton>
     </form>
   );
 }

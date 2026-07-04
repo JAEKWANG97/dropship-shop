@@ -43,14 +43,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       </div>
 
       {error ? (
-        <div className="notice">
+        <div className="notice danger">
           <strong>상품을 불러오지 못했습니다</strong>
           <span>백엔드 API 연결 상태를 확인해 주세요.</span>
         </div>
       ) : null}
 
       {!error && filteredProducts.length === 0 ? (
-        <div className="notice">
+        <div className="notice empty">
           <strong>판매중인 상품이 없습니다</strong>
           <span>검색 조건을 바꾸거나 관리자에서 상품을 등록해 주세요.</span>
         </div>
