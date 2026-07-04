@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { getCart, type Cart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
@@ -31,16 +32,7 @@ export default async function CartPage({ searchParams }: CartPageProps) {
   ]);
 
   if (!session) {
-    return (
-      <section className="narrow-page">
-        <p className="eyebrow">장바구니</p>
-        <h1>로그인이 필요합니다</h1>
-        <p>장바구니는 소셜 로그인 후 사용할 수 있습니다.</p>
-        <Link className="button primary" href="/login">
-          로그인
-        </Link>
-      </section>
-    );
+    redirect("/login?redirectTo=%2Fcart");
   }
 
   if (status === "forbidden" && admin) {

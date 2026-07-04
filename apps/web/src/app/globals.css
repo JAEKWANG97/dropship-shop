@@ -113,14 +113,28 @@ textarea {
 
 .site-search {
   display: grid;
-  grid-template-columns: minmax(220px, 430px) 44px;
+  grid-template-columns: minmax(0, 1fr) 44px;
   flex: 1;
   max-width: 520px;
+  overflow: hidden;
+  border: 1px solid #4778f5;
+  border-radius: 4px;
+  background: #ffffff;
 }
 
-.site-search input {
-  border-color: #9aa9c1;
-  border-radius: 6px 0 0 6px;
+.site-search input:not([type="checkbox"]):not([type="radio"]) {
+  appearance: none;
+  min-height: 40px;
+  border: 0;
+  border-radius: 0;
+  color: var(--navy);
+  background: transparent;
+  box-shadow: none;
+}
+
+.site-search input:not([type="checkbox"]):not([type="radio"]):focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .site-search button {
@@ -128,17 +142,16 @@ textarea {
   place-items: center;
   min-height: 40px;
   padding: 0;
-  border: 1px solid #9aa9c1;
-  border-left: 0;
-  border-radius: 0 6px 6px 0;
-  background: var(--surface);
-  color: var(--navy);
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  color: #2563eb;
   font-weight: 800;
 }
 
 .site-search button svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -505,6 +518,109 @@ p {
   margin-top: 2px;
 }
 
+.auth-page {
+  display: grid;
+  place-items: start center;
+  min-height: calc(100vh - 300px);
+  padding: 54px 16px 72px;
+}
+
+.auth-card {
+  display: grid;
+  gap: 22px;
+  width: min(100%, 460px);
+}
+
+.auth-brand {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  color: var(--navy);
+}
+
+.auth-brand strong {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.auth-brand em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.auth-brand small {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.auth-copy {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+}
+
+.auth-context {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.auth-copy h1 {
+  font-size: 28px;
+  line-height: 1.22;
+}
+
+.auth-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 900;
+  text-align: center;
+}
+
+.auth-tabs span {
+  padding: 12px 6px;
+  border-bottom: 3px solid transparent;
+}
+
+.auth-tabs .active {
+  border-color: var(--accent);
+  color: var(--navy);
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.auth-signed-in {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #b7e4c7;
+  border-radius: 8px;
+  background: #f1f8f3;
+  text-align: center;
+}
+
+.auth-helper {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .login-panel {
   display: grid;
   gap: 16px;
@@ -524,11 +640,11 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
+  min-height: 48px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--surface);
-  font-weight: 700;
+  font-weight: 900;
 }
 
 .oauth-button.kakao {
@@ -2246,6 +2362,32 @@ textarea {
 
   .site-search input {
     min-width: 0;
+  }
+
+  .auth-page {
+    min-height: calc(100vh - 220px);
+    padding: 28px 12px 52px;
+  }
+
+  .auth-card {
+    gap: 18px;
+  }
+
+  .auth-brand strong {
+    font-size: 34px;
+  }
+
+  .auth-copy h1 {
+    font-size: 22px;
+  }
+
+  .auth-tabs span {
+    padding: 10px 4px;
+    font-size: 13px;
+  }
+
+  .auth-actions {
+    grid-template-columns: 1fr;
   }
 
   .page-shell {

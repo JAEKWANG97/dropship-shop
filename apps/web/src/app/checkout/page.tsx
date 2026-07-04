@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { getAddresses, getAgreementState, type Address } from "@/lib/account";
 import { getCart, type Cart } from "@/lib/cart";
@@ -36,16 +37,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   ]);
 
   if (!session) {
-    return (
-      <section className="narrow-page">
-        <p className="eyebrow">주문서</p>
-        <h1>로그인이 필요합니다</h1>
-        <p>주문서는 소셜 로그인 후 생성할 수 있습니다.</p>
-        <Link className="button primary" href="/login">
-          로그인
-        </Link>
-      </section>
-    );
+    redirect("/login?redirectTo=%2Fcheckout");
   }
 
   if (data.status === "forbidden" && admin) {

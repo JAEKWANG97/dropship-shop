@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { formatPrice } from "@/lib/catalog";
 import { BUSINESS_PROFILE } from "@/lib/legal";
@@ -49,15 +49,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
   ]);
 
   if (!session) {
-    return (
-      <section className="narrow-page">
-        <p className="eyebrow">주문</p>
-        <h1>로그인이 필요합니다</h1>
-        <Link className="button primary" href="/login">
-          로그인
-        </Link>
-      </section>
-    );
+    redirect(`/login?redirectTo=${encodeURIComponent(`/orders/${orderId}`)}`);
   }
 
   const { order, status } = await loadOrder(orderId);

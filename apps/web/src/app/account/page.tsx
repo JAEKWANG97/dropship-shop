@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getProfileCompletion, getReferralState } from "@/lib/account";
 import { getCurrentUser } from "@/lib/session";
 import { SubmitButton } from "../submit-button";
@@ -18,16 +19,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const session = await getCurrentUser();
 
   if (!session) {
-    return (
-      <section className="narrow-page">
-        <p className="eyebrow">계정</p>
-        <h1>로그인이 필요합니다</h1>
-        <p>장바구니, 주문, 배송지 관리는 소셜 로그인 후 사용할 수 있습니다.</p>
-        <Link className="button primary" href="/login">
-          로그인
-        </Link>
-      </section>
-    );
+    redirect("/login?redirectTo=%2Faccount");
   }
 
   const [profile, referral] = await Promise.all([loadProfileCompletion(), loadReferralState()]);

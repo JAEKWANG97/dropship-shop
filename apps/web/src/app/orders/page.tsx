@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { formatPrice } from "@/lib/catalog";
 import { getCustomerOrders, orderStatusLabel, type OrderSummary } from "@/lib/orders";
@@ -19,16 +20,7 @@ export default async function OrdersPage() {
   const [session, admin, data] = await Promise.all([getCurrentUser(), getAdminUser(), loadOrders()]);
 
   if (!session) {
-    return (
-      <section className="narrow-page">
-        <p className="eyebrow">주문</p>
-        <h1>로그인이 필요합니다</h1>
-        <p>주문 내역은 소셜 로그인 후 확인할 수 있습니다.</p>
-        <Link className="button primary" href="/login">
-          로그인
-        </Link>
-      </section>
-    );
+    redirect("/login?redirectTo=%2Forders");
   }
 
   if (data.status === "forbidden" && admin) {
