@@ -720,7 +720,7 @@ Rule:
 
 Rule:
 
-- Default customer sale price is supplier cost plus the total markup rate, rounded up by `roundingUnit`.
+- Default customer sale price is supplier cost plus the total markup rate, rounded to the nearest `roundingUnit`.
 
 ### Product Detail Response Shape
 

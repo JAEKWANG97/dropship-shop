@@ -10,7 +10,7 @@ import {
   type ProductDetail,
   type ProductSummary,
 } from "@/lib/catalog";
-import { policyHref } from "@/lib/legal";
+import { POLICY_PAGES, policyHref, type PolicyPage } from "@/lib/legal";
 import { SubmitButton } from "@/app/submit-button";
 import { ProductImage } from "../product-image";
 
@@ -60,6 +60,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const activeOptions = product.options.filter((option) => option.status === "ACTIVE");
   const purchasable = product.status === "ACTIVE" && activeOptions.length > 0;
   const galleryImages = product.images.filter((image) => image.type === "GALLERY");
+  const policyPages = product.policyLinks
+    .map((policy) => policyPageForType(policy.policyType))
+    .filter((policy): policy is PolicyPage => policy !== null);
 
   return (
     <article className="product-detail">
@@ -242,20 +245,46 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </section>
       ) : null}
 
-      {product.policyLinks.length > 0 ? (
+      {policyPages.length > 0 ? (
         <section className="detail-section">
-          <h2>정책</h2>
-          <div className="policy-links">
-            {product.policyLinks.map((policy) => (
-              <Link href={policyHref(policy.policyType)} key={policy.policyType}>
-                {policy.label}
-              </Link>
+          <h2>배송/교환/환불 안내</h2>
+          <div className="product-policy-board">
+            {policyPages.map((policy) => (
+              <section className="product-policy-card" key={policy.slug}>
+                <h3>{policy.title}</h3>
+                <dl className="product-policy-table">
+                  <div>
+                    <dt>요약</dt>
+                    <dd>{policy.summary}</dd>
+                  </div>
+                  {policy.sections.map((section) => (
+                    <div key={section.heading}>
+                      <dt>{section.heading}</dt>
+                      <dd>
+                        <ul>
+                          {section.paragraphs.map((paragraph) => (
+                            <li key={paragraph}>{paragraph}</li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <Link className="policy-detail-link" href={`/policies/${policy.slug}`}>
+                  상세 정책 보기
+                </Link>
+              </section>
             ))}
           </div>
         </section>
       ) : null}
     </article>
   );
+}
+
+function policyPageForType(policyType: string) {
+  const href = policyHref(policyType);
+  return POLICY_PAGES.find((policy) => `/policies/${policy.slug}` === href) ?? null;
 }
 
 function DetailBlock({

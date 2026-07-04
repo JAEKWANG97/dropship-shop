@@ -72,7 +72,7 @@ node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manif
 
 - `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`를 먼저 확인한다.
 - 생성된 manifest는 기본적으로 `import: false`, `status: "HIDDEN"`이다.
-- `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 올린 값이다.
+- `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 반올림한 값이다.
 - 숫자 가격이 없는 상품은 import 실패 또는 `HIDDEN` 유지 대상으로 보고 수동 검수한다.
 - `ACTIVE` 전환은 관리자 화면에서 상품 고시, 인증/KC, 가격, 이미지 품질을 확인한 뒤 진행한다.
 - import 결과는 `tmp/domeggook-import-result.json`에 저장된다.

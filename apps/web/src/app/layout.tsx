@@ -44,7 +44,10 @@ export default async function RootLayout({
                 placeholder="상품명, 브랜드, 키워드로 검색하세요"
               />
               <button aria-label="검색" type="submit">
-                검색
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="m21 21-4.3-4.3" />
+                  <circle cx="11" cy="11" r="7" />
+                </svg>
               </button>
             </form>
             <nav className="site-nav" aria-label="Primary navigation">

@@ -23,8 +23,9 @@ function numberValue(formData: FormData, name: string) {
 }
 
 function calculatedBasePrice(sourcePrice: number, policy: PricingPolicy) {
-  const rawPrice = Math.ceil(sourcePrice * (1 + policy.totalMarkupRate / 100));
-  return Math.ceil(rawPrice / policy.roundingUnit) * policy.roundingUnit;
+  const roundingUnit = policy.roundingUnit || 100;
+  const rawPrice = sourcePrice * (1 + policy.totalMarkupRate / 100);
+  return Math.round(rawPrice / roundingUnit) * roundingUnit;
 }
 
 type ProductImageUploadResponse = {

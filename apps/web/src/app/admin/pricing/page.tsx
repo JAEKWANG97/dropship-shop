@@ -51,7 +51,7 @@ export default async function AdminPricingPage({ searchParams }: AdminPricingPag
             <input name="safetyMarginRate" required min="0" step="0.01" type="number" defaultValue={policy.safetyMarginRate} />
           </label>
           <label>
-            올림 단위
+            반올림 단위
             <input name="roundingUnit" required min="1" step="1" type="number" defaultValue={policy.roundingUnit} />
           </label>
           <div className="admin-form-actions wide">

@@ -59,8 +59,17 @@ function totalMarkupRate(policy) {
 
 function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
   const roundingUnit = Number(policy.roundingUnit || 100);
-  const rawPrice = Math.ceil(Number(sourcePrice || 0) * (1 + totalMarkupRate(policy) / 100));
-  return Math.ceil(rawPrice / roundingUnit) * roundingUnit;
+  const rawPrice = Number(sourcePrice || 0) * (1 + totalMarkupRate(policy) / 100);
+  return Math.round(rawPrice / roundingUnit) * roundingUnit;
+}
+
+function normalizedBasePrice(item, sourcePrice, policy = DEFAULT_PRICING_POLICY) {
+  const roundingUnit = Number(policy.roundingUnit || 100);
+  const basePrice = Number(item.basePrice || 0);
+  if (Number.isFinite(basePrice) && basePrice > 0 && basePrice % roundingUnit === 0) {
+    return basePrice;
+  }
+  return calculateBasePrice(sourcePrice, policy);
 }
 
 function publicSummaryPart(part) {
@@ -194,7 +203,7 @@ function manifestIssue(item) {
 async function importItem(args, item, product, suppliers, products, policy) {
   if (!item.import) return { itemNo: item.itemNo, status: "SKIPPED", reason: "manifest import=false" };
   item.sourcePrice = Number(item.sourcePrice || item.basePrice || parsePrice(product.priceText));
-  item.basePrice = Number(item.basePrice || calculateBasePrice(item.sourcePrice, policy));
+  item.basePrice = normalizedBasePrice(item, item.sourcePrice, policy);
   item.summary = sanitizePublicSummary(item.summary || summaryFor(product));
   const issue = manifestIssue(item);
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
@@ -271,7 +280,7 @@ async function runManifest(args) {
       const checkedItem = {
         ...item,
         sourcePrice,
-        basePrice: Number(item.basePrice || calculateBasePrice(sourcePrice, policy)),
+        basePrice: normalizedBasePrice(item, sourcePrice, policy),
       };
       const issue = manifestIssue(checkedItem);
       results.push({

@@ -312,13 +312,15 @@ function ProductPricingPanel({
   product: ProductDetail;
 }) {
   const sourcePrice = product.sourcePrice ?? listProduct?.sourcePrice ?? product.basePrice;
-  const calculatedPrice = Math.ceil(Math.ceil(sourcePrice * (1 + pricingPolicy.totalMarkupRate / 100)) / pricingPolicy.roundingUnit) * pricingPolicy.roundingUnit;
+  const calculatedPrice = Math.round(
+    (sourcePrice * (1 + pricingPolicy.totalMarkupRate / 100)) / pricingPolicy.roundingUnit
+  ) * pricingPolicy.roundingUnit;
 
   return (
     <section className="admin-panel">
       <div className="admin-panel-head">
         <h2>가격 관리</h2>
-        <span>계산 판매가 {formatPrice(calculatedPrice)}</span>
+        <span>계산 판매가 {formatPrice(calculatedPrice)} · {pricingPolicy.roundingUnit}원 단위 반올림</span>
       </div>
       <form action={updateAdminProductPrices} className="admin-form-grid">
         <input name="productId" type="hidden" value={product.id} />
@@ -336,7 +338,7 @@ function ProductPricingPanel({
         </label>
         <label>
           변경 사유
-          <input name="reason" required placeholder="예: 도매가 25% 마진 적용" />
+          <input name="reason" required placeholder="예: 도매가 25% 마진 및 100원 반올림 적용" />
         </label>
         <div className="admin-form-actions wide">
           <button className="button" name="priceMode" value="manual" type="submit">

@@ -12,17 +12,52 @@ const SITE_BUNDLES = [
   {
     title: "기본 보호구 준비",
     summary: "현장 출입 전 기본으로 확인하는 보호구",
-    categories: ["PPE_SAFETY_HELMET", "PPE_SAFETY_SHOES", "PPE_HIGH_VISIBILITY_VEST"],
+    categories: ["PPE_SAFETY_HELMET", "PPE_SAFETY_SHOES", "PPE_HIGH_VISIBILITY_VEST", "PPE_SAFETY_GLASSES"],
   },
   {
     title: "추락 작업 준비",
     summary: "고소작업과 개구부 주변 작업 전 점검 품목",
-    categories: ["PPE_FALL_ARREST_HARNESS", "FALL_PREVENTION_NET", "SAFETY_BLOCK"],
+    categories: ["PPE_FALL_ARREST_HARNESS", "FALL_PREVENTION_NET", "LIFELINE", "SAFETY_BLOCK"],
   },
   {
     title: "안전 통제 구역 설치",
     summary: "출입 제한과 위험구역 표시를 위한 통제 시설",
-    categories: ["SAFETY_SIGN", "TRAFFIC_CONE", "SAFETY_FENCE"],
+    categories: ["SAFETY_SIGN", "TRAFFIC_CONE", "SAFETY_FENCE", "BARRICADE"],
+  },
+  {
+    title: "화기·용접 작업 준비",
+    summary: "불꽃, 비산물, 연기 노출 전 확인 품목",
+    categories: ["PPE_WELDING_GLOVES", "PPE_SAFETY_GLASSES", "PPE_RESPIRATOR", "PPE_PROTECTIVE_CLOTHING"],
+  },
+  {
+    title: "전기 작업 준비",
+    summary: "감전 위험과 작업 구역 통제를 위한 준비",
+    categories: ["PPE_INSULATED_GLOVES", "PPE_SAFETY_HELMET", "WARNING_SIGN", "DANGER_AREA_BARRIER"],
+  },
+  {
+    title: "철거·분진 작업 준비",
+    summary: "분진, 소음, 비산물 노출 작업 전 점검",
+    categories: ["PPE_RESPIRATOR", "PPE_SAFETY_GLASSES", "DUST_METER", "VENTILATION_EQUIPMENT"],
+  },
+  {
+    title: "야간·우천 작업 준비",
+    summary: "시야 확보와 차량·작업자 식별이 필요한 현장",
+    categories: ["PPE_HIGH_VISIBILITY_VEST", "WARNING_LIGHT", "SIGNAL_BATON", "TRAFFIC_CONE"],
+  },
+  {
+    title: "중장비 작업 구역 준비",
+    summary: "장비 접근, 후방, 협착 위험 구역 관리",
+    categories: ["HEAVY_EQUIPMENT_PROXIMITY_ALARM", "HEAVY_EQUIPMENT_COLLISION_PREVENTION", "HEAVY_EQUIPMENT_REAR_DETECTOR", "TRAFFIC_CONE"],
+  },
+  {
+    title: "밀폐·협소 공간 작업 준비",
+    summary: "산소, 가스, 환기와 비상 호출을 확인하는 작업",
+    categories: ["OXYGEN_METER", "GAS_DETECTOR", "VENTILATION_EQUIPMENT", "WORKER_SOS_EMERGENCY_CALL"],
+  },
+  {
+    title: "응급 대응 준비",
+    summary: "응급처치와 현장 초기 대응을 위한 품목",
+    categories: ["FIRST_AID_KIT", "FIRST_AID_SUPPLIES", "AED", "EYEWASH_STATION"],
   },
 ] satisfies {
   title: string;
