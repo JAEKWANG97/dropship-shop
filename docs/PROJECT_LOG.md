@@ -1,5 +1,23 @@
 # Project Log
 
+## 2026-07-04 18:42 KST
+
+- 관련 항목: B-054, B-053, B-032, B-026, B-033
+- 작업: 도매꾹 수집 상품 761개를 실제 판매 후보로 바로 적재하지 않고 `IMPORT`/`REVIEW`/`EXCLUDE`로 자동 분류하는 리뷰 스크립트를 추가했다. 스크립트는 로컬 수집 JSON을 읽고, 원본 상세 URL에서 공급처 기본 배송비를 보강 파싱한 뒤 `effectiveSourcePrice`와 25% 증액/100원 단위 반올림 판매가를 계산한다. 산출물은 `tmp/domeggook-product-review.json`, `tmp/domeggook-product-review.csv`, `tmp/domeggook-import-manifest.filtered.json`이다.
+- 문제·고민: 수집본에는 상품 가격과 옵션은 있었지만 배송비 필드가 없어, 원가에 배송비를 포함하지 않으면 고객 판매가가 낮게 계산된다. 반대로 배송비 조건부/수량별 상품까지 자동 import하면 운영 검수 전에 실제 판매가와 맞지 않을 수 있다.
+- 해결방안: 원본 상세 URL의 배송정보에서 고정 배송비 또는 무료배송을 파싱하고, 수량별/조건부/파싱 실패는 `REVIEW`로 보낸다. 최소구매수량 2개 이상, 카테고리 확신 낮음, 상세 이미지 없음, 상세 이미지 품질 의심, 브랜드/정품/부속품/도메인 이탈 키워드도 자동 import하지 않는다.
+- 검증: 전체 리뷰 결과는 `IMPORT 127 / REVIEW 574 / EXCLUDE 60`이다. filtered manifest dry-run은 실패 없이 `DRY_RUN 127 / SKIPPED 634`였고, 첫 10개 제한 manifest를 `--apply`로 실행해 9개를 `HIDDEN`으로 적재했다. 관리자 상세에서 대표 이미지, 상세 이미지 블록, 옵션 source metadata가 저장된 것을 확인했다.
+- 후속작업: 운영자가 `tmp/domeggook-product-review.csv`에서 `IMPORT` 후보를 먼저 보고, HIDDEN 상품의 인증/KC/상품고시/이미지/가격을 검수한 뒤 소량씩 `ACTIVE` 전환한다. `REVIEW` 상품은 이유 코드별로 수동 보정하거나 제외한다.
+
+## 2026-07-04 16:55 KST
+
+- 관련 항목: B-053, B-031, B-032, B-026, B-033
+- 작업: 도매꾹 수집 산출물의 옵션 backfill과 전체 카테고리 coverage scan, 옵션-aware import를 구현했다. 기존 `tmp/domeggook-products/*/product.json`은 `sourceUrl`만 다시 조회해 이미지 재다운로드 없이 `options`를 보강하고, coverage scan은 81개 leaf category에 키워드가 모두 있는지 확인한 뒤 모바일 검색 API에서 후보 URL을 가져온다. import는 옵션별 원본 공급가에 가격 정책을 적용해 최저 판매가를 상품 `basePrice`로 두고, 나머지는 옵션 `additionalPrice`로 저장한다.
+- 문제·고민: PC 검색 페이지는 EUC-KR query를 요구해 UTF-8 URL 인코딩으로는 검색 결과가 비어 있었다. 또한 도매꾹 옵션 JS 객체는 `00`, `01` 같은 키와 `optSet.changeKey`의 `0`, `1`이 달라 단순 `Object.entries` 순서로 읽으면 옵션 순서가 깨졌다.
+- 해결방안: coverage scan은 모바일 `/api/v1/getItemList` JSON API를 사용해 UTF-8 키워드 문제를 피했다. 옵션 파서는 `eval` 없이 `JSON.parse`만 사용하고, `optSet.changeKey`를 `padStart(2, "0")`로 보정해 원본 옵션 순서를 유지한다. 관리자 API에는 원본 옵션코드/추가금/재고/정렬값을 보존하되 public product detail에는 포함하지 않도록 DTO 매핑을 분리했다.
+- 검증: `--backfill-options --limit 5`, 안전화 샘플 `65522270` 옵션 12개 저장, `--coverage-scan --target-per-category 1 --max-categories 3`, import manifest/dry-run, `cd apps/api && ./gradlew test --tests '*Catalog*'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`를 통과했다.
+- 후속작업: 대량 coverage 수집은 별도 실행으로 돌리고, import manifest에서 카테고리/인증/KC/상품고시를 검수한 뒤 `HIDDEN` 상품만 선별 적재한다.
+
 ## 2026-07-04 13:40 KST
 
 - 관련 항목: B-001, B-030

@@ -29,6 +29,10 @@ export type ProductOption = {
   name: string;
   additionalPrice: number;
   status: ProductOptionStatus;
+  sourceOptionCode?: string;
+  sourceAdditionalPrice?: number;
+  sourceStockQuantity?: number;
+  sortOrder?: number;
 };
 
 export type ProductDetailBlock = {

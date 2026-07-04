@@ -103,7 +103,11 @@ final class CatalogDtos {
 		@NotBlank @Size(max = 200) String name,
 		@Min(0) long additionalPrice,
 		ProductOptionStatus status,
-		@Size(max = 500) String reason
+		@Size(max = 500) String reason,
+		@Size(max = 100) String sourceOptionCode,
+		Long sourceAdditionalPrice,
+		@Min(0) Long sourceStockQuantity,
+		@Min(0) Integer sortOrder
 	) {
 	}
 
@@ -155,7 +159,11 @@ final class CatalogDtos {
 		UUID id,
 		String name,
 		long additionalPrice,
-		ProductOptionStatus status
+		ProductOptionStatus status,
+		@JsonInclude(JsonInclude.Include.NON_NULL) String sourceOptionCode,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourceAdditionalPrice,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourceStockQuantity,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Integer sortOrder
 	) {
 	}
 

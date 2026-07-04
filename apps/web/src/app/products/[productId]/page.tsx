@@ -63,9 +63,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const policyPages = product.policyLinks
     .map((policy) => policyPageForType(policy.policyType))
     .filter((policy): policy is PolicyPage => policy !== null);
+  const purchaseFormId = `product-purchase-form-${product.id}`;
 
   return (
-    <article className="product-detail">
+    <article className={purchasable ? "product-detail has-mobile-purchase-bar" : "product-detail"}>
       <nav className="breadcrumb" aria-label="breadcrumb">
         <Link href="/">홈</Link>
         <span>/</span>
@@ -110,7 +111,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
             </div>
             {purchasable ? (
-              <form action={addCartItem} className="cart-add-form">
+              <form action={addCartItem} className="cart-add-form" id={purchaseFormId}>
                 <input name="productId" type="hidden" value={product.id} />
                 <label>
                   옵션
@@ -154,6 +155,29 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </div>
         </div>
       </section>
+
+      {purchasable ? (
+        <div className="mobile-purchase-bar" aria-label="모바일 구매 액션">
+          <SubmitButton
+            className="button mobile-purchase-secondary"
+            form={purchaseFormId}
+            name="intent"
+            pendingLabel="담는 중..."
+            value="cart"
+          >
+            장바구니 담기
+          </SubmitButton>
+          <SubmitButton
+            className="button primary mobile-purchase-primary"
+            form={purchaseFormId}
+            name="intent"
+            pendingLabel="이동 중..."
+            value="checkout"
+          >
+            바로구매
+          </SubmitButton>
+        </div>
+      ) : null}
 
       {relatedProducts.length > 0 ? (
         <section className="detail-section">

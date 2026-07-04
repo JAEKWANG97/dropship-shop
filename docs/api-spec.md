@@ -721,6 +721,8 @@ Rule:
 Rule:
 
 - Default customer sale price is supplier cost plus the total markup rate, rounded to the nearest `roundingUnit`.
+- Admin product option create/update/detail may include source metadata fields for import traceability: `sourceOptionCode`, `sourceAdditionalPrice`, `sourceStockQuantity`, and `sortOrder`.
+- Public product detail omits source option metadata. Customers see only option `id`, `name`, customer-facing `additionalPrice`, and `status`.
 
 ### Product Detail Response Shape
 
@@ -735,7 +737,14 @@ Rule:
   "detailVersion": 3,
   "productNoticeVersion": 2,
   "images": [],
-  "options": [],
+  "options": [
+    {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "Option name",
+      "additionalPrice": 0,
+      "status": "ACTIVE"
+    }
+  ],
   "detailBlocks": [],
   "productNotice": {
     "productInfoNotice": "Product information notice",

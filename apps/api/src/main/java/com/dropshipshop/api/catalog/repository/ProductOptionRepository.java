@@ -10,7 +10,7 @@ import com.dropshipshop.api.catalog.domain.ProductOption;
 
 public interface ProductOptionRepository extends JpaRepository<ProductOption, UUID> {
 
-	List<ProductOption> findAllByProduct_IdOrderByCreatedAtAsc(UUID productId);
+	List<ProductOption> findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(UUID productId);
 
 	Optional<ProductOption> findByIdAndProduct_Id(UUID id, UUID productId);
 }

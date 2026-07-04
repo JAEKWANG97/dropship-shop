@@ -142,7 +142,7 @@ public class LocalOrderSeedData implements ApplicationRunner {
 	}
 
 	private ProductOption activeOption(Product product) {
-		return productOptionRepository.findAllByProduct_IdOrderByCreatedAtAsc(product.getId())
+		return productOptionRepository.findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(product.getId())
 			.stream()
 			.filter(option -> option.getStatus() == ProductOptionStatus.ACTIVE)
 			.findFirst()

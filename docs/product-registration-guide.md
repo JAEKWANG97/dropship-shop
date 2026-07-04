@@ -53,26 +53,43 @@
 ```bash
 node scripts/collect-domeggook-product.mjs https://mobile.domeggook.com/8667274
 node scripts/collect-domeggook-product.mjs --file tmp/domeggook-urls.txt
+node scripts/collect-domeggook-product.mjs --backfill-options --limit 5
+node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
 ```
 
 - 결과는 `tmp/domeggook-products/{상품번호}/`에 저장된다.
 - `이미지사용` 값이 `허용`인 상품만 대표 이미지와 상세 이미지를 다운로드한다.
+- 기존 수집본은 `--backfill-options`로 이미지를 다시 받지 않고 옵션 정보만 보강한다.
+- 전체 카테고리 후보는 `--coverage-scan`으로 카테고리별 검색 후보와 부족 카테고리 리포트를 만든다.
 - 수집 후 상품명, 가격, 카테고리, 인증/KC, 상품고시, 이미지 품질을 확인한다.
 - 이미지는 필요한 크기로 수동 보정한 뒤 관리자 화면에서 업로드한다.
 
 ## Domeggook Import
 
-도매꾹 수집 상품은 관리자 API를 통해 `HIDDEN` 상태로만 먼저 적재한다.
+도매꾹 수집 상품은 먼저 자동 리뷰로 걸러낸 뒤, `IMPORT` 후보만 관리자 API를 통해 `HIDDEN` 상태로 적재한다.
 
 ```bash
 node scripts/import-domeggook-products.mjs --init-manifest
+node scripts/review-domeggook-products.mjs
+node scripts/review-domeggook-products.mjs --api http://localhost:8080 --cookie-file tmp/admin-cookie.txt
 node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json
+node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.filtered.json
 node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json --cookie-file tmp/admin-cookie.txt --apply
+node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.filtered.json --cookie-file tmp/admin-cookie.txt --apply
 ```
 
-- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`를 먼저 확인한다.
+- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`, `options`를 먼저 확인한다.
 - 생성된 manifest는 기본적으로 `import: false`, `status: "HIDDEN"`이다.
+- 실제 운영 적재 전에는 `tmp/domeggook-product-review.csv`를 먼저 확인한다.
+- 자동 리뷰 결과는 `IMPORT`, `REVIEW`, `EXCLUDE`로 나뉜다.
+- `IMPORT` 대상만 `tmp/domeggook-import-manifest.filtered.json`에서 `import: true`가 된다.
+- `REVIEW` 상품은 최소구매수량, 조건부 배송비, 낮은 카테고리 확신, 부속품/브랜드/도메인 이탈 의심, 이미지 품질 같은 이유가 있으므로 관리자에 넣기 전 수동 판단한다.
+- `EXCLUDE` 상품은 가격 없음, 이미지 사용 미허용, 활성 옵션 없음, 상세 이미지 없음, 명백한 비안전용품, 고객 노출 금지 키워드 같은 하드 실패 사유가 있는 상품이다.
 - `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 반올림한 값이다.
+- `tmp/domeggook-import-manifest.filtered.json`의 `sourcePrice`는 수집 원가에 공급처 기본 배송비를 더한 `effectiveSourcePrice`다.
+- 옵션이 있는 상품은 옵션별 원본 공급가(`sourcePrice + sourceAdditionalPrice`)에 가격 정책을 적용하고, 가장 낮은 옵션 판매가를 상품 `basePrice`로 둔다. 각 옵션의 `additionalPrice`는 `옵션 판매가 - basePrice`로 계산한다.
+- `sourceOptionCode`, `sourceAdditionalPrice`, `sourceStockQuantity`, `sortOrder`는 관리자 검수용 메타데이터이며 고객 화면에는 노출하지 않는다.
 - 숫자 가격이 없는 상품은 import 실패 또는 `HIDDEN` 유지 대상으로 보고 수동 검수한다.
 - `ACTIVE` 전환은 관리자 화면에서 상품 고시, 인증/KC, 가격, 이미지 품질을 확인한 뒤 진행한다.
 - import 결과는 `tmp/domeggook-import-result.json`에 저장된다.
+- 대량 적재 전에는 filtered manifest를 10개 정도로 제한한 임시 manifest를 만들어 먼저 `--apply` 한다.

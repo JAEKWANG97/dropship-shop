@@ -226,8 +226,17 @@ public class CatalogService {
 	public CatalogDtos.ProductOptionResponse createOption(UUID productId, CatalogDtos.ProductOptionRequest request) {
 		Product product = findProduct(productId);
 		ProductOptionStatus status = request.status() == null ? ProductOptionStatus.ACTIVE : request.status();
-		ProductOption option = new ProductOption(product, request.name(), request.additionalPrice(), status);
-		return toOptionResponse(productOptionRepository.save(option));
+		ProductOption option = new ProductOption(
+			product,
+			request.name(),
+			request.additionalPrice(),
+			status,
+			request.sourceOptionCode(),
+			request.sourceAdditionalPrice(),
+			request.sourceStockQuantity(),
+			valueOrDefault(request.sortOrder(), 0)
+		);
+		return toOptionResponse(productOptionRepository.save(option), true);
 	}
 
 	@Transactional
@@ -247,8 +256,15 @@ public class CatalogService {
 			recordChange(option.getProduct(), option, adminUserId, ProductChangeType.OPTION_BASE,
 				option.getName(), request.name(), request.reason());
 		}
-		option.update(request.name(), request.additionalPrice());
-		return toOptionResponse(option);
+		option.update(
+			request.name(),
+			request.additionalPrice(),
+			valueOrDefault(request.sourceOptionCode(), option.getSourceOptionCode()),
+			valueOrDefault(request.sourceAdditionalPrice(), option.getSourceAdditionalPrice()),
+			valueOrDefault(request.sourceStockQuantity(), option.getSourceStockQuantity()),
+			valueOrDefault(request.sortOrder(), option.getSortOrder())
+		);
+		return toOptionResponse(option, true);
 	}
 
 	@Transactional
@@ -265,7 +281,7 @@ public class CatalogService {
 				option.getStatus().name(), request.status().name(), request.reason());
 			option.updateStatus(request.status());
 		}
-		return toOptionResponse(option);
+		return toOptionResponse(option, true);
 	}
 
 	@Transactional
@@ -496,6 +512,18 @@ public class CatalogService {
 		return value == null || value.isBlank();
 	}
 
+	private String valueOrDefault(String value, String defaultValue) {
+		return value == null ? defaultValue : value;
+	}
+
+	private Long valueOrDefault(Long value, Long defaultValue) {
+		return value == null ? defaultValue : value;
+	}
+
+	private int valueOrDefault(Integer value, int defaultValue) {
+		return value == null ? defaultValue : value;
+	}
+
 	private long sourcePrice(Long sourcePrice, long basePrice) {
 		return sourcePrice == null ? basePrice : sourcePrice;
 	}
@@ -574,9 +602,9 @@ public class CatalogService {
 			.map(this::toImageResponse)
 			.toList();
 		List<CatalogDtos.ProductOptionResponse> options = productOptionRepository
-			.findAllByProduct_IdOrderByCreatedAtAsc(product.getId())
+			.findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(product.getId())
 			.stream()
-			.map(this::toOptionResponse)
+			.map(option -> toOptionResponse(option, includeSourcePrice))
 			.toList();
 		List<CatalogDtos.ProductDetailBlockResponse> blocks = productDetailBlockRepository
 			.findAllByProduct_IdOrderBySortOrderAsc(product.getId())
@@ -606,12 +634,16 @@ public class CatalogService {
 		);
 	}
 
-	private CatalogDtos.ProductOptionResponse toOptionResponse(ProductOption option) {
+	private CatalogDtos.ProductOptionResponse toOptionResponse(ProductOption option, boolean includeSourceMetadata) {
 		return new CatalogDtos.ProductOptionResponse(
 			option.getId(),
 			option.getName(),
 			option.getAdditionalPrice(),
-			option.getStatus()
+			option.getStatus(),
+			includeSourceMetadata ? option.getSourceOptionCode() : null,
+			includeSourceMetadata ? option.getSourceAdditionalPrice() : null,
+			includeSourceMetadata ? option.getSourceStockQuantity() : null,
+			includeSourceMetadata ? option.getSortOrder() : null
 		);
 	}
 

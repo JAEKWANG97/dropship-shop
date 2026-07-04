@@ -145,11 +145,31 @@ export default async function AdminProductDetailPage({
                   <dt>최종 판매가</dt>
                   <dd>{formatPrice(product.basePrice + option.additionalPrice)}</dd>
                 </div>
+                <div>
+                  <dt>원본 옵션코드</dt>
+                  <dd>{option.sourceOptionCode ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>원본 추가금</dt>
+                  <dd>{option.sourceAdditionalPrice === undefined ? "-" : formatPrice(option.sourceAdditionalPrice)}</dd>
+                </div>
+                <div>
+                  <dt>원본 재고</dt>
+                  <dd>{option.sourceStockQuantity === undefined ? "-" : `${option.sourceStockQuantity.toLocaleString("ko-KR")}개`}</dd>
+                </div>
+                <div>
+                  <dt>정렬값</dt>
+                  <dd>{option.sortOrder ?? "-"}</dd>
+                </div>
               </dl>
               <form action={updateAdminProductOption} className="admin-inline-form">
                 <input name="productId" type="hidden" value={product.id} />
                 <input name="optionId" type="hidden" value={option.id} />
                 <input name="status" type="hidden" value={option.status} />
+                <input name="sourceOptionCode" type="hidden" value={option.sourceOptionCode ?? ""} />
+                <input name="sourceAdditionalPrice" type="hidden" value={option.sourceAdditionalPrice ?? ""} />
+                <input name="sourceStockQuantity" type="hidden" value={option.sourceStockQuantity ?? ""} />
+                <input name="sortOrder" type="hidden" value={option.sortOrder ?? ""} />
                 <label>
                   옵션명
                   <input name="name" required defaultValue={option.name} />

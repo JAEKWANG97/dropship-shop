@@ -4,6 +4,16 @@
 
 ## 2026-07-04
 
+- B-054 수집 상품 필터링 + 실제 데이터 선별 Import
+  - 커밋: 미커밋
+  - 완료 내용: `scripts/review-domeggook-products.mjs`를 추가해 `tmp/domeggook-products/*/product.json` 761개를 `IMPORT`/`REVIEW`/`EXCLUDE`로 자동 분류했다. 가격/옵션/이미지/카테고리/최소구매수량/배송비/금지·검수 키워드를 기준으로 보수 판정하고, 원본 상세 URL에서 공급처 기본 배송비를 파싱해 `effectiveSourcePrice = 수집 원가 + 배송비`, `calculatedBasePrice = 25% 증액 후 100원 단위 반올림`으로 계산한다. 결과는 `tmp/domeggook-product-review.json`, `tmp/domeggook-product-review.csv`, `tmp/domeggook-import-manifest.filtered.json`에 저장된다.
+  - 결정: 자동 공개는 하지 않는다. `IMPORT` 후보도 모두 `HIDDEN` 상태로만 적재하고, 인증/KC/상품고시/이미지/가격 검수 후 관리자에서 수동으로 `ACTIVE` 전환한다. 배송비 조건부, 최소구매수량 2개 이상, 카테고리 확신 낮음, 브랜드/부속품/도메인 이탈 의심 상품은 자동 import하지 않고 `REVIEW`로 남긴다.
+  - 검증: `node --check scripts/review-domeggook-products.mjs`, `node scripts/review-domeggook-products.mjs --shipping-concurrency 4` 결과 `IMPORT 127 / REVIEW 574 / EXCLUDE 60`, `node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.filtered.json`, 첫 10개 제한 manifest dry-run, `node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.filtered-first10.json --cookie-file tmp/admin-cookie.txt --apply` 결과 9개 `HIDDEN` 적재 및 관리자 상세에서 대표 이미지, 상세 이미지 블록, 옵션 source metadata 확인
+- B-053 도매꾹 전체 카테고리 커버리지 + 기존 수집본 옵션 Backfill
+  - 커밋: 미커밋
+  - 완료 내용: 기존 수집 산출물의 `sourceUrl`을 다시 조회해 이미지 재다운로드 없이 `optSet`, `optData`, `optSoldOut` 기반 옵션 배열을 backfill하는 모드를 추가했다. 81개 leaf category 기준 coverage scan을 모바일 검색 API로 구현하고, import manifest와 관리자 API 적재를 옵션-aware 가격 계산으로 변경했다. `product_options`에는 원본 옵션코드, 원본 추가금, 원본 재고, 정렬값을 보존하되 public product detail에는 노출하지 않는다.
+  - 결정: 원본 재고 수량은 운영 참고값으로만 보존하고 checkout 재고 차감에는 쓰지 않는다. 대량 신규 수집은 도구 검증 후 별도 실행하며, 이번 검증은 5개 backfill과 3개 카테고리 샘플로 제한했다.
+  - 검증: `node scripts/collect-domeggook-product.mjs --help`, `node scripts/collect-domeggook-product.mjs --backfill-options --limit 5`, 안전화 샘플 `65522270` 옵션 12개 저장 확인, `node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3`, `node scripts/import-domeggook-products.mjs --init-manifest`, `node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json`, `cd apps/api && ./gradlew test --tests '*Catalog*'`, `cd apps/api && ./gradlew test`, `cd apps/web && npm run lint`, `cd apps/web && npm run build`
 - B-051 UX/UI 폴리싱 (리뷰 잔여 항목)
   - 커밋: `feat: polish mobile commerce ux`
   - 완료 내용: 상품 상세 구매 영역을 가격/구매조건/옵션/수량/장바구니/바로구매 순서의 구매 패널로 정리하고 `바로구매`를 primary CTA로 두었다. 모바일 홈/상품목록/관련상품 카드는 390px에서 읽히도록 1열 리스트 밀도로 보정하고, header/search/footer/forms/summary list가 좁은 화면에서 overflow를 만들지 않게 했다. 고객 핵심 form에는 `useFormStatus` 기반 `SubmitButton`을 적용해 제출 중 비활성/문구 피드백을 제공한다. 빈 상태와 API 오류는 기존 `.notice` 안에서 `empty`/`danger`로 구분했다.

@@ -63,15 +63,6 @@ function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
   return Math.round(rawPrice / roundingUnit) * roundingUnit;
 }
 
-function normalizedBasePrice(item, sourcePrice, policy = DEFAULT_PRICING_POLICY) {
-  const roundingUnit = Number(policy.roundingUnit || 100);
-  const basePrice = Number(item.basePrice || 0);
-  if (Number.isFinite(basePrice) && basePrice > 0 && basePrice % roundingUnit === 0) {
-    return basePrice;
-  }
-  return calculateBasePrice(sourcePrice, policy);
-}
-
 function publicSummaryPart(part) {
   const value = String(part || "").trim();
   if (!value) return "";
@@ -98,6 +89,99 @@ function summaryFor(product) {
   ].filter(Boolean).join(" / "));
 }
 
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function optionStatus(value) {
+  return ["ACTIVE", "SOLD_OUT", "STOPPED"].includes(value) ? value : "ACTIVE";
+}
+
+function optionName(value, index) {
+  const name = String(value || "").trim();
+  return (name || `옵션 ${index + 1}`).slice(0, 200);
+}
+
+function defaultSourceOption() {
+  return {
+    sourceOptionCode: "00",
+    name: "기본",
+    sourceAdditionalPrice: 0,
+    sourceStockQuantity: null,
+    status: "ACTIVE",
+    sortOrder: 0,
+  };
+}
+
+function normalizeSourceOption(option, index) {
+  const sourceAdditionalPrice = numberOrNull(option.sourceAdditionalPrice ?? option.additionalPrice) ?? 0;
+  return {
+    sourceOptionCode: String(option.sourceOptionCode || option.code || index).slice(0, 100),
+    name: optionName(option.name, index),
+    sourceAdditionalPrice,
+    sourceStockQuantity: numberOrNull(option.sourceStockQuantity ?? option.stockQuantity),
+    status: optionStatus(option.status),
+    sortOrder: numberOrNull(option.sortOrder) ?? index,
+  };
+}
+
+function sourceOptionsFor(item, product) {
+  const options = Array.isArray(item.options) && item.options.length > 0
+    ? item.options
+    : Array.isArray(product.options) && product.options.length > 0
+      ? product.options
+      : [defaultSourceOption()];
+  return options.map(normalizeSourceOption);
+}
+
+function pricedOptionsFor(item, product, policy = DEFAULT_PRICING_POLICY) {
+  const sourcePrice = Number(item.sourcePrice || parsePrice(product.priceText));
+  const sourceOptions = sourceOptionsFor(item, product);
+  const pricedOptions = sourceOptions.map((option) => {
+    const sourceOptionPrice = sourcePrice + Number(option.sourceAdditionalPrice || 0);
+    const calculatedSalePrice = calculateBasePrice(sourceOptionPrice, policy);
+    return {
+      ...option,
+      sourceOptionPrice,
+      calculatedSalePrice,
+    };
+  });
+  const salePrices = pricedOptions
+    .map((option) => option.calculatedSalePrice)
+    .filter((price) => Number.isFinite(price) && price > 0);
+  const basePrice = salePrices.length === 0 ? 0 : Math.min(...salePrices);
+  return {
+    sourcePrice,
+    basePrice,
+    options: pricedOptions.map((option) => ({
+      sourceOptionCode: option.sourceOptionCode,
+      name: option.name,
+      sourceAdditionalPrice: option.sourceAdditionalPrice,
+      sourceStockQuantity: option.sourceStockQuantity,
+      status: option.status,
+      sortOrder: option.sortOrder,
+      sourceOptionPrice: option.sourceOptionPrice,
+      calculatedSalePrice: option.calculatedSalePrice,
+      additionalPrice: Math.max(0, option.calculatedSalePrice - basePrice),
+    })),
+  };
+}
+
+function manifestOption(option) {
+  return {
+    sourceOptionCode: option.sourceOptionCode,
+    name: option.name,
+    sourceAdditionalPrice: option.sourceAdditionalPrice,
+    sourceStockQuantity: option.sourceStockQuantity,
+    status: option.status,
+    sortOrder: option.sortOrder,
+    calculatedSalePrice: option.calculatedSalePrice,
+    additionalPrice: option.additionalPrice,
+  };
+}
+
 async function readCollectedProducts() {
   const entries = await readdir(DEFAULT_PRODUCTS_DIR, { withFileTypes: true });
   const products = [];
@@ -117,6 +201,7 @@ async function initManifest() {
   const products = await readCollectedProducts();
   const items = products.map((product) => {
     const sourcePrice = parsePrice(product.priceText);
+    const pricing = pricedOptionsFor({ sourcePrice, options: product.options }, product);
     return {
       itemNo: product.itemNo,
       import: false,
@@ -126,9 +211,8 @@ async function initManifest() {
       name: product.title,
       summary: summaryFor(product),
       sourcePrice,
-      basePrice: calculateBasePrice(sourcePrice),
-      optionName: "기본",
-      additionalPrice: 0,
+      basePrice: pricing.basePrice,
+      options: pricing.options.map(manifestOption),
       supplierName: product.sellerName || "도매꾹 공급처",
       productInfoNotice: "",
       shippingInfo: "",
@@ -190,22 +274,26 @@ async function ensureSupplier(args, suppliers, name) {
   return created;
 }
 
-function manifestIssue(item) {
+function manifestIssue(item, pricing) {
   if (!item.import) return "";
   if (!item.categoryCode) return "categoryCode is required";
   if (!item.summary) return "summary is required";
-  if (!Number.isFinite(Number(item.sourcePrice)) || Number(item.sourcePrice) <= 0) return "sourcePrice must be a positive number";
-  if (!Number.isFinite(Number(item.basePrice)) || Number(item.basePrice) <= 0) return "basePrice must be a positive number";
+  if (!Number.isFinite(Number(pricing.sourcePrice)) || Number(pricing.sourcePrice) <= 0) return "sourcePrice must be a positive number";
+  if (!Number.isFinite(Number(pricing.basePrice)) || Number(pricing.basePrice) <= 0) return "basePrice must be a positive number";
+  if (!pricing.options.length) return "options are required";
+  const invalidOption = pricing.options.find((option) => !option.name || !Number.isFinite(option.calculatedSalePrice) || option.calculatedSalePrice <= 0);
+  if (invalidOption) return `invalid option price: ${invalidOption.name || invalidOption.sourceOptionCode}`;
   if (item.status === "ACTIVE" && !item.productInfoNotice) return "ACTIVE import requires product notice";
   return "";
 }
 
 async function importItem(args, item, product, suppliers, products, policy) {
   if (!item.import) return { itemNo: item.itemNo, status: "SKIPPED", reason: "manifest import=false" };
-  item.sourcePrice = Number(item.sourcePrice || item.basePrice || parsePrice(product.priceText));
-  item.basePrice = normalizedBasePrice(item, item.sourcePrice, policy);
+  const pricing = pricedOptionsFor(item, product, policy);
+  item.sourcePrice = pricing.sourcePrice;
+  item.basePrice = pricing.basePrice;
   item.summary = sanitizePublicSummary(item.summary || summaryFor(product));
-  const issue = manifestIssue(item);
+  const issue = manifestIssue(item, pricing);
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
   if (products.some((existing) => existing.name === item.name)) {
     return { itemNo: item.itemNo, status: "SKIPPED", reason: "same product name already exists" };
@@ -218,21 +306,27 @@ async function importItem(args, item, product, suppliers, products, policy) {
       supplierId: supplier.id,
       name: item.name,
       summary: item.summary,
-      sourcePrice: item.sourcePrice,
-      basePrice: item.basePrice,
+      sourcePrice: pricing.sourcePrice,
+      basePrice: pricing.basePrice,
       categoryCode: item.categoryCode,
       status: item.status || "HIDDEN",
     }),
   });
 
-  await apiFetch(args, `/api/admin/products/${created.id}/options`, {
-    method: "POST",
-    body: JSON.stringify({
-      name: item.optionName || "기본",
-      additionalPrice: item.additionalPrice || 0,
-      status: "ACTIVE",
-    }),
-  });
+  for (const option of pricing.options) {
+    await apiFetch(args, `/api/admin/products/${created.id}/options`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: option.name,
+        additionalPrice: option.additionalPrice,
+        status: option.status,
+        sourceOptionCode: option.sourceOptionCode,
+        sourceAdditionalPrice: option.sourceAdditionalPrice,
+        sourceStockQuantity: option.sourceStockQuantity,
+        sortOrder: option.sortOrder,
+      }),
+    });
+  }
 
   const thumbnail = await uploadImage(args, created.id, product.thumbnailImagePath);
   await apiFetch(args, `/api/admin/products/${created.id}/images`, {
@@ -244,8 +338,9 @@ async function importItem(args, item, product, suppliers, products, policy) {
   });
 
   const detailBlocks = [];
-  for (let index = 0; index < product.detailImagePaths.length; index += 1) {
-    const uploaded = await uploadImage(args, created.id, product.detailImagePaths[index]);
+  const detailImagePaths = product.detailImagePaths || [];
+  for (let index = 0; index < detailImagePaths.length; index += 1) {
+    const uploaded = await uploadImage(args, created.id, detailImagePaths[index]);
     detailBlocks.push({ type: "IMAGE", imageUrl: uploaded.imageUrl, htmlContent: null, sortOrder: index, altText: item.name });
   }
   await apiFetch(args, `/api/admin/products/${created.id}/detail-blocks`, {
@@ -267,7 +362,15 @@ async function importItem(args, item, product, suppliers, products, policy) {
   }
 
   products.push(created);
-  return { itemNo: item.itemNo, status: "IMPORTED", productId: created.id, supplierId: supplier.id };
+  return {
+    itemNo: item.itemNo,
+    status: "IMPORTED",
+    productId: created.id,
+    supplierId: supplier.id,
+    sourcePrice: pricing.sourcePrice,
+    basePrice: pricing.basePrice,
+    optionCount: pricing.options.length,
+  };
 }
 
 async function runManifest(args) {
@@ -276,21 +379,24 @@ async function runManifest(args) {
   if (!args.apply) {
     const policy = await pricingPolicy(args);
     for (const item of manifest.items || []) {
-      const sourcePrice = Number(item.sourcePrice || item.basePrice || 0);
-      const checkedItem = {
-        ...item,
-        sourcePrice,
-        basePrice: normalizedBasePrice(item, sourcePrice, policy),
-      };
-      const issue = manifestIssue(checkedItem);
-      results.push({
-        itemNo: item.itemNo,
-        status: item.import ? (issue ? "FAILED" : "DRY_RUN") : "SKIPPED",
-        reason: item.import ? issue : "manifest import=false",
-        sourcePrice,
-        currentBasePrice: Number(item.basePrice || 0),
-        calculatedBasePrice: calculateBasePrice(sourcePrice, policy),
-      });
+      try {
+        const product = JSON.parse(await readFile(item.productFile, "utf8"));
+        const pricing = pricedOptionsFor(item, product, policy);
+        const issue = manifestIssue(item, pricing);
+        results.push({
+          itemNo: item.itemNo,
+          status: item.import ? (issue ? "FAILED" : "DRY_RUN") : "SKIPPED",
+          reason: item.import ? issue : "manifest import=false",
+          sourcePrice: pricing.sourcePrice,
+          currentBasePrice: Number(item.basePrice || 0),
+          calculatedBasePrice: pricing.basePrice,
+          optionCount: pricing.options.length,
+          minOptionSalePrice: pricing.basePrice,
+          maxOptionSalePrice: Math.max(...pricing.options.map((option) => option.calculatedSalePrice)),
+        });
+      } catch (error) {
+        results.push({ itemNo: item.itemNo, status: "FAILED", reason: error.message });
+      }
     }
     await writeFile(DEFAULT_RESULT, `${JSON.stringify(results, null, 2)}\n`);
     console.log(`dry-run 완료: ${results.length}개. 실제 적재는 --apply 필요`);

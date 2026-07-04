@@ -34,6 +34,18 @@ public class ProductOption {
 	@Column(name = "additional_price", nullable = false)
 	private long additionalPrice;
 
+	@Column(name = "source_option_code", length = 100)
+	private String sourceOptionCode;
+
+	@Column(name = "source_additional_price")
+	private Long sourceAdditionalPrice;
+
+	@Column(name = "source_stock_quantity")
+	private Long sourceStockQuantity;
+
+	@Column(name = "sort_order", nullable = false)
+	private int sortOrder;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private ProductOptionStatus status;
@@ -48,10 +60,27 @@ public class ProductOption {
 	}
 
 	public ProductOption(Product product, String name, long additionalPrice, ProductOptionStatus status) {
+		this(product, name, additionalPrice, status, null, null, null, 0);
+	}
+
+	public ProductOption(
+		Product product,
+		String name,
+		long additionalPrice,
+		ProductOptionStatus status,
+		String sourceOptionCode,
+		Long sourceAdditionalPrice,
+		Long sourceStockQuantity,
+		int sortOrder
+	) {
 		this.product = product;
 		this.name = name;
 		this.additionalPrice = additionalPrice;
 		this.status = status;
+		this.sourceOptionCode = sourceOptionCode;
+		this.sourceAdditionalPrice = sourceAdditionalPrice;
+		this.sourceStockQuantity = sourceStockQuantity;
+		this.sortOrder = sortOrder;
 	}
 
 	@PrePersist
@@ -67,8 +96,23 @@ public class ProductOption {
 	}
 
 	public void update(String name, long additionalPrice) {
+		update(name, additionalPrice, sourceOptionCode, sourceAdditionalPrice, sourceStockQuantity, sortOrder);
+	}
+
+	public void update(
+		String name,
+		long additionalPrice,
+		String sourceOptionCode,
+		Long sourceAdditionalPrice,
+		Long sourceStockQuantity,
+		int sortOrder
+	) {
 		this.name = name;
 		this.additionalPrice = additionalPrice;
+		this.sourceOptionCode = sourceOptionCode;
+		this.sourceAdditionalPrice = sourceAdditionalPrice;
+		this.sourceStockQuantity = sourceStockQuantity;
+		this.sortOrder = sortOrder;
 	}
 
 	public void updateStatus(ProductOptionStatus status) {
@@ -93,5 +137,21 @@ public class ProductOption {
 
 	public ProductOptionStatus getStatus() {
 		return status;
+	}
+
+	public String getSourceOptionCode() {
+		return sourceOptionCode;
+	}
+
+	public Long getSourceAdditionalPrice() {
+		return sourceAdditionalPrice;
+	}
+
+	public Long getSourceStockQuantity() {
+		return sourceStockQuantity;
+	}
+
+	public int getSortOrder() {
+		return sortOrder;
 	}
 }

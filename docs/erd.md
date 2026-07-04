@@ -346,9 +346,19 @@ Rules:
 - `product_id`
 - `name`
 - `additional_price`
+- `source_option_code`
+- `source_additional_price`
+- `source_stock_quantity`
+- `sort_order`
 - `status`: `ACTIVE` / `SOLD_OUT` / `STOPPED`
 - `created_at`
 - `updated_at`
+
+Rules:
+
+- `additional_price` is the customer-facing option price delta from product `base_price`.
+- Source metadata is for admin/import traceability only and must not be exposed by public customer APIs.
+- `source_stock_quantity` is a supplier-side reference value and is not used for checkout stock deduction in MVP.
 
 ### product_images
 

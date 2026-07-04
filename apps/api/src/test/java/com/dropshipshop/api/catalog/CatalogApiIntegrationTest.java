@@ -112,11 +112,25 @@ class CatalogApiIntegrationTest {
 					{
 					  "name": "Black / Large",
 					  "additionalPrice": 1000,
-					  "status": "ACTIVE"
+					  "status": "ACTIVE",
+					  "sourceOptionCode": "00",
+					  "sourceAdditionalPrice": 800,
+					  "sourceStockQuantity": 120,
+					  "sortOrder": 2
 					}
 					"""))
 			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.status", is("ACTIVE")));
+			.andExpect(jsonPath("$.status", is("ACTIVE")))
+			.andExpect(jsonPath("$.sourceOptionCode", is("00")))
+			.andExpect(jsonPath("$.sourceAdditionalPrice", is(800)))
+			.andExpect(jsonPath("$.sourceStockQuantity", is(120)))
+			.andExpect(jsonPath("$.sortOrder", is(2)));
+
+		mockMvc.perform(get("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.options[0].sourceOptionCode", is("00")))
+			.andExpect(jsonPath("$.options[0].sourceStockQuantity", is(120)));
 
 		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -190,6 +204,10 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
 			.andExpect(jsonPath("$.options", hasSize(1)))
+			.andExpect(jsonPath("$.options[0].sourceOptionCode").doesNotExist())
+			.andExpect(jsonPath("$.options[0].sourceAdditionalPrice").doesNotExist())
+			.andExpect(jsonPath("$.options[0].sourceStockQuantity").doesNotExist())
+			.andExpect(jsonPath("$.options[0].sortOrder").doesNotExist())
 			.andExpect(jsonPath("$.images", hasSize(2)))
 			.andExpect(jsonPath("$.productNoticeVersion", is(1)));
 

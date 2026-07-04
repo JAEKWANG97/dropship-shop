@@ -22,6 +22,13 @@ function numberValue(formData: FormData, name: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function optionalNumberValue(formData: FormData, name: string) {
+  const raw = text(formData, name);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function calculatedBasePrice(sourcePrice: number, policy: PricingPolicy) {
   const roundingUnit = policy.roundingUnit || 100;
   const rawPrice = sourcePrice * (1 + policy.totalMarkupRate / 100);
@@ -229,14 +236,24 @@ export async function updateAdminProductOption(formData: FormData) {
   const cookieHeader = (await cookies()).toString();
   let message = "옵션 정보를 변경했습니다.";
   try {
+    const body: Record<string, unknown> = {
+      name: text(formData, "name"),
+      additionalPrice: Number(text(formData, "additionalPrice") || "0"),
+      status: text(formData, "status") as ProductOptionStatus,
+      reason: text(formData, "reason"),
+    };
+    const sourceOptionCode = text(formData, "sourceOptionCode");
+    const sourceAdditionalPrice = optionalNumberValue(formData, "sourceAdditionalPrice");
+    const sourceStockQuantity = optionalNumberValue(formData, "sourceStockQuantity");
+    const sortOrder = optionalNumberValue(formData, "sortOrder");
+    if (sourceOptionCode) body.sourceOptionCode = sourceOptionCode;
+    if (sourceAdditionalPrice !== null) body.sourceAdditionalPrice = sourceAdditionalPrice;
+    if (sourceStockQuantity !== null) body.sourceStockQuantity = sourceStockQuantity;
+    if (sortOrder !== null) body.sortOrder = sortOrder;
+
     await apiSendWithCookie(`/api/admin/products/${productId}/options/${optionId}`, cookieHeader, {
       method: "PATCH",
-      body: JSON.stringify({
-        name: text(formData, "name"),
-        additionalPrice: Number(text(formData, "additionalPrice") || "0"),
-        status: text(formData, "status") as ProductOptionStatus,
-        reason: text(formData, "reason"),
-      }),
+      body: JSON.stringify(body),
     });
   } catch {
     message = "옵션 정보 변경에 실패했습니다.";

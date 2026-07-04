@@ -224,9 +224,20 @@ Suggested fields:
 - productId
 - name
 - additionalPrice
+- sourceOptionCode
+- sourceAdditionalPrice
+- sourceStockQuantity
+- sortOrder
 - status: ACTIVE / SOLD_OUT / STOPPED
 - createdAt
 - updatedAt
+
+Rules:
+
+- `additionalPrice` is the customer-facing sale delta from the product `basePrice`.
+- Source option metadata is retained for supplier/import traceability and admin review.
+- Source metadata must not be included in public product detail responses.
+- Source stock quantity is not a checkout inventory source in MVP.
 
 ## ProductDetailBlock
 
