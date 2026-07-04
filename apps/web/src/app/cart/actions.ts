@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { apiSendWithCookie } from "@/lib/api";
 import type { Cart, CartValidation } from "@/lib/cart";
+import { getCurrentUser } from "@/lib/session";
 
 function value(formData: FormData, name: string) {
   const raw = formData.get(name);
@@ -15,10 +16,24 @@ function messagePath(message: string) {
   return `/cart?message=${encodeURIComponent(message)}`;
 }
 
+function productRedirectPath(productId: string) {
+  const normalized = productId.trim();
+  if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(normalized)) {
+    return "/products";
+  }
+  return `/products/${normalized}`;
+}
+
 export async function addCartItem(formData: FormData) {
   const productOptionId = value(formData, "productOptionId");
+  const productId = value(formData, "productId");
   const quantity = Number(value(formData, "quantity") || "1");
   const intent = value(formData, "intent");
+  const session = await getCurrentUser();
+
+  if (!session) {
+    redirect(`/login?redirectTo=${encodeURIComponent(productRedirectPath(productId))}`);
+  }
 
   try {
     await apiSendWithCookie<Cart>("/api/cart/items", (await cookies()).toString(), {

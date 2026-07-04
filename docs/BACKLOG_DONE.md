@@ -4,6 +4,12 @@
 
 ## 2026-07-04
 
+- B-049 상품 상세 비로그인 구매 진입 개선
+  - 커밋: `feat: improve guest product purchase entry`
+  - 완료 내용: 상품 상세에서 비로그인 사용자도 옵션, 수량, 장바구니, 바로구매 버튼을 볼 수 있게 했다. 장바구니 서버 액션 초입에서 `getCurrentUser()`로 세션을 먼저 확인하고, 비로그인 제출은 `/login?redirectTo=/products/{productId}`로 이동시킨다. 게스트 장바구니는 만들지 않는다.
+  - 결정: 로그인 후 상품 상세 복귀는 유지하지만, 선택했던 옵션/수량 복원은 이번 범위에서 구현하지 않는다.
+  - 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/web && npx playwright test tests/e2e/product-detail-purchase-entry.spec.ts`, `cd apps/web && npx playwright test tests/e2e/visual-regression.spec.ts --project=desktop -g 'desktop product detail'`, `cd apps/api && ./gradlew test`, `git diff --check`
+  - 비고: `pnpm lint`는 이 프로젝트가 `package-lock.json` 기반이라 pnpm이 `node_modules`를 재구성하려다 build script 승인 단계에서 실패했다. npm 기준으로 복구 후 검증했다.
 - B-048 로컬 개발용 시드 계정 간편 로그인 도구
   - 커밋: `feat: add local seed dev login`
   - 완료 내용: local/dev 프로필과 `app.dev-login.enabled`를 모두 만족할 때만 `/api/dev/login`을 노출한다. 기존 시드 고객/관리자(`local-b003-customer`, `local-b003-admin`)를 찾아 `JwtAccessTokenService`로 JWT를 발급하고, OAuth 로그인과 같은 `ACCESS_TOKEN` HttpOnly cookie 속성을 재사용한다. Playwright E2E helper는 로컬에서 쿠키 env가 없으면 이 엔드포인트로 seed 쿠키를 받아온다.

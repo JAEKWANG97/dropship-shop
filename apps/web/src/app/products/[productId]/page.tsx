@@ -11,7 +11,6 @@ import {
   type ProductSummary,
 } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
-import { getCurrentUser } from "@/lib/session";
 import { ProductImage } from "../product-image";
 
 type ProductPageProps = {
@@ -39,9 +38,8 @@ async function loadRelatedProducts(productId: string) {
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
   const { productId } = await params;
-  const [{ product, error }, session, relatedProducts] = await Promise.all([
+  const [{ product, error }, relatedProducts] = await Promise.all([
     loadProduct(productId),
-    getCurrentUser(),
     loadRelatedProducts(productId),
   ]);
 
@@ -104,40 +102,31 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
           </div>
           {purchasable ? (
-            session ? (
-              <form action={addCartItem} className="cart-add-form">
-                <label>
-                  옵션
-                  <select name="productOptionId" required>
-                    {activeOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name} {formatOptionPrice(option.additionalPrice)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  수량
-                  <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
-                </label>
-                <div className="product-action-row">
-                  <button className="button" name="intent" value="cart" type="submit">
-                    장바구니
-                  </button>
-                  <button className="button primary" name="intent" value="checkout" type="submit">
-                    바로구매
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="notice">
-                <strong>로그인이 필요합니다</strong>
-                <span>장바구니와 주문은 소셜 로그인 후 이용할 수 있습니다.</span>
-                <Link className="button primary" href={`/login?redirectTo=${encodeURIComponent(`/products/${product.id}`)}`}>
-                  로그인하고 계속하기
-                </Link>
+            <form action={addCartItem} className="cart-add-form">
+              <input name="productId" type="hidden" value={product.id} />
+              <label>
+                옵션
+                <select name="productOptionId" required>
+                  {activeOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name} {formatOptionPrice(option.additionalPrice)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                수량
+                <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
+              </label>
+              <div className="product-action-row">
+                <button className="button" name="intent" value="cart" type="submit">
+                  장바구니
+                </button>
+                <button className="button primary" name="intent" value="checkout" type="submit">
+                  바로구매
+                </button>
               </div>
-            )
+            </form>
           ) : null}
         </div>
       </section>
