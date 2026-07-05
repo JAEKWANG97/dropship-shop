@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-05 (E2E drift 수리와 배포 smoke 분리)
+
+- 관련 항목: B-016, B-039, B-047, B-051
+- 작업: 로그인 화면 H1 변경과 상품 상세 모바일 플로팅 구매바 추가로 깨진 Playwright 기대값을 현재 UI 기준으로 고쳤다. 상품 상세 버튼 locator는 구매 form으로 scope를 좁혔고, 모바일 플로팅 구매바 노출/submit 동작 테스트를 추가했다.
+- 문제·고민: 기존 screenshot baseline은 로컬 시드 데이터 전용인데 배포 URL 데이터와 상세 이미지 길이가 달라 배포 smoke에서 실패했다. 배포 검증에 full-page snapshot을 섞으면 실제 장애가 아닌 데이터 차이를 장애처럼 보게 된다.
+- 해결방안: `visual-regression`과 screenshot 기반 readiness 테스트는 non-local target에서 명시 skip하도록 하고, 배포 URL 전용 `deploy-smoke.spec.ts`를 추가했다. 이 spec은 공개 route 200 렌더링, horizontal overflow, 상품 상세 구매 CTA, `/api/health`, `/api/dev/login` 404만 확인해 auth cookie, seed order, screenshot에 의존하지 않는다.
+- 검증: `cd apps/web && npm run lint`, `cd apps/web && npm run build`, `cd apps/web && npx playwright test --workers=2` 결과 `50 passed / 22 skipped`, `E2E_WEB_BASE_URL=https://coreable-saf.com npx playwright test deploy-smoke` 결과 `6 passed`, `E2E_WEB_BASE_URL=https://coreable-saf.com E2E_API_BASE_URL=https://coreable-saf.com npx playwright test tests/e2e/visual-regression.spec.ts tests/e2e/readiness-smoke.spec.ts --workers=2` 결과 `2 passed / 28 skipped`.
+- 결정: 배포 URL smoke는 route/overflow/CTA/health처럼 운영 데이터가 바뀌어도 안정적인 신호만 본다. screenshot baseline은 로컬 시드 기준으로만 관리하고, 배포 화면으로 baseline을 갱신하지 않는다.
+
 ## 2026-07-05 (배포 환경 smoke 점검)
 
 - 관련 항목: B-016, B-039, B-040

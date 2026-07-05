@@ -2,6 +2,17 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-05
+
+- B-039 AWS EC2 Docker CI/CD 배포
+  - 커밋: `test: repair e2e deployment smoke`
+  - 완료 내용: `coreable-saf.com` 배포를 GitHub Actions, GHCR, EC2 Docker Compose로 반복 가능하게 구성했다. API/Web Dockerfile, production compose, nginx reverse proxy, EC2 bootstrap, GitHub Actions verify/build/deploy, Cloudflare DNS와 Full(strict) HTTPS 연결을 완료했다.
+  - 검증: `15ab8e9` 배포 run 성공, API/Web/Postgres/nginx Up, public/loopback health 정상. E2E drift 수리 후 `E2E_WEB_BASE_URL=https://coreable-saf.com npx playwright test deploy-smoke` 결과 `6 passed`.
+- B-016 테스트 배포 및 운영 readiness 점검
+  - 커밋: `test: repair e2e deployment smoke`
+  - 완료 내용: 배포 서버 env key 목록, 업로드 host volume과 `APP_STORAGE_*` compose 주입, Flyway migration 최신 적용, backup/snapshot 상태, HTTPS, 공개 정책/회사정보/고객센터 경로를 확인했다. 배포 URL 전용 Playwright smoke를 snapshot/auth/seed 의존 없이 분리했다.
+  - 검증: 로컬 `npx playwright test --workers=2` 결과 `50 passed / 22 skipped`, 배포 URL `deploy-smoke` 결과 `6 passed`, 배포 URL readiness/visual spec은 snapshot/auth/seed 의존 테스트가 `28 skipped`, 공개 readiness `2 passed`로 실패 없이 종료.
+
 ## 2026-07-04
 
 - B-054 수집 상품 필터링 + 실제 데이터 선별 Import

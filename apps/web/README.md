@@ -72,8 +72,16 @@ running.
 npm run test:e2e
 ```
 
+Deployment smoke uses only public routes, public health, and the dev-login
+404 guard. It does not require auth cookies, seed orders, or screenshots:
+
+```bash
+E2E_WEB_BASE_URL=https://coreable-saf.com npx playwright test deploy-smoke
+```
+
 Screenshot baselines are intentional artifacts. Update them only after visually
-checking the changed screens:
+checking the changed screens. Snapshot specs are local-seed only and skip
+automatically when `E2E_WEB_BASE_URL` is not localhost:
 
 ```bash
 npx playwright test tests/e2e/visual-regression.spec.ts --project=desktop --update-snapshots

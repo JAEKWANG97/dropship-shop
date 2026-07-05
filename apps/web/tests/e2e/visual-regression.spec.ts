@@ -4,11 +4,13 @@ import {
   addCookie,
   expectNoHorizontalOverflow,
   firstAdminOrderLink,
+  isLocalTarget,
   requireCustomerCookie,
   requireSeedOrderByStatus,
 } from "./helpers";
 
 test("desktop home screenshot remains stable", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "desktop", "Desktop baselines run only in the desktop project.");
 
   await page.goto("/");
@@ -18,6 +20,7 @@ test("desktop home screenshot remains stable", async ({ page }, testInfo) => {
 });
 
 test("desktop product detail screenshot remains stable", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "desktop", "Desktop baselines run only in the desktop project.");
 
   const productId = await activeProductId();
@@ -28,6 +31,7 @@ test("desktop product detail screenshot remains stable", async ({ page }, testIn
 });
 
 test("desktop checkout bank-transfer screenshot remains stable", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "desktop", "Desktop baselines run only in the desktop project.");
   const [customerCookie, paymentPendingOrder] = await Promise.all([
     requireCustomerCookie(),
@@ -49,6 +53,7 @@ test("desktop checkout bank-transfer screenshot remains stable", async ({ page, 
 });
 
 test("desktop admin order detail screenshot remains stable", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "desktop", "Desktop baselines run only in the desktop project.");
   test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin screenshot smoke.");
 
@@ -73,6 +78,7 @@ test("desktop admin order detail screenshot remains stable", async ({ page, cont
 });
 
 test("mobile home screenshot remains stable", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Mobile baselines run only in the mobile project.");
 
   await page.goto("/");
@@ -82,6 +88,7 @@ test("mobile home screenshot remains stable", async ({ page }, testInfo) => {
 });
 
 test("mobile product detail screenshot remains stable", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Mobile baselines run only in the mobile project.");
 
   const productId = await activeProductId();
@@ -92,6 +99,7 @@ test("mobile product detail screenshot remains stable", async ({ page }, testInf
 });
 
 test("mobile checkout bank-transfer screenshot remains stable", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Mobile baselines run only in the mobile project.");
   const [customerCookie, paymentPendingOrder] = await Promise.all([
     requireCustomerCookie(),

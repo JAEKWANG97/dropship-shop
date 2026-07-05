@@ -11,6 +11,10 @@ export const REQUIRE_ADMIN_SEED_ORDERS = ["1", "true", "yes"].includes(
   REQUIRE_ADMIN_SEED_ORDERS_VALUE.toLowerCase(),
 );
 
+export function isLocalTarget() {
+  return WEB_BASE_URL.includes("localhost") || WEB_BASE_URL.includes("127.0.0.1");
+}
+
 export type ProductSummary = {
   id: string;
   name: string;

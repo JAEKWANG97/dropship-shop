@@ -4,6 +4,7 @@ import {
   addCookie,
   expectNoHorizontalOverflow,
   firstAdminOrderLink,
+  isLocalTarget,
 } from "./helpers";
 
 test("public customer pages render without horizontal overflow", async ({ page }) => {
@@ -106,6 +107,7 @@ test("admin order action failure shows backend reason", async ({ page, context }
 });
 
 test("mobile public smoke screenshots remain stable", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Screenshots are mobile-only.");
 
   await page.goto("/");
@@ -124,6 +126,7 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
 });
 
 test("mobile admin smoke screenshots remain stable", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Screenshots are mobile-only.");
   test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin screenshot smoke.");
 

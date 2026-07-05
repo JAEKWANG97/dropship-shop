@@ -202,6 +202,12 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 로그인/상품상세 모바일 테스트 locator는 현재 UI 기준으로 갱신한다.
 - 운영 데이터가 바뀌는 환경에서는 full-page snapshot 대신 핵심 viewport/overflow/CTA 존재 여부 중심으로 검증한다.
 
+Follow-up on 2026-07-05:
+
+- E2E drift를 수리하고 배포 URL 전용 `deploy-smoke.spec.ts`를 추가했다.
+- `E2E_WEB_BASE_URL=https://coreable-saf.com npx playwright test deploy-smoke` 결과 `6 passed`.
+- 배포 URL에서 `visual-regression`과 screenshot 기반 readiness test는 명시 skip되며, 공개 readiness는 `2 passed`, snapshot/auth/seed 의존 test는 `28 skipped`로 실패 없이 종료된다.
+
 ## Beta OAuth And Payment Readiness
 
 DS-76 local verification on 2026-06-29:
