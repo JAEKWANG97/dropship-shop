@@ -222,29 +222,33 @@ Tasks:
 
 ### B-037 배포 환경 부하 smoke
 
-Status: Todo
+Status: Done
 
 Notes:
-- Oracle VM/API가 실제로 떠 있는 뒤에만 진행한다.
-- 목적은 한계 측정이 아니라 상품 목록/상세/장바구니/체크아웃 기본 부하에서 장애가 나는지 확인하는 것이다.
+- 2026-07-05 `coreable-saf.com` 기준으로 k6 public smoke를 완료했다.
+- 범위는 비로그인 공개 페이지/API로 제한했다: `/`, `/products`, `/products/{id}`, `/api/products`, `/api/health`.
+- 5 VU 1분 -> 20 VU 2분에서 5xx 0%, p95 511.18ms, p99 887.50ms, RPS 6.15/s였다.
+- EC2 `t4g.micro`는 테스트 중 available memory가 180MB까지 내려가고 swap이 317MB까지 올라갔다. 오픈 전 `t4g.small` 업그레이드 후 같은 시나리오로 재측정한다.
 
 Tasks:
-- [ ] 배포 URL 기준 짧은 k6 smoke 시나리오를 만든다.
-- [ ] `/products`, `/products/{id}`, `/cart`, `/checkout` 응답 시간과 오류율을 확인한다.
-- [ ] 부하 기준과 VM 업그레이드 판단선을 문서에 남긴다.
+- [x] 배포 URL 기준 짧은 k6 smoke 시나리오를 만든다.
+- [x] 공개 페이지/API 응답 시간과 오류율을 확인한다.
+- [x] 부하 기준과 VM 업그레이드 판단선을 문서에 남긴다.
 
 ### B-038 실오픈 전 성능/보안 baseline 점검
 
-Status: Todo
+Status: Done
 
 Notes:
-- 테스트 배포와 HTTPS 연결 후 진행한다.
-- Lighthouse와 OWASP ZAP baseline만 우선 사용한다.
+- 2026-07-05 Lighthouse mobile baseline과 OWASP ZAP passive baseline을 완료했다.
+- Lighthouse Performance는 `/` 60, `/products` 73, 상품 상세 73이다. LCP가 18.8~24.3초로 가장 큰 개선 항목이다.
+- ZAP baseline은 `FAIL-NEW 0`, `WARN-NEW 15`였다. 차단 수준의 즉시 취약점은 확인되지 않았지만 HTML 보안 헤더 hardening은 실결제 전 후속 후보로 남긴다.
+- 세부 결과는 `docs/perf-security-baseline.md`에 기록했다.
 
 Tasks:
-- [ ] Lighthouse 모바일 성능/접근성 baseline을 확인한다.
-- [ ] 공개 페이지 ZAP baseline scan을 실행한다.
-- [ ] 실결제 오픈 전 차단 수준의 보안/정책 이슈를 정리한다.
+- [x] Lighthouse 모바일 성능/접근성 baseline을 확인한다.
+- [x] 공개 페이지 ZAP baseline scan을 실행한다.
+- [x] 실결제 오픈 전 차단 수준의 보안/정책 이슈를 정리한다.
 
 ## Working Rules
 

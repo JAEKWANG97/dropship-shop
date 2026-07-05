@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-05 (배포 부하/성능/보안 baseline)
+
+- 관련 항목: B-037, B-038
+- 작업: `scripts/load/k6-smoke.js`를 추가하고 `https://coreable-saf.com` 배포 URL 기준으로 public-only 부하 smoke, Lighthouse mobile baseline, OWASP ZAP baseline(passive) scan을 실행했다. 실제 주문/회원가입/문의 생성, active scan, 서버 쓰기 작업은 하지 않았다.
+- 검증: k6는 5 VU 1분 -> 20 VU 2분에서 1,173 requests, RPS 6.15/s, 5xx 0%, p95 511.18ms, p99 887.50ms로 통과했다. EC2 `t4g.micro`는 load 중 available memory가 180MB, swap used 317MB까지 내려가 메모리 여유가 작다는 기준값을 확보했다.
+- 성능 baseline: Lighthouse mobile 점수는 `/` Performance 60, `/products` 73, 상품 상세 73이다. Accessibility는 92~93, Best Practices는 100, SEO는 92~100이며 LCP 18.8~24.3초가 주요 개선 항목이다.
+- 보안 baseline: ZAP baseline은 `FAIL-NEW 0`, `WARN-NEW 15`, `PASS 52`였다. 즉시 차단 수준의 active exploit 증거는 없지만 HTML 응답의 CSP, HSTS, anti-clickjacking, `X-Content-Type-Options`, `X-Powered-By` 제거는 실결제 전 hardening 후보로 남겼다.
+- 결정: B-037/B-038은 측정과 기록 범위로 완료 처리한다. 보안 헤더 보강과 LCP 개선은 별도 후속 이슈로 분리한다.
+
 ## 2026-07-05 (E2E drift 수리와 배포 smoke 분리)
 
 - 관련 항목: B-016, B-039, B-047, B-051
