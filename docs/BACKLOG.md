@@ -20,6 +20,41 @@ Tasks:
 - [x] 배포 문서에 build cache 정책과 한계를 기록한다.
 - [x] cache warm-up 이후 앱 변경 배포 시간을 비교한다.
 
+### B-058 웹 보안 헤더 hardening
+
+Status: Todo
+
+Notes:
+- 2026-07-05 ZAP baseline(WARN 15)에서 HTML 응답에 보안 헤더가 없음을 확인했다. API 응답은 Spring Security 기본값으로 nosniff/X-Frame-Options DENY가 이미 붙어 있고, HTML(Next.js)만 비어 있다.
+- 대상 헤더: CSP, HSTS, X-Frame-Options(또는 CSP frame-ancestors), X-Content-Type-Options, Referrer-Policy, Permissions-Policy. x-powered-by 노출 제거 포함.
+- 적용 위치는 Next.js 설정(next.config)으로 한다. 로컬에서도 동일하게 적용되어 테스트 가능하고, nginx/서버 설정 변경 없이 배포 파이프라인만으로 반영된다.
+- CSP는 Next.js 인라인 스크립트 특성상 script-src 'unsafe-inline'을 허용하는 실용 수준에서 시작한다. 외부 도메인 스크립트/연결 차단이 핵심 가치다.
+- 세부 근거는 `docs/perf-security-baseline.md`의 ZAP 결과를 따른다.
+
+Tasks:
+- [ ] next.config에 보안 헤더를 추가하고 poweredByHeader를 끈다.
+- [ ] CSP 정책을 정의하고 전 페이지가 콘솔 위반 없이 렌더링되는지 확인한다.
+- [ ] 헤더 존재를 검증하는 자동 테스트를 추가한다 (deploy-smoke에서도 동작).
+- [ ] 배포 후 ZAP baseline을 재실행해 WARN 감소를 확인하고 문서에 기록한다.
+
+### B-059 AWS 계정/서버 보안 정리
+
+Status: In Progress
+
+Notes:
+- 2026-07-05 계정 점검 결과: 이 컴퓨터의 CLI는 IAM 사용자(cli-user, AdministratorAccess)이고 root 키가 아니다. root MFA는 켜져 있으나 root 액세스 키가 계정에 존재한다.
+- 서버 보안그룹은 80/443/22만 오픈이고 DB(5432)/API(8080)는 비노출로 양호했다.
+- 80/443은 Cloudflare 공개 IPv4 대역 15개만 허용하도록 좁혔다. origin IP 직접 접속은 타임아웃으로 차단 확인. Cloudflare 대역 변경 시 재동기화 필요 (https://www.cloudflare.com/ips-v4).
+- SSH 22 전세계 오픈(key-only)은 알려진 트레이드오프로 유지하고, SSM 전환은 B-052와 함께 검토한다.
+
+Tasks:
+- [x] 80/443 인바운드를 Cloudflare IP 대역으로 제한하고 사이트/직접 IP 접속을 검증한다.
+- [ ] root 액세스 키를 삭제한다 (콘솔에서 root 로그인 필요, 운영자 진행. 삭제 전 "마지막 사용" 확인).
+- [x] 미사용 보안그룹 5개를 삭제한다: RDP_Access, soup_backend, launch-wizard-1, swieogage-security-group, ssh_web_access. 2026-07-05 삭제 완료, 남은 보안그룹은 default와 coreable-saf-test-sg뿐.
+- [ ] EC2 unattended-upgrades(OS 자동 보안 패치) 활성 여부를 확인한다.
+- [ ] cli-user 액세스 키를 로테이션한다.
+- [ ] SSH를 SSM Session Manager로 전환할지 B-052에서 결정한다.
+
 ### B-002 소셜 로그인 실브라우저 검증
 
 Status: Todo
@@ -92,6 +127,45 @@ Tasks:
 - [ ] checkout form이 작은 화면에서 겹치지 않는지 확인한다.
 - [ ] 로그인/계정/주문/관리자 주요 화면의 빈 상태와 오류 상태를 점검한다.
 - [ ] 실제 상품 사진 fixture가 준비되면 local seed 이미지를 교체한다.
+
+### B-056 관리자 상품 검수 워크플로우와 목록 페이징
+
+Status: Todo
+
+Notes:
+- 도매꾹 import로 HIDDEN 상품이 대량으로 들어오는 상황에서, 운영자가 검수 후 ACTIVE 전환하는 흐름을 관리자 화면에서 끝낼 수 있게 한다.
+- 상품/주문 목록이 전체 로드 후 웹 필터 방식이라 상품 수백 개 기준으로 서버 측 페이징/필터로 전환한다.
+- 검수 상태는 별도 컬럼 없이 기존 ProductStatus를 재활용한다: HIDDEN=검수 대기, ACTIVE=판매, STOPPED=판매 안 함.
+- **검수 정책은 운영자와 결정 후 진행 (2주 후 미팅, 아래 질문지)**. 결정 전에는 페이징/정보 노출/원본 링크 저장 등 정책 무관 부분만 진행 가능하다.
+- 운영자 결정 필요 질문:
+  1. 첫 배치(HIDDEN 127개)를 전부 직접 볼 것인가, 시스템이 위험 플래그(인증 대상인데 인증정보 없음, 고시 미입력, 마진 이상치, 이미지 부족)를 붙인 것만 볼 것인가?
+  2. 플래그 없는 상품(PASS)의 일괄 판매 시작을 허용할 것인가?
+  3. 마진율이 몇 % 아래면 확인 대상으로 볼 것인가?
+  4. "판매 안 함"으로 뺀 상품을 나중에 다시 살릴 필요가 있는가?
+
+Tasks:
+- [ ] 관리자 상품 목록을 서버 측 페이징/상태·카테고리·공급처 필터로 전환한다.
+- [ ] products.source_url을 추가하고 import 스크립트가 채우게 한다.
+- [ ] 상품 목록/상세에 검수 핵심 정보를 노출한다: 원가/판매가/마진, 도매꾹 원본 링크, 옵션 수, 고시/이미지 입력 여부.
+- [ ] 관리자 주문 목록도 같은 페이징 방식으로 맞춘다.
+- [ ] 회귀 테스트와 Playwright smoke를 갱신한다.
+- [ ] (운영자 결정 후) 검수 플래그 계산과 전환 동선(개별/일괄)을 구현한다.
+
+### B-057 관리자 회원 관리와 알림 발송 이력
+
+Status: Todo
+
+Notes:
+- CS 대응의 기본 조회 수단이 없다. 고객 이름/이메일/전화로 계정을 찾고 주문 이력을 보는 화면이 필요하다.
+- SMS 발송 로그(SENT/FAILED/SKIPPED)와 실패 재발송 API는 B-011에서 만들었지만 화면이 없어 실패를 눈으로 확인할 수 없다.
+- 개인정보 표시는 CS에 필요한 최소 범위로 하고, 탈퇴/비식별화 계정은 구분 표시한다.
+
+Tasks:
+- [ ] 관리자 회원 목록/검색(이름, 이메일, 전화, 추천 코드)과 상세(주문 이력, 가입일, 상태)를 추가한다.
+- [ ] 관리자 알림 발송 이력 화면을 추가하고 실패 건 재발송 버튼을 기존 retry API에 연결한다.
+- [ ] 회원 상세와 주문 상세를 상호 링크한다.
+- [ ] 접근 권한(ADMIN)과 개인정보 노출 범위를 검토한다.
+- [ ] 회귀 테스트를 추가한다.
 
 ### B-026 초기 판매 상품 데이터 준비
 
@@ -193,9 +267,27 @@ Tasks:
 - [ ] 전환 실패 시 rollback(기존 컨테이너 유지) 동작을 확인한다.
 - [ ] 마이그레이션 expand-contract 규칙을 배포 문서에 기록한다.
 
+### B-055 인프라 비용 최적화 (업그레이드 후 약정)
+
+Status: Todo
+
+Notes:
+- 2026-07-05 smoke에서 t4g.micro의 available memory 271MB, swap 201MB 사용을 확인했다. 즉시 장애는 아니지만 오픈 전 t4g.small(2GB) 업그레이드를 전제로 한다.
+- Lightsail 이전은 하지 않는다. 월 5천원 수준 절감 대비 EC2 기준으로 만든 배포/백업/보안그룹/문서 재구축 비용이 크다.
+- 절감 수단은 이전이 아니라 약정이다. 사이즈 확정 후 1년 Compute Savings Plan(선결제 없음)으로 30~40% 할인해 Lightsail 수준 가격을 만든다.
+
+Tasks:
+- [ ] 오픈 직전 t4g.small로 업그레이드한다 (중지 → 타입 변경 → 시작, Elastic IP 유지, B-052 전제 조건).
+- [ ] AWS Budgets 월 예산 알람을 설정한다.
+- [ ] 오픈 후 1~2달 운영으로 t4g.small 사이즈가 맞는지 확인한다.
+- [ ] 사이즈 확정 후 1년 Compute Savings Plan을 적용한다.
+
 ### B-008 검색/필터 고도화
 
 Status: Todo
+
+Notes:
+- 관리자 상품/주문 목록의 페이징·필터는 B-056에서 먼저 처리한다. 이 항목은 고객 목록 검색 고도화 중심으로 남긴다.
 
 Tasks:
 - [ ] 고객 상품 목록 검색 기준을 상품명/요약/카테고리 중심으로 정리한다.
