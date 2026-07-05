@@ -149,6 +149,59 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - Flyway migration 적용 순서 확인
 - PostgreSQL backup/snapshot 상태 확인
 
+## Deployment Smoke Verification - 2026-07-05
+
+대상:
+
+- 배포 commit: `15ab8e9` (`feat: fill business profile legal values`)
+- 배포 URL: `https://coreable-saf.com`
+- 운영 서버 점검은 읽기 전용 명령으로만 수행했다. 서버 설정 변경, container restart, DB write는 하지 않았다.
+
+결과:
+
+- GitHub Actions: Pass
+  - Deploy run `28726833792` 성공.
+  - 실행 시간: `verify 3m10s`, `build-and-push 5m43s`, `deploy 1m09s`.
+  - B-040 기준값 `verify 2m58s`, `build-and-push 7m39s`, `deploy 1m12s`와 비교하면 `build-and-push`가 약 1m56s 감소했다.
+- Container health: Pass
+  - `api`, `web`, `postgres`, `nginx` 모두 Up.
+  - 배포 이미지는 API/Web 모두 `15ab8e9` tag로 기동 중이다.
+  - EC2 내부 `http://localhost:8080/api/health`, `http://localhost:8080/actuator/health/readiness` 성공.
+  - Cloudflare 경유 `https://coreable-saf.com/api/health`, `https://coreable-saf.com/actuator/health/readiness` 성공.
+- Memory snapshot: Pass with caution
+  - `free -m`: total 906MB, used 634MB, available 271MB, swap 2047MB 중 201MB 사용.
+  - `docker stats --no-stream`: API 약 260MiB/512MiB, Web 약 60MiB/192MiB, Postgres 약 17MiB/256MiB, nginx 약 4MiB/64MiB.
+  - 현재 smoke 기준 즉시 장애는 없지만 `t4g.micro` 메모리 여유는 작으므로 5xx, OOM, swap 증가를 계속 확인한다.
+- Env key completeness: Pass
+  - 서버 `/opt/coreable/.env` key 목록은 `infra/aws/ec2/env.example` key 목록과 일치한다.
+  - 값은 출력하거나 복사하지 않았다.
+- Storage path: Pass
+  - `APP_STORAGE_*`는 서버 `.env`가 아니라 compose environment로 API container에 주입된다.
+  - host upload path `/var/lib/coreable/uploads/products`와 API container path `/var/app/uploads/products`가 존재한다.
+  - `/uploads/products` public prefix는 compose에 설정되어 있다.
+- Migration validation: Pass
+  - 서버 Flyway schema history는 성공 migration 29개, latest `V29__add_product_option_source_metadata.sql`.
+  - 로컬 migration 최신 파일과 서버 적용 최신 version이 일치한다.
+- Public/legal routes: Pass
+  - `/`, `/products`, `/policies`, `/policies/terms`, `/policies/privacy`, `/policies/shipping`, `/policies/cancellation-refund`, `/policies/stock-risk`, `/company`, `/support` 모두 200.
+  - `/company`에 상호, 대표자, 사업자등록번호, 통신판매업 신고 면제, 사업장/반품 주소, AWS 호스팅, 고객센터 전화번호, 고객센터 이메일, 운영 시간이 노출된다.
+  - footer에서 이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책, 결제 후 품절 안내, 고객 문의 링크가 노출된다.
+  - `https://coreable-saf.com/api/dev/login?role=ADMIN`은 404로 응답해 dev login이 운영 URL에 노출되지 않는다.
+- Playwright deployment smoke: Fail
+  - 명령: `E2E_WEB_BASE_URL=https://coreable-saf.com E2E_API_BASE_URL=https://coreable-saf.com npm run test:e2e`
+  - 결과: `15 passed`, `41 skipped`, `8 failed`.
+  - Skip은 배포 URL에서 `E2E_CUSTOMER_COOKIE`, `E2E_ADMIN_COOKIE`, local seed order가 없어서 발생한 예상 skip이다.
+  - Fail 원인:
+    - `/login` 테스트가 예전 heading `로그인`을 기대하지만 운영 화면은 `현장에 필요한 안전용품을 바로 주문하세요` heading으로 변경됐다.
+    - 모바일 상품상세에 하단 고정 구매바가 추가되어 `장바구니` button locator가 2개 요소와 매칭된다.
+    - 운영 데이터와 상세 이미지 길이가 로컬 snapshot baseline과 달라 full-page screenshot snapshot이 실패한다.
+
+후속:
+
+- 배포 URL 전용 Playwright smoke는 snapshot test와 상태 변경/seed 의존 test를 분리해야 한다.
+- 로그인/상품상세 모바일 테스트 locator는 현재 UI 기준으로 갱신한다.
+- 운영 데이터가 바뀌는 환경에서는 full-page snapshot 대신 핵심 viewport/overflow/CTA 존재 여부 중심으로 검증한다.
+
 ## Beta OAuth And Payment Readiness
 
 DS-76 local verification on 2026-06-29:

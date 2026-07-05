@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-05 (배포 환경 smoke 점검)
+
+- 관련 항목: B-016, B-039, B-040
+- 작업: `15ab8e9` 배포 run과 EC2 운영 컨테이너, health endpoint, memory, env key 목록, storage volume, Flyway migration, 공개 법적/고객지원 경로를 읽기 전용으로 확인했다.
+- 검증: GitHub Actions Deploy run은 성공했고 실행 시간은 `verify 3m10s`, `build-and-push 5m43s`, `deploy 1m09s`였다. EC2의 API/Web/Postgres/nginx는 모두 Up이고, public/loopback health는 정상이다. Flyway는 `V29`까지 29개 migration이 성공 상태이며, 서버 env key 목록은 `infra/aws/ec2/env.example`과 일치한다.
+- 문제·고민: 배포 URL 기준 Playwright는 `15 passed`, `41 skipped`, `8 failed`로 실패했다. 실제 배포 장애라기보다 로그인 화면 H1 변경, 모바일 하단 구매바 추가에 따른 locator 모호성, 운영 데이터와 로컬 snapshot baseline 차이가 원인이다.
+- 결정: 이번 점검에서 Playwright smoke는 완료 처리하지 않는다. 배포 URL용 smoke는 snapshot과 seed/auth 의존 테스트를 분리하고, 운영 데이터가 바뀌어도 안정적인 route/overflow/CTA 중심 테스트로 다시 정리한다.
+- 후속작업: 로그인/상품상세 테스트 locator를 현재 UI 기준으로 고치고, 배포용 visual baseline 정책을 별도 정한다. `t4g.micro`는 현재 즉시 장애는 없지만 available memory가 작으므로 OOM, swap 증가, 5xx를 계속 관찰한다.
+
 ## 2026-07-05 (사업자 표기 실값 반영)
 
 - 관련 항목: B-030

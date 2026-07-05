@@ -6,18 +6,19 @@
 
 ### B-040 GitHub Actions Docker build 최적화
 
-Status: In Progress
+Status: Done
 
 Notes:
 - 현재 AWS 테스트 배포 병목은 EC2 pull/up이 아니라 GitHub Actions의 `build-and-push`, 특히 Web ARM64 Docker image build다.
 - 기준 실행 시간은 `verify 2m58s`, `build-and-push 7m39s`, `deploy 1m12s`다.
 - 1차 최적화는 Docker BuildKit GitHub Actions cache를 사용한다.
+- 2026-07-05 `15ab8e9` 배포 기준 실행 시간은 `verify 3m10s`, `build-and-push 5m43s`, `deploy 1m09s`다. Web image cache warm-up 이후 `build-and-push`는 기준 대비 약 1m56s 줄었다.
 
 Tasks:
 - [x] API Docker build에 GitHub Actions cache scope를 추가한다.
 - [x] Web Docker build에 GitHub Actions cache scope를 추가한다.
 - [x] 배포 문서에 build cache 정책과 한계를 기록한다.
-- [ ] cache warm-up 이후 앱 변경 배포 시간을 비교한다.
+- [x] cache warm-up 이후 앱 변경 배포 시간을 비교한다.
 
 ### B-039 AWS EC2 Docker CI/CD 배포
 
@@ -30,6 +31,8 @@ Notes:
 - S3/RDS/CloudFront는 테스트 URL 확보 뒤 필요 시 전환한다.
 - EC2 `43.200.135.171` 기준 Docker 배포와 host-local health check는 성공했다.
 - Cloudflare DNS는 proxied A record로 연결했고, 운영 기준 HTTPS는 nginx + Cloudflare Origin Certificate + Full (strict)로 전환한다.
+- 2026-07-05 `15ab8e9` 배포 run은 성공했고, Web/API/Postgres/nginx 컨테이너와 public health는 정상이다.
+- 배포 URL public route smoke는 `/`, `/products`, `/policies`, `/company`, `/support` 접근까지 정상이다. 단, 전체 Playwright smoke는 E2E 기대값 drift와 snapshot drift로 실패해 browser smoke task는 아직 완료 처리하지 않는다.
 
 Tasks:
 - [x] API/Web Dockerfile을 추가한다.
@@ -47,7 +50,7 @@ Tasks:
 
 ### B-016 테스트 배포 및 운영 readiness 점검
 
-Status: Todo
+Status: In Progress
 
 Notes:
 - `coreable-saf.com` 도메인은 확보됨.
@@ -55,17 +58,19 @@ Notes:
 - 아직 실결제 오픈 전이며, 외부 연동 준비용 운영 기준 배포로 본다.
 - MVP 결제는 Toss Payments가 아니라 고객 직접 계좌입금과 관리자 입금확인 흐름으로 전환한다.
 - Toss live 심사와 live key 전환은 후순위로 미루고, 통신판매업 신고와 실주문 운영 준비는 계좌입금 기준으로 확인한다.
+- 2026-07-05 배포 서버 env key 목록은 `infra/aws/ec2/env.example`과 일치한다. `APP_STORAGE_*`는 서버 `.env`가 아니라 compose environment로 고정 주입되며, host upload volume과 API container mount가 확인됐다.
+- Playwright smoke는 배포 URL 기준 실행했지만 `15 passed`, `41 skipped`, `8 failed`로 실패했다. 실패 원인은 로그인 화면 H1 변경에 따른 테스트 기대값 drift, 모바일 상품상세 플로팅 구매바 추가에 따른 locator 모호성, 운영 데이터/상세 이미지 길이 차이에 따른 snapshot drift다.
 
 Tasks:
 - [x] 테스트 배포 아키텍처를 확정한다.
-- [ ] production/staging env 변수 목록을 배포 서버에 등록한다.
-- [ ] 상품 이미지 local volume 경로와 `APP_STORAGE_*` 값을 확정한다.
+- [x] production/staging env 변수 목록을 배포 서버에 등록한다.
+- [x] 상품 이미지 local volume 경로와 `APP_STORAGE_*` 값을 확정한다.
 - [x] `/api/health`, readiness를 배포 환경에서 확인한다.
-- [ ] DB migration dry run을 확인한다.
+- [x] DB migration dry run을 확인한다.
 - [x] DB backup과 root volume snapshot 상태를 확인한다.
 - [x] Web/API 도메인과 HTTPS를 연결한다.
 - [ ] 배포 URL 기준 Playwright smoke를 실행한다.
-- [ ] 계좌입금 주문/입금확인 플로우 기준 공개 정책, 회사 정보, 고객센터 접근 경로를 확인한다.
+- [x] 계좌입금 주문/입금확인 플로우 기준 공개 정책, 회사 정보, 고객센터 접근 경로를 확인한다.
 - [x] 실주문 전 DB와 업로드 이미지 backup/restore 방법을 확인한다.
 
 ### B-002 소셜 로그인 실브라우저 검증
