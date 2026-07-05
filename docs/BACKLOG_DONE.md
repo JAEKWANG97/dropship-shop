@@ -4,6 +4,11 @@
 
 ## 2026-07-05
 
+- B-058 웹 보안 헤더 hardening
+  - 커밋: `test: harden web security headers`
+  - 완료 내용: Next.js `next.config.ts`에 웹 보안 헤더를 추가하고 `poweredByHeader`를 껐다. 적용 헤더는 HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, CSP다. CSP는 Next.js 인라인 스크립트 때문에 `script-src 'unsafe-inline'`, CSS/폰트는 기존 Pretendard CDN 때문에 `https://cdn.jsdelivr.net`만 최소 허용했다.
+  - 검증: 로컬 production `PORT=3001 npm run start` 기준 `curl -I` 헤더 확인, `E2E_WEB_BASE_URL=http://localhost:3001 E2E_API_BASE_URL=http://localhost:8080 npx playwright test --workers=2` 결과 `58 passed / 22 skipped`. 배포 후 `curl -I https://coreable-saf.com`, `E2E_WEB_BASE_URL=https://coreable-saf.com E2E_API_BASE_URL=https://coreable-saf.com npx playwright test deploy-smoke --workers=2` 결과 `8 passed`, ZAP baseline 재실행 결과 `FAIL 0`, `WARN 15 -> 14`.
+  - 비고: ZAP의 HTML anti-clickjacking, `X-Powered-By` 노출은 PASS로 바뀌었다. 남은 경고 중 `_next/static` 일부는 Cloudflare에 이전 무헤더 정적 chunk가 HIT로 남은 영향이고, `/uploads/products`는 API 응답이므로 이번 Next hardening 범위 밖이다.
 - B-039 AWS EC2 Docker CI/CD 배포
   - 커밋: `test: repair e2e deployment smoke`
   - 완료 내용: `coreable-saf.com` 배포를 GitHub Actions, GHCR, EC2 Docker Compose로 반복 가능하게 구성했다. API/Web Dockerfile, production compose, nginx reverse proxy, EC2 bootstrap, GitHub Actions verify/build/deploy, Cloudflare DNS와 Full(strict) HTTPS 연결을 완료했다.

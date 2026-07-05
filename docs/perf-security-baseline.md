@@ -134,3 +134,55 @@ Verdict:
 
 - No ZAP `FAIL` item and no clear active exploit evidence were found in passive baseline.
 - Security header hardening is the main follow-up before real payment launch. Candidate issue: `B-058 실결제 전 보안 헤더 hardening`.
+
+## B-058 Security Header Remeasurement
+
+- Time: 2026-07-05 16:16-16:19 KST
+- Code baseline: `af05e4c`
+- Deploy run: `28732843583`, success
+- Scope: Next.js web headers only. nginx, Cloudflare config, and Spring Security/API headers were not changed.
+
+Implemented web headers:
+
+| Header | Value |
+| --- | --- |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` |
+
+CSP decision:
+
+- The initial policy blocked Pretendard's existing CDN stylesheet from `https://cdn.jsdelivr.net`.
+- The final policy only relaxes `style-src` and `font-src` for `https://cdn.jsdelivr.net`.
+- `script-src 'unsafe-inline'` and `style-src 'unsafe-inline'` remain intentional MVP compromises for Next.js inline runtime/style behavior. External scripts, external connects, framing, foreign base URI, and foreign form actions remain blocked.
+
+Verification:
+
+| Check | Result |
+| --- | --- |
+| Local `curl -I http://localhost:3001/` | Web headers present, `x-powered-by` absent. |
+| Local production Playwright | `58 passed / 22 skipped`. |
+| Deployed `curl -I https://coreable-saf.com` | Web headers present, `x-powered-by` absent, `cf-cache-status: DYNAMIC`. |
+| Deployed `deploy-smoke` | `8 passed`. |
+| ZAP baseline | `FAIL-NEW 0`, `WARN-NEW 14`, `PASS 53`. |
+
+ZAP delta:
+
+| Alert | Before | After | Note |
+| --- | ---: | ---: | --- |
+| Missing Anti-clickjacking Header | 5 | 0 | Fixed for HTML. |
+| Server Leaks `X-Powered-By` | 5 | 0 | Fixed by `poweredByHeader: false`. |
+| Content Security Policy Header Not Set | 5 | 1 | Fixed for app HTML; remaining item is Cloudflare `/cdn-cgi/l/email-protection` 404. |
+| X-Content-Type-Options Header Missing | 5 | 5 | Remaining findings are cached/static assets such as `_next/static` or `robots.txt`, not app HTML. Local production serves these with headers; deployed `_next/static` can remain Cloudflare HIT from the previous no-header response until cache rollover/purge. |
+| Strict-Transport-Security Header Not Set | 5 | 5 | Remaining findings are static assets or `/uploads/products/**`. Uploads are proxied API responses and were outside the Next-only B-058 scope. |
+| Permissions Policy Header Not Set | 5 | 5 | Remaining findings are static assets. App HTML has the header. |
+| CSP `unsafe-inline` | 0 | 10 | Expected tradeoff from the chosen practical CSP. Nonce-based CSP is a future hardening option, not B-058 scope. |
+| Absence of Anti-CSRF Tokens | 5 | 5 | Still needs separate form/CSRF review before real payment. |
+
+Verdict:
+
+- B-058 closed the app HTML header gap and removed the most direct ZAP warnings for clickjacking and framework disclosure.
+- Remaining warnings are not a reason to roll back B-058. Follow-up candidates are Cloudflare cache purge/static header verification, API/upload HSTS parity, nonce-based CSP, and CSRF review.

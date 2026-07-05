@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-07-05 (웹 보안 헤더 hardening)
+
+- 관련 항목: B-058, B-038
+- 작업: Next.js `next.config.ts`에 HSTS, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, CSP를 추가하고 `poweredByHeader`를 껐다. `deploy-smoke`에는 `/` 응답 헤더 검증을 추가했고, 별도 Playwright smoke로 주요 고객/관리자 페이지의 CSP console violation을 잡도록 했다.
+- 문제·고민: 초기 CSP는 기존 Pretendard CDN `@import`를 막았다. 폰트를 유지하려면 CSP를 완화하거나 폰트를 self-hosting해야 한다. 이번 범위는 새 asset 이전이 아니라 보안 헤더 hardening이므로 `style-src`와 `font-src`에 `https://cdn.jsdelivr.net`만 최소 허용했다. `script-src/style-src 'unsafe-inline'`은 Next.js 인라인 런타임 특성상 nonce 미들웨어 없이 시작하기 위한 의도된 타협으로 남겼다.
+- 검증: `cd apps/web && npm run lint`는 기존 `<img>` warning 3건만 남고 통과, `cd apps/web && npm run build` 통과, 로컬 production `E2E_WEB_BASE_URL=http://localhost:3001 E2E_API_BASE_URL=http://localhost:8080 npx playwright test --workers=2` 결과 `58 passed / 22 skipped`. 배포 run `28732843583` 성공 후 `curl -I https://coreable-saf.com`에서 헤더와 `x-powered-by` 제거 확인, 배포 `deploy-smoke`는 `8 passed`, ZAP baseline은 `FAIL 0`, `WARN 15 -> 14`로 재측정했다.
+- 후속작업: 남은 ZAP 경고는 `_next/static` Cloudflare HIT 캐시, API/uploads 응답 경계, 의도된 `unsafe-inline`, CSRF token 리뷰로 분리한다. 실결제 전에는 Cloudflare 캐시 purge/static header 재확인, API/upload HSTS parity, nonce 기반 CSP 필요성을 검토한다.
+
 ## 2026-07-05 (AWS 계정/서버 보안 점검, B-059)
 
 - 관련 항목: B-059, B-038

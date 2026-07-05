@@ -20,23 +20,6 @@ Tasks:
 - [x] 배포 문서에 build cache 정책과 한계를 기록한다.
 - [x] cache warm-up 이후 앱 변경 배포 시간을 비교한다.
 
-### B-058 웹 보안 헤더 hardening
-
-Status: Todo
-
-Notes:
-- 2026-07-05 ZAP baseline(WARN 15)에서 HTML 응답에 보안 헤더가 없음을 확인했다. API 응답은 Spring Security 기본값으로 nosniff/X-Frame-Options DENY가 이미 붙어 있고, HTML(Next.js)만 비어 있다.
-- 대상 헤더: CSP, HSTS, X-Frame-Options(또는 CSP frame-ancestors), X-Content-Type-Options, Referrer-Policy, Permissions-Policy. x-powered-by 노출 제거 포함.
-- 적용 위치는 Next.js 설정(next.config)으로 한다. 로컬에서도 동일하게 적용되어 테스트 가능하고, nginx/서버 설정 변경 없이 배포 파이프라인만으로 반영된다.
-- CSP는 Next.js 인라인 스크립트 특성상 script-src 'unsafe-inline'을 허용하는 실용 수준에서 시작한다. 외부 도메인 스크립트/연결 차단이 핵심 가치다.
-- 세부 근거는 `docs/perf-security-baseline.md`의 ZAP 결과를 따른다.
-
-Tasks:
-- [ ] next.config에 보안 헤더를 추가하고 poweredByHeader를 끈다.
-- [ ] CSP 정책을 정의하고 전 페이지가 콘솔 위반 없이 렌더링되는지 확인한다.
-- [ ] 헤더 존재를 검증하는 자동 테스트를 추가한다 (deploy-smoke에서도 동작).
-- [ ] 배포 후 ZAP baseline을 재실행해 WARN 감소를 확인하고 문서에 기록한다.
-
 ### B-059 AWS 계정/서버 보안 정리
 
 Status: In Progress
