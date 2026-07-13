@@ -30,6 +30,16 @@ sms:
     from-number: ${SMS_SENS_FROM_NUMBER:}
 
 app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
+  inquiry:
+    lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET:local-inquiry-lookup-secret-change-me-123456}
+  email:
+    from-address: ${EMAIL_FROM_ADDRESS:contact@coreable-saf.com}
+    ses:
+      enabled: ${EMAIL_SES_ENABLED:false}
+      region: ${EMAIL_SES_REGION:ap-northeast-2}
   seed:
     enabled: ${APP_SEED_ENABLED:false}
   dev-login:

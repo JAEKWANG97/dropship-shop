@@ -14,6 +14,7 @@ import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.support.domain.CustomerInquiry;
 import com.dropshipshop.api.user.domain.UserAccount;
 
 @Service
@@ -57,11 +58,30 @@ public class NotificationService {
 			paymentGroup == null ? null : paymentGroup.getId(),
 			claim == null ? null : claim.getId(),
 			refund == null ? null : refund.getId(),
+			null,
 			type,
 			NotificationChannel.SMS,
 			recipient(user, order),
 			type.name().toLowerCase(),
 			payload(order, paymentGroup, claim, refund, type, message)
+		));
+		eventPublisher.publishEvent(new NotificationDispatchRequested(log.getId()));
+		return log;
+	}
+
+	public NotificationLog customerInquiryAnswered(CustomerInquiry inquiry) {
+		NotificationLog log = notificationLogRepository.saveAndFlush(new NotificationLog(
+			null,
+			null,
+			null,
+			null,
+			null,
+			inquiry.getId(),
+			NotificationType.CUSTOMER_INQUIRY_ANSWERED,
+			NotificationChannel.EMAIL,
+			inquiry.getEmail(),
+			"customer_inquiry_answered",
+			"message=" + inquiry.getAnswer()
 		));
 		eventPublisher.publishEvent(new NotificationDispatchRequested(log.getId()));
 		return log;
@@ -113,6 +133,7 @@ public class NotificationService {
 			case DELAY_NOTICE -> "[코어블SAF] 출고 지연 중입니다. 확인 후 안내드리겠습니다";
 			case CLAIM_STATUS_CHANGED -> "[코어블SAF] 클레임 처리 상태가 변경되었습니다. 주문상세 확인";
 			case REFUND_COMPLETED -> "[코어블SAF] 환불 완료 처리되었습니다. 주문상세 확인";
+			case CUSTOMER_INQUIRY_ANSWERED -> "[코어블SAF] 고객 문의 답변이 등록되었습니다";
 			case MARKETING -> "[코어블SAF] 안내 메시지입니다";
 		};
 	}

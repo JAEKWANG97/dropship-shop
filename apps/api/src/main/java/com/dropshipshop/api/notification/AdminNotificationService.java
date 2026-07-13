@@ -38,8 +38,8 @@ class AdminNotificationService {
 	NotificationLog retry(UUID notificationId) {
 		NotificationLog log = notificationLogRepository.findById(notificationId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
-		if (log.getStatus() != NotificationStatus.FAILED) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only failed notifications can be retried");
+		if (log.getStatus() != NotificationStatus.FAILED && log.getStatus() != NotificationStatus.SKIPPED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only failed or skipped notifications can be retried");
 		}
 		log.markPendingForRetry();
 		notificationLogRepository.saveAndFlush(log);

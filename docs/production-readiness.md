@@ -35,6 +35,11 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `SMS_SENS_SECRET_KEY` | Naver Cloud API secret key. 서버에서만 사용 |
 | `SMS_SENS_SERVICE_ID` | SENS SMS service id |
 | `SMS_SENS_FROM_NUMBER` | SENS에 등록된 발신번호 |
+| `EMAIL_SES_ENABLED` | 고객 문의 답변 AWS SES 발송 활성화. SES 도메인 인증과 production access 후 `true` |
+| `EMAIL_SES_REGION` | SES region. 기본값 `ap-northeast-2` |
+| `EMAIL_FROM_ADDRESS` | 문의 답변 발신/회신 주소. 기본값 `contact@coreable-saf.com` |
+| `APP_PUBLIC_BASE_URL` | 문의 조회 링크에 사용하는 공개 웹 origin. 운영값 `https://coreable-saf.com` |
+| `APP_INQUIRY_LOOKUP_SECRET` | 문의 조회 HMAC secret. 32자 이상 랜덤 값이며 변경 시 기존 조회 링크가 무효화됨 |
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | B-001 Toss 재도입 시 frontend 결제창 호출에 사용. 현재 필수 아님 |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
 | `APP_INTERNAL_SYNC_TOKEN` | 내부 배송조회 동기화 API 호출용 shared token. 서버/스케줄러에서만 사용 |
@@ -148,6 +153,8 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `DATABASE_*`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
 - B-001 Toss 경로를 활성화하는 배포에서만 `PAYMENTS_TOSS_*`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 확인
 - `SMS_SENS_*` 설정과 SENS 발신번호 승인 상태 확인
+- SES `coreable-saf.com` identity/DKIM과 production access, EC2 role의 제한된 `ses:SendEmail` 권한 확인
+- 실제 문의 답변 이메일 도착, 조회 링크, `FAILED`/`SKIPPED` 재시도 확인
 - Flyway migration 적용 순서 확인
 - PostgreSQL backup/snapshot 상태 확인
 

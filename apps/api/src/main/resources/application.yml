@@ -22,6 +22,15 @@ management:
         enabled: true
 
 app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
+  inquiry:
+    lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET:local-inquiry-lookup-secret-change-me-123456}
+    consent-policy-version: support-inquiry-privacy-2026-07-13
+  email:
+    from-address: ${EMAIL_FROM_ADDRESS:contact@coreable-saf.com}
+    ses:
+      enabled: ${EMAIL_SES_ENABLED:false}
+      region: ${EMAIL_SES_REGION:ap-northeast-2}
   auth:
     jwt-issuer: dropship-shop-api
     access-token-cookie-name: ACCESS_TOKEN

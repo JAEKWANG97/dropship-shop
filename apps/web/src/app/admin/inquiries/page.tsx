@@ -1,46 +1,45 @@
-import { ApiError, apiGetWithCookie } from "@/lib/api";
+import Link from "next/link";
 import { cookies } from "next/headers";
+import { ApiError, apiGetWithCookie } from "@/lib/api";
+import { AdminInquiry, InquiryStatus, inquiryStatusLabel } from "./model";
 
-type CustomerInquiry = {
-  inquiryId: string;
-  customerName: string;
-  email: string;
-  phone: string | null;
-  subject: string;
-  message: string;
-  createdAt: string;
-};
+type CustomerInquiryListResponse = { inquiries: AdminInquiry[] };
+type PageProps = { searchParams: Promise<{ status?: string }> };
 
-type CustomerInquiryListResponse = {
-  inquiries: CustomerInquiry[];
-};
+const statuses: InquiryStatus[] = ["RECEIVED", "IN_PROGRESS", "ANSWERED", "CLOSED"];
 
-async function loadInquiries() {
+async function loadInquiries(status?: InquiryStatus) {
   try {
-    const data = await apiGetWithCookie<CustomerInquiryListResponse>(
-      "/api/admin/customer-inquiries",
-      (await cookies()).toString(),
-    );
+    const path = status ? `/api/admin/customer-inquiries?status=${status}` : "/api/admin/customer-inquiries";
+    const data = await apiGetWithCookie<CustomerInquiryListResponse>(path, (await cookies()).toString());
     return { error: false as const, inquiries: data.inquiries };
   } catch (error) {
-    if (error instanceof ApiError) {
-      return { error: true as const, inquiries: [] };
-    }
-    return { error: true as const, inquiries: [] };
+    return { error: error instanceof ApiError, inquiries: [] };
   }
 }
 
-export default async function AdminInquiriesPage() {
-  const { error, inquiries } = await loadInquiries();
+export default async function AdminInquiriesPage({ searchParams }: PageProps) {
+  const query = await searchParams;
+  const selectedStatus = statuses.includes(query.status as InquiryStatus) ? (query.status as InquiryStatus) : undefined;
+  const { error, inquiries } = await loadInquiries(selectedStatus);
 
   return (
     <div className="admin-page">
       <div className="admin-heading">
         <div>
           <h1>고객 문의</h1>
-          <p>사이트 고객 문의 접수 내역을 확인합니다.</p>
+          <p>접수된 문의의 진행 상태와 답변을 관리합니다.</p>
         </div>
       </div>
+
+      <nav className="admin-filter-links" aria-label="문의 상태 필터">
+        <Link className={!selectedStatus ? "active" : ""} href="/admin/inquiries">전체</Link>
+        {statuses.map((status) => (
+          <Link className={selectedStatus === status ? "active" : ""} href={`/admin/inquiries?status=${status}`} key={status}>
+            {inquiryStatusLabel[status]}
+          </Link>
+        ))}
+      </nav>
 
       {error ? (
         <div className="notice danger">
@@ -51,37 +50,28 @@ export default async function AdminInquiriesPage() {
 
       <section className="admin-panel">
         <div className="admin-panel-head">
-          <h2>접수 내역</h2>
+          <h2>{selectedStatus ? inquiryStatusLabel[selectedStatus] : "전체 문의"}</h2>
           <span>총 {inquiries.length}건</span>
         </div>
         <div className="admin-inquiry-list">
           {inquiries.map((inquiry) => (
-            <article className="admin-inquiry-card" key={inquiry.inquiryId}>
+            <Link className="admin-inquiry-card" href={`/admin/inquiries/${inquiry.inquiryId}`} key={inquiry.inquiryId}>
               <div>
                 <strong>{inquiry.subject}</strong>
-                <time dateTime={inquiry.createdAt}>{new Date(inquiry.createdAt).toLocaleString("ko-KR")}</time>
+                <span className={`inquiry-status ${inquiry.status.toLowerCase()}`}>{inquiryStatusLabel[inquiry.status]}</span>
               </div>
               <dl>
-                <div>
-                  <dt>고객</dt>
-                  <dd>{inquiry.customerName}</dd>
-                </div>
-                <div>
-                  <dt>이메일</dt>
-                  <dd>{inquiry.email}</dd>
-                </div>
-                <div>
-                  <dt>연락처</dt>
-                  <dd>{inquiry.phone ?? "-"}</dd>
-                </div>
+                <div><dt>고객</dt><dd>{inquiry.customerName}</dd></div>
+                <div><dt>이메일</dt><dd>{inquiry.email}</dd></div>
+                <div><dt>접수</dt><dd>{new Date(inquiry.createdAt).toLocaleString("ko-KR")}</dd></div>
               </dl>
               <p>{inquiry.message}</p>
-            </article>
+            </Link>
           ))}
           {inquiries.length === 0 ? (
             <div className="admin-empty compact">
-              <strong>접수된 문의가 없습니다</strong>
-              <span>고객 문의가 접수되면 이 영역에 표시됩니다.</span>
+              <strong>해당 상태의 문의가 없습니다</strong>
+              <span>새 문의가 접수되거나 상태가 변경되면 표시됩니다.</span>
             </div>
           ) : null}
         </div>

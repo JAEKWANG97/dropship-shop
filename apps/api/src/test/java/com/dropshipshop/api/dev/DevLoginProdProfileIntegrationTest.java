@@ -29,6 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
 	"app.storage.local.upload-dir=build/test-product-images-dev-login-prod",
 	"app.internal.sync-token=test-internal-sync-token",
 	"app.cors.allowed-origins=http://localhost:3000",
+	"app.public-base-url=http://localhost:3000",
+	"app.inquiry.lookup-secret=test-inquiry-lookup-secret-at-least-32-characters",
 	"app.auth.jwt-secret=test-prod-jwt-secret-for-dev-login-guard",
 	"app.auth.success-redirect-uri=http://localhost:3000/auth/callback/success",
 	"app.oauth.google.client-id=test-google-client",

@@ -1,5 +1,23 @@
 # Decision Log
 
+## 2026-07-13: Customer Inquiry Consent, Retention, And Reply Channel
+
+Decision:
+
+Public customer inquiries require explicit consent for the disclosed inquiry-processing items. Store consent version/time and delete inquiry records three years after receipt. Admins process one latest answer through `RECEIVED`, `IN_PROGRESS`, `ANSWERED`, and `CLOSED`; customers receive the answer through AWS SES email and an HMAC-token-protected lookup page.
+
+Context:
+
+The existing public form stored contact and message data without consent evidence, while the admin page only listed raw inquiries. This could not complete customer support operations or prove what an anonymous customer accepted.
+
+Consequences:
+
+- The inquiry disclosure version is `support-inquiry-privacy-2026-07-13`; existing rows keep null consent evidence.
+- The same normalized email is limited to three submissions per ten minutes. CAPTCHA remains deferred until actual abuse requires it.
+- Lookup tokens are derived with `APP_INQUIRY_LOOKUP_SECRET`, placed in URL fragments, and never stored in notification payloads.
+- Answer storage commits before email dispatch. Failed or disabled email remains retryable while the customer lookup page still shows the answer.
+- B-061 remains in progress until SES domain/DKIM verification, production access, and a real delivery test are complete.
+
 ## 2026-07-13: Bank Transfer Legal Disclosure Baseline
 
 Decision:

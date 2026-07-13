@@ -49,8 +49,15 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
             <textarea name="message" required maxLength={2000} rows={8} />
           </label>
           <label className="support-consent wide">
-            <input type="checkbox" required />
-            문의 처리를 위해 입력한 개인정보를 수집·이용하는 데 동의합니다.
+            <input name="privacyConsent" type="checkbox" value="true" required />
+            <span>
+              <strong>개인정보 수집·이용에 동의합니다. (필수)</strong>
+              <small>
+                문의 답변과 분쟁 처리를 위해 이름, 이메일, 제목, 문의 내용을 수집하며 연락처는 선택 항목입니다.
+                접수일로부터 3년간 보관하며 동의를 거부할 수 있으나 문의 접수는 불가합니다.
+              </small>
+              <Link href="/policies/privacy">개인정보처리방침 보기</Link>
+            </span>
           </label>
           <div className="admin-form-actions wide">
             <SubmitButton className="button primary" pendingLabel="접수 중...">

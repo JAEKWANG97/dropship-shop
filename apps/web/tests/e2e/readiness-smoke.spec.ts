@@ -26,6 +26,24 @@ test("public customer pages render without horizontal overflow", async ({ page }
   }
 });
 
+test("public inquiry requires consent and opens the protected lookup page", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Inquiry mutation runs once in the desktop project.");
+
+  await page.goto("/support");
+  await expect(page.getByText("접수일로부터 3년간 보관")).toBeVisible();
+  await page.getByLabel("이름", { exact: true }).fill("E2E 고객");
+  await page.getByLabel("이메일", { exact: true }).fill(`e2e-inquiry-${Date.now()}@example.com`);
+  await page.getByLabel("제목", { exact: true }).fill("E2E 문의");
+  await page.getByLabel("문의 내용", { exact: true }).fill("문의 접수와 조회 링크를 확인합니다.");
+  await page.getByRole("checkbox", { name: /개인정보 수집·이용/ }).check();
+  await page.getByRole("button", { name: "문의 접수" }).click();
+
+  await expect(page).toHaveURL(/\/support\/inquiries\/[0-9a-f-]+#token=/);
+  await expect(page.getByText("E2E 문의")).toBeVisible();
+  await expect(page.getByText("접수", { exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("customer account pages render with a session cookie", async ({ page, context }) => {
   test.skip(!process.env.E2E_CUSTOMER_COOKIE, "Set E2E_CUSTOMER_COOKIE to run customer auth smoke.");
 
@@ -56,6 +74,14 @@ test("admin pages render with an admin session cookie", async ({ page, context }
   for (const route of routes) {
     await page.goto(route);
     await expect(page.locator("h1").first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  }
+
+  await page.goto("/admin/inquiries");
+  const firstInquiry = page.locator(".admin-inquiry-card").first();
+  if (await firstInquiry.count()) {
+    await firstInquiry.click();
+    await expect(page.getByRole("heading", { name: "문의 내용" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
 });

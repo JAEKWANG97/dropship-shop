@@ -19,6 +19,7 @@ final class NotificationDtos {
 	record AdminNotificationResponse(
 		UUID notificationId,
 		UUID orderId,
+		UUID customerInquiryId,
 		NotificationType type,
 		NotificationChannel channel,
 		NotificationStatus status,

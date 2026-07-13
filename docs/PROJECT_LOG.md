@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-14 00:10 KST
+
+- 관련 항목: B-061
+- 작업: 고객 문의를 `RECEIVED`, `IN_PROGRESS`, `ANSWERED`, `CLOSED` 상태로 처리하고 개인정보 동의 증적, 3년 보관 만료, 관리자 메모와 최신 답변을 저장하도록 확장했다. 관리자는 문의 상세에서 처리하고, 고객은 URL fragment의 HMAC 토큰으로 제한된 답변 화면을 조회한다. 답변 이메일은 AWS SES 발송 이력과 재시도 흐름에 연결했다.
+- 문제·고민: 답변 저장과 외부 이메일 발송을 한 트랜잭션으로 묶으면 SES 장애가 고객센터 처리 결과까지 롤백할 수 있다. 브라우저 조회 API를 직접 호출하면 CSP `connect-src 'self'`에도 어긋나고 조회 토큰이 외부 요청 경계로 확산된다. 기존 문의에는 실제 동의 증적이 없으므로 migration에서 이를 임의 생성해서도 안 된다.
+- 해결방안: 답변은 먼저 커밋하고 `AFTER_COMMIT` 알림에서 이메일을 발송해 실패를 `FAILED` 또는 비활성 환경의 `SKIPPED`로 기록했다. Web은 `/api` same-origin rewrite를 사용하고 조회 토큰은 fragment에서 읽어 POST body로만 전달한다. V30은 기존 행을 `RECEIVED`로 전환하되 동의 버전과 시각은 null로 유지하고, 만료 삭제 시 알림 참조는 `ON DELETE SET NULL`로 보존한다.
+- 검증: 전체 API 테스트와 PostgreSQL Testcontainers migration smoke, Web lint/build를 통과했다. production build 기준 Playwright 기능 smoke는 `62 passed / 2 skipped`였고 공개 문의 접수·조회와 관리자 목록·상세를 확인했다. 기존 full-page screenshot baseline은 현재 로컬 상품/주문 데이터와 달라 별도로 갱신이 필요하다.
+- 후속작업: SES 도메인/DKIM 인증, production access 승인, EC2 role의 발신 identity 제한 권한, 실제 외부 이메일 도착과 관리자 재시도를 확인한 뒤 B-061을 완료 처리한다.
+
 ## 2026-07-13 23:22 KST
 
 - 관련 항목: B-030

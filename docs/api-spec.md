@@ -545,13 +545,17 @@ Rules:
 | `GET` | `/api/business-profile` | Public | Implemented | Active business disclosure |
 | `GET` | `/api/privacy-processing-items` | Public | Implemented | Active privacy processing table |
 | `POST` | `/api/customer-inquiries` | Public | Implemented | Create customer support inquiry |
+| `POST` | `/api/customer-inquiries/{inquiryId}/lookup` | Public lookup token | Implemented | Read customer-safe inquiry status and latest answer |
 | `GET` | `/api/admin/policies` | `ADMIN` | Implemented | Admin policy document list |
 | `POST` | `/api/admin/policies` | `ADMIN` | Implemented | Create policy draft |
 | `PATCH` | `/api/admin/policies/{policyId}` | `ADMIN` | Implemented | Update policy draft |
 | `POST` | `/api/admin/policies/{policyId}/activate` | `ADMIN` | Implemented | Activate policy version |
 | `PATCH` | `/api/admin/business-profile` | `ADMIN` | Planned | Update business disclosure |
 | `PUT` | `/api/admin/privacy-processing-items` | `ADMIN` | Planned | Replace privacy processing table |
-| `GET` | `/api/admin/customer-inquiries` | `ADMIN` | Implemented | List customer support inquiries |
+| `GET` | `/api/admin/customer-inquiries?status=...` | `ADMIN` | Implemented | List and filter customer support inquiries |
+| `GET` | `/api/admin/customer-inquiries/{inquiryId}` | `ADMIN` | Implemented | Customer support inquiry detail |
+| `PATCH` | `/api/admin/customer-inquiries/{inquiryId}/status` | `ADMIN` | Implemented | Change inquiry processing status and memo |
+| `POST` | `/api/admin/customer-inquiries/{inquiryId}/answer` | `ADMIN` | Implemented | Save latest answer and queue customer email |
 | `GET` | `/api/admin/referrals` | `ADMIN` | Implemented | List registered referral relationships |
 
 Rules:
@@ -565,7 +569,11 @@ Rules:
 - Policy pages are available from customer menu and footer.
 - Policy documents have version and effective date.
 - Checkout stores policy versions per payment group.
-- Customer inquiry MVP stores name, email, optional phone, subject, message, and created timestamp. Reply workflow is planned later.
+- Customer inquiry creation requires explicit privacy consent and stores the disclosed policy version, consent time, and three-year retention expiry.
+- Inquiry status is `RECEIVED`, `IN_PROGRESS`, `ANSWERED`, or `CLOSED`; a closed inquiry must be reopened before answering.
+- Public lookup requires an HMAC token and never exposes customer contact, consent evidence, admin memo, or handler id.
+- The same normalized email can create at most three inquiries in ten minutes. Further requests return `429 RATE_LIMITED`.
+- Answer email delivery is logged separately and does not roll back the stored answer when delivery fails.
 - Actual legal wording requires launch review.
 
 ## Notification And Audit APIs
@@ -575,7 +583,7 @@ Rules:
 | `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Implemented | Order status transition history |
 | `GET` | `/api/admin/actions` | `ADMIN` | Implemented | Admin order action history |
 | `GET` | `/api/admin/notifications?status=FAILED` | `ADMIN` | Implemented | Notification log search, optionally filtered by status |
-| `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Implemented | Retry failed notification |
+| `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Implemented | Retry failed or skipped notification |
 | `POST` | `/api/admin/orders/{orderId}/delay-notice` | `ADMIN` | Implemented | Send manual supplier delay notice before shipment |
 
 Rules:

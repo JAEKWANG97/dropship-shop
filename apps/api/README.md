@@ -37,7 +37,7 @@ For local SMS OTP testing, leave `SMS_SENS_ENABLED=false` to use the development
 
 - Production runs with `SPRING_PROFILES_ACTIVE=prod`.
 - Required production variables are documented in [Production Readiness](../../docs/production-readiness.md).
-- The `prod` profile requires `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `PAYMENTS_TOSS_SECRET_KEY`, `SMS_SENS_*`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_JWT_SECRET`, `APP_AUTH_SUCCESS_REDIRECT_URI`, and OAuth provider credentials.
+- The `prod` profile requires database, CORS, auth/OAuth, `APP_PUBLIC_BASE_URL`, and `APP_INQUIRY_LOOKUP_SECRET` values. Toss and SMS/SES provider keys are required only when those providers are enabled.
 - Flyway is enabled and Hibernate uses `ddl-auto=validate` in production.
 
 ## Health Checks

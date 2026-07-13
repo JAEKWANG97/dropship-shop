@@ -23,6 +23,14 @@ sms:
     from-number: ${SMS_SENS_FROM_NUMBER}
 
 app:
+  public-base-url: ${APP_PUBLIC_BASE_URL}
+  inquiry:
+    lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET}
+  email:
+    from-address: ${EMAIL_FROM_ADDRESS:contact@coreable-saf.com}
+    ses:
+      enabled: ${EMAIL_SES_ENABLED:false}
+      region: ${EMAIL_SES_REGION:ap-northeast-2}
   storage:
     public-base-url: ${APP_STORAGE_PUBLIC_BASE_URL:/uploads/products}
     local:

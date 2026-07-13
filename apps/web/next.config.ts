@@ -55,6 +55,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/api/:path*",
+        destination: `${apiBaseUrl}/api/:path*`,
+      },
+      {
         source: "/uploads/products/:path*",
         destination: `${apiBaseUrl}/uploads/products/:path*`,
       },

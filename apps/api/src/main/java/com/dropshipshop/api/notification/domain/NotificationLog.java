@@ -36,6 +36,9 @@ public class NotificationLog {
 	@Column(name = "refund_id")
 	private UUID refundId;
 
+	@Column(name = "customer_inquiry_id")
+	private UUID customerInquiryId;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 50)
 	private NotificationType type;
@@ -81,6 +84,7 @@ public class NotificationLog {
 		UUID paymentGroupId,
 		UUID claimId,
 		UUID refundId,
+		UUID customerInquiryId,
 		NotificationType type,
 		NotificationChannel channel,
 		String recipient,
@@ -92,6 +96,7 @@ public class NotificationLog {
 		this.paymentGroupId = paymentGroupId;
 		this.claimId = claimId;
 		this.refundId = refundId;
+		this.customerInquiryId = customerInquiryId;
 		this.type = type;
 		this.channel = channel;
 		this.transactional = true;
@@ -139,6 +144,10 @@ public class NotificationLog {
 
 	public UUID getRefundId() {
 		return refundId;
+	}
+
+	public UUID getCustomerInquiryId() {
+		return customerInquiryId;
 	}
 
 	public NotificationChannel getChannel() {

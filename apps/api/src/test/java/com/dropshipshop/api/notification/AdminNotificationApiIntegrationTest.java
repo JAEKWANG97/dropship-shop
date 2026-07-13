@@ -37,6 +37,8 @@ import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.email.EmailSendResult;
+import com.dropshipshop.api.email.EmailSender;
 import com.dropshipshop.api.notification.domain.NotificationChannel;
 import com.dropshipshop.api.notification.domain.NotificationLog;
 import com.dropshipshop.api.notification.domain.NotificationStatus;
@@ -72,6 +74,12 @@ class AdminNotificationApiIntegrationTest {
 	private RecordingSmsSender smsSender;
 
 	@Autowired
+	private RecordingEmailSender emailSender;
+
+	@Autowired
+	private NotificationDispatchListener notificationDispatchListener;
+
+	@Autowired
 	private UserAccountRepository userAccountRepository;
 
 	@Autowired
@@ -101,6 +109,7 @@ class AdminNotificationApiIntegrationTest {
 	@BeforeEach
 	void resetSmsSender() {
 		smsSender.reset();
+		emailSender.reset();
 	}
 
 	@Test
@@ -151,6 +160,7 @@ class AdminNotificationApiIntegrationTest {
 			null,
 			null,
 			null,
+			null,
 			NotificationType.DELAY_NOTICE,
 			NotificationChannel.SMS,
 			"010-2222-3333",
@@ -188,6 +198,55 @@ class AdminNotificationApiIntegrationTest {
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.notifications[*].notificationId", hasItem(log.getId().toString())));
+	}
+
+	@Test
+	void dispatchesInquiryEmailWithLookupLinkAndRecordsFailure() {
+		UUID inquiryId = UUID.randomUUID();
+		NotificationLog sentLog = notificationLogRepository.saveAndFlush(new NotificationLog(
+			null,
+			null,
+			null,
+			null,
+			null,
+			inquiryId,
+			NotificationType.CUSTOMER_INQUIRY_ANSWERED,
+			NotificationChannel.EMAIL,
+			"customer@example.com",
+			"customer_inquiry_answered",
+			"message=답변 내용"
+		));
+
+		notificationDispatchListener.dispatchNow(sentLog.getId());
+
+		NotificationLog sent = notificationLogRepository.findById(sentLog.getId()).orElseThrow();
+		assertThat(sent.getStatus()).isEqualTo(NotificationStatus.SENT);
+		assertThat(sent.getPayloadSnapshot()).doesNotContain("#token=");
+		assertThat(emailSender.messages()).singleElement().asString()
+			.contains("customer@example.com", "답변 내용", "/support/inquiries/" + inquiryId, "#token=");
+
+		emailSender.fail("SES timeout");
+		NotificationLog failedLog = notificationLogRepository.saveAndFlush(new NotificationLog(
+			null,
+			null,
+			null,
+			null,
+			null,
+			UUID.randomUUID(),
+			NotificationType.CUSTOMER_INQUIRY_ANSWERED,
+			NotificationChannel.EMAIL,
+			"failed@example.com",
+			"customer_inquiry_answered",
+			"message=실패 답변"
+		));
+
+		notificationDispatchListener.dispatchNow(failedLog.getId());
+
+		assertThat(notificationLogRepository.findById(failedLog.getId()).orElseThrow())
+			.satisfies(log -> {
+				assertThat(log.getStatus()).isEqualTo(NotificationStatus.FAILED);
+				assertThat(log.getFailureReason()).contains("SES timeout");
+			});
 	}
 
 	private UserAccount createCustomer(String providerUserId) {
@@ -252,6 +311,12 @@ class AdminNotificationApiIntegrationTest {
 		RecordingSmsSender recordingSmsSender() {
 			return new RecordingSmsSender();
 		}
+
+		@Bean
+		@Primary
+		RecordingEmailSender recordingEmailSender() {
+			return new RecordingEmailSender();
+		}
 	}
 
 	static class RecordingSmsSender implements SmsSender {
@@ -283,6 +348,34 @@ class AdminNotificationApiIntegrationTest {
 
 		List<String> transactionalMessages() {
 			return transactionalMessages;
+		}
+	}
+
+	static class RecordingEmailSender implements EmailSender {
+
+		private final List<String> messages = new ArrayList<>();
+		private String failureMessage;
+
+		@Override
+		public EmailSendResult sendTransactional(String recipient, String subject, String body) {
+			if (failureMessage != null) {
+				throw new IllegalStateException(failureMessage);
+			}
+			messages.add(recipient + "|" + subject + "|" + body);
+			return EmailSendResult.sent();
+		}
+
+		void fail(String message) {
+			failureMessage = message;
+		}
+
+		void reset() {
+			failureMessage = null;
+			messages.clear();
+		}
+
+		List<String> messages() {
+			return messages;
 		}
 	}
 }

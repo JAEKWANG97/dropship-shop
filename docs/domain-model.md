@@ -736,7 +736,8 @@ Implemented fields:
 - paymentGroupId
 - claimId
 - refundId
-- type: PAYMENT_PENDING / PAYMENT_COMPLETED / PAYMENT_EXCEPTION / OUT_OF_STOCK / SHIPMENT_STARTED / DELIVERY_COMPLETED / DELAY_NOTICE / CLAIM_STATUS_CHANGED / REFUND_COMPLETED / MARKETING
+- customerInquiryId
+- type: PAYMENT_PENDING / PAYMENT_COMPLETED / PAYMENT_EXCEPTION / OUT_OF_STOCK / SHIPMENT_STARTED / DELIVERY_COMPLETED / DELAY_NOTICE / CLAIM_STATUS_CHANGED / REFUND_COMPLETED / CUSTOMER_INQUIRY_ANSWERED / MARKETING
 - channel: EMAIL / ORDER_DETAIL / SMS / KAKAO_ALIMTALK / PUSH
 - transactional
 - status: PENDING / SENT / FAILED / SKIPPED
@@ -750,12 +751,12 @@ Implemented fields:
 
 Implemented B-011 scope:
 
-- `notification_logs` persists transactional SMS notification attempts.
+- `notification_logs` persists transactional SMS and customer inquiry email attempts.
 - Logs start as `PENDING` and move to `SENT`, `FAILED`, or `SKIPPED` after dispatch.
 - `sms.sens.enabled=false` records transactional SMS as `SKIPPED` instead of pretending to send.
 - Implemented triggers include payment pending bank-transfer 안내, payment completed, payment exception, out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed.
 - Order-related notifications use the order recipient phone number, not the account phone number.
-- Admin can list notification logs with `GET /api/admin/notifications?status=...` and retry failed logs with `POST /api/admin/notifications/{notificationId}/retry`.
+- Admin can list notification logs with `GET /api/admin/notifications?status=...` and retry failed or skipped logs with `POST /api/admin/notifications/{notificationId}/retry`.
 
 ## OrderStatusHistory
 
@@ -1108,8 +1109,8 @@ Suggested fields:
 - 결제 그룹(PaymentGroup) 시점에는 주문서 통합 확인 체크의 정책 버전과 확인 시각을 저장한다.
 - 주문서 통합 확인 체크는 결제 그룹(PaymentGroup) 단위로 저장한다.
 - 주문서 통합 확인 체크는 주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 품절 가능성, 품절 시 해당 배송 그룹 주문 금액 환불 안내를 포함한다.
-- 고객 문의는 `CustomerInquiry`로 저장하고 관리자 화면에서 접수 내용을 확인한다.
-- MVP 문의 처리는 접수/확인으로 시작하고 답변 상태, 담당자 배정, SLA 관리는 이후 범위로 둔다.
+- 고객 문의는 `CustomerInquiry`로 저장하고 관리자 화면에서 상태, 메모, 최신 답변을 관리한다.
+- 답변 이메일 실패는 문의 답변 저장을 되돌리지 않으며 고객 조회 링크에서 저장된 답변을 확인할 수 있다.
 
 ## CustomerInquiry
 
@@ -1123,10 +1124,22 @@ Implemented fields:
 - phone
 - subject
 - message
+- status: RECEIVED / IN_PROGRESS / ANSWERED / CLOSED
+- consentPolicyVersion
+- consentedAt
+- retentionExpiresAt
+- adminMemo
+- answer
+- handledByAdminId
+- answeredAt
+- closedAt
 - createdAt
+- updatedAt
 
 Rules:
 
 - 비로그인 고객도 문의를 접수할 수 있다.
-- 관리자만 문의 목록을 조회할 수 있다.
-- 답변 상태와 처리 이력은 MVP 이후에 추가한다.
+- 같은 이메일은 10분 동안 최대 3건까지 접수할 수 있다.
+- 고객 조회는 문의 id와 HMAC 조회 토큰을 함께 검증하며 연락처와 관리자 메모를 반환하지 않는다.
+- 관리자만 문의 목록, 상세, 상태, 메모, 답변을 관리할 수 있다.
+- 문의와 동의 증적은 접수일로부터 3년 후 자동 삭제하며, 연결된 알림 로그는 수신 이메일과 답변 snapshot을 익명화한 뒤 보존한다.

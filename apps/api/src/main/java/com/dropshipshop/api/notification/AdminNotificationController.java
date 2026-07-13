@@ -43,6 +43,7 @@ class AdminNotificationController {
 		return new NotificationDtos.AdminNotificationResponse(
 			log.getId(),
 			log.getOrderId(),
+			log.getCustomerInquiryId(),
 			log.getType(),
 			log.getChannel(),
 			log.getStatus(),

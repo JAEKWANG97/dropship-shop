@@ -885,13 +885,25 @@ Rule:
 - `phone`
 - `subject`
 - `message`
+- `status`
+- `consent_policy_version`
+- `consented_at`
+- `retention_expires_at`
+- `admin_memo`
+- `answer`
+- `handled_by_admin_id`
+- `answered_at`
+- `closed_at`
 - `created_at`
+- `updated_at`
 
 Rule:
 
-- Public customers can create inquiries without login.
-- Admin users can list inquiries in newest-first order.
-- Reply status and assignment are out of MVP scope.
+- Public customers can create inquiries without login after required consent.
+- Admin users manage status, memo, and the latest answer.
+- Existing rows migrated by V30 remain `RECEIVED` with null consent evidence rather than fabricated consent.
+- Indexes support status queues, email rate limiting, and three-year retention cleanup.
+- Retention cleanup clears inquiry email and answer content from notification logs before deleting the inquiry row.
 
 Audit/notification tables:
 
@@ -908,7 +920,8 @@ Audit/notification tables:
 - `payment_group_id`
 - `claim_id`
 - `refund_id`
-- `type`: `PAYMENT_PENDING` / `PAYMENT_COMPLETED` / `PAYMENT_EXCEPTION` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `DELIVERY_COMPLETED` / `DELAY_NOTICE` / `CLAIM_STATUS_CHANGED` / `REFUND_COMPLETED` / `MARKETING`
+- `customer_inquiry_id`: nullable, customer inquiry answer email reference; `ON DELETE SET NULL`
+- `type`: `PAYMENT_PENDING` / `PAYMENT_COMPLETED` / `PAYMENT_EXCEPTION` / `OUT_OF_STOCK` / `SHIPMENT_STARTED` / `DELIVERY_COMPLETED` / `DELAY_NOTICE` / `CLAIM_STATUS_CHANGED` / `REFUND_COMPLETED` / `CUSTOMER_INQUIRY_ANSWERED` / `MARKETING`
 - `channel`: `EMAIL` / `ORDER_DETAIL` / `SMS` / `KAKAO_ALIMTALK` / `PUSH`
 - `transactional`
 - `status`: `PENDING` / `SENT` / `FAILED` / `SKIPPED`
