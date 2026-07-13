@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-14 00:48 KST
+
+- 관련 항목: B-061
+- 작업: 공개 문의 접수부터 관리자 `IN_PROGRESS` 변경, 답변 저장, SES 비활성 `SKIPPED` 확인, 이메일 재시도, 비로그인 고객 조회 반영까지 하나의 local-only Playwright 시나리오로 검증했다.
+- 문제·고민: 로컬 SES 비활성 환경에서는 재시도 후에도 발송 상태가 `SKIPPED`이므로 실제 발송 완료처럼 보이는 기존 안내 문구가 부정확했다.
+- 해결방안: 재시도 문구를 요청 접수와 상태 확인 안내로 바꾸고, Playwright는 저장된 답변과 관리자 메모, 고객 조회 화면의 개인정보 비노출까지 확인하도록 확장했다. 테스트용 메일 API나 sender는 추가하지 않았다.
+- 검증: API 전체 테스트, Web lint/build, 문의 desktop E2E `1 passed`, screenshot 제외 기능 suite `62 passed / 2 skipped`, `git diff --check`를 통과했다.
+- 후속작업: SES 도메인/DKIM 인증과 production access 승인 후 실제 이메일 도착과 운영 재시도를 확인해야 B-061을 완료할 수 있다.
+
 ## 2026-07-14 00:10 KST
 
 - 관련 항목: B-061

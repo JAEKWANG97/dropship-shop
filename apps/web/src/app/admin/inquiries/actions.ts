@@ -48,7 +48,7 @@ export async function answerInquiry(formData: FormData) {
 export async function retryInquiryEmail(formData: FormData) {
   const inquiryId = id(formData);
   const notificationId = text(formData, "notificationId");
-  let message = "답변 이메일을 다시 발송했습니다.";
+  let message = "답변 이메일 재시도를 요청했습니다. 발송 상태를 확인하세요.";
   try {
     await apiSendWithCookie(`/api/admin/notifications/${notificationId}/retry`, (await cookies()).toString(), {
       method: "POST",

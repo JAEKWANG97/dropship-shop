@@ -5,6 +5,7 @@ import {
   expectNoHorizontalOverflow,
   firstAdminOrderLink,
   isLocalTarget,
+  requireAdminCookie,
 } from "./helpers";
 
 test("public customer pages render without horizontal overflow", async ({ page }) => {
@@ -26,21 +27,77 @@ test("public customer pages render without horizontal overflow", async ({ page }
   }
 });
 
-test("public inquiry requires consent and opens the protected lookup page", async ({ page }, testInfo) => {
+test("customer inquiry flows from public receipt through admin answer to protected lookup", async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Inquiry mutation runs once in the desktop project.");
+  test.skip(!isLocalTarget(), "Inquiry mutation uses local dev login and disabled SES.");
+
+  const adminCookie = await requireAdminCookie();
+  const nonce = Date.now();
+  const email = `e2e-inquiry-${nonce}@example.com`;
+  const subject = `E2E 문의 ${nonce}`;
+  const adminMemo = `E2E 관리자 메모 ${nonce}`;
+  const answer = `E2E 답변 ${nonce}`;
 
   await page.goto("/support");
   await expect(page.getByText("접수일로부터 3년간 보관")).toBeVisible();
   await page.getByLabel("이름", { exact: true }).fill("E2E 고객");
-  await page.getByLabel("이메일", { exact: true }).fill(`e2e-inquiry-${Date.now()}@example.com`);
-  await page.getByLabel("제목", { exact: true }).fill("E2E 문의");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("제목", { exact: true }).fill(subject);
   await page.getByLabel("문의 내용", { exact: true }).fill("문의 접수와 조회 링크를 확인합니다.");
   await page.getByRole("checkbox", { name: /개인정보 수집·이용/ }).check();
   await page.getByRole("button", { name: "문의 접수" }).click();
 
   await expect(page).toHaveURL(/\/support\/inquiries\/[0-9a-f-]+#token=/);
-  await expect(page.getByText("E2E 문의")).toBeVisible();
+  await expect(page.getByText(subject)).toBeVisible();
   await expect(page.getByText("접수", { exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  const lookupUrl = page.url();
+  const inquiryId = new URL(lookupUrl).pathname.split("/").at(-1)!;
+  await addCookie(context, adminCookie);
+  await page.goto("/admin/inquiries?status=RECEIVED");
+
+  const inquiryLink = page.locator(`a[href="/admin/inquiries/${inquiryId}"]`);
+  await expect(inquiryLink).toContainText(subject);
+  await inquiryLink.click();
+
+  const statusForm = page.locator("form").filter({ has: page.getByRole("button", { name: "상태 저장" }) });
+  await statusForm.getByLabel("상태").selectOption("IN_PROGRESS");
+  await statusForm.getByLabel("관리자 메모").fill(adminMemo);
+  await statusForm.getByRole("button", { name: "상태 저장" }).click();
+
+  await expect(page.locator(".notice").first()).toContainText("문의 상태를 변경했습니다.");
+  await expect(page.locator(".inquiry-status")).toHaveText("처리 중");
+  await expect(statusForm.getByLabel("관리자 메모")).toHaveValue(adminMemo);
+
+  const answerForm = page.locator("form").filter({
+    has: page.getByRole("button", { name: "답변 저장 및 이메일 발송" }),
+  });
+  await answerForm.getByLabel("답변 내용").fill(answer);
+  await answerForm.getByRole("button", { name: "답변 저장 및 이메일 발송" }).click();
+
+  await expect(page.locator(".notice").first()).toContainText("답변을 저장했습니다.");
+  await expect(page.locator(".inquiry-status")).toHaveText("답변 완료");
+  const emailPanel = page.locator("section.admin-panel").filter({
+    has: page.getByRole("heading", { name: "답변 이메일" }),
+  });
+  await expect(emailPanel).toContainText("SKIPPED");
+  await expect(emailPanel).toContainText("AWS SES is disabled");
+  await emailPanel.getByRole("button", { name: "이메일 재시도" }).click();
+
+  await expect(page.locator(".notice").first()).toContainText(
+    "답변 이메일 재시도를 요청했습니다. 발송 상태를 확인하세요.",
+  );
+  await expect(emailPanel).toContainText("SKIPPED");
+  await expect(emailPanel).toContainText("AWS SES is disabled");
+
+  await context.clearCookies();
+  await page.goto(lookupUrl);
+  await expect(page.locator(".inquiry-lookup-head span")).toHaveText("답변 완료");
+  await expect(page.getByText(answer)).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(email);
+  await expect(page.locator("body")).not.toContainText(adminMemo);
+  await expect(page.locator("body")).not.toContainText("support-inquiry-privacy-2026-07-13");
   await expectNoHorizontalOverflow(page);
 });
 
