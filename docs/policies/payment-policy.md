@@ -58,10 +58,12 @@ Status: Confirmed
 - 입금확인, 미입금 취소, 입금 불일치 메모, 수동 환불 완료는 관리자 주체, 시각, 사유를 기록한다.
 - 계좌입금 환불은 PG 취소가 아니라 관리자가 실제 환불을 완료한 뒤 수동 환불 완료로 기록한다.
 - 고객에게 환불 완료로 노출하는 시점은 실제 환불 완료 기록 이후다.
-- 현금영수증은 고객 요청 시 발급해야 하며, 1차 운영은 홈택스 수동 발급으로 둔다. 자동 API 연동은 후속 작업이다.
+- 현금영수증은 대표자/관리자가 입금 확인 후 홈택스에서 수동 발급한다. 고객 요청은 `/support`, 고객센터 전화, 이메일로 접수하고 자동 API 연동은 후속 작업으로 둔다.
+- 사업자등록 업종이 현금영수증 의무발행업종에 해당하면 건당 10만원 이상 현금 거래는 고객 요청이 없어도 발급한다. 실제 판매 전 홈택스 가맹/발급 권한과 업종 적용 여부를 확인한다.
 - 계좌입금은 현금성 결제이므로 실결제 오픈 전 구매안전서비스 방식을 확정해야 한다. 은행 에스크로, 소비자피해보상보험, PG/가상계좌 재도입 중 하나를 운영 선택지로 둔다.
+- 계좌입금 구매안전서비스 계약과 고객 선택 화면이 준비되기 전에는 실제 판매 주문을 받지 않는다.
 - MVP에서는 배송 그룹 주문 단위 부분 취소/부분 환불을 지원한다.
-- 배송 그룹 주문 단위 부분 환불은 하나의 PG 결제 중 특정 배송 그룹 주문 금액만 취소/환불하는 것을 의미한다.
+- 배송 그룹 주문 단위 부분 환불은 하나의 결제 그룹 중 특정 배송 그룹 주문 금액만 환불하는 것을 의미한다. 계좌입금은 수동 환불, Toss 재도입 후에는 PG 부분 취소로 실행한다.
 - 배송 그룹 주문 내부의 상품, 옵션, 수량 단위 부분 취소/부분 환불은 MVP에서 지원하지 않는다.
 - 특정 배송 그룹 주문이 공급처 품절이면 해당 배송 그룹 주문 금액만 부분 취소/환불한다.
 - 하나의 배송 그룹 주문 내부에서 일부 상품 또는 일부 수량만 품절이면 MVP에서는 해당 배송 그룹 주문 전체를 취소/환불한다.
@@ -109,7 +111,7 @@ Sandbox path:
 
 - Use Toss Payments test client key in the frontend.
 - Use Toss Payments test secret key only on the Spring Boot server.
-- Current development proceeds with Toss Payments test keys until the deployed homepage URL is ready for live PG review.
+- Toss test keys are needed only while executing B-001 sandbox verification; they are not required for the current bank-transfer checkout.
 - Configure the Spring Boot server secret through `payments.toss.secret-key` or the equivalent environment variable, and never commit it.
 - Create a server-side `PaymentGroup` before invoking the Toss payment UI.
 - Confirm approved payment results on the server before moving orders to `SUPPLIER_ORDER_PENDING`.

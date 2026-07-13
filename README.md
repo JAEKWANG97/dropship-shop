@@ -24,7 +24,7 @@
 - 장바구니
 - 주문서 작성
 - 배송/취소/환불/품절 정책 확인
-- 실제 결제
+- 계좌입금 주문과 입금 확인
 - 주문 내역 조회
 - 배송 상태 조회
 - 취소/환불 요청
@@ -59,10 +59,10 @@
 - Database: PostgreSQL
 - ORM: JPA
 - Auth: Spring Security
-- Frontend: React or Next.js
-- Storage: S3-compatible object storage
-- Payment: Toss Payments
-- Deployment: Single application server + managed PostgreSQL at first
+- Frontend: Next.js
+- Storage: EC2 EBS-backed local uploads with S3 backup; object storage serving is deferred
+- Payment: Direct bank transfer; Toss Payments is deferred
+- Deployment: Single EC2 Docker host with PostgreSQL and persistent EBS volumes
 
 ## Documentation
 
@@ -77,10 +77,9 @@
 - [Architecture](docs/architecture.md)
 - [Production Readiness](docs/production-readiness.md)
 - [Roadmap](docs/roadmap.md)
-- [Linear Backlog](docs/linear-backlog.md)
+- [Backlog](docs/BACKLOG.md)
 - [Development Workflow](docs/development-workflow.md)
 - [Decision Log](docs/decision-log.md)
-- [GitHub And Linear Setup](docs/github-linear-setup.md)
 
 ## Local Development
 

@@ -17,6 +17,19 @@ Status: single-EC2 Docker deployment baseline for B-039
 
 This is the low-cost first production-style deployment shape. S3 is used for backup storage. RDS, S3-backed application image serving, CloudFront, and a load balancer are deferred until traffic or operational requirements justify the added cost.
 
+## Pre-Launch Runtime Schedule
+
+EventBridge Scheduler limits EC2 runtime while the service is not yet accepting real orders:
+
+Current state: paused on `2026-07-13`; the EC2 instance is stopped and both schedules are disabled until development resumes.
+
+- Start: every day at `09:00 KST` (`coreable-ec2-start-daily`).
+- Backup: every day at `00:10 KST` (`15:10 UTC` host cron) through `/etc/cron.d/coreable-backup`.
+- Stop: every day at `01:00 KST` (`coreable-ec2-stop-daily`).
+- Scheduler role: `coreable-ec2-scheduler-role`, limited to starting and stopping `i-0c795cb4b0f0b4177`.
+
+This schedule saves only EC2 compute time; EBS and public IPv4 charges continue. Disable the stop schedule before live orders are enabled. A deployment attempted while the instance is stopped still requires a manual start until the deploy workflow is migrated from SSH to SSM.
+
 ## One-Time AWS Setup
 
 ```sh

@@ -40,15 +40,12 @@ export default function CompanyPage() {
             개인정보처리방침
           </Link>
         </div>
-        <p className="legal-note">
-          고객센터 전화번호와 이메일은 실결제 오픈 전 실제 운영 연락처로 확정해야 합니다.
-        </p>
       </section>
       <section className="detail-section">
         <h2>결제/구매안전 안내</h2>
         <p>{BUSINESS_PROFILE.purchaseSafetyNotice}</p>
         <p className="legal-note">
-          통신판매업 신고와 결제/구매안전서비스 정보가 확정되면 공정거래위원회 통신판매사업자 등록현황에서 사업자 정보를 확인할 수 있습니다.
+          현재 통신판매업 신고 면제 상태입니다. 신고 의무가 발생하거나 자진 신고하면 실제 신고번호와 등록 정보를 갱신합니다.
         </p>
         <a className="admin-text-link" href={BUSINESS_PROFILE.businessRegistryUrl}>
           공정거래위원회 통신판매사업자 등록현황

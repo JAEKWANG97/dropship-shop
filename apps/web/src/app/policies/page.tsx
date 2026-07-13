@@ -7,7 +7,7 @@ export default function PolicyIndexPage() {
       <div className="section-heading">
         <p className="eyebrow">정책</p>
         <h1>정책 안내</h1>
-        <p>실제 운영 전 최종 검토가 필요한 정책 안내입니다.</p>
+        <p>주문, 배송, 개인정보 처리와 취소·환불 기준을 확인할 수 있습니다.</p>
       </div>
       <div className="legal-card-grid">
         {POLICY_PAGES.map((policy) => (

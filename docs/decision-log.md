@@ -1,5 +1,38 @@
 # Decision Log
 
+## 2026-07-13: Bank Transfer Legal Disclosure Baseline
+
+Decision:
+
+Public order and refund notices must describe the current bank-transfer flow first and distinguish deferred PG behavior. Bank-transfer orders use a 24-hour deposit deadline, and a refund is complete only after the actual transfer is made and an admin records completion. Cash receipts are handled manually through Hometax by the representative/admin; customer requests are accepted through support, phone, or email, and mandatory-issuance transactions are issued even without a request. Do not accept real sales orders until a purchase-safety service and customer selection path are available.
+
+Context:
+
+The public cancellation/refund page still described only PG cancellation even though direct bank transfer is the current checkout path. Official KFTC guidance also requires a purchase-safety option for applicable non-credit-card prepayment transactions, and NTS guidance requires automatic cash-receipt issuance for qualifying mandatory-issuance transactions of KRW 100,000 or more.
+
+Consequences:
+
+- Public terms and refund text now describe bank-transfer deposit confirmation, manual refund completion, and the deferred Toss path separately.
+- The default checkout cash-receipt notice covers both customer requests and mandatory-issuance transactions.
+- B-030 remains in progress until the purchase-safety provider, Hometax account/industry applicability, actual privacy processors, policy effective version, and initial product certifications are confirmed.
+
+## 2026-07-13: Launch Documentation Baseline
+
+Decision:
+
+Treat direct bank transfer as the current customer payment path and Toss Payments as a deferred integration in every active product, policy, architecture, and operations document. Treat the mail-order sales exemption, customer center values, and AWS hosting provider as confirmed public values. Keep purchase-safety service, cash-receipt operations, inquiry consent evidence, product activation checks, and monitoring as launch blockers.
+
+Context:
+
+Implementation and recent policy decisions had moved to bank transfer and a low-cost single-EC2 deployment, while several top-level documents still described Toss Payments and managed PostgreSQL as the current baseline. The legal checklist also left already-configured public values marked unresolved.
+
+Consequences:
+
+- The 2026-07-03 bank-transfer decision supersedes the 2026-06-27 Toss-first decision for the current default checkout path; the older entry remains as historical context for B-001.
+- `docs/BACKLOG.md` is ordered by launch risk, and completed work is stored only in `docs/BACKLOG_DONE.md`.
+- B-030 owns unresolved public legal/payment wording, B-056 owns product activation guards, B-061 owns inquiry operations and consent evidence, B-059 owns security closure, and B-062 owns minimum monitoring.
+- The paused EC2 environment is a production-style deployment baseline, not evidence that the service is ready to accept orders.
+
 ## 2026-07-04: Local Seed Dev Login Guard
 
 Decision:

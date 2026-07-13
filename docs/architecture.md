@@ -117,9 +117,9 @@ First admin screens:
 
 ### Payment Gateway
 
-Use Toss Payments for MVP.
+Use direct bank transfer with manual admin deposit confirmation for the current customer checkout path.
 
-The server must verify payment result directly with Toss Payments before approving an order.
+Toss Payments code remains a deferred PG integration path. If it is reintroduced, the server must verify the approved amount and payment result directly with Toss Payments before approving an order.
 
 ### Object Storage
 
@@ -130,8 +130,8 @@ Runtime storage rules:
 - PostgreSQL stores product data and image metadata only.
 - Image binaries are not stored in PostgreSQL.
 - Local development may use filesystem-backed product image storage.
-- Test deployment may use the EC2 EBS-backed local upload volume for product images.
-- Production should move to S3-compatible object storage when image volume, backup, or traffic makes local disk risky.
+- The initial production-style deployment uses the EC2 EBS-backed local upload volume for product images and copies them to S3 as backup data.
+- Move serving to S3-compatible object storage only when image volume, multi-server deployment, recovery time, or traffic makes local disk risky.
 - Backend file storage is behind a small storage boundary so the API can keep returning stable image URLs to the frontend.
 - Frontend catalog screens should consume backend API data instead of maintaining long-lived mock product JSON.
 
@@ -173,8 +173,8 @@ Do not introduce microservices before order and fulfillment workflows are stable
 Production baseline is tracked in [Production Readiness](production-readiness.md).
 
 - Run the API with `SPRING_PROFILES_ACTIVE=prod`.
-- Use managed PostgreSQL with automated backup and point-in-time recovery before live payments.
+- The initial low-cost deployment may run PostgreSQL on the same EC2 host only while daily S3 backup, EBS snapshot, and restore rehearsal are maintained. Move to managed PostgreSQL when availability or recovery requirements exceed this baseline.
 - Run Flyway migrations for schema changes; production Hibernate mode is `validate`.
 - Use `/actuator/health/readiness` for readiness probes and `/actuator/health/liveness` for liveness probes.
 - Configure CORS through `APP_CORS_ALLOWED_ORIGINS` with only the deployed customer/admin frontend origins.
-- Keep Toss Payments secret key and DB credentials in runtime environment or secret manager only.
+- Keep DB credentials and any deferred Toss Payments secret key in runtime environment or secret manager only.

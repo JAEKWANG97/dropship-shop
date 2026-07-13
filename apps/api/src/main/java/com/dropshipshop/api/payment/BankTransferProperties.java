@@ -19,7 +19,7 @@ public class BankTransferProperties {
 		@Value("${app.bank-transfer.account-number:입금 계좌 준비중}") String accountNumber,
 		@Value("${app.bank-transfer.account-holder:가라사니}") String accountHolder,
 		@Value("${app.bank-transfer.deposit-deadline-hours:24}") long depositDeadlineHours,
-		@Value("${app.bank-transfer.cash-receipt-notice:현금영수증은 요청 시 홈택스 수동 발급으로 처리합니다.}") String cashReceiptNotice
+		@Value("${app.bank-transfer.cash-receipt-notice:현금영수증은 요청 시 홈택스에서 발급하며, 의무발행 대상 거래는 요청 여부와 관계없이 발급합니다.}") String cashReceiptNotice
 	) {
 		this.bankName = bankName;
 		this.accountNumber = accountNumber;

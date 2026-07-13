@@ -35,15 +35,15 @@ Exit criteria:
 
 - Implement cart
 - Implement checkout
-- Integrate PG sandbox
-- Verify payment success on server
-- Handle failed payments
-- Handle duplicate payment confirmation
+- Show direct bank-transfer instructions
+- Add admin deposit confirmation and unpaid cancellation
+- Handle deposit mismatch
+- Prevent duplicate checkout and concurrent state changes
 
 Exit criteria:
 
-- Customer can complete a sandbox payment.
-- Confirmed order enters supplier order pending state.
+- Customer can create a deposit-pending checkout.
+- Admin-confirmed deposit moves the order to supplier order pending state.
 
 ## Phase 3: Admin Fulfillment
 
@@ -63,7 +63,7 @@ Exit criteria:
 
 - Implement cancellation request
 - Implement refund request
-- Integrate PG refund/cancel API
+- Complete manual bank-transfer refund recording
 - Add customer-facing policy pages
 - Add admin refund handling
 
@@ -86,6 +86,7 @@ Exit criteria:
 
 ## Later
 
+- Toss Payments sandbox/live reintroduction
 - Supplier CSV import
 - Product bulk upload
 - Coupon
@@ -94,4 +95,3 @@ Exit criteria:
 - Dashboard metrics
 - Automated supplier API integration
 - Customer notifications
-

@@ -77,7 +77,7 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 - Catalog: public product APIs and admin supplier/product/option/detail management.
 - Cart: current customer cart and cart item mutations.
 - Checkout/Order: payment group creation, policy confirmation, customer order history, address changes, self-service cancel.
-- Payment: Toss confirmation, webhook, payment exception handling.
+- Payment: admin bank-transfer confirmation/refund completion and deferred Toss confirmation/webhook handling.
 - Fulfillment/Shipment: admin supplier actions, shipment entry, tracking sync, shipment correction.
 - Refund/Claim: customer claim submission and admin review/refund execution.
 - Policy Pages: public policy, business disclosure, privacy processing table, admin policy management.

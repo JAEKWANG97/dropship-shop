@@ -12,6 +12,7 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - 출시 전 법적 고지 체크리스트: [Legal Launch Checklist](legal-launch-checklist.md)
 - 상품 등록 운영 기준: [Product Registration Guide](product-registration-guide.md)
 - 현재 작업 큐: [Backlog](BACKLOG.md)
+- 완료 작업 보관: [Completed Backlog](BACKLOG_DONE.md)
 - 구현 설계 초안: [Domain Model](domain-model.md), [MVP ERD](erd.md), [MVP API Specification](api-spec.md), [Order Flow](order-flow.md), [Architecture](architecture.md), [Production Readiness](production-readiness.md)
 
 정책 파일에서는 `Confirmed Policy`가 현재 구현 기준이다. `Initial Direction`은 논의 초기에 잡은 방향이므로, 충돌이 있으면 `Confirmed Policy`와 `Decision Log`를 우선한다.
@@ -32,7 +33,6 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 12. [Backlog](BACKLOG.md)
 13. [Development Workflow](development-workflow.md)
 14. [Decision Log](decision-log.md)
-15. [GitHub And Linear Setup](github-linear-setup.md)
 
 ## Current Policy Hardening
 

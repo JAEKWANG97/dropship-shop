@@ -36,4 +36,4 @@ app:
     account-number: ${APP_BANK_TRANSFER_ACCOUNT_NUMBER:입금 계좌 준비중}
     account-holder: ${APP_BANK_TRANSFER_ACCOUNT_HOLDER:가라사니}
     deposit-deadline-hours: ${APP_BANK_TRANSFER_DEPOSIT_DEADLINE_HOURS:24}
-    cash-receipt-notice: ${APP_BANK_TRANSFER_CASH_RECEIPT_NOTICE:현금영수증은 요청 시 홈택스 수동 발급으로 처리합니다.}
+    cash-receipt-notice: ${APP_BANK_TRANSFER_CASH_RECEIPT_NOTICE:현금영수증은 요청 시 홈택스에서 발급하며, 의무발행 대상 거래는 요청 여부와 관계없이 발급합니다.}

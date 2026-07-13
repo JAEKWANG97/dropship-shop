@@ -1,5 +1,7 @@
 # Order Flow
 
+Current payment path: direct bank transfer with manual admin deposit confirmation. Sections explicitly labeled `Deferred Toss path` describe retained PG code and are not the current customer checkout flow.
+
 ## Happy Path
 
 ```text
@@ -36,7 +38,7 @@ DS-8 backend implementation notes:
 - The cart is emptied after successful checkout creation.
 - Direct-buy checkout is deferred.
 
-DS-9 backend implementation notes:
+DS-9 deferred Toss path implementation notes:
 
 - The backend confirms Toss Payments through `POST /api/payments/toss/confirm`.
 - The server validates ownership, payment pending state, expiration, policy confirmation, amount, payment key uniqueness, and current product/option sellability before finalizing orders.
@@ -86,9 +88,8 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Customer is notified
 -> Refund is requested for this order amount
 -> Admin approves refund
--> Refund status: APPROVED
--> Refund status: PG_CANCEL_REQUESTED
--> PG full cancel/refund succeeds because the payment group contains only this order
+-> Admin transfers the refund to the customer account
+-> Admin records actual refund completion
 -> Refund status: COMPLETED
 -> Payment status: REFUNDED
 -> Order status: REFUNDED
@@ -100,7 +101,7 @@ Order status: SUPPLIER_ORDER_PENDING
 Payment group contains:
   - Order A: delivery group A, 60,000
   - Order B: delivery group B, 40,000
-PG payment total: 100,000
+Payment group total: 100,000
 
 Order A supplier order succeeds
 -> Order A continues fulfillment
@@ -109,9 +110,8 @@ Order B supplier says out of stock
 -> Order B status: OUT_OF_STOCK
 -> Refund is requested for Order B amount only
 -> Admin approves refund
--> Refund status: APPROVED
--> Refund status: PG_CANCEL_REQUESTED
--> PG partial cancel/refund succeeds for 40,000
+-> Admin transfers 40,000 to the customer account
+-> Admin records actual refund completion
 -> Order B status: REFUNDED
 -> Order A remains active
 ```
@@ -148,7 +148,7 @@ Order status: PAYMENT_PENDING
 -> Bank-transfer account information can be used for deposit
 ```
 
-## Payment Amount Mismatch
+## Payment Amount Mismatch - Deferred Toss Path
 
 ```text
 Order status: PAYMENT_PENDING
@@ -163,7 +163,7 @@ Order status: PAYMENT_PENDING
 -> Admin emergency review queue is derived from DB payment status, not a separate broker queue
 ```
 
-## Payment Exception
+## Payment Exception - Deferred Toss Path
 
 ```text
 PG payment is approved
@@ -363,8 +363,8 @@ Admin detects wrong operational state or shipment information
 - Payment exceptions attempt immediate full PG cancel.
 - Immediate full PG cancel applies to payment exceptions before order confirmation, not to normal delivery-group order level refund after a payment group is confirmed.
 - Failed automatic PG cancel creates an admin emergency review item and must not be hidden from the customer.
-- MVP enabled payment methods are card, easy payment, and account transfer through Toss Payments.
-- Virtual account, mobile phone payment, and gift certificate payment are excluded from MVP.
+- The current payment method is direct bank transfer with admin deposit confirmation.
+- Toss card, easy payment, account transfer, virtual account, mobile phone payment, and gift certificate payment are disabled until B-001 defines the reintroduction scope.
 - Failed, pending, and expired payment orders are not shown in customer order history.
 - `PAYMENT_PENDING`, `EXPIRED`, and payment failure states belong to checkout/retry surfaces, not normal customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.

@@ -36,7 +36,8 @@ cat >/etc/cron.d/coreable-backup <<'CRON'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TZ=Asia/Seoul
-10 3 * * * root /opt/coreable/backup.sh >/dev/null 2>&1
+# The host cron daemon runs in UTC; 15:10 UTC is 00:10 KST.
+10 15 * * * root /opt/coreable/backup.sh >/dev/null 2>&1
 CRON
 
 chmod 0644 /etc/cron.d/coreable-backup

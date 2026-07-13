@@ -28,20 +28,20 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `DATABASE_URL` | PostgreSQL JDBC URL |
 | `DATABASE_USERNAME` | PostgreSQL 사용자 |
 | `DATABASE_PASSWORD` | PostgreSQL 비밀번호 |
-| `PAYMENTS_TOSS_SECRET_KEY` | Toss Payments secret key. 서버에서만 사용 |
-| `PAYMENTS_TOSS_BASE_URL` | Toss Payments API URL. 기본값은 `https://api.tosspayments.com` |
+| `PAYMENTS_TOSS_SECRET_KEY` | B-001 Toss 재도입 시 사용하는 server secret. 현재 계좌입금 경로에는 필수 아님 |
+| `PAYMENTS_TOSS_BASE_URL` | B-001 Toss 재도입용 API URL. 기본값은 `https://api.tosspayments.com` |
 | `SMS_SENS_ENABLED` | Naver Cloud SENS SMS 발송 활성화. 운영 기본값은 `false`; 실제 SENS 자격증명과 발신번호가 준비된 뒤 명시적으로 `true`로 켠다 |
 | `SMS_SENS_ACCESS_KEY` | Naver Cloud API access key |
 | `SMS_SENS_SECRET_KEY` | Naver Cloud API secret key. 서버에서만 사용 |
 | `SMS_SENS_SERVICE_ID` | SENS SMS service id |
 | `SMS_SENS_FROM_NUMBER` | SENS에 등록된 발신번호 |
-| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | Toss Payments client key. frontend 결제창 호출에 사용 |
+| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | B-001 Toss 재도입 시 frontend 결제창 호출에 사용. 현재 필수 아님 |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
 | `APP_INTERNAL_SYNC_TOKEN` | 내부 배송조회 동기화 API 호출용 shared token. 서버/스케줄러에서만 사용 |
 | `APP_AUTH_JWT_SECRET` | JWT access token 서명 secret. 충분히 긴 랜덤 값 사용 |
 | `APP_AUTH_SUCCESS_REDIRECT_URI` | OAuth callback 성공 후 frontend로 보낼 URI |
 | `APP_STORAGE_PUBLIC_BASE_URL` | 상품 이미지 공개 URL prefix. 기본값은 `/uploads/products` |
-| `APP_STORAGE_LOCAL_UPLOAD_DIR` | local storage 사용 시 상품 이미지 저장 디렉터리. 테스트 배포 기본값은 `/var/app/uploads/products` |
+| `APP_STORAGE_LOCAL_UPLOAD_DIR` | local storage 사용 시 상품 이미지 저장 디렉터리. EC2 기본값은 `/var/app/uploads/products` |
 | `OAUTH_GOOGLE_CLIENT_ID` | Google OAuth client id |
 | `OAUTH_GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `OAUTH_GOOGLE_REDIRECT_URI` | Google OAuth redirect URI |
@@ -52,7 +52,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
 
-Frontend 또는 Toss Payments 위젯에서 쓰는 client key는 public key로 취급하되, backend secret key와 분리해서 배포 환경에 설정한다. 현재 개발과 sandbox 검증은 Toss Payments test key로 진행하고, live PG 심사와 live key 전환은 배포된 홈페이지 URL이 준비된 뒤 진행한다. `PAYMENTS_TOSS_SECRET_KEY`, `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+현재 고객 결제 경로는 계좌입금이며 Toss key는 필수 운영값이 아니다. B-001에서 Toss를 재도입할 때 client key와 server secret을 분리해 설정한다. `PAYMENTS_TOSS_SECRET_KEY`, `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
 
 ## Health And Readiness
 
@@ -81,7 +81,7 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 
 ## Product Image Storage
 
-- 테스트 배포는 EC2 EBS-backed local volume에 상품 이미지를 저장할 수 있다.
+- 현재 저비용 배포는 EC2 EBS-backed local volume에 상품 이미지를 저장하고 S3에 백업한다.
 - 운영 전환 시에도 PostgreSQL에는 이미지 binary를 넣지 않는다. 상품/상세 API는 image URL metadata만 저장한다.
 - local storage 사용 시 `APP_STORAGE_LOCAL_UPLOAD_DIR`는 애플리케이션 재배포로 지워지지 않는 persistent volume 경로로 둔다.
 - `APP_STORAGE_PUBLIC_BASE_URL`은 API가 직접 `/uploads/products/**`를 서빙하면 `/uploads/products`, CDN/object storage로 이전하면 해당 public prefix로 바꾼다.
@@ -89,6 +89,7 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 ## AWS EC2 Docker Deployment
 
 - 배포 baseline은 [AWS EC2 Docker Deployment](aws-ec2-docker-deployment.md)를 따른다.
+- 현재 EC2는 비용 절감을 위해 정지됐고 자동 시작/정지 schedule도 비활성화됐다. 개발 재개 시 수동 시작 후 schedule 복구 여부를 결정한다.
 - GitHub Actions가 API/Web Docker 이미지를 GHCR에 push하고, EC2는 이미지를 pull해 Docker Compose로 재시작한다.
 - 서버에서 애플리케이션 소스 빌드는 하지 않는다.
 - PostgreSQL data, 상품 이미지, Cloudflare Origin Certificate는 EC2 local persistent path에 둔다.
@@ -115,8 +116,8 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - 운영 logging 기본값은 root `INFO`다.
 - Hibernate SQL debug logging은 운영에서 끈다.
 - 결제 secret, 개인정보, raw PG payload는 로그에 남기지 않는다.
-- MVP error monitoring은 배포 플랫폼 로그 수집과 알림으로 시작한다.
-- 운영 전 Sentry, OpenTelemetry collector, 또는 cloud provider error alert 중 하나를 선택해 uncaught exception과 5xx rate alert를 연결한다.
+- 현재 CloudWatch alarm은 아직 구성되지 않았다. B-062에서 EC2 status check, CPU credit, memory/swap, container restart, backup freshness 알림을 최소 범위로 연결한다.
+- Sentry와 OpenTelemetry는 실제 장애 분석에 AWS 기본 알림만으로 부족할 때 검토한다.
 - 5xx 급증, payment exception 증가, payment webhook 검증 실패, `REVIEW_REQUIRED` 증가, refund retry 증가, DB connection failure는 운영 알림 대상으로 둔다.
 
 ## Error Response Baseline
@@ -144,7 +145,8 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `cd apps/api && ./gradlew test --rerun-tasks`
 - `git diff --check`
 - staging 또는 운영 동일 profile에서 `/api/health`, `/actuator/health/readiness`, `/actuator/health/liveness` 확인
-- `DATABASE_*`, `PAYMENTS_TOSS_SECRET_KEY`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
+- `DATABASE_*`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
+- B-001 Toss 경로를 활성화하는 배포에서만 `PAYMENTS_TOSS_*`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 확인
 - `SMS_SENS_*` 설정과 SENS 발신번호 승인 상태 확인
 - Flyway migration 적용 순서 확인
 - PostgreSQL backup/snapshot 상태 확인
@@ -208,7 +210,7 @@ Follow-up on 2026-07-05:
 - `E2E_WEB_BASE_URL=https://coreable-saf.com npx playwright test deploy-smoke` 결과 `6 passed`.
 - 배포 URL에서 `visual-regression`과 screenshot 기반 readiness test는 명시 skip되며, 공개 readiness는 `2 passed`, snapshot/auth/seed 의존 test는 `28 skipped`로 실패 없이 종료된다.
 
-## Beta OAuth And Payment Readiness
+## OAuth And Payment Readiness
 
 DS-76 local verification on 2026-06-29:
 
@@ -220,6 +222,5 @@ DS-76 local verification on 2026-06-29:
 Remaining beta gates:
 
 - Complete real browser OAuth login and callback for Google, Kakao, and Naver with provider accounts.
-- Configure Toss Payments sandbox secret key on the API and public client key on the web app.
-- Verify real Toss sandbox success redirect, server confirmation, and order transition to `SUPPLIER_ORDER_PENDING`.
-- Verify Toss failure/cancel redirect and payment exception monitoring before production payment opening.
+- Before accepting bank-transfer orders, finalize purchase-safety service, cash-receipt operations, public refund wording, and initial product certification review.
+- Toss sandbox success/failure/cancel and payment exception monitoring remain B-001 deferred gates and are required only before enabling Toss for customers.

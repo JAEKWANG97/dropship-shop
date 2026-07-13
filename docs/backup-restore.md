@@ -20,7 +20,7 @@ Resources:
 ## Backup Policy
 
 - DB backup: `pg_dump -Fc` custom-format dump.
-- DB backup schedule: every day at `03:10 KST`.
+- DB backup schedule: every day at `00:10 KST` (`15:10 UTC` host cron), before the pre-launch EC2 stop schedule at `01:00 KST`.
 - DB S3 location: `s3://coreable-backups-prod/db/`.
 - Local DB retention: latest 3 dump files.
 - S3 DB retention: lifecycle expiration after 30 days.
@@ -31,6 +31,8 @@ Resources:
 - Root volume `DeleteOnTermination`: `false`.
 
 The EC2 host must use only the minimal IAM access key for `coreable-backup-writer`. Do not leave root or admin AWS credentials under `/opt/coreable`, `/home/ubuntu/.aws`, or any application directory.
+
+The `09:00 KST` start and `01:00 KST` stop schedules are only for the pre-launch environment. Disable the stop schedule before accepting real customer orders.
 
 ## Manual Backup
 

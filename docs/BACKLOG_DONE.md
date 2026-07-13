@@ -2,6 +2,27 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-13
+
+- B-040 GitHub Actions Docker build 최적화
+  - 완료 내용: API/Web ARM64 image build에 BuildKit GitHub Actions cache를 적용하고 문서-only push의 deploy skip을 유지했다.
+  - 검증: cache warm-up 후 `build-and-push`가 기준 `7m39s`에서 `5m43s`로 약 `1m56s` 감소했다.
+- B-042 즉시 보안/운영 핫픽스
+  - 완료 내용: OAuth redirect 검증, Toss 환불 idempotency, SMS 안전 기본값, deploy concurrency, Docker image prune, container memory 제한을 적용했다.
+- B-043 체크아웃 중복 제출 및 주문 상태 경합 방지
+  - 완료 내용: 장바구니 잠금과 주문/결제 그룹 낙관적 잠금으로 중복 checkout과 동시 상태 변경 충돌을 막았다.
+  - 검증: 중복 checkout과 고객 취소·관리자 액션 경합 회귀 테스트를 추가했다.
+- B-037 배포 환경 부하 smoke
+  - 완료 내용: 공개 페이지/API를 5 VU, 20 VU로 검증하고 t4g.micro의 응답 시간과 메모리/swap 기준을 기록했다.
+- B-038 실오픈 전 성능/보안 baseline 점검
+  - 완료 내용: Lighthouse mobile과 OWASP ZAP passive baseline을 기록하고 후속 웹 보안 헤더 작업을 B-058로 완료했다.
+
+## 2026-07-12
+
+- B-060 테스트 환경 EC2 운영시간 스케줄링
+  - 완료 내용: EventBridge Scheduler로 `coreable-saf-test` EC2를 매일 `09:00 KST`에 시작하고 `01:00 KST`에 정지하도록 구성했다. Scheduler IAM Role은 해당 인스턴스의 시작·정지만 허용한다.
+  - 운영 기준: 야간 정지 전에 완료되도록 DB·업로드 백업 cron을 `03:10`에서 `00:10 KST`로 옮겼다. 자동 정지는 오픈 전 전용이며 실제 주문을 받기 전에 비활성화한다.
+
 ## 2026-07-05
 
 - B-058 웹 보안 헤더 hardening
