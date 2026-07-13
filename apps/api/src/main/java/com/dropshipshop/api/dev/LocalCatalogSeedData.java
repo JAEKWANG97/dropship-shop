@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
+import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlock;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImage;
@@ -109,14 +110,16 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 
 	private void seedProduct(Supplier supplier, SeedProduct seed) {
 		String imageUrl = image(seed, "thumb", seed.color());
-		Product product = productRepository.save(new Product(
+		Product product = new Product(
 			supplier,
 			seed.name(),
 			seed.summary(),
 			seed.basePrice(),
 			seed.categoryCode(),
 			seed.status()
-		));
+		);
+		product.updateComplianceStatus(ProductComplianceStatus.NOT_REQUIRED);
+		productRepository.save(product);
 		product.updateThumbnailImageUrl(imageUrl);
 
 		productOptionRepository.save(new ProductOption(product, "기본", 0, ProductOptionStatus.ACTIVE));

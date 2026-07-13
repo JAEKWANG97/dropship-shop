@@ -31,6 +31,7 @@ type AdminProductDetailPageProps = {
 
 const PRODUCT_STATUSES = ["ACTIVE", "SOLD_OUT", "HIDDEN", "STOPPED"] as const;
 const OPTION_STATUSES = ["ACTIVE", "SOLD_OUT", "STOPPED"] as const;
+const COMPLIANCE_STATUSES = ["PENDING", "NOT_REQUIRED", "VERIFIED", "REJECTED"] as const;
 
 async function loadProduct(productId: string) {
   try {
@@ -311,6 +312,10 @@ function ProductSummaryPanel({
               <dd>{formatPrice(product.basePrice)}</dd>
             </div>
             <div>
+              <dt>인증 검수</dt>
+              <dd>{complianceStatusLabel(product.complianceStatus ?? listProduct?.complianceStatus ?? "PENDING")}</dd>
+            </div>
+            <div>
               <dt>상세 버전</dt>
               <dd>v{product.detailVersion}</dd>
             </div>
@@ -339,7 +344,7 @@ function ProductPricingPanel({
   return (
     <section className="admin-panel">
       <div className="admin-panel-head">
-        <h2>가격 관리</h2>
+        <h2>가격 및 판매 검수</h2>
         <span>계산 판매가 {formatPrice(calculatedPrice)} · {pricingPolicy.roundingUnit}원 단위 반올림</span>
       </div>
       <form action={updateAdminProductPrices} className="admin-form-grid">
@@ -357,12 +362,20 @@ function ProductPricingPanel({
           <input name="basePrice" required min="0" type="number" defaultValue={product.basePrice} />
         </label>
         <label>
+          인증 검수
+          <select name="complianceStatus" required defaultValue={product.complianceStatus ?? listProduct?.complianceStatus ?? "PENDING"}>
+            {COMPLIANCE_STATUSES.map((status) => (
+              <option key={status} value={status}>{complianceStatusLabel(status)}</option>
+            ))}
+          </select>
+        </label>
+        <label>
           변경 사유
           <input name="reason" required placeholder="예: 도매가 25% 마진 및 100원 반올림 적용" />
         </label>
         <div className="admin-form-actions wide">
           <button className="button" name="priceMode" value="manual" type="submit">
-            입력 가격 저장
+            입력 정보 저장
           </button>
           <button className="button primary" name="priceMode" value="apply" type="submit">
             계산가 적용
@@ -371,6 +384,15 @@ function ProductPricingPanel({
       </form>
     </section>
   );
+}
+
+function complianceStatusLabel(status: string) {
+  return ({
+    PENDING: "검수 전",
+    NOT_REQUIRED: "인증 비대상",
+    VERIFIED: "인증 확인 완료",
+    REJECTED: "판매 불가",
+  }[status] ?? status);
 }
 
 function ProductStatusPanel({ product }: { product: ProductDetail }) {

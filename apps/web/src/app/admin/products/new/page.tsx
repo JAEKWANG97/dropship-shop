@@ -84,7 +84,7 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
               </label>
               <label>
                 판매 상태
-                <select name="status" defaultValue="ACTIVE">
+                <select name="status" defaultValue="HIDDEN">
                   <option value="ACTIVE">판매중</option>
                   <option value="SOLD_OUT">품절</option>
                   <option value="HIDDEN">숨김</option>

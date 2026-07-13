@@ -2,6 +2,13 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-14
+
+- B-056 판매 필수정보 없는 상품의 ACTIVE 전환 차단
+  - 완료 내용: 상품 판매가는 0원보다 커야 하고 대표 이미지, 판매 가능한 옵션, 활성 상품 고시가 있어야 하며 인증 검수 상태가 `NOT_REQUIRED` 또는 `VERIFIED`일 때만 `ACTIVE` 전환을 허용한다. 신규 상품은 `HIDDEN` 등록을 기본으로 하고, 활성 상품에서 필수정보를 제거하는 가격·이미지·옵션·인증 변경도 같은 검증으로 차단한다.
+  - 데이터 처리: `products.compliance_status`를 추가하고 기존 상품은 `PENDING`, 기존 `ACTIVE` 상품은 검수 증적이 없으므로 `HIDDEN`으로 전환한다.
+  - 검증: `CatalogApiIntegrationTest`, Web lint/build, 전체 API 테스트, PostgreSQL migration smoke, `git diff --check`.
+
 ## 2026-07-13
 
 - B-040 GitHub Actions Docker build 최적화

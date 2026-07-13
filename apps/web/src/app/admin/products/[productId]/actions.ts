@@ -2,11 +2,11 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { apiSendWithCookie, apiUrl } from "@/lib/api";
+import { ApiError, apiSendWithCookie, apiUrl } from "@/lib/api";
 import type { PricingPolicy } from "@/lib/admin";
 import { getAdminPricingPolicy } from "@/lib/admin";
 import type { ProductCategoryCode } from "@/lib/categories";
-import type { ProductDetailBlockType, ProductOptionStatus, ProductStatus } from "@/lib/catalog";
+import type { ProductComplianceStatus, ProductDetailBlockType, ProductOptionStatus, ProductStatus } from "@/lib/catalog";
 
 function text(formData: FormData, name: string) {
   const value = formData.get(name);
@@ -80,8 +80,10 @@ export async function updateAdminProductStatus(formData: FormData) {
         reason: text(formData, "reason"),
       }),
     });
-  } catch {
-    message = "상품 판매 상태 변경에 실패했습니다.";
+  } catch (error) {
+    message = error instanceof ApiError && error.responseMessage
+      ? error.responseMessage
+      : "상품 판매 상태 변경에 실패했습니다.";
   }
   redirect(detailPath(productId, message));
 }
@@ -106,11 +108,14 @@ export async function updateAdminProductPrices(formData: FormData) {
         sourcePrice,
         basePrice,
         categoryCode: text(formData, "categoryCode") as ProductCategoryCode,
+        complianceStatus: text(formData, "complianceStatus") as ProductComplianceStatus,
         reason: text(formData, "reason"),
       }),
     });
-  } catch {
-    message = "상품 가격 저장에 실패했습니다.";
+  } catch (error) {
+    message = error instanceof ApiError && error.responseMessage
+      ? error.responseMessage
+      : "상품 가격 저장에 실패했습니다.";
   }
 
   redirect(detailPath(productId, message));

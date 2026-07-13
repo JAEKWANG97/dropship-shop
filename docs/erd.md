@@ -326,6 +326,7 @@ Relationships:
 - `base_price`
 - `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - `status`: `ACTIVE` / `SOLD_OUT` / `HIDDEN` / `STOPPED`
+- `compliance_status`: `PENDING` / `NOT_REQUIRED` / `VERIFIED` / `REJECTED`
 - `thumbnail_image_url`: optional denormalized cache
 - `created_at`
 - `updated_at`
@@ -337,6 +338,7 @@ Rules:
 - Existing order item price snapshots are not changed when product source or sale prices change.
 - One product has one `category_code`; category admin and multi-category mapping are future scope.
 - Customer-visible sale requires product `ACTIVE` and option `ACTIVE`.
+- Product activation additionally requires positive `base_price`, one canonical thumbnail, one active option, an active product notice, and compliance status `NOT_REQUIRED` or `VERIFIED`.
 - Canonical thumbnail data lives in `product_images` where `type = THUMBNAIL`.
 - If `thumbnail_image_url` is kept on `products`, it is a cache updated from canonical thumbnail image metadata.
 

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { apiGetWithCookie } from "./api";
 import type { ProductCategoryCode } from "./categories";
-import type { ProductDetail, ProductOptionStatus } from "./catalog";
+import type { ProductComplianceStatus, ProductDetail, ProductOptionStatus } from "./catalog";
 
 export type AdminProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 
@@ -15,6 +15,7 @@ export type AdminProduct = {
   basePrice: number;
   categoryCode: ProductCategoryCode;
   status: AdminProductStatus;
+  complianceStatus: ProductComplianceStatus;
   thumbnailImageUrl: string | null;
   detailVersion: number;
 };

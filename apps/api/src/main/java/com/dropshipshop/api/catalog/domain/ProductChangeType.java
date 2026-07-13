@@ -3,6 +3,7 @@ package com.dropshipshop.api.catalog.domain;
 public enum ProductChangeType {
 	PRICE,
 	PRODUCT_STATUS,
+	COMPLIANCE_STATUS,
 	PRODUCT_CATEGORY,
 	OPTION_STATUS,
 	SUPPLIER,

@@ -1,6 +1,7 @@
 package com.dropshipshop.api.catalog;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductChangeHistory;
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
+import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlock;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImage;
@@ -163,6 +165,9 @@ public class CatalogService {
 
 	@Transactional
 	public CatalogDtos.AdminProductResponse createProduct(CatalogDtos.ProductCreateRequest request) {
+		if (request.status() == ProductStatus.ACTIVE) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상품은 HIDDEN으로 등록한 뒤 판매 필수정보를 확인하세요");
+		}
 		Supplier supplier = findSupplier(request.supplierId());
 		Product product = new Product(
 			supplier,
@@ -203,6 +208,8 @@ public class CatalogService {
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
 		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
+		product.updateComplianceStatus(valueOrDefault(request.complianceStatus(), product.getComplianceStatus()));
+		validateIfActive(product);
 		return toAdminProductResponse(product);
 	}
 
@@ -215,6 +222,9 @@ public class CatalogService {
 		Product product = findProduct(productId);
 		requireReason(request.reason());
 		if (product.getStatus() != request.status()) {
+			if (request.status() == ProductStatus.ACTIVE) {
+				validateSaleReadiness(product);
+			}
 			recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_STATUS,
 				product.getStatus().name(), request.status().name(), request.reason());
 			product.updateStatus(request.status());
@@ -280,6 +290,7 @@ public class CatalogService {
 			recordChange(option.getProduct(), option, adminUserId, ProductChangeType.OPTION_STATUS,
 				option.getStatus().name(), request.status().name(), request.reason());
 			option.updateStatus(request.status());
+			validateIfActive(option.getProduct());
 		}
 		return toOptionResponse(option, true);
 	}
@@ -299,6 +310,7 @@ public class CatalogService {
 			.toList();
 		productImageRepository.saveAll(images);
 		product.updateThumbnailImageUrl(thumbnailUrl(images));
+		validateIfActive(product);
 		recordChange(product, null, adminUserId, ProductChangeType.IMAGES, null, "replaced", request.reason());
 		return toProductDetailResponse(product, true);
 	}
@@ -416,6 +428,38 @@ public class CatalogService {
 				request.name() + " / " + request.summary(),
 				request.reason());
 		}
+		if (request.complianceStatus() != null && product.getComplianceStatus() != request.complianceStatus()) {
+			recordChange(product, null, adminUserId, ProductChangeType.COMPLIANCE_STATUS,
+				product.getComplianceStatus().name(), request.complianceStatus().name(), request.reason());
+		}
+	}
+
+	private void validateIfActive(Product product) {
+		if (product.getStatus() == ProductStatus.ACTIVE) {
+			validateSaleReadiness(product);
+		}
+	}
+
+	private void validateSaleReadiness(Product product) {
+		List<String> missing = new ArrayList<>();
+		if (product.getBasePrice() <= 0) {
+			missing.add("판매가");
+		}
+		if (!productImageRepository.existsByProduct_IdAndType(product.getId(), ProductImageType.THUMBNAIL)) {
+			missing.add("대표 이미지");
+		}
+		if (!productOptionRepository.existsByProduct_IdAndStatus(product.getId(), ProductOptionStatus.ACTIVE)) {
+			missing.add("판매 가능한 옵션");
+		}
+		if (!productNoticeRepository.existsByProduct_IdAndStatus(product.getId(), ProductNoticeStatus.ACTIVE)) {
+			missing.add("상품 고시");
+		}
+		if (!product.getComplianceStatus().allowsSale()) {
+			missing.add("인증 검수");
+		}
+		if (!missing.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ACTIVE 전환 불가: " + String.join(", ", missing));
+		}
 	}
 
 	private Supplier findSupplier(UUID supplierId) {
@@ -524,6 +568,10 @@ public class CatalogService {
 		return value == null ? defaultValue : value;
 	}
 
+	private ProductComplianceStatus valueOrDefault(ProductComplianceStatus value, ProductComplianceStatus defaultValue) {
+		return value == null ? defaultValue : value;
+	}
+
 	private long sourcePrice(Long sourcePrice, long basePrice) {
 		return sourcePrice == null ? basePrice : sourcePrice;
 	}
@@ -578,6 +626,7 @@ public class CatalogService {
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
+			product.getComplianceStatus(),
 			product.getThumbnailImageUrl(),
 			product.getDetailVersion()
 		);
@@ -623,6 +672,7 @@ public class CatalogService {
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
+			includeSourcePrice ? product.getComplianceStatus() : null,
 			product.getThumbnailImageUrl(),
 			product.getDetailVersion(),
 			notice == null ? null : notice.version(),

@@ -48,6 +48,10 @@ public class Product {
 	@Column(nullable = false, length = 20)
 	private ProductStatus status;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "compliance_status", nullable = false, length = 20)
+	private ProductComplianceStatus complianceStatus = ProductComplianceStatus.PENDING;
+
 	@Column(name = "thumbnail_image_url", length = 1000)
 	private String thumbnailImageUrl;
 
@@ -121,6 +125,10 @@ public class Product {
 		this.status = status;
 	}
 
+	public void updateComplianceStatus(ProductComplianceStatus complianceStatus) {
+		this.complianceStatus = complianceStatus;
+	}
+
 	public void updateThumbnailImageUrl(String thumbnailImageUrl) {
 		this.thumbnailImageUrl = thumbnailImageUrl;
 	}
@@ -159,6 +167,10 @@ public class Product {
 
 	public ProductStatus getStatus() {
 		return status;
+	}
+
+	public ProductComplianceStatus getComplianceStatus() {
+		return complianceStatus;
 	}
 
 	public String getThumbnailImageUrl() {

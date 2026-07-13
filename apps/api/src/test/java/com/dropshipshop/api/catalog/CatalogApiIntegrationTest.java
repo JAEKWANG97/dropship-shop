@@ -105,7 +105,7 @@ class CatalogApiIntegrationTest {
 			.andReturn();
 		String uploadedImageUrl = fieldFrom(uploadResult, "imageUrl");
 
-		mockMvc.perform(post("/api/admin/products/{productId}/options", productId)
+		MvcResult optionResult = mockMvc.perform(post("/api/admin/products/{productId}/options", productId)
 				.with(authentication(TestAuthentication.admin()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -124,13 +124,16 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.sourceOptionCode", is("00")))
 			.andExpect(jsonPath("$.sourceAdditionalPrice", is(800)))
 			.andExpect(jsonPath("$.sourceStockQuantity", is(120)))
-			.andExpect(jsonPath("$.sortOrder", is(2)));
+			.andExpect(jsonPath("$.sortOrder", is(2)))
+			.andReturn();
+		UUID optionId = idFrom(optionResult);
 
 		mockMvc.perform(get("/api/admin/products/{productId}", productId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.options[0].sourceOptionCode", is("00")))
-			.andExpect(jsonPath("$.options[0].sourceStockQuantity", is(120)));
+			.andExpect(jsonPath("$.options[0].sourceStockQuantity", is(120)))
+			.andExpect(jsonPath("$.complianceStatus", is("PENDING")));
 
 		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -194,6 +197,36 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.productNoticeVersion", is(1)))
 			.andExpect(jsonPath("$.productNotice.productInfoNotice", is("Product info notice")));
 
+		mockMvc.perform(patch("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Product A",
+					  "summary": "Summary",
+					  "sourcePrice": 31200,
+					  "basePrice": 39000,
+					  "categoryCode": "PPE_SAFETY_HELMET",
+					  "complianceStatus": "VERIFIED",
+					  "reason": "Certification reviewed"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.complianceStatus", is("VERIFIED")));
+
+		mockMvc.perform(patch("/api/admin/products/{productId}/status", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "ACTIVE",
+					  "reason": "Sale readiness confirmed"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("ACTIVE")));
+
 		mockMvc.perform(get("/api/products"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$", hasSize(1)))
@@ -203,6 +236,7 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/products/{productId}", productId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
+			.andExpect(jsonPath("$.complianceStatus").doesNotExist())
 			.andExpect(jsonPath("$.options", hasSize(1)))
 			.andExpect(jsonPath("$.options[0].sourceOptionCode").doesNotExist())
 			.andExpect(jsonPath("$.options[0].sourceAdditionalPrice").doesNotExist())
@@ -210,6 +244,57 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.options[0].sortOrder").doesNotExist())
 			.andExpect(jsonPath("$.images", hasSize(2)))
 			.andExpect(jsonPath("$.productNoticeVersion", is(1)));
+
+		mockMvc.perform(patch("/api/admin/products/{productId}/options/{optionId}/status", productId, optionId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "SOLD_OUT",
+					  "reason": "Test last option guard"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("판매 가능한 옵션")));
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Test thumbnail guard",
+					  "images": []
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("대표 이미지")));
+
+		mockMvc.perform(patch("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Product A",
+					  "summary": "Summary",
+					  "sourcePrice": 31200,
+					  "basePrice": 0,
+					  "categoryCode": "PPE_SAFETY_HELMET",
+					  "complianceStatus": "PENDING",
+					  "reason": "Test price and compliance guard"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("판매가")))
+			.andExpect(jsonPath("$.message", containsString("인증 검수")));
+
+		mockMvc.perform(get("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.basePrice", is(39000)))
+			.andExpect(jsonPath("$.complianceStatus", is("VERIFIED")))
+			.andExpect(jsonPath("$.options[0].status", is("ACTIVE")))
+			.andExpect(jsonPath("$.images", hasSize(2)));
 
 		mockMvc.perform(patch("/api/admin/products/{productId}/status", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -226,7 +311,7 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.changes", hasSize(4)))
+			.andExpect(jsonPath("$.changes", hasSize(6)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'IMAGES')]", hasSize(1)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeValue", hasItem("ACTIVE")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].afterValue", hasItem("HIDDEN")))
@@ -244,6 +329,61 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isNotFound());
 
 		org.assertj.core.api.Assertions.assertThat(productChangeHistoryRepository.count()).isGreaterThanOrEqualTo(4);
+	}
+
+	@Test
+	void rejectsActiveCreationAndReportsMissingSaleRequirements() throws Exception {
+		UUID supplierId = createSupplier();
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Unsafe active product",
+					  "summary": "Missing review data",
+					  "sourcePrice": 0,
+					  "basePrice": 0,
+					  "categoryCode": "PPE_SAFETY_HELMET",
+					  "status": "ACTIVE"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("HIDDEN")));
+
+		MvcResult hiddenProduct = mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Pending product",
+					  "summary": "Missing review data",
+					  "sourcePrice": 0,
+					  "basePrice": 0,
+					  "categoryCode": "PPE_SAFETY_HELMET",
+					  "status": "HIDDEN"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isCreated())
+			.andReturn();
+
+		mockMvc.perform(patch("/api/admin/products/{productId}/status", idFrom(hiddenProduct))
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "ACTIVE",
+					  "reason": "Try incomplete activation"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("판매가")))
+			.andExpect(jsonPath("$.message", containsString("대표 이미지")))
+			.andExpect(jsonPath("$.message", containsString("판매 가능한 옵션")))
+			.andExpect(jsonPath("$.message", containsString("상품 고시")))
+			.andExpect(jsonPath("$.message", containsString("인증 검수")));
 	}
 
 	@Test
@@ -359,14 +499,14 @@ class CatalogApiIntegrationTest {
 					  "sourcePrice": 31200,
 					  "basePrice": 39000,
 					  "categoryCode": "PPE_SAFETY_HELMET",
-					  "status": "ACTIVE"
+					  "status": "HIDDEN"
 					}
 					""".formatted(supplierId)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.sourcePrice", is(31200)))
 			.andExpect(jsonPath("$.basePrice", is(39000)))
 			.andExpect(jsonPath("$.categoryCode", is("PPE_SAFETY_HELMET")))
-			.andExpect(jsonPath("$.status", is("ACTIVE")))
+			.andExpect(jsonPath("$.status", is("HIDDEN")))
 			.andReturn();
 		return idFrom(result);
 	}

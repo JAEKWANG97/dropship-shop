@@ -12,5 +12,7 @@ public interface ProductNoticeRepository extends JpaRepository<ProductNotice, UU
 
 	Optional<ProductNotice> findFirstByProduct_IdAndStatusOrderByVersionDesc(UUID productId, ProductNoticeStatus status);
 
+	boolean existsByProduct_IdAndStatus(UUID productId, ProductNoticeStatus status);
+
 	int countByProduct_Id(UUID productId);
 }

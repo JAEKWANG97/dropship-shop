@@ -181,6 +181,7 @@ Suggested fields:
 - basePrice
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
+- complianceStatus: PENDING / NOT_REQUIRED / VERIFIED / REJECTED
 - thumbnailImageUrl: optional denormalized cache of the thumbnail `ProductImage`
 - createdAt
 - updatedAt
@@ -191,6 +192,7 @@ Modeling notes:
 - `sourcePrice` is internal cost. `basePrice` is the customer sale price including expected shipping cost.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
+- `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status `NOT_REQUIRED` or `VERIFIED`.
 
 ## ProductImage
 
@@ -813,7 +815,7 @@ Suggested fields:
 - productId
 - productOptionId
 - adminUserId
-- changeType: PRICE / PRODUCT_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE
+- changeType: PRICE / PRODUCT_STATUS / COMPLIANCE_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE
 - beforeValue
 - afterValue
 - reason

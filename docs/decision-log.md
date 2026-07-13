@@ -1,5 +1,22 @@
 # Decision Log
 
+## 2026-07-14: Product Activation Requires Explicit Sale Readiness
+
+Decision:
+
+Allow `ACTIVE` only when a product has a positive sale price, canonical thumbnail, active option, active product notice, and compliance review state `NOT_REQUIRED` or `VERIFIED`. New products start non-active. Do not infer certification requirements from category alone.
+
+Context:
+
+Collected products could be activated before required sales information and certification review were complete. The existing model had no machine-readable record that an administrator had determined whether certification was required or verified.
+
+Consequences:
+
+- `products.compliance_status` stores `PENDING`, `NOT_REQUIRED`, `VERIFIED`, or `REJECTED`; changes reuse product change history.
+- Existing products start `PENDING`, and existing `ACTIVE` products move to `HIDDEN` because no prior compliance evidence exists.
+- Activation and mutations that could invalidate an active product use the same backend readiness validation.
+- B-064 may display richer review reasons, but it must reuse this backend rule rather than define a second activation policy.
+
 ## 2026-07-13: Customer Inquiry Consent, Retention, And Reply Channel
 
 Decision:

@@ -256,6 +256,9 @@ DS-6 minimum:
 - Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
 - Admin product responses include `sourcePrice`; public product responses do not expose supplier cost.
+- Admin product responses include `complianceStatus`; public product responses do not expose internal compliance review state.
+- Products must be created as non-active. `ACTIVE` requires a positive sale price, thumbnail, active option, active product notice, and `NOT_REQUIRED` or `VERIFIED` compliance review.
+- Price, image, option, and compliance updates cannot leave an `ACTIVE` product without those requirements.
 - Active pricing policy stores the default margin rates used to calculate customer sale prices from supplier cost.
 - Customer product list/detail read APIs.
 

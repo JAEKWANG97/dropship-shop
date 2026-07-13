@@ -32,6 +32,9 @@ Status: Confirmed
 - 상품과 옵션은 재고 수량 대신 판매 상태만 가진다.
 - 상품 전체 상태와 상품 옵션 상태를 분리한다.
 - 상품이 `ACTIVE`이고 옵션도 `ACTIVE`일 때만 고객이 구매할 수 있다.
+- 상품은 판매가가 0원보다 크고, 대표 이미지, `ACTIVE` 옵션, 활성 상품 고시가 있으며 인증 검수 상태가 `NOT_REQUIRED` 또는 `VERIFIED`일 때만 `ACTIVE`가 될 수 있다.
+- 인증 검수 상태는 `PENDING`, `NOT_REQUIRED`, `VERIFIED`, `REJECTED`로 관리하고 카테고리만으로 인증 대상 여부를 자동 판단하지 않는다.
+- 신규 상품은 `HIDDEN`으로 등록한 뒤 판매 필수정보와 인증 여부를 확인하고 `ACTIVE`로 전환한다.
 - 상품이 `HIDDEN`이면 고객 상품 목록과 상세에서 노출하지 않는다.
 - 상품이 `STOPPED`이면 더 이상 판매하지 않는 상품으로 취급한다.
 - 옵션이 `SOLD_OUT`이면 해당 옵션만 선택할 수 없다.
@@ -59,6 +62,7 @@ Status: Confirmed
 - 주문 생성 시 상품/옵션이 판매 가능한 상태인지 검증한다.
 - 결제 후 품절 가능성을 주문/환불 정책에서 반드시 처리해야 한다.
 - 구매 가능 조건은 `Product.status == ACTIVE` and `ProductOption.status == ACTIVE`이다.
+- `ACTIVE` 전환과 활성 상품의 가격·대표 이미지·옵션·인증 변경은 같은 판매 준비 조건을 검증해야 한다.
 - 상품 전체 품절과 옵션 단위 품절을 구분해 관리자 화면에서 처리해야 한다.
 - 상품 상세 콘텐츠 모델은 `ProductDetailBlock` 또는 동등한 구조를 가진다.
 - HTML 상세는 XSS 위험이 있으므로 허용 태그, 속성, URL protocol을 제한해야 한다.

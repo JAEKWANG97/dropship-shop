@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
+import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
@@ -67,6 +68,7 @@ final class CatalogDtos {
 		@Min(0) Long sourcePrice,
 		@Min(0) long basePrice,
 		@NotNull ProductCategory categoryCode,
+		ProductComplianceStatus complianceStatus,
 		@NotBlank @Size(max = 500) String reason
 	) {
 	}
@@ -214,6 +216,7 @@ final class CatalogDtos {
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,
+		ProductComplianceStatus complianceStatus,
 		String thumbnailImageUrl,
 		int detailVersion
 	) {
@@ -238,6 +241,7 @@ final class CatalogDtos {
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,
+		@JsonInclude(JsonInclude.Include.NON_NULL) ProductComplianceStatus complianceStatus,
 		String thumbnailImageUrl,
 		int detailVersion,
 		Integer productNoticeVersion,

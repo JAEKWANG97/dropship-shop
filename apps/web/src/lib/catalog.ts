@@ -2,6 +2,7 @@ import { apiGet } from "./api";
 import type { ProductCategoryCode } from "./categories";
 
 export type ProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
+export type ProductComplianceStatus = "PENDING" | "NOT_REQUIRED" | "VERIFIED" | "REJECTED";
 export type ProductOptionStatus = "ACTIVE" | "SOLD_OUT" | "STOPPED";
 export type ProductImageType = "THUMBNAIL" | "GALLERY";
 export type ProductDetailBlockType = "IMAGE" | "HTML";
@@ -61,6 +62,7 @@ export type PolicyLink = {
 
 export type ProductDetail = ProductSummary & {
   sourcePrice?: number;
+  complianceStatus?: ProductComplianceStatus;
   detailVersion: number;
   productNoticeVersion: number | null;
   images: ProductImage[];

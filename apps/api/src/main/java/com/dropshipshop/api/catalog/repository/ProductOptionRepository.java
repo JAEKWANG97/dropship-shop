@@ -7,10 +7,13 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.dropshipshop.api.catalog.domain.ProductOption;
+import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 
 public interface ProductOptionRepository extends JpaRepository<ProductOption, UUID> {
 
 	List<ProductOption> findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(UUID productId);
 
 	Optional<ProductOption> findByIdAndProduct_Id(UUID id, UUID productId);
+
+	boolean existsByProduct_IdAndStatus(UUID productId, ProductOptionStatus status);
 }
