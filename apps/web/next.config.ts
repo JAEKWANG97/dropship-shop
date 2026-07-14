@@ -4,7 +4,7 @@ const apiBaseUrl = process.env.DROPSHIP_API_BASE_URL ?? "http://localhost:8080";
 
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
   "img-src 'self' data: blob:",
   "font-src 'self' data: https://cdn.jsdelivr.net",

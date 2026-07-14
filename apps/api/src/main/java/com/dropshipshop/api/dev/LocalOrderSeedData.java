@@ -134,19 +134,18 @@ public class LocalOrderSeedData implements ApplicationRunner {
 	}
 
 	private Product activeProduct() {
-		List<Product> products = productRepository.findAllByStatus(ProductStatus.ACTIVE);
-		if (products.isEmpty()) {
-			throw new IllegalStateException("Local order seed requires at least one active product");
-		}
-		return products.getFirst();
+		return productRepository.findAllByStatus(ProductStatus.ACTIVE).stream()
+			.filter(product -> product.getName().equals(LocalCatalogSeedData.PRIMARY_PRODUCT_NAME))
+			.findFirst()
+			.orElseThrow(() -> new IllegalStateException("Local order seed requires the primary active product"));
 	}
 
 	private ProductOption activeOption(Product product) {
 		return productOptionRepository.findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(product.getId())
 			.stream()
-			.filter(option -> option.getStatus() == ProductOptionStatus.ACTIVE)
+			.filter(option -> option.getName().equals("기본") && option.getStatus() == ProductOptionStatus.ACTIVE)
 			.findFirst()
-			.orElseThrow(() -> new IllegalStateException("Local order seed requires an active product option"));
+			.orElseThrow(() -> new IllegalStateException("Local order seed requires the primary active product option"));
 	}
 
 	private void seedPaymentPending(UserAccount customer, Product product, ProductOption option) {

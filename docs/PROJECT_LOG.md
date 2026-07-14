@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-07-14 B-066 Playwright 판매 가능 fixture와 snapshot 복구
+
+- 관련 항목: B-066
+- 작업: B-056 migration 이후 공개 상품이 0건이 된 기존 로컬 DB에서도 판매 가능한 fixture와 이미지 파일을 멱등적으로 복구하도록 카탈로그 시드를 바꿨다.
+- 문제·고민: 기존 시드는 첫 공급처가 존재하면 전체 실행을 종료해 상품 상태와 인증 검수, 누락 파일을 복구하지 못했다. Playwright와 주문 시드는 임의의 첫 활성 상품에 의존해 DB 정렬이나 운영 데이터에 따라 화면과 snapshot이 달라졌다. 개발 CSP가 Next.js dev runtime의 `eval`을 차단해 모바일 고정 구매 바 클릭도 dev overlay에 가로막혔다.
+- 해결방안: 정확한 공급처 이름과 공급처 ID·상품명으로 시드 소유 데이터를 식별해 upsert하고, 대표 상품과 기본 옵션을 고정했다. CSP의 `unsafe-eval`은 개발 모드에만 허용하고 production 정책은 유지했다. snapshot은 actual/diff를 직접 확인한 6개만 갱신했다.
+- 검증: `LocalCatalogSeedDataTest`와 전체 API 테스트, Web lint/build를 통과했다. Playwright 전체 suite는 Desktop/Mobile 합계 `63 passed / 23 skipped / 0 failed`이며 skip은 프로젝트별 비대상 시나리오와 명시된 환경 조건만 남았다. `git diff --check`도 통과했다.
+
 ## 2026-07-14 B-063 관리자 상품 목록 서버 페이징과 필터
 
 - 관련 항목: B-063

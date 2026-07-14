@@ -146,12 +146,16 @@ cd apps/api
 ./gradlew test --tests '*Postgres*Smoke*'
 ```
 
-모바일/관리자 화면 회귀를 확인해야 하는 변경이면 로컬 API/Web을 띄운 뒤 Playwright smoke를 실행한다. 로그인 화면은 `E2E_CUSTOMER_COOKIE`, `E2E_ADMIN_COOKIE`가 있을 때만 확인한다.
+모바일/관리자 화면 회귀를 확인해야 하는 변경이면 로컬 API/Web을 띄운 뒤 Playwright smoke를 실행한다. 로컬은 기존 dev-login fallback으로 고객/관리자 쿠키를 준비하고, 배포 URL은 `E2E_CUSTOMER_COOKIE`, `E2E_ADMIN_COOKIE`가 있을 때만 인증 화면을 확인한다.
+
+`local/dev`에서 `APP_SEED_ENABLED=true`로 시작하면 카탈로그 시드 10개는 authoritative fixture로 동작한다. 정확한 시드 상품을 로컬에서 수정해도 재시작하면 정의된 가격, 상태, 인증 상태, 대표 이미지와 필수 연관 데이터가 복구된다. 수집 상품이나 사용자가 등록한 비시드 상품은 수정하지 않는다.
 
 ```sh
 cd apps/web
 npm run test:e2e
 ```
+
+snapshot 차이가 나면 바로 baseline을 덮지 않는다. 먼저 갱신 없이 실행해 `actual`과 `diff`를 확인하고 overflow, 겹침, 빈 화면이 없는지 검토한다. 의도된 UI 변경만 `--update-snapshots`로 갱신한 뒤 전체 suite를 다시 실행한다.
 
 필요하면 API를 실행하고 health endpoints를 직접 확인한다.
 

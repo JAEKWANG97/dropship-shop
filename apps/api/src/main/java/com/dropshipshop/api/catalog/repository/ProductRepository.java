@@ -1,6 +1,7 @@
 package com.dropshipshop.api.catalog.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -18,6 +19,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
 	@EntityGraph(attributePaths = "supplier")
 	List<Product> findAllByStatus(ProductStatus status);
+
+	Optional<Product> findBySupplier_IdAndName(UUID supplierId, String name);
 
 	@Query(
 		value = """

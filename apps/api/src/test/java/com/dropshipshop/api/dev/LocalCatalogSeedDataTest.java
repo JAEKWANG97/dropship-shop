@@ -1,28 +1,39 @@
 package com.dropshipshop.api.dev;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 
+import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
+import com.dropshipshop.api.catalog.domain.ProductImageType;
+import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
+import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
+import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductDetailBlockRepository;
 import com.dropshipshop.api.catalog.repository.ProductImageRepository;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(
 	webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -49,6 +60,7 @@ class LocalCatalogSeedDataTest {
 	private final ProductNoticeRepository productNoticeRepository;
 	private final Path imageStoragePath;
 	private final MockMvc mockMvc;
+	private final LocalCatalogSeedData seedData;
 
 	@Autowired
 	LocalCatalogSeedDataTest(
@@ -59,7 +71,8 @@ class LocalCatalogSeedDataTest {
 		ProductDetailBlockRepository productDetailBlockRepository,
 		ProductNoticeRepository productNoticeRepository,
 		@Value("${app.catalog.image-storage-path}") String imageStoragePath,
-		MockMvc mockMvc
+		MockMvc mockMvc,
+		LocalCatalogSeedData seedData
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -69,6 +82,74 @@ class LocalCatalogSeedDataTest {
 		this.productNoticeRepository = productNoticeRepository;
 		this.imageStoragePath = Path.of(imageStoragePath);
 		this.mockMvc = mockMvc;
+		this.seedData = seedData;
+	}
+
+	@Test
+	@DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+	void restoresExistingSeedProductsWithoutTouchingOtherProducts() throws Exception {
+		Map<String, UUID> seedProductIds = productRepository.findAll().stream()
+			.collect(Collectors.toMap(Product::getName, Product::getId));
+		productRepository.findAll().forEach(product -> {
+			product.updateStatus(ProductStatus.HIDDEN);
+			product.updateComplianceStatus(ProductComplianceStatus.PENDING);
+		});
+		productRepository.flush();
+
+		Supplier externalSupplier = supplierRepository.save(new Supplier(
+			"외부 공급처", "담당자", "02-0000-0000", "external@example.com", "not seed data"
+		));
+		Product externalProduct = productRepository.saveAndFlush(new Product(
+			externalSupplier,
+			"사용자 등록 상품",
+			"시드 복구 대상이 아닌 상품",
+			10000,
+			ProductStatus.HIDDEN
+		));
+		Path thumbnail = imageStoragePath.resolve("local-seed/helmet-thumb.png");
+		Files.deleteIfExists(thumbnail);
+
+		seedData.run(new DefaultApplicationArguments(new String[0]));
+
+		Map<String, ProductStatus> expectedStatuses = Map.of(
+			LocalCatalogSeedData.PRIMARY_PRODUCT_NAME, ProductStatus.ACTIVE,
+			"K2 안전화 K2-67S", ProductStatus.ACTIVE,
+			"반사 형광조끼 SV-1001", ProductStatus.ACTIVE,
+			"3M 컴포트 그립 장갑 CG-100", ProductStatus.ACTIVE,
+			"포스탑 추락방지 세트 FS-2020", ProductStatus.ACTIVE,
+			"3M 보안경 SF401", ProductStatus.ACTIVE,
+			"세이프원 안전모 SW-200", ProductStatus.ACTIVE,
+			"지벤 안전화 ZB-186", ProductStatus.SOLD_OUT,
+			"토와 파워그랩 장갑", ProductStatus.ACTIVE,
+			"보안경 김서림 방지형", ProductStatus.HIDDEN
+		);
+		List<Product> restoredSeeds = productRepository.findAll().stream()
+			.filter(product -> expectedStatuses.containsKey(product.getName()))
+			.toList();
+		assertThat(restoredSeeds).hasSize(10);
+		restoredSeeds.forEach(product -> {
+				assertThat(product.getId()).isEqualTo(seedProductIds.get(product.getName()));
+				assertThat(product.getStatus()).isEqualTo(expectedStatuses.get(product.getName()));
+				assertThat(product.getComplianceStatus()).isEqualTo(ProductComplianceStatus.NOT_REQUIRED);
+			});
+
+		Product primaryProduct = productRepository.findAllByStatus(ProductStatus.ACTIVE).stream()
+			.filter(product -> product.getName().equals(LocalCatalogSeedData.PRIMARY_PRODUCT_NAME))
+			.findFirst()
+			.orElseThrow();
+		assertThat(primaryProduct.getBasePrice()).isPositive();
+		assertThat(primaryProduct.getThumbnailImageUrl()).isNotBlank();
+		assertThat(productOptionRepository.existsByProduct_IdAndStatus(primaryProduct.getId(), ProductOptionStatus.ACTIVE)).isTrue();
+		assertThat(productImageRepository.existsByProduct_IdAndType(primaryProduct.getId(), ProductImageType.THUMBNAIL)).isTrue();
+		assertThat(productNoticeRepository.existsByProduct_IdAndStatus(primaryProduct.getId(), ProductNoticeStatus.ACTIVE)).isTrue();
+		assertThat(Files.exists(thumbnail)).isTrue();
+
+		Product untouched = productRepository.findById(externalProduct.getId()).orElseThrow();
+		assertThat(untouched.getStatus()).isEqualTo(ProductStatus.HIDDEN);
+		assertThat(untouched.getComplianceStatus()).isEqualTo(ProductComplianceStatus.PENDING);
+		assertThat(productRepository.count()).isEqualTo(11);
+		assertThat(productOptionRepository.count()).isEqualTo(20);
+		assertThat(productImageRepository.count()).isEqualTo(30);
 	}
 
 	@Test

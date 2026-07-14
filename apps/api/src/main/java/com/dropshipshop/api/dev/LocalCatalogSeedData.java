@@ -31,10 +31,12 @@ import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImage;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductNotice;
+import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.catalog.domain.SupplierStatus;
 import com.dropshipshop.api.catalog.repository.ProductDetailBlockRepository;
 import com.dropshipshop.api.catalog.repository.ProductImageRepository;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
@@ -48,7 +50,24 @@ import com.dropshipshop.api.catalog.repository.SupplierRepository;
 @Order(1)
 public class LocalCatalogSeedData implements ApplicationRunner {
 
-	private static final String SEED_SUPPLIER = "세이프허브 산업안전";
+	static final String PRIMARY_PRODUCT_NAME = "K2 안전모 K2-THINK 1";
+	private static final List<SeedSupplier> SEED_SUPPLIERS = List.of(
+		new SeedSupplier("세이프허브 산업안전", "홍길동", "02-1234-5678", "safety@safehubpro.co.kr"),
+		new SeedSupplier("케이투 현장장비", "김현장", "02-2345-6789", "k2@safehubpro.co.kr"),
+		new SeedSupplier("쓰리엠 보호구", "박보호", "02-3456-7890", "3m@safehubpro.co.kr")
+	);
+	private static final List<SeedProduct> SEED_PRODUCTS = List.of(
+		new SeedProduct(0, PRIMARY_PRODUCT_NAME, "가볍고 편한 기본형 안전모", 7200, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_HELMET, "HELMET", "#ff4d00"),
+		new SeedProduct(1, "K2 안전화 K2-67S", "현장 작업용 미끄럼 방지 안전화", 48500, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_SHOES, "BOOTS", "#061b49"),
+		new SeedProduct(0, "반사 형광조끼 SV-1001", "야간 작업용 고시인성 형광조끼", 5800, ProductStatus.ACTIVE, ProductCategory.PPE_HIGH_VISIBILITY_VEST, "VEST", "#f59e0b"),
+		new SeedProduct(2, "3M 컴포트 그립 장갑 CG-100", "정밀 작업용 코팅 안전장갑", 1650, ProductStatus.ACTIVE, ProductCategory.PPE_INSULATED_GLOVES, "GLOVES", "#475569"),
+		new SeedProduct(0, "포스탑 추락방지 세트 FS-2020", "고소 작업용 안전벨트 세트", 89000, ProductStatus.ACTIVE, ProductCategory.PPE_FALL_ARREST_HARNESS, "HARNESS", "#0f766e"),
+		new SeedProduct(2, "3M 보안경 SF401", "분진과 비산물 차단 보안경", 3300, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_GLASSES, "GOGGLES", "#2563eb"),
+		new SeedProduct(1, "세이프원 안전모 SW-200", "대량 구매에 적합한 보급형 안전모", 6900, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_HELMET, "SAFE", "#1d4ed8"),
+		new SeedProduct(1, "지벤 안전화 ZB-186", "장시간 착용용 쿠션 안전화", 52000, ProductStatus.SOLD_OUT, ProductCategory.PPE_SAFETY_SHOES, "ZIBEN", "#111827"),
+		new SeedProduct(2, "토와 파워그랩 장갑", "미끄럼 방지 작업 장갑", 2200, ProductStatus.ACTIVE, ProductCategory.PPE_INSULATED_GLOVES, "TOWA", "#2563eb"),
+		new SeedProduct(0, "보안경 김서림 방지형", "습한 현장용 안티포그 보안경", 4200, ProductStatus.HIDDEN, ProductCategory.PPE_SAFETY_GLASSES, "FOG", "#64748b")
+	);
 
 	private final SupplierRepository supplierRepository;
 	private final ProductRepository productRepository;
@@ -79,70 +98,81 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		List<SeedProduct> products = List.of(
-			new SeedProduct(0, "K2 안전모 K2-THINK 1", "가볍고 편한 기본형 안전모", 7200, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_HELMET, "HELMET", "#ff4d00"),
-			new SeedProduct(1, "K2 안전화 K2-67S", "현장 작업용 미끄럼 방지 안전화", 48500, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_SHOES, "BOOTS", "#061b49"),
-			new SeedProduct(0, "반사 형광조끼 SV-1001", "야간 작업용 고시인성 형광조끼", 5800, ProductStatus.ACTIVE, ProductCategory.PPE_HIGH_VISIBILITY_VEST, "VEST", "#f59e0b"),
-			new SeedProduct(2, "3M 컴포트 그립 장갑 CG-100", "정밀 작업용 코팅 안전장갑", 1650, ProductStatus.ACTIVE, ProductCategory.PPE_INSULATED_GLOVES, "GLOVES", "#475569"),
-			new SeedProduct(0, "포스탑 추락방지 세트 FS-2020", "고소 작업용 안전벨트 세트", 89000, ProductStatus.ACTIVE, ProductCategory.PPE_FALL_ARREST_HARNESS, "HARNESS", "#0f766e"),
-			new SeedProduct(2, "3M 보안경 SF401", "분진과 비산물 차단 보안경", 3300, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_GLASSES, "GOGGLES", "#2563eb"),
-			new SeedProduct(1, "세이프원 안전모 SW-200", "대량 구매에 적합한 보급형 안전모", 6900, ProductStatus.ACTIVE, ProductCategory.PPE_SAFETY_HELMET, "SAFE", "#1d4ed8"),
-			new SeedProduct(1, "지벤 안전화 ZB-186", "장시간 착용용 쿠션 안전화", 52000, ProductStatus.SOLD_OUT, ProductCategory.PPE_SAFETY_SHOES, "ZIBEN", "#111827"),
-			new SeedProduct(2, "토와 파워그랩 장갑", "미끄럼 방지 작업 장갑", 2200, ProductStatus.ACTIVE, ProductCategory.PPE_INSULATED_GLOVES, "TOWA", "#2563eb"),
-			new SeedProduct(0, "보안경 김서림 방지형", "습한 현장용 안티포그 보안경", 4200, ProductStatus.HIDDEN, ProductCategory.PPE_SAFETY_GLASSES, "FOG", "#64748b")
-		);
+		SEED_PRODUCTS.forEach(this::ensureImages);
+		List<Supplier> suppliers = SEED_SUPPLIERS.stream().map(this::ensureSupplier).toList();
+		SEED_PRODUCTS.forEach(seed -> ensureProduct(suppliers.get(seed.supplierIndex()), seed));
+	}
 
-		products.forEach(this::ensureImages);
-		if (supplierRepository.existsByName(SEED_SUPPLIER)) {
-			return;
+	private Supplier ensureSupplier(SeedSupplier seed) {
+		return supplierRepository.findByName(seed.name())
+			.map(supplier -> {
+				supplier.update(seed.name(), seed.contactName(), seed.phone(), seed.email(), "local seed supplier", SupplierStatus.ACTIVE);
+				return supplier;
+			})
+			.orElseGet(() -> supplierRepository.save(new Supplier(
+				seed.name(), seed.contactName(), seed.phone(), seed.email(), "local seed supplier"
+			)));
+	}
+
+	private void ensureProduct(Supplier supplier, SeedProduct seed) {
+		String imageUrl = image(seed, "thumb", seed.color());
+		Product product = productRepository.findBySupplier_IdAndName(supplier.getId(), seed.name())
+			.orElseGet(() -> productRepository.save(new Product(
+				supplier,
+				seed.name(),
+				seed.summary(),
+				seed.basePrice(),
+				seed.categoryCode(),
+				seed.status()
+			)));
+		product.updateBase(supplier, seed.name(), seed.summary(), seed.basePrice(), seed.basePrice(), seed.categoryCode());
+		product.updateStatus(seed.status());
+		product.updateComplianceStatus(ProductComplianceStatus.NOT_REQUIRED);
+		product.updateThumbnailImageUrl(imageUrl);
+
+		ensureOption(product, "기본", ProductOptionStatus.ACTIVE);
+		ensureOption(product, "대량 구매", seed.status() == ProductStatus.SOLD_OUT ? ProductOptionStatus.SOLD_OUT : ProductOptionStatus.ACTIVE);
+		ensureProductImage(product, ProductImageType.THUMBNAIL, imageUrl, 0, seed.name());
+		ensureProductImage(product, ProductImageType.GALLERY, image(seed, "dark", "#061b49"), 1, seed.name());
+		ensureProductImage(product, ProductImageType.GALLERY, image(seed, "accent", seed.color()), 2, seed.name());
+		if (productDetailBlockRepository.findAllByProduct_IdOrderBySortOrderAsc(product.getId()).isEmpty()) {
+			productDetailBlockRepository.save(new ProductDetailBlock(
+				product,
+				ProductDetailBlockType.HTML,
+				null,
+				"<h2>" + seed.name() + "</h2><p>" + seed.summary() + "</p><ul><li>배송비 포함 가격</li><li>세금계산서 발행 가능</li><li>최소주문 수량은 옵션별로 확인</li></ul>",
+				1,
+				null
+			));
 		}
-
-		List<Supplier> suppliers = supplierRepository.saveAll(List.of(
-			new Supplier(SEED_SUPPLIER, "홍길동", "02-1234-5678", "safety@safehubpro.co.kr", "local seed supplier"),
-			new Supplier("케이투 현장장비", "김현장", "02-2345-6789", "k2@safehubpro.co.kr", "local seed supplier"),
-			new Supplier("쓰리엠 보호구", "박보호", "02-3456-7890", "3m@safehubpro.co.kr", "local seed supplier")
-		));
-
-		for (SeedProduct seed : products) {
-			seedProduct(suppliers.get(seed.supplierIndex()), seed);
+		if (!productNoticeRepository.existsByProduct_IdAndStatus(product.getId(), ProductNoticeStatus.ACTIVE)) {
+			productNoticeRepository.save(new ProductNotice(
+				product,
+				productNoticeRepository.countByProduct_Id(product.getId()) + 1,
+				"상세 사양은 상품별 공급처 고시를 기준으로 확인합니다.",
+				"배송비는 상품 가격에 포함됩니다.",
+				"초기 불량과 AS는 고객센터 접수 후 처리합니다.",
+				"배송/취소/환불 정책에 따라 처리합니다."
+			));
 		}
 	}
 
-	private void seedProduct(Supplier supplier, SeedProduct seed) {
-		String imageUrl = image(seed, "thumb", seed.color());
-		Product product = new Product(
-			supplier,
-			seed.name(),
-			seed.summary(),
-			seed.basePrice(),
-			seed.categoryCode(),
-			seed.status()
-		);
-		product.updateComplianceStatus(ProductComplianceStatus.NOT_REQUIRED);
-		productRepository.save(product);
-		product.updateThumbnailImageUrl(imageUrl);
+	private void ensureOption(Product product, String name, ProductOptionStatus status) {
+		ProductOption option = productOptionRepository.findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(product.getId())
+			.stream()
+			.filter(candidate -> candidate.getName().equals(name))
+			.findFirst()
+			.orElseGet(() -> productOptionRepository.save(new ProductOption(product, name, 0, status)));
+		option.update(name, 0);
+		option.updateStatus(status);
+	}
 
-		productOptionRepository.save(new ProductOption(product, "기본", 0, ProductOptionStatus.ACTIVE));
-		productOptionRepository.save(new ProductOption(product, "대량 구매", 0, seed.status() == ProductStatus.SOLD_OUT ? ProductOptionStatus.SOLD_OUT : ProductOptionStatus.ACTIVE));
-		productImageRepository.save(new ProductImage(product, ProductImageType.THUMBNAIL, imageUrl, 0, seed.name()));
-		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed, "dark", "#061b49"), 1, seed.name()));
-		productImageRepository.save(new ProductImage(product, ProductImageType.GALLERY, image(seed, "accent", seed.color()), 2, seed.name()));
-		productDetailBlockRepository.save(new ProductDetailBlock(
-			product,
-			ProductDetailBlockType.HTML,
-			null,
-			"<h2>" + seed.name() + "</h2><p>" + seed.summary() + "</p><ul><li>배송비 포함 가격</li><li>세금계산서 발행 가능</li><li>최소주문 수량은 옵션별로 확인</li></ul>",
-			1,
-			null
-		));
-		productNoticeRepository.save(new ProductNotice(
-			product,
-			1,
-			"상세 사양은 상품별 공급처 고시를 기준으로 확인합니다.",
-			"배송비는 상품 가격에 포함됩니다.",
-			"초기 불량과 AS는 고객센터 접수 후 처리합니다.",
-			"배송/취소/환불 정책에 따라 처리합니다."
-		));
+	private void ensureProductImage(Product product, ProductImageType type, String imageUrl, int sortOrder, String altText) {
+		boolean exists = productImageRepository.findAllByProduct_IdOrderBySortOrderAsc(product.getId()).stream()
+			.anyMatch(image -> image.getType() == type && image.getImageUrl().equals(imageUrl));
+		if (!exists) {
+			productImageRepository.save(new ProductImage(product, type, imageUrl, sortOrder, altText));
+		}
 	}
 
 	private void ensureImages(SeedProduct seed) {
@@ -268,5 +298,8 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 		String label,
 		String color
 	) {
+	}
+
+	private record SeedSupplier(String name, String contactName, String phone, String email) {
 	}
 }

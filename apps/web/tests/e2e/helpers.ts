@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 export const API_BASE_URL = process.env.E2E_API_BASE_URL ?? "http://localhost:8080";
 export const WEB_BASE_URL = process.env.E2E_WEB_BASE_URL ?? "http://localhost:3000";
+const PRIMARY_PRODUCT_NAME = "K2 안전모 K2-THINK 1";
 
 const REQUIRE_ADMIN_SEED_ORDERS_VALUE =
   process.env.E2E_REQUIRE_ADMIN_SEED_ORDERS ??
@@ -43,8 +44,13 @@ export async function activeProductId() {
   const response = await fetch(`${API_BASE_URL}/api/products`);
   expect(response.ok).toBeTruthy();
   const products = (await response.json()) as ProductSummary[];
-  expect(products.length).toBeGreaterThan(0);
-  return products[0].id;
+  const primaryProduct = products.find((product) => product.name === PRIMARY_PRODUCT_NAME);
+  if (isLocalTarget()) {
+    expect(primaryProduct, `Local seed product '${PRIMARY_PRODUCT_NAME}' is required`).toBeTruthy();
+  }
+  const product = primaryProduct ?? products[0];
+  expect(product, "At least one active product is required").toBeTruthy();
+  return product.id;
 }
 
 export async function addCookie(context: BrowserContext, cookieHeader: string) {

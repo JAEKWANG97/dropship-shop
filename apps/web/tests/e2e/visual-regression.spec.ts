@@ -5,6 +5,7 @@ import {
   expectNoHorizontalOverflow,
   firstAdminOrderLink,
   isLocalTarget,
+  requireAdminCookie,
   requireCustomerCookie,
   requireSeedOrderByStatus,
 } from "./helpers";
@@ -55,9 +56,8 @@ test("desktop checkout bank-transfer screenshot remains stable", async ({ page, 
 test("desktop admin order detail screenshot remains stable", async ({ page, context }, testInfo) => {
   test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "desktop", "Desktop baselines run only in the desktop project.");
-  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin screenshot smoke.");
 
-  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
+  await addCookie(context, await requireAdminCookie());
   await page.goto("/admin/orders");
   const orderLink = await firstAdminOrderLink(page);
   await orderLink.click();
