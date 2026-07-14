@@ -323,6 +323,7 @@ Relationships:
 - `name`
 - `summary`
 - `source_price`: supplier cost, admin-only
+- `source_url`: nullable supplier source URL, admin-only, maximum 2,000 characters
 - `base_price`
 - `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - `status`: `ACTIVE` / `SOLD_OUT` / `HIDDEN` / `STOPPED`
@@ -334,11 +335,13 @@ Relationships:
 Rules:
 
 - No real stock quantity.
-- `base_price` is the customer-facing sale price. `source_price` must not be exposed by public customer APIs.
+- `base_price` is the customer-facing sale price. `source_price` and `source_url` must not be exposed by public customer APIs.
+- `source_url` accepts only `http` or `https`; the backend stores it for operator traceability and does not request the URL.
 - Existing order item price snapshots are not changed when product source or sale prices change.
 - One product has one `category_code`; category admin and multi-category mapping are future scope.
 - Customer-visible sale requires product `ACTIVE` and option `ACTIVE`.
 - Product activation additionally requires positive `base_price`, one canonical thumbnail, one active option, an active product notice, and compliance status `NOT_REQUIRED` or `VERIFIED`.
+- Sale readiness is calculated from those current values and is not stored as a separate column.
 - Canonical thumbnail data lives in `product_images` where `type = THUMBNAIL`.
 - If `thumbnail_image_url` is kept on `products`, it is a cache updated from canonical thumbnail image metadata.
 

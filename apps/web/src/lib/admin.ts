@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { apiGetWithCookie } from "./api";
 import type { ProductCategoryCode } from "./categories";
-import type { ProductComplianceStatus, ProductDetail, ProductOptionStatus } from "./catalog";
+import type { ProductComplianceStatus, ProductDetail, ProductOptionStatus, SaleBlocker } from "./catalog";
 
 export type AdminProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 
@@ -12,12 +12,19 @@ export type AdminProduct = {
   name: string;
   summary: string;
   sourcePrice: number;
+  sourceUrl: string | null;
   basePrice: number;
   categoryCode: ProductCategoryCode;
   status: AdminProductStatus;
   complianceStatus: ProductComplianceStatus;
   thumbnailImageUrl: string | null;
   detailVersion: number;
+  saleReady: boolean;
+  saleBlockers: SaleBlocker[];
+  optionCount: number;
+  hasThumbnail: boolean;
+  hasProductNotice: boolean;
+  hasDetailContent: boolean;
 };
 
 export type AdminProductPage = {
@@ -187,6 +194,7 @@ export async function getAdminProducts(params: {
   status?: string;
   category?: string;
   supplierId?: string;
+  readiness?: string;
   page?: number;
   size?: number;
 } = {}) {
@@ -195,6 +203,7 @@ export async function getAdminProducts(params: {
   if (params.status) query.set("status", params.status);
   if (params.category) query.set("category", params.category);
   if (params.supplierId) query.set("supplierId", params.supplierId);
+  if (params.readiness) query.set("readiness", params.readiness);
   query.set("page", String(params.page ?? 0));
   query.set("size", String(params.size ?? 20));
 	return readAdmin<AdminProductPage>(`/api/admin/products?${query}`);

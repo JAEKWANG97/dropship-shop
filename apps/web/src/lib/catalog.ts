@@ -3,6 +3,7 @@ import type { ProductCategoryCode } from "./categories";
 
 export type ProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 export type ProductComplianceStatus = "PENDING" | "NOT_REQUIRED" | "VERIFIED" | "REJECTED";
+export type SaleBlocker = "BASE_PRICE" | "THUMBNAIL" | "ACTIVE_OPTION" | "PRODUCT_NOTICE" | "COMPLIANCE";
 export type ProductOptionStatus = "ACTIVE" | "SOLD_OUT" | "STOPPED";
 export type ProductImageType = "THUMBNAIL" | "GALLERY";
 export type ProductDetailBlockType = "IMAGE" | "HTML";
@@ -64,7 +65,14 @@ export type ProductDetail = ProductSummary & {
   supplierId?: string;
   supplierName?: string;
   sourcePrice?: number;
+  sourceUrl?: string | null;
   complianceStatus?: ProductComplianceStatus;
+  saleReady?: boolean;
+  saleBlockers?: SaleBlocker[];
+  optionCount?: number;
+  hasThumbnail?: boolean;
+  hasProductNotice?: boolean;
+  hasDetailContent?: boolean;
   detailVersion: number;
   productNoticeVersion: number | null;
   images: ProductImage[];

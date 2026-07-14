@@ -61,6 +61,7 @@ export async function createAdminProduct(formData: FormData) {
         name: text(formData, "name"),
         summary: text(formData, "summary"),
         sourcePrice: Number(text(formData, "sourcePrice") || text(formData, "basePrice") || "0"),
+        sourceUrl: text(formData, "sourceUrl") || null,
         basePrice: Number(text(formData, "basePrice") || "0"),
         categoryCode: text(formData, "categoryCode") as ProductCategoryCode,
         status: text(formData, "status") as AdminProductStatus,

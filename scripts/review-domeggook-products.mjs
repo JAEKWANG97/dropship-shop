@@ -542,6 +542,7 @@ async function reviewProduct(entry, context) {
       status: "HIDDEN",
       name: title,
       summary: summaryFor(product),
+      sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
       sourcePrice: effectiveSourcePrice || sourcePrice,
       basePrice: calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
       options: manifestOptions,

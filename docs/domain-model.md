@@ -178,6 +178,7 @@ Suggested fields:
 - summary
 - description
 - sourcePrice: supplier/domeggook cost, admin-only
+- sourceUrl: optional supplier source page, admin-only
 - basePrice
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
@@ -189,10 +190,13 @@ Suggested fields:
 Modeling notes:
 
 - MVP stores one fixed `categoryCode` per product.
-- `sourcePrice` is internal cost. `basePrice` is the customer sale price including expected shipping cost.
+- `sourcePrice` is internal cost. `sourceUrl` is an operator traceability link. Neither is exposed by public product APIs.
+- `sourceUrl` accepts only `http` or `https`, is limited to 2,000 characters, and is never fetched by the backend.
+- `basePrice` is the customer sale price including expected shipping cost.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
 - `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status `NOT_REQUIRED` or `VERIFIED`.
+- `saleReady` and `saleBlockers` are derived admin views over those conditions rather than persisted product state. Detail-content presence is shown as a recommendation and does not block activation.
 
 ## ProductImage
 

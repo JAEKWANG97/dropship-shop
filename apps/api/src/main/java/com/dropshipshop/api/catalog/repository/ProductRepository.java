@@ -33,6 +33,29 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 			and (:status is null or product.status = :status)
 			and (:category is null or product.categoryCode = :category)
 			and (:supplierId is null or supplier.id = :supplierId)
+			and (
+				:saleReady is null
+				or (:saleReady = true
+					and product.basePrice > 0
+					and product.complianceStatus in (
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.NOT_REQUIRED,
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.VERIFIED
+					)
+					and exists (select image.id from ProductImage image where image.product = product and image.type = com.dropshipshop.api.catalog.domain.ProductImageType.THUMBNAIL)
+					and exists (select option.id from ProductOption option where option.product = product and option.status = com.dropshipshop.api.catalog.domain.ProductOptionStatus.ACTIVE)
+					and exists (select notice.id from ProductNotice notice where notice.product = product and notice.status = com.dropshipshop.api.catalog.domain.ProductNoticeStatus.ACTIVE)
+				)
+				or (:saleReady = false and (
+					product.basePrice <= 0
+					or product.complianceStatus not in (
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.NOT_REQUIRED,
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.VERIFIED
+					)
+					or not exists (select image.id from ProductImage image where image.product = product and image.type = com.dropshipshop.api.catalog.domain.ProductImageType.THUMBNAIL)
+					or not exists (select option.id from ProductOption option where option.product = product and option.status = com.dropshipshop.api.catalog.domain.ProductOptionStatus.ACTIVE)
+					or not exists (select notice.id from ProductNotice notice where notice.product = product and notice.status = com.dropshipshop.api.catalog.domain.ProductNoticeStatus.ACTIVE)
+				))
+			)
 			""",
 		countQuery = """
 			select count(product) from Product product
@@ -44,6 +67,29 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 			and (:status is null or product.status = :status)
 			and (:category is null or product.categoryCode = :category)
 			and (:supplierId is null or supplier.id = :supplierId)
+			and (
+				:saleReady is null
+				or (:saleReady = true
+					and product.basePrice > 0
+					and product.complianceStatus in (
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.NOT_REQUIRED,
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.VERIFIED
+					)
+					and exists (select image.id from ProductImage image where image.product = product and image.type = com.dropshipshop.api.catalog.domain.ProductImageType.THUMBNAIL)
+					and exists (select option.id from ProductOption option where option.product = product and option.status = com.dropshipshop.api.catalog.domain.ProductOptionStatus.ACTIVE)
+					and exists (select notice.id from ProductNotice notice where notice.product = product and notice.status = com.dropshipshop.api.catalog.domain.ProductNoticeStatus.ACTIVE)
+				)
+				or (:saleReady = false and (
+					product.basePrice <= 0
+					or product.complianceStatus not in (
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.NOT_REQUIRED,
+						com.dropshipshop.api.catalog.domain.ProductComplianceStatus.VERIFIED
+					)
+					or not exists (select image.id from ProductImage image where image.product = product and image.type = com.dropshipshop.api.catalog.domain.ProductImageType.THUMBNAIL)
+					or not exists (select option.id from ProductOption option where option.product = product and option.status = com.dropshipshop.api.catalog.domain.ProductOptionStatus.ACTIVE)
+					or not exists (select notice.id from ProductNotice notice where notice.product = product and notice.status = com.dropshipshop.api.catalog.domain.ProductNoticeStatus.ACTIVE)
+				))
+			)
 			"""
 	)
 	Page<Product> findAdminProducts(
@@ -51,6 +97,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 		@Param("status") ProductStatus status,
 		@Param("category") ProductCategory category,
 		@Param("supplierId") UUID supplierId,
+		@Param("saleReady") Boolean saleReady,
 		Pageable pageable
 	);
 }

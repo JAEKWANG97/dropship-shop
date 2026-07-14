@@ -2,10 +2,14 @@ package com.dropshipshop.api.catalog;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -147,6 +151,7 @@ public class CatalogService {
 		ProductStatus status,
 		ProductCategory category,
 		UUID supplierId,
+		CatalogDtos.ProductReadinessFilter readiness,
 		int page,
 		int size
 	) {
@@ -159,10 +164,14 @@ public class CatalogService {
 			status,
 			category,
 			supplierId,
+			readiness == null ? null : readiness == CatalogDtos.ProductReadinessFilter.READY,
 			PageRequest.of(page, size, sort)
 		);
+		Map<UUID, SaleReadiness> readinessByProductId = saleReadinessByProductId(products.getContent());
 		return new CatalogDtos.AdminProductPageResponse(
-			products.getContent().stream().map(this::toAdminProductResponse).toList(),
+			products.getContent().stream()
+				.map(product -> toAdminProductResponse(product, readinessByProductId.get(product.getId())))
+				.toList(),
 			products.getNumber(),
 			products.getSize(),
 			products.getTotalElements(),
@@ -205,6 +214,7 @@ public class CatalogService {
 			request.categoryCode(),
 			request.status()
 		);
+		product.updateSourceUrl(request.sourceUrl());
 		return toAdminProductResponse(productRepository.save(product));
 	}
 
@@ -235,6 +245,7 @@ public class CatalogService {
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
 		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
+		product.updateSourceUrl(request.sourceUrl());
 		product.updateComplianceStatus(valueOrDefault(request.complianceStatus(), product.getComplianceStatus()));
 		validateIfActive(product);
 		return toAdminProductResponse(product);
@@ -455,6 +466,10 @@ public class CatalogService {
 				request.name() + " / " + request.summary(),
 				request.reason());
 		}
+		if (!Objects.equals(product.getSourceUrl(), request.sourceUrl())) {
+			recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_BASE,
+				product.getSourceUrl(), request.sourceUrl(), request.reason());
+		}
 		if (request.complianceStatus() != null && product.getComplianceStatus() != request.complianceStatus()) {
 			recordChange(product, null, adminUserId, ProductChangeType.COMPLIANCE_STATUS,
 				product.getComplianceStatus().name(), request.complianceStatus().name(), request.reason());
@@ -468,25 +483,74 @@ public class CatalogService {
 	}
 
 	private void validateSaleReadiness(Product product) {
-		List<String> missing = new ArrayList<>();
-		if (product.getBasePrice() <= 0) {
-			missing.add("판매가");
+		SaleReadiness readiness = saleReadiness(product);
+		if (!readiness.saleReady()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ACTIVE 전환 불가: " + readiness.blockers().stream()
+				.map(this::saleBlockerLabel)
+				.collect(Collectors.joining(", ")));
 		}
-		if (!productImageRepository.existsByProduct_IdAndType(product.getId(), ProductImageType.THUMBNAIL)) {
-			missing.add("대표 이미지");
+	}
+
+	private SaleReadiness saleReadiness(Product product) {
+		return saleReadiness(
+			product,
+			productOptionRepository.findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(product.getId()).size(),
+			productOptionRepository.existsByProduct_IdAndStatus(product.getId(), ProductOptionStatus.ACTIVE),
+			productImageRepository.existsByProduct_IdAndType(product.getId(), ProductImageType.THUMBNAIL),
+			productNoticeRepository.existsByProduct_IdAndStatus(product.getId(), ProductNoticeStatus.ACTIVE),
+			!productDetailBlockRepository.findAllByProduct_IdOrderBySortOrderAsc(product.getId()).isEmpty()
+		);
+	}
+
+	private SaleReadiness saleReadiness(
+		Product product,
+		long optionCount,
+		boolean hasActiveOption,
+		boolean hasThumbnail,
+		boolean hasProductNotice,
+		boolean hasDetailContent
+	) {
+		List<CatalogDtos.SaleBlocker> blockers = new ArrayList<>();
+		if (product.getBasePrice() <= 0) blockers.add(CatalogDtos.SaleBlocker.BASE_PRICE);
+		if (!hasThumbnail) blockers.add(CatalogDtos.SaleBlocker.THUMBNAIL);
+		if (!hasActiveOption) blockers.add(CatalogDtos.SaleBlocker.ACTIVE_OPTION);
+		if (!hasProductNotice) blockers.add(CatalogDtos.SaleBlocker.PRODUCT_NOTICE);
+		if (!product.getComplianceStatus().allowsSale()) blockers.add(CatalogDtos.SaleBlocker.COMPLIANCE);
+		return new SaleReadiness(blockers.isEmpty(), List.copyOf(blockers), optionCount, hasThumbnail, hasProductNotice, hasDetailContent);
+	}
+
+	private Map<UUID, SaleReadiness> saleReadinessByProductId(List<Product> products) {
+		if (products.isEmpty()) return Map.of();
+		List<UUID> productIds = products.stream().map(Product::getId).toList();
+		Map<UUID, ProductOptionRepository.ProductOptionCounts> optionCounts = productOptionRepository.countByProductIds(productIds)
+			.stream()
+			.collect(Collectors.toMap(ProductOptionRepository.ProductOptionCounts::getProductId, value -> value));
+		Set<UUID> thumbnailProductIds = Set.copyOf(productImageRepository.findProductIdsByType(productIds, ProductImageType.THUMBNAIL));
+		Set<UUID> noticeProductIds = Set.copyOf(productNoticeRepository.findProductIdsByStatus(productIds, ProductNoticeStatus.ACTIVE));
+		Set<UUID> detailProductIds = Set.copyOf(productDetailBlockRepository.findProductIdsWithDetailContent(productIds));
+		Map<UUID, SaleReadiness> result = new HashMap<>();
+		for (Product product : products) {
+			ProductOptionRepository.ProductOptionCounts counts = optionCounts.get(product.getId());
+			result.put(product.getId(), saleReadiness(
+				product,
+				counts == null ? 0 : counts.getOptionCount(),
+				counts != null && counts.getActiveOptionCount() > 0,
+				thumbnailProductIds.contains(product.getId()),
+				noticeProductIds.contains(product.getId()),
+				detailProductIds.contains(product.getId())
+			));
 		}
-		if (!productOptionRepository.existsByProduct_IdAndStatus(product.getId(), ProductOptionStatus.ACTIVE)) {
-			missing.add("판매 가능한 옵션");
-		}
-		if (!productNoticeRepository.existsByProduct_IdAndStatus(product.getId(), ProductNoticeStatus.ACTIVE)) {
-			missing.add("상품 고시");
-		}
-		if (!product.getComplianceStatus().allowsSale()) {
-			missing.add("인증 검수");
-		}
-		if (!missing.isEmpty()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ACTIVE 전환 불가: " + String.join(", ", missing));
-		}
+		return result;
+	}
+
+	private String saleBlockerLabel(CatalogDtos.SaleBlocker blocker) {
+		return switch (blocker) {
+			case BASE_PRICE -> "판매가";
+			case THUMBNAIL -> "대표 이미지";
+			case ACTIVE_OPTION -> "판매 가능한 옵션";
+			case PRODUCT_NOTICE -> "상품 고시";
+			case COMPLIANCE -> "인증 검수";
+		};
 	}
 
 	private Supplier findSupplier(UUID supplierId) {
@@ -643,6 +707,10 @@ public class CatalogService {
 	}
 
 	private CatalogDtos.AdminProductResponse toAdminProductResponse(Product product) {
+		return toAdminProductResponse(product, saleReadiness(product));
+	}
+
+	private CatalogDtos.AdminProductResponse toAdminProductResponse(Product product, SaleReadiness readiness) {
 		return new CatalogDtos.AdminProductResponse(
 			product.getId(),
 			product.getSupplier().getId(),
@@ -650,12 +718,19 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			product.getSourcePrice(),
+			product.getSourceUrl(),
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
 			product.getComplianceStatus(),
 			product.getThumbnailImageUrl(),
-			product.getDetailVersion()
+			product.getDetailVersion(),
+			readiness.saleReady(),
+			readiness.blockers(),
+			readiness.optionCount(),
+			readiness.hasThumbnail(),
+			readiness.hasProductNotice(),
+			readiness.hasDetailContent()
 		);
 	}
 
@@ -691,6 +766,14 @@ public class CatalogService {
 			.findFirstByProduct_IdAndStatusOrderByVersionDesc(product.getId(), ProductNoticeStatus.ACTIVE)
 			.map(this::toNoticeResponse)
 			.orElse(null);
+		SaleReadiness readiness = saleReadiness(
+			product,
+			options.size(),
+			options.stream().anyMatch(option -> option.status() == ProductOptionStatus.ACTIVE),
+			images.stream().anyMatch(image -> image.type() == ProductImageType.THUMBNAIL),
+			notice != null,
+			!blocks.isEmpty()
+		);
 		return new CatalogDtos.ProductDetailResponse(
 			product.getId(),
 			includeSourcePrice ? product.getSupplier().getId() : null,
@@ -698,6 +781,7 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			includeSourcePrice ? product.getSourcePrice() : null,
+			includeSourcePrice ? product.getSourceUrl() : null,
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
@@ -709,8 +793,24 @@ public class CatalogService {
 			options,
 			blocks,
 			notice,
-			policyLinks()
+			policyLinks(),
+			includeSourcePrice ? readiness.saleReady() : null,
+			includeSourcePrice ? readiness.blockers() : null,
+			includeSourcePrice ? readiness.optionCount() : null,
+			includeSourcePrice ? readiness.hasThumbnail() : null,
+			includeSourcePrice ? readiness.hasProductNotice() : null,
+			includeSourcePrice ? readiness.hasDetailContent() : null
 		);
+	}
+
+	private record SaleReadiness(
+		boolean saleReady,
+		List<CatalogDtos.SaleBlocker> blockers,
+		long optionCount,
+		boolean hasThumbnail,
+		boolean hasProductNotice,
+		boolean hasDetailContent
+	) {
 	}
 
 	private CatalogDtos.ProductOptionResponse toOptionResponse(ProductOption option, boolean includeSourceMetadata) {

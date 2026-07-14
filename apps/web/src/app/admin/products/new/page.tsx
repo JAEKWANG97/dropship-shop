@@ -34,7 +34,7 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
       ) : null}
 
       {!data.error ? (
-        <form action={createAdminProduct} className="admin-form" encType="multipart/form-data">
+        <form action={createAdminProduct} className="admin-form">
           <section className="admin-panel">
             <h2>기본 정보</h2>
             <div className="admin-form-grid">
@@ -55,6 +55,11 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
               <label className="wide">
                 요약 설명
                 <input name="summary" required placeholder="상품 목록과 상세 상단에 노출되는 설명" />
+              </label>
+              <label className="wide">
+                공급처 원본 URL
+                <input name="sourceUrl" type="url" placeholder="https://..." />
+                <span className="field-help">운영자 검수용이며 고객 화면에는 노출하지 않습니다.</span>
               </label>
               <label className="wide">
                 카테고리

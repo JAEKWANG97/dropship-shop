@@ -16,8 +16,24 @@ type AdminProductPage = {
     status: string;
     categoryCode: string;
     supplierId: string;
+    saleReady: boolean;
   }[];
   totalElements: number;
+};
+
+type AdminProductDetail = {
+  id: string;
+  supplierId: string;
+  name: string;
+  summary: string;
+  sourcePrice: number;
+  sourceUrl: string | null;
+  basePrice: number;
+  categoryCode: string;
+  complianceStatus: string;
+  status: string;
+  saleReady: boolean;
+  saleBlockers: string[];
 };
 
 test("public customer pages render without horizontal overflow", async ({ page }) => {
@@ -177,6 +193,7 @@ test("admin product list preserves server filters and pagination", async ({ page
   await filterForm.locator('select[name="status"]').selectOption(product.status);
   await filterForm.locator('select[name="category"]').selectOption(product.categoryCode);
   await filterForm.locator('select[name="supplierId"]').selectOption(product.supplierId);
+  await filterForm.locator('select[name="readiness"]').selectOption(product.saleReady ? "READY" : "BLOCKED");
   await filterForm.getByRole("button", { name: "검색" }).click();
 
   await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(product.name);
@@ -187,6 +204,88 @@ test("admin product list preserves server filters and pagination", async ({ page
   if (productPage.totalElements > 20) {
     await page.getByRole("link", { name: "다음" }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("2");
+  }
+});
+
+test("admin reviews a ready hidden product and activates it individually", async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Product review mutation runs once in the desktop project.");
+  test.skip(!isLocalTarget(), "Product review mutation uses local seed data.");
+
+  const adminCookie = await requireAdminCookie();
+  const seedName = "보안경 김서림 방지형";
+  const listResponse = await fetch(
+    `${API_BASE_URL}/api/admin/products?q=${encodeURIComponent(seedName)}&status=HIDDEN&readiness=READY&size=10`,
+    { headers: { Cookie: adminCookie } },
+  );
+  if (!listResponse.ok) expect(listResponse.ok, await listResponse.text()).toBeTruthy();
+  const productPage = (await listResponse.json()) as AdminProductPage;
+  const product = productPage.products.find((item) => item.name === seedName);
+  expect(product, `Local ready HIDDEN seed product '${seedName}' is required`).toBeTruthy();
+
+  const sourceUrl = `https://example.com/e2e-product-source-${Date.now()}`;
+  await addCookie(context, adminCookie);
+
+  try {
+    await page.goto(`/admin/products/${product!.id}`);
+    const readinessPanel = page.locator(".admin-readiness-panel");
+    await expect(readinessPanel).toContainText("준비 완료");
+    await expect(readinessPanel.locator("a.missing")).toHaveCount(0);
+
+    const pricingForm = page.locator("#product-pricing form");
+    await pricingForm.getByLabel("공급처 원본 URL").fill(sourceUrl);
+    await pricingForm.getByLabel("변경 사유").fill("E2E 원본 추적 검증");
+    await pricingForm.getByRole("button", { name: "입력 정보 저장" }).click();
+
+    const sourceLink = page.getByRole("link", { name: "원본 보기" }).first();
+    await expect(sourceLink).toHaveAttribute("href", sourceUrl);
+    await expect(sourceLink).toHaveAttribute("target", "_blank");
+    await expect(sourceLink).toHaveAttribute("rel", /noopener/);
+    await expect(sourceLink).toHaveAttribute("rel", /noreferrer/);
+
+    const statusForm = page.locator("form").filter({
+      has: page.getByRole("button", { name: "상품 상태 변경" }),
+    });
+    await statusForm.getByLabel("판매 상태").selectOption("ACTIVE");
+    await statusForm.getByLabel("변경 사유").fill("E2E 판매 준비 완료 검증");
+    await statusForm.getByRole("button", { name: "상품 상태 변경" }).click();
+
+    await expect(page.locator(".notice").first()).toContainText("상품 판매 상태를 변경했습니다.");
+    await expect(statusForm.getByLabel("판매 상태")).toHaveValue("ACTIVE");
+    await expectNoHorizontalOverflow(page);
+  } finally {
+    const detailResponse = await fetch(`${API_BASE_URL}/api/admin/products/${product!.id}`, {
+      headers: { Cookie: adminCookie },
+    });
+    if (!detailResponse.ok) expect(detailResponse.ok, await detailResponse.text()).toBeTruthy();
+    const detail = (await detailResponse.json()) as AdminProductDetail;
+
+    const resetProductResponse = await fetch(`${API_BASE_URL}/api/admin/products/${product!.id}`, {
+      method: "PATCH",
+      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplierId: detail.supplierId,
+        name: detail.name,
+        summary: detail.summary,
+        sourcePrice: detail.sourcePrice,
+        sourceUrl: null,
+        basePrice: detail.basePrice,
+        categoryCode: detail.categoryCode,
+        complianceStatus: detail.complianceStatus,
+        reason: "E2E 원본 URL 복구",
+      }),
+    });
+    if (!resetProductResponse.ok) {
+      expect(resetProductResponse.ok, await resetProductResponse.text()).toBeTruthy();
+    }
+
+    const resetStatusResponse = await fetch(`${API_BASE_URL}/api/admin/products/${product!.id}/status`, {
+      method: "PATCH",
+      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "HIDDEN", reason: "E2E 상품 상태 복구" }),
+    });
+    if (!resetStatusResponse.ok) {
+      expect(resetStatusResponse.ok, await resetStatusResponse.text()).toBeTruthy();
+    }
   }
 });
 
@@ -277,14 +376,15 @@ test("mobile admin order detail screenshot remains stable", async ({ page, conte
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
+  const summaryValue = (label: string) => page.getByText(label, { exact: true }).locator("..").locator("strong");
   await expect(page).toHaveScreenshot("mobile-admin-order-detail.png", {
     mask: [
       page.locator(".admin-order-detail > span").first(),
-      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "입금확인" }),
-      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "미입금 취소" }),
-      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "출고시각" }),
-      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "배송완료시각" }),
-      page.locator(".admin-order-detail .summary-list div").filter({ hasText: "마지막 조회" }),
+      summaryValue("입금확인"),
+      summaryValue("미입금 취소"),
+      summaryValue("출고시각"),
+      summaryValue("배송완료시각"),
+      summaryValue("마지막 조회"),
     ],
   });
 });

@@ -72,10 +72,11 @@ class AdminCatalogController {
 		@RequestParam(required = false) ProductStatus status,
 		@RequestParam(required = false) ProductCategory category,
 		@RequestParam(required = false) UUID supplierId,
+		@RequestParam(required = false) CatalogDtos.ProductReadinessFilter readiness,
 		@RequestParam(defaultValue = "0") @Min(0) int page,
 		@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
 	) {
-		return catalogService.listAdminProducts(q, status, category, supplierId, page, size);
+		return catalogService.listAdminProducts(q, status, category, supplierId, readiness, page, size);
 	}
 
 	@GetMapping("/pricing-policy")

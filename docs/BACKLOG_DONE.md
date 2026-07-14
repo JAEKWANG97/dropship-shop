@@ -4,6 +4,10 @@
 
 ## 2026-07-14
 
+- B-064 관리자 상품 검수 UI와 원본 추적
+  - 완료 내용: 상품에 관리자 전용 `sourceUrl`을 추가하고 수집 manifest와 import API 요청으로 전달한다. 판매 준비 상태는 별도 컬럼 없이 판매가, 대표 이미지, 활성 옵션, 활성 상품 고시, 인증 검수를 기준으로 계산하며 관리자 목록·상세에 안정적인 blocker 코드와 체크리스트로 표시한다.
+  - 운영 화면: 관리자 목록에 `READY`/`BLOCKED` 서버 필터, 공급가·판매가·원가 대비 인상률·옵션 수·부족 항목·원본 링크를 추가했다. 상세에서는 원본 URL과 대표 이미지를 수정하고, 준비 완료 상품만 기존 상태 API로 개별 `ACTIVE` 전환할 수 있다. 일괄 공개는 범위에서 제외했다.
+  - 검증: 카탈로그 통합 테스트와 전체 API 테스트, PostgreSQL migration smoke, Web lint/build, Playwright 개별 검수·원본 링크·ACTIVE 전환 및 전체 Desktop/Mobile suite `64 passed / 24 skipped / 0 failed`, `git diff --check`를 통과했다. Desktop `1440x1000`, Mobile `390x844` 목록·상세 캡처에서 horizontal overflow가 없음을 확인했다.
 - B-066 Playwright 판매 가능 fixture와 snapshot 복구
   - 완료 내용: `local/dev` 시작 시 정확한 시드 공급처와 상품 10개를 이름으로 찾아 기존 ID를 유지하면서 상태, 인증 검수, 가격, 대표 이미지 URL과 누락된 옵션·이미지 metadata·상세·고시를 복구한다. 이미지 metadata가 남아 있어도 실제 파일이 없으면 다시 생성하며 비시드 상품은 수정하지 않는다.
   - fixture: 대표 상품을 `K2 안전모 K2-THINK 1`과 `기본` 옵션으로 고정하고 주문 시드와 Playwright가 같은 상품을 사용한다. 시드 상품 10개는 로컬 재시작 시 정의 상태(`ACTIVE` 8, `SOLD_OUT` 1, `HIDDEN` 1)로 돌아간다.

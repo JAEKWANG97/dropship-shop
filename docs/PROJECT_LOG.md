@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-07-14 B-064 관리자 상품 검수 UI와 원본 추적
+
+- 관련 항목: B-064
+- 작업: HIDDEN 수집 상품을 운영자가 원본, 가격, 이미지, 옵션, 상품 고시, 인증 상태 기준으로 검수하고 준비 완료 상품만 개별 공개할 수 있게 했다.
+- 문제·고민: 별도 검수 상태를 저장하면 실제 상품 정보가 바뀔 때 상태가 쉽게 낡고, 목록 페이지에서 상품별 연관 데이터를 개별 조회하면 N+1이 발생한다. B-063 이후 import 도구도 이전 배열형 관리자 목록 계약을 계속 사용하고 있었다.
+- 해결방안: B-056의 다섯 판매 조건을 공통 readiness 계산으로 재사용하고, 목록은 연관 정보를 네 개의 batch query로 집계했다. `READY`/`BLOCKED` 필터는 DB page query에 적용해 전체 건수와 페이지가 정확하게 유지된다. import 도구는 모든 관리자 상품 페이지를 순회하고 `sourceUrl`을 생성 요청에 포함한다.
+- UI 검증: 목록에 공급가·판매가·원가 대비 인상률·옵션 수·부족 항목을 표시하고, 상세에 판매 준비 체크리스트·원본 URL·대표 이미지 교체를 추가했다. 모바일 관리자 메뉴를 3열로 압축하고 누락된 로컬 이미지 파일은 깨진 아이콘 대신 `이미지 없음`으로 표시한다.
+- 검증: 전체 API 테스트와 PostgreSQL migration smoke, Web lint/build를 통과했다. Playwright는 원본 링크의 새 탭 보안 속성, READY/BLOCKED 필터, 개별 ACTIVE 전환과 원상 복구를 확인했고 전체 suite는 `64 passed / 24 skipped / 0 failed`였다. 브라우저 캡처는 `tmp/qa/b-064/`에만 저장했으며 Desktop/Mobile 목록·상세에 horizontal overflow가 없었다.
+- 남은 위험: `sourceUrl`과 인증 검수 결과는 운영자가 확인하는 증적이다. 외부 원본 자동 조회, 인증 자동 판정, 일괄 ACTIVE 전환은 의도적으로 구현하지 않았다. 최소 fixture로 manifest의 `sourceUrl` 전달은 검증했지만, 이번 세션에는 git-ignored `tmp/domeggook-products` 수집본이 없어 실수집 manifest 전체 재생성은 실행하지 못했다.
+
 ## 2026-07-14 B-066 Playwright 판매 가능 fixture와 snapshot 복구
 
 - 관련 항목: B-066

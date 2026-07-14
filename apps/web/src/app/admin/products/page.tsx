@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { adminStatusLabel, getAdminProducts, getAdminSuppliers } from "@/lib/admin";
 import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
 import { formatPrice } from "@/lib/catalog";
+import type { SaleBlocker } from "@/lib/catalog";
 import { ProductImage } from "@/app/products/product-image";
 
 type ProductSearchParams = {
@@ -11,6 +12,7 @@ type ProductSearchParams = {
   status?: string;
   category?: string;
   supplierId?: string;
+  readiness?: string;
   page?: string;
 };
 
@@ -87,6 +89,11 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
               </option>
             ))}
           </select>
+          <select name="readiness" defaultValue={params.readiness ?? ""}>
+            <option value="">전체 검수 상태</option>
+            <option value="READY">판매 준비 완료</option>
+            <option value="BLOCKED">필수정보 부족</option>
+          </select>
           <button className="button" type="submit">
             검색
           </button>
@@ -105,32 +112,52 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
           <div className="admin-table products">
             <div className="admin-table-row admin-table-head">
               <span>이미지</span>
-              <span>상품명</span>
-              <span>카테고리</span>
-              <span>공급처</span>
+              <span>상품</span>
               <span>가격</span>
+              <span>판매 준비</span>
               <span>상태</span>
               <span>관리</span>
             </div>
-            {products.map((product) => (
+            {products.map((product) => {
+              const increase = product.basePrice - product.sourcePrice;
+              const increaseRate = product.sourcePrice > 0 ? (increase / product.sourcePrice) * 100 : null;
+              return (
               <div className="admin-table-row" key={product.id}>
                 <ProductImage
                   alt={product.name}
                   className="admin-product-image"
                   src={product.thumbnailImageUrl}
                 />
-                <strong>{product.name}</strong>
-                <span>{categoryLabel(product.categoryCode)}</span>
-                <span>{product.supplierName}</span>
-                <span>{formatPrice(product.basePrice)}</span>
-                <span className={`admin-badge ${product.status.toLowerCase()}`}>
+                <div className="admin-product-identity">
+                  <strong>{product.name}</strong>
+                  <span>{categoryLabel(product.categoryCode)} · {product.supplierName}</span>
+                  {product.sourceUrl ? (
+                    <a href={product.sourceUrl} rel="noopener noreferrer" target="_blank">원본 보기</a>
+                  ) : <span>원본 없음</span>}
+                </div>
+                <div className="admin-product-price">
+                  <strong>{formatPrice(product.basePrice)}</strong>
+                  <span>공급가 {formatPrice(product.sourcePrice)}</span>
+                  <span>
+                    인상 {formatPrice(increase)}{increaseRate === null ? "" : ` · ${increaseRate.toFixed(1)}%`}
+                  </span>
+                </div>
+                <div className="admin-product-readiness">
+                  <strong className={`admin-badge ${product.saleReady ? "ready" : "blocked"}`}>
+                    {product.saleReady ? "준비 완료" : "필수정보 부족"}
+                  </strong>
+                  <span>옵션 {product.optionCount}개</span>
+                  {!product.saleReady ? <span>{product.saleBlockers.map(saleBlockerLabel).join(", ")}</span> : null}
+                </div>
+                <span className={`admin-badge admin-product-status ${product.status.toLowerCase()}`}>
                   {adminStatusLabel(product.status)}
                 </span>
-                <Link className="admin-text-link" href={`/admin/products/${product.id}`}>
+                <Link className="admin-text-link admin-product-manage" href={`/admin/products/${product.id}`}>
                   관리
                 </Link>
               </div>
-            ))}
+              );
+            })}
             {products.length === 0 ? (
               <div className="admin-empty">
                 <strong>조건에 맞는 상품이 없습니다</strong>
@@ -173,6 +200,7 @@ async function loadProducts(params: ProductSearchParams, page: number) {
         status: params.status,
         category: params.category,
         supplierId: params.supplierId,
+        readiness: params.readiness,
         page,
       }),
       getAdminSuppliers(),
@@ -190,7 +218,7 @@ function positivePage(value?: string) {
 
 function pageHref(params: ProductSearchParams, page: number) {
   const query = new URLSearchParams();
-  for (const key of ["q", "status", "category", "supplierId"] as const) {
+  for (const key of ["q", "status", "category", "supplierId", "readiness"] as const) {
     if (params[key]) query.set(key, params[key]);
   }
   if (page > 1) query.set("page", String(page));
@@ -206,4 +234,14 @@ function pageNumbers(currentPage: number, totalPages: number) {
 
 function categoryGroups() {
   return Object.entries(Object.groupBy(PRODUCT_CATEGORIES, (category) => category[0]));
+}
+
+function saleBlockerLabel(blocker: SaleBlocker) {
+  return ({
+    BASE_PRICE: "판매가",
+    THUMBNAIL: "대표 이미지",
+    ACTIVE_OPTION: "판매 옵션",
+    PRODUCT_NOTICE: "상품 고시",
+    COMPLIANCE: "인증 검수",
+  }[blocker]);
 }

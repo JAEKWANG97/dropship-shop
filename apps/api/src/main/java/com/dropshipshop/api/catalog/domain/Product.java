@@ -40,6 +40,9 @@ public class Product {
 	@Column(name = "source_price", nullable = false)
 	private long sourcePrice;
 
+	@Column(name = "source_url", length = 2000)
+	private String sourceUrl;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "category_code", nullable = false, length = 80)
 	private ProductCategory categoryCode;
@@ -129,6 +132,10 @@ public class Product {
 		this.complianceStatus = complianceStatus;
 	}
 
+	public void updateSourceUrl(String sourceUrl) {
+		this.sourceUrl = sourceUrl;
+	}
+
 	public void updateThumbnailImageUrl(String thumbnailImageUrl) {
 		this.thumbnailImageUrl = thumbnailImageUrl;
 	}
@@ -159,6 +166,10 @@ public class Product {
 
 	public long getSourcePrice() {
 		return sourcePrice;
+	}
+
+	public String getSourceUrl() {
+		return sourceUrl;
 	}
 
 	public ProductCategory getCategoryCode() {

@@ -10,7 +10,7 @@ import {
   type PricingPolicy,
 } from "@/lib/admin";
 import { categoryLabel } from "@/lib/categories";
-import { formatPrice, type ProductDetail } from "@/lib/catalog";
+import { formatPrice, type ProductDetail, type SaleBlocker } from "@/lib/catalog";
 import { ProductImage } from "@/app/products/product-image";
 import {
   createAdminProductOption,
@@ -20,6 +20,7 @@ import {
   updateAdminProductOptionStatus,
   updateAdminProductPrices,
   updateAdminProductStatus,
+  updateAdminProductThumbnail,
 } from "./actions";
 
 type AdminProductDetailPageProps = {
@@ -107,10 +108,14 @@ export default async function AdminProductDetailPage({
         </div>
       ) : null}
 
+      <ProductReadinessPanel product={product} />
+
       <section className="admin-product-layout">
         <ProductSummaryPanel product={product} />
         <ProductStatusPanel product={product} />
       </section>
+
+      <ProductThumbnailPanel product={product} />
 
       {pricingPolicy ? (
         <ProductPricingPanel pricingPolicy={pricingPolicy} product={product} />
@@ -119,7 +124,7 @@ export default async function AdminProductDetailPage({
       <ProductDetailBlocksPanel product={product} />
       <ProductNoticePanel product={product} />
 
-      <section className="admin-panel">
+      <section className="admin-panel" id="product-options">
         <div className="admin-panel-head">
           <h2>옵션 관리</h2>
           <span>총 {product.options.length}개</span>
@@ -273,6 +278,67 @@ export default async function AdminProductDetailPage({
   );
 }
 
+function ProductReadinessPanel({ product }: { product: ProductDetail }) {
+  const blockers = new Set(product.saleBlockers ?? []);
+  const items: Array<{ blocker: SaleBlocker; label: string; href: string }> = [
+    { blocker: "BASE_PRICE", label: "판매가", href: "#product-pricing" },
+    { blocker: "THUMBNAIL", label: "대표 이미지", href: "#product-images" },
+    { blocker: "ACTIVE_OPTION", label: "판매 가능한 옵션", href: "#product-options" },
+    { blocker: "PRODUCT_NOTICE", label: "상품 고시", href: "#product-notice" },
+    { blocker: "COMPLIANCE", label: "인증 검수", href: "#product-pricing" },
+  ];
+
+  return (
+    <section className={`admin-panel admin-readiness-panel ${product.saleReady ? "ready" : "blocked"}`}>
+      <div className="admin-panel-head">
+        <div>
+          <h2>판매 준비 상태</h2>
+          <span>{product.saleReady ? "고객에게 공개할 수 있습니다." : "부족한 필수정보를 먼저 입력하세요."}</span>
+        </div>
+        <strong className={`admin-badge ${product.saleReady ? "ready" : "blocked"}`}>
+          {product.saleReady ? "준비 완료" : `필수정보 부족 ${blockers.size}개`}
+        </strong>
+      </div>
+      <div className="admin-readiness-list">
+        {items.map((item) => {
+          const complete = !blockers.has(item.blocker);
+          return (
+            <a className={complete ? "complete" : "missing"} href={item.href} key={item.blocker}>
+              <span aria-hidden="true">{complete ? "✓" : "!"}</span>
+              <strong>{item.label}</strong>
+              <small>{complete ? "완료" : "확인 필요"}</small>
+            </a>
+          );
+        })}
+      </div>
+      {!product.hasDetailContent ? <p className="field-help">상세 콘텐츠는 판매 차단 조건은 아니지만 공개 전 확인을 권장합니다.</p> : null}
+    </section>
+  );
+}
+
+function ProductThumbnailPanel({ product }: { product: ProductDetail }) {
+  return (
+    <section className="admin-panel" id="product-images">
+      <div className="admin-panel-head">
+        <h2>대표 이미지</h2>
+        <span>{product.hasThumbnail ? "등록 완료" : "판매 전 등록 필요"}</span>
+      </div>
+      <form action={updateAdminProductThumbnail} className="admin-inline-form">
+        <input name="productId" type="hidden" value={product.id} />
+        <label>
+          이미지 파일
+          <input accept="image/jpeg,image/png,image/webp" name="thumbnailFile" required type="file" />
+        </label>
+        <label>
+          변경 사유
+          <input name="reason" required placeholder="예: 대표 이미지 검수 완료" />
+        </label>
+        <button className="button" type="submit">대표 이미지 저장</button>
+      </form>
+    </section>
+  );
+}
+
 function ProductSummaryPanel({ product }: { product: ProductDetail }) {
   return (
     <section className="admin-panel">
@@ -300,6 +366,14 @@ function ProductSummaryPanel({ product }: { product: ProductDetail }) {
             <div>
               <dt>판매가</dt>
               <dd>{formatPrice(product.basePrice)}</dd>
+            </div>
+            <div>
+              <dt>공급처 원본</dt>
+              <dd>
+                {product.sourceUrl ? (
+                  <a href={product.sourceUrl} rel="noopener noreferrer" target="_blank">원본 보기</a>
+                ) : "등록되지 않음"}
+              </dd>
             </div>
             <div>
               <dt>인증 검수</dt>
@@ -330,7 +404,7 @@ function ProductPricingPanel({
   ) * pricingPolicy.roundingUnit;
 
   return (
-    <section className="admin-panel">
+    <section className="admin-panel" id="product-pricing">
       <div className="admin-panel-head">
         <h2>가격 및 판매 검수</h2>
         <span>계산 판매가 {formatPrice(calculatedPrice)} · {pricingPolicy.roundingUnit}원 단위 반올림</span>
@@ -344,6 +418,11 @@ function ProductPricingPanel({
         <label>
           공급가
           <input name="sourcePrice" required min="0" type="number" defaultValue={sourcePrice} />
+        </label>
+        <label className="wide">
+          공급처 원본 URL
+          <input name="sourceUrl" type="url" placeholder="https://..." defaultValue={product.sourceUrl ?? ""} />
+          <span className="field-help">운영자 검수용이며 고객 화면에는 노출하지 않습니다.</span>
         </label>
         <label>
           판매가
@@ -398,7 +477,11 @@ function ProductStatusPanel({ product }: { product: ProductDetail }) {
           판매 상태
           <select name="status" required defaultValue={product.status}>
             {PRODUCT_STATUSES.map((status) => (
-              <option key={status} value={status}>
+              <option
+                disabled={status === "ACTIVE" && !product.saleReady && product.status !== "ACTIVE"}
+                key={status}
+                value={status}
+              >
                 {adminStatusLabel(status)}
               </option>
             ))}
@@ -420,12 +503,12 @@ function ProductDetailBlocksPanel({ product }: { product: ProductDetail }) {
   const nextSortOrder = product.detailBlocks.length;
 
   return (
-    <section className="admin-panel">
+    <section className="admin-panel" id="product-details">
       <div className="admin-panel-head">
         <h2>상세 콘텐츠</h2>
         <span>현재 {product.detailBlocks.length}개</span>
       </div>
-      <form action={updateAdminProductDetailBlocks} className="admin-detail-form" encType="multipart/form-data">
+      <form action={updateAdminProductDetailBlocks} className="admin-detail-form">
         <input name="productId" type="hidden" value={product.id} />
         <input name="blockCount" type="hidden" value={product.detailBlocks.length} />
         <div className="admin-detail-block-list">
@@ -530,7 +613,7 @@ function ProductDetailBlocksPanel({ product }: { product: ProductDetail }) {
 
 function ProductNoticePanel({ product }: { product: ProductDetail }) {
   return (
-    <section className="admin-panel">
+    <section className="admin-panel" id="product-notice">
       <div className="admin-panel-head">
         <h2>상품 고시</h2>
         <span>{product.productNotice ? `v${product.productNotice.version}` : "미등록"}</span>

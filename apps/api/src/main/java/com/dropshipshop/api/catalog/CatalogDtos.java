@@ -22,6 +22,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 final class CatalogDtos {
@@ -55,6 +56,7 @@ final class CatalogDtos {
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
 		@Min(0) Long sourcePrice,
+		@Size(max = 2000) @Pattern(regexp = "(?i)^https?://\\S+$", message = "sourceUrl must use http or https") String sourceUrl,
 		@Min(0) long basePrice,
 		@NotNull ProductCategory categoryCode,
 		@NotNull ProductStatus status
@@ -66,6 +68,7 @@ final class CatalogDtos {
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
 		@Min(0) Long sourcePrice,
+		@Size(max = 2000) @Pattern(regexp = "(?i)^https?://\\S+$", message = "sourceUrl must use http or https") String sourceUrl,
 		@Min(0) long basePrice,
 		@NotNull ProductCategory categoryCode,
 		ProductComplianceStatus complianceStatus,
@@ -213,12 +216,19 @@ final class CatalogDtos {
 		String name,
 		String summary,
 		long sourcePrice,
+		String sourceUrl,
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,
 		ProductComplianceStatus complianceStatus,
 		String thumbnailImageUrl,
-		int detailVersion
+		int detailVersion,
+		boolean saleReady,
+		List<SaleBlocker> saleBlockers,
+		long optionCount,
+		boolean hasThumbnail,
+		boolean hasProductNotice,
+		boolean hasDetailContent
 	) {
 	}
 
@@ -249,6 +259,7 @@ final class CatalogDtos {
 		String name,
 		String summary,
 		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourcePrice,
+		@JsonInclude(JsonInclude.Include.NON_NULL) String sourceUrl,
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,
@@ -260,8 +271,27 @@ final class CatalogDtos {
 		List<ProductOptionResponse> options,
 		List<ProductDetailBlockResponse> detailBlocks,
 		ProductNoticeResponse productNotice,
-		List<PolicyLinkResponse> policyLinks
+		List<PolicyLinkResponse> policyLinks,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Boolean saleReady,
+		@JsonInclude(JsonInclude.Include.NON_NULL) List<SaleBlocker> saleBlockers,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Long optionCount,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Boolean hasThumbnail,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Boolean hasProductNotice,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Boolean hasDetailContent
 	) {
+	}
+
+	enum ProductReadinessFilter {
+		READY,
+		BLOCKED
+	}
+
+	enum SaleBlocker {
+		BASE_PRICE,
+		THUMBNAIL,
+		ACTIVE_OPTION,
+		PRODUCT_NOTICE,
+		COMPLIANCE
 	}
 
 	record PolicyLinkResponse(

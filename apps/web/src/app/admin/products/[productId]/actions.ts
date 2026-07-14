@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ApiError, apiSendWithCookie, apiUrl } from "@/lib/api";
 import type { PricingPolicy } from "@/lib/admin";
-import { getAdminPricingPolicy } from "@/lib/admin";
+import { getAdminPricingPolicy, getAdminProduct } from "@/lib/admin";
 import type { ProductCategoryCode } from "@/lib/categories";
 import type { ProductComplianceStatus, ProductDetailBlockType, ProductOptionStatus, ProductStatus } from "@/lib/catalog";
 
@@ -106,6 +106,7 @@ export async function updateAdminProductPrices(formData: FormData) {
         name: text(formData, "name"),
         summary: text(formData, "summary"),
         sourcePrice,
+        sourceUrl: text(formData, "sourceUrl") || null,
         basePrice,
         categoryCode: text(formData, "categoryCode") as ProductCategoryCode,
         complianceStatus: text(formData, "complianceStatus") as ProductComplianceStatus,
@@ -116,6 +117,44 @@ export async function updateAdminProductPrices(formData: FormData) {
     message = error instanceof ApiError && error.responseMessage
       ? error.responseMessage
       : "상품 가격 저장에 실패했습니다.";
+  }
+
+  redirect(detailPath(productId, message));
+}
+
+export async function updateAdminProductThumbnail(formData: FormData) {
+  const productId = text(formData, "productId");
+  const file = formData.get("thumbnailFile");
+  const cookieHeader = (await cookies()).toString();
+  let message = "대표 이미지를 저장했습니다.";
+
+  try {
+    if (!(file instanceof File) || file.size === 0) throw new Error("Thumbnail file is required");
+    const [product, imageUrl] = await Promise.all([
+      getAdminProduct(productId),
+      uploadDetailImage(productId, file, cookieHeader),
+    ]);
+    await apiSendWithCookie(`/api/admin/products/${productId}/images`, cookieHeader, {
+      method: "PUT",
+      body: JSON.stringify({
+        images: [
+          { type: "THUMBNAIL", imageUrl, sortOrder: 0, altText: product.name },
+          ...product.images
+            .filter((image) => image.type === "GALLERY")
+            .map((image) => ({
+              type: image.type,
+              imageUrl: image.imageUrl,
+              sortOrder: image.sortOrder,
+              altText: image.altText,
+            })),
+        ],
+        reason: text(formData, "reason"),
+      }),
+    });
+  } catch (error) {
+    message = error instanceof ApiError && error.responseMessage
+      ? error.responseMessage
+      : "대표 이미지 저장에 실패했습니다.";
   }
 
   redirect(detailPath(productId, message));

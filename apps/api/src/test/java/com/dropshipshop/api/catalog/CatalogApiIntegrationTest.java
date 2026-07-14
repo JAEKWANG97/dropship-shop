@@ -136,7 +136,16 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.supplierName", is("Supplier A")))
 			.andExpect(jsonPath("$.options[0].sourceOptionCode", is("00")))
 			.andExpect(jsonPath("$.options[0].sourceStockQuantity", is(120)))
-			.andExpect(jsonPath("$.complianceStatus", is("PENDING")));
+			.andExpect(jsonPath("$.complianceStatus", is("PENDING")))
+			.andExpect(jsonPath("$.sourceUrl", is("https://mobile.domeggook.com/8667274")))
+			.andExpect(jsonPath("$.saleReady", is(false)))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("THUMBNAIL")))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("PRODUCT_NOTICE")))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("COMPLIANCE")))
+			.andExpect(jsonPath("$.optionCount", is(1)))
+			.andExpect(jsonPath("$.hasThumbnail", is(false)))
+			.andExpect(jsonPath("$.hasProductNotice", is(false)))
+			.andExpect(jsonPath("$.hasDetailContent", is(false)));
 
 		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -209,6 +218,7 @@ class CatalogApiIntegrationTest {
 					  "name": "Product A",
 					  "summary": "Summary",
 					  "sourcePrice": 31200,
+					  "sourceUrl": "https://mobile.domeggook.com/8667274",
 					  "basePrice": 39000,
 					  "categoryCode": "PPE_SAFETY_HELMET",
 					  "complianceStatus": "VERIFIED",
@@ -228,7 +238,10 @@ class CatalogApiIntegrationTest {
 					}
 					"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.status", is("ACTIVE")));
+			.andExpect(jsonPath("$.status", is("ACTIVE")))
+			.andExpect(jsonPath("$.saleReady", is(true)))
+			.andExpect(jsonPath("$.saleBlockers", hasSize(0)))
+			.andExpect(jsonPath("$.hasDetailContent", is(true)));
 
 		mockMvc.perform(get("/api/products"))
 			.andExpect(status().isOk())
@@ -241,7 +254,10 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.supplierId").doesNotExist())
 			.andExpect(jsonPath("$.supplierName").doesNotExist())
 			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
+			.andExpect(jsonPath("$.sourceUrl").doesNotExist())
 			.andExpect(jsonPath("$.complianceStatus").doesNotExist())
+			.andExpect(jsonPath("$.saleReady").doesNotExist())
+			.andExpect(jsonPath("$.saleBlockers").doesNotExist())
 			.andExpect(jsonPath("$.options", hasSize(1)))
 			.andExpect(jsonPath("$.options[0].sourceOptionCode").doesNotExist())
 			.andExpect(jsonPath("$.options[0].sourceAdditionalPrice").doesNotExist())
@@ -361,6 +377,7 @@ class CatalogApiIntegrationTest {
 			"TRAFFIC_CONE",
 			"HIDDEN"
 		);
+		prepareProductForSale(helmetId, alphaSupplier);
 
 		mockMvc.perform(get("/api/admin/products")
 				.param("page", "0")
@@ -400,7 +417,24 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.products", hasSize(1)))
 			.andExpect(jsonPath("$.products[0].id", is(coneId.toString())));
 
-		for (String query : List.of("page=-1", "size=101", "category=UNKNOWN")) {
+		mockMvc.perform(get("/api/admin/products")
+				.param("readiness", "READY")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].id", is(helmetId.toString())))
+			.andExpect(jsonPath("$.products[0].saleReady", is(true)))
+			.andExpect(jsonPath("$.totalElements", is(1)));
+
+		mockMvc.perform(get("/api/admin/products")
+				.param("readiness", "BLOCKED")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(2)))
+			.andExpect(jsonPath("$.products[*].saleReady", hasItem(false)))
+			.andExpect(jsonPath("$.totalElements", is(2)));
+
+		for (String query : List.of("page=-1", "size=101", "category=UNKNOWN", "readiness=UNKNOWN")) {
 			mockMvc.perform(get("/api/admin/products?" + query)
 					.with(authentication(TestAuthentication.admin())))
 				.andExpect(status().isBadRequest());
@@ -428,6 +462,23 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.message", containsString("HIDDEN")));
 
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Invalid source URL",
+					  "summary": "Invalid source URL",
+					  "sourcePrice": 1000,
+					  "sourceUrl": "javascript:alert(1)",
+					  "basePrice": 1300,
+					  "categoryCode": "PPE_SAFETY_HELMET",
+					  "status": "HIDDEN"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isBadRequest());
+
 		MvcResult hiddenProduct = mockMvc.perform(post("/api/admin/products")
 				.with(authentication(TestAuthentication.admin()))
 				.contentType(MediaType.APPLICATION_JSON)
@@ -444,6 +495,17 @@ class CatalogApiIntegrationTest {
 					""".formatted(supplierId)))
 			.andExpect(status().isCreated())
 			.andReturn();
+
+		mockMvc.perform(get("/api/admin/products/{productId}", idFrom(hiddenProduct))
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.saleReady", is(false)))
+			.andExpect(jsonPath("$.saleBlockers", hasSize(5)))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("BASE_PRICE")))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("THUMBNAIL")))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("ACTIVE_OPTION")))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("PRODUCT_NOTICE")))
+			.andExpect(jsonPath("$.saleBlockers", hasItem("COMPLIANCE")));
 
 		mockMvc.perform(patch("/api/admin/products/{productId}/status", idFrom(hiddenProduct))
 				.with(authentication(TestAuthentication.admin()))
@@ -571,6 +633,56 @@ class CatalogApiIntegrationTest {
 		return createProduct(supplierId, "Product A", "Summary", "PPE_SAFETY_HELMET", "HIDDEN");
 	}
 
+	private void prepareProductForSale(UUID productId, UUID supplierId) throws Exception {
+		mockMvc.perform(post("/api/admin/products/{productId}/options", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"기본","additionalPrice":0,"status":"ACTIVE"}
+					"""))
+			.andExpect(status().isCreated());
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason":"readiness test",
+					  "images":[{"type":"THUMBNAIL","imageUrl":"https://cdn.example.com/thumbnail.jpg","sortOrder":0}]
+					}
+					"""))
+			.andExpect(status().isOk());
+		mockMvc.perform(put("/api/admin/products/{productId}/notice", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason":"readiness test",
+					  "productInfoNotice":"info",
+					  "shippingInfo":"shipping",
+					  "asInfo":"as",
+					  "returnExchangeInfo":"returns"
+					}
+					"""))
+			.andExpect(status().isOk());
+		mockMvc.perform(patch("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId":"%s",
+					  "name":"Bright safety helmet",
+					  "summary":"Helmet for field work",
+					  "sourcePrice":31200,
+					  "sourceUrl":"https://mobile.domeggook.com/8667274",
+					  "basePrice":39000,
+					  "categoryCode":"PPE_SAFETY_HELMET",
+					  "complianceStatus":"VERIFIED",
+					  "reason":"readiness test"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isOk());
+	}
+
 	private UUID createProduct(
 		UUID supplierId,
 		String name,
@@ -587,6 +699,7 @@ class CatalogApiIntegrationTest {
 					  "name": "%s",
 					  "summary": "%s",
 					  "sourcePrice": 31200,
+					  "sourceUrl": "https://mobile.domeggook.com/8667274",
 					  "basePrice": 39000,
 					  "categoryCode": "%s",
 					  "status": "%s"

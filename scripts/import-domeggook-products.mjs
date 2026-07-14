@@ -210,6 +210,7 @@ async function initManifest() {
       status: "HIDDEN",
       name: product.title,
       summary: summaryFor(product),
+      sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
       sourcePrice,
       basePrice: pricing.basePrice,
       options: pricing.options.map(manifestOption),
@@ -253,6 +254,18 @@ async function pricingPolicy(args) {
     return await apiFetch(args, "/api/admin/pricing-policy");
   } catch {
     return DEFAULT_PRICING_POLICY;
+  }
+}
+
+async function allAdminProducts(args) {
+  const products = [];
+  let page = 0;
+
+  while (true) {
+    const response = await apiFetch(args, `/api/admin/products?page=${page}&size=100`);
+    products.push(...response.products);
+    page += 1;
+    if (page >= response.totalPages) return products;
   }
 }
 
@@ -307,6 +320,7 @@ async function importItem(args, item, product, suppliers, products, policy) {
       name: item.name,
       summary: item.summary,
       sourcePrice: pricing.sourcePrice,
+      sourceUrl: item.sourceUrl || product.sourceUrl || null,
       basePrice: pricing.basePrice,
       categoryCode: item.categoryCode,
       status: item.status || "HIDDEN",
@@ -409,7 +423,7 @@ async function runManifest(args) {
 
   const [suppliers, products] = await Promise.all([
     apiFetch(args, "/api/admin/suppliers"),
-    apiFetch(args, "/api/admin/products"),
+    allAdminProducts(args),
   ]);
   const policy = await pricingPolicy(args);
 
