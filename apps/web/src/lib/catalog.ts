@@ -61,6 +61,8 @@ export type PolicyLink = {
 };
 
 export type ProductDetail = ProductSummary & {
+  supplierId?: string;
+  supplierName?: string;
   sourcePrice?: number;
   complianceStatus?: ProductComplianceStatus;
   detailVersion: number;

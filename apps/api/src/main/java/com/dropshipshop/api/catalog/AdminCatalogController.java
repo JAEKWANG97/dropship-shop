@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,18 +14,24 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.dropshipshop.api.auth.security.CurrentUser;
+import com.dropshipshop.api.catalog.domain.ProductCategory;
+import com.dropshipshop.api.catalog.domain.ProductStatus;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasRole('ADMIN')")
+@Validated
 class AdminCatalogController {
 
 	private final CatalogService catalogService;
@@ -60,8 +67,15 @@ class AdminCatalogController {
 	}
 
 	@GetMapping("/products")
-	List<CatalogDtos.AdminProductResponse> listProducts() {
-		return catalogService.listAdminProducts();
+	CatalogDtos.AdminProductPageResponse listProducts(
+		@RequestParam(required = false) String q,
+		@RequestParam(required = false) ProductStatus status,
+		@RequestParam(required = false) ProductCategory category,
+		@RequestParam(required = false) UUID supplierId,
+		@RequestParam(defaultValue = "0") @Min(0) int page,
+		@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
+	) {
+		return catalogService.listAdminProducts(q, status, category, supplierId, page, size);
 	}
 
 	@GetMapping("/pricing-policy")

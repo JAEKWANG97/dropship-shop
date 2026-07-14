@@ -227,7 +227,7 @@ Customer visibility rules:
 | `POST` | `/api/admin/suppliers` | `ADMIN` | Implemented | Create supplier |
 | `GET` | `/api/admin/suppliers/{supplierId}` | `ADMIN` | Implemented | Supplier detail |
 | `PATCH` | `/api/admin/suppliers/{supplierId}` | `ADMIN` | Implemented | Update supplier |
-| `GET` | `/api/admin/products` | `ADMIN` | Implemented | List products including hidden/stopped products |
+| `GET` | `/api/admin/products` | `ADMIN` | Implemented | Page products with keyword, status, category, and supplier filters |
 | `POST` | `/api/admin/products` | `ADMIN` | Implemented | Create product |
 | `GET` | `/api/admin/products/{productId}` | `ADMIN` | Implemented | Product detail for admin editing |
 | `PATCH` | `/api/admin/products/{productId}` | `ADMIN` | Implemented | Update product base fields |
@@ -257,6 +257,9 @@ DS-6 minimum:
 - Product and option status handling without stock quantity.
 - Admin product responses include `sourcePrice`; public product responses do not expose supplier cost.
 - Admin product responses include `complianceStatus`; public product responses do not expose internal compliance review state.
+- Admin product detail includes `supplierId` and `supplierName`; public product detail omits supplier information.
+- Admin product list accepts optional `q`, `status`, `category`, `supplierId`, `page`, and `size`. `page` is zero-based, `size` defaults to 20 and is limited to 1-100.
+- Admin product list returns `{ products, page, size, totalElements, totalPages }` ordered by `createdAt DESC, id DESC`.
 - Products must be created as non-active. `ACTIVE` requires a positive sale price, thumbnail, active option, active product notice, and `NOT_REQUIRED` or `VERIFIED` compliance review.
 - Price, image, option, and compliance updates cannot leave an `ACTIVE` product without those requirements.
 - Active pricing policy stores the default margin rates used to calculate customer sale prices from supplier cost.

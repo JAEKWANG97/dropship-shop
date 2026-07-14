@@ -19,10 +19,10 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  const { orders, products } = data;
+  const { orders, productPage, soldOutPage } = data;
   const pendingOrders = orders.filter((order) => order.status === "SUPPLIER_ORDER_PENDING");
   const shippedOrders = orders.filter((order) => order.status === "SHIPPED");
-  const lowStockProducts = products.filter((product) => product.status === "SOLD_OUT");
+  const lowStockProducts = soldOutPage.products;
   const revenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
 
   return (
@@ -41,7 +41,7 @@ export default async function AdminDashboardPage() {
         <Metric label="주문" value={`${orders.length}건`} sub={formatPrice(revenue)} />
         <Metric label="매출" value={formatPrice(revenue)} sub="배송비 포함 가격" />
         <Metric label="배송 대기" value={`${pendingOrders.length}건`} sub="발주 시작 필요" />
-        <Metric label="재고 확인" value={`${lowStockProducts.length}건`} sub="판매 상태 확인" />
+        <Metric label="재고 확인" value={`${soldOutPage.totalElements}건`} sub="판매 상태 확인" />
       </div>
 
       <div className="admin-dashboard-grid">
@@ -61,7 +61,7 @@ export default async function AdminDashboardPage() {
             </div>
             <div>
               <span>상품</span>
-              <strong>{products.length}개</strong>
+              <strong>{productPage.totalElements}개</strong>
             </div>
           </div>
         </section>
@@ -141,10 +141,14 @@ export default async function AdminDashboardPage() {
 
 async function loadDashboard() {
   try {
-    const [products, orders] = await Promise.all([getAdminProducts(), getAdminOrders()]);
-    return { error: false as const, orders, products };
+    const [productPage, soldOutPage, orders] = await Promise.all([
+      getAdminProducts({ size: 1 }),
+      getAdminProducts({ status: "SOLD_OUT", size: 4 }),
+      getAdminOrders(),
+    ]);
+    return { error: false as const, orders, productPage, soldOutPage };
   } catch {
-    return { error: true as const, orders: [], products: [] };
+    return { error: true as const, orders: [], productPage: null, soldOutPage: null };
   }
 }
 

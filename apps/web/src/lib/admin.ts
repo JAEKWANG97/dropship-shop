@@ -20,6 +20,14 @@ export type AdminProduct = {
   detailVersion: number;
 };
 
+export type AdminProductPage = {
+  products: AdminProduct[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
 export type AdminSupplier = {
   id: string;
   name: string;
@@ -174,8 +182,22 @@ async function readAdmin<T>(path: string) {
 	return apiGetWithCookie<T>(path, (await cookies()).toString());
 }
 
-export async function getAdminProducts() {
-	return readAdmin<AdminProduct[]>("/api/admin/products");
+export async function getAdminProducts(params: {
+  q?: string;
+  status?: string;
+  category?: string;
+  supplierId?: string;
+  page?: number;
+  size?: number;
+} = {}) {
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.status) query.set("status", params.status);
+  if (params.category) query.set("category", params.category);
+  if (params.supplierId) query.set("supplierId", params.supplierId);
+  query.set("page", String(params.page ?? 0));
+  query.set("size", String(params.size ?? 20));
+	return readAdmin<AdminProductPage>(`/api/admin/products?${query}`);
 }
 
 export async function getAdminProduct(productId: string) {

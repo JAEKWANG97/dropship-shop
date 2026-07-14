@@ -20,6 +20,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
@@ -131,6 +132,8 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/products/{productId}", productId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.supplierId", is(supplierId.toString())))
+			.andExpect(jsonPath("$.supplierName", is("Supplier A")))
 			.andExpect(jsonPath("$.options[0].sourceOptionCode", is("00")))
 			.andExpect(jsonPath("$.options[0].sourceStockQuantity", is(120)))
 			.andExpect(jsonPath("$.complianceStatus", is("PENDING")));
@@ -235,6 +238,8 @@ class CatalogApiIntegrationTest {
 
 		mockMvc.perform(get("/api/products/{productId}", productId))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.supplierId").doesNotExist())
+			.andExpect(jsonPath("$.supplierName").doesNotExist())
 			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
 			.andExpect(jsonPath("$.complianceStatus").doesNotExist())
 			.andExpect(jsonPath("$.options", hasSize(1)))
@@ -329,6 +334,77 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isNotFound());
 
 		org.assertj.core.api.Assertions.assertThat(productChangeHistoryRepository.count()).isGreaterThanOrEqualTo(4);
+	}
+
+	@Test
+	void pagesAndFiltersAdminProducts() throws Exception {
+		UUID alphaSupplier = createSupplier("Alpha Safety");
+		UUID betaSupplier = createSupplier("Beta Industrial");
+		UUID helmetId = createProduct(
+			alphaSupplier,
+			"Bright safety helmet",
+			"Helmet for field work",
+			"PPE_SAFETY_HELMET",
+			"HIDDEN"
+		);
+		createProduct(
+			alphaSupplier,
+			"Safety shoes",
+			"Slip resistant footwear",
+			"PPE_SAFETY_SHOES",
+			"SOLD_OUT"
+		);
+		UUID coneId = createProduct(
+			betaSupplier,
+			"Traffic cone",
+			"Bright road control equipment",
+			"TRAFFIC_CONE",
+			"HIDDEN"
+		);
+
+		mockMvc.perform(get("/api/admin/products")
+				.param("page", "0")
+				.param("size", "2")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(2)))
+			.andExpect(jsonPath("$.products[0].id", is(coneId.toString())))
+			.andExpect(jsonPath("$.page", is(0)))
+			.andExpect(jsonPath("$.size", is(2)))
+			.andExpect(jsonPath("$.totalElements", is(3)))
+			.andExpect(jsonPath("$.totalPages", is(2)));
+
+		mockMvc.perform(get("/api/admin/products")
+				.param("page", "1")
+				.param("size", "2")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].id", is(helmetId.toString())));
+
+		mockMvc.perform(get("/api/admin/products")
+				.param("q", "bright")
+				.param("status", "HIDDEN")
+				.param("category", "PPE_SAFETY_HELMET")
+				.param("supplierId", alphaSupplier.toString())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].id", is(helmetId.toString())))
+			.andExpect(jsonPath("$.totalElements", is(1)));
+
+		mockMvc.perform(get("/api/admin/products")
+				.param("q", "beta industrial")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].id", is(coneId.toString())));
+
+		for (String query : List.of("page=-1", "size=101", "category=UNKNOWN")) {
+			mockMvc.perform(get("/api/admin/products?" + query)
+					.with(authentication(TestAuthentication.admin())))
+				.andExpect(status().isBadRequest());
+		}
 	}
 
 	@Test
@@ -469,18 +545,22 @@ class CatalogApiIntegrationTest {
 	}
 
 	private UUID createSupplier() throws Exception {
+		return createSupplier("Supplier A");
+	}
+
+	private UUID createSupplier(String name) throws Exception {
 		MvcResult result = mockMvc.perform(post("/api/admin/suppliers")
 				.with(authentication(TestAuthentication.admin()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "name": "Supplier A",
+					  "name": "%s",
 					  "contactName": "Manager",
 					  "phone": "010-0000-0000",
 					  "email": "supplier@example.com",
 					  "memo": "Internal memo"
 					}
-					"""))
+					""".formatted(name)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.status", is("ACTIVE")))
 			.andReturn();
@@ -488,25 +568,35 @@ class CatalogApiIntegrationTest {
 	}
 
 	private UUID createProduct(UUID supplierId) throws Exception {
+		return createProduct(supplierId, "Product A", "Summary", "PPE_SAFETY_HELMET", "HIDDEN");
+	}
+
+	private UUID createProduct(
+		UUID supplierId,
+		String name,
+		String summary,
+		String categoryCode,
+		String status
+	) throws Exception {
 		MvcResult result = mockMvc.perform(post("/api/admin/products")
 				.with(authentication(TestAuthentication.admin()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
 					  "supplierId": "%s",
-					  "name": "Product A",
-					  "summary": "Summary",
+					  "name": "%s",
+					  "summary": "%s",
 					  "sourcePrice": 31200,
 					  "basePrice": 39000,
-					  "categoryCode": "PPE_SAFETY_HELMET",
-					  "status": "HIDDEN"
+					  "categoryCode": "%s",
+					  "status": "%s"
 					}
-					""".formatted(supplierId)))
+					""".formatted(supplierId, name, summary, categoryCode, status)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.sourcePrice", is(31200)))
 			.andExpect(jsonPath("$.basePrice", is(39000)))
-			.andExpect(jsonPath("$.categoryCode", is("PPE_SAFETY_HELMET")))
-			.andExpect(jsonPath("$.status", is("HIDDEN")))
+			.andExpect(jsonPath("$.categoryCode", is(categoryCode)))
+			.andExpect(jsonPath("$.status", is(status)))
 			.andReturn();
 		return idFrom(result);
 	}

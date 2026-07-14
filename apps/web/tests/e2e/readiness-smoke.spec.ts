@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  API_BASE_URL,
   activeProductId,
   addCookie,
   expectNoHorizontalOverflow,
@@ -7,6 +8,17 @@ import {
   isLocalTarget,
   requireAdminCookie,
 } from "./helpers";
+
+type AdminProductPage = {
+  products: {
+    id: string;
+    name: string;
+    status: string;
+    categoryCode: string;
+    supplierId: string;
+  }[];
+  totalElements: number;
+};
 
 test("public customer pages render without horizontal overflow", async ({ page }) => {
   const productId = await activeProductId();
@@ -143,6 +155,41 @@ test("admin pages render with an admin session cookie", async ({ page, context }
   }
 });
 
+test("admin product list preserves server filters and pagination", async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Admin product filtering runs once in the desktop project.");
+  test.skip(!isLocalTarget(), "Admin product filtering uses local dev login and seed data.");
+
+  const adminCookie = await requireAdminCookie();
+  const response = await fetch(`${API_BASE_URL}/api/admin/products?size=1`, {
+    headers: { Cookie: adminCookie },
+  });
+  if (!response.ok) {
+    expect(response.ok, await response.text()).toBeTruthy();
+  }
+  const productPage = (await response.json()) as AdminProductPage;
+  test.skip(productPage.products.length === 0, "No admin product exists for this smoke target.");
+  const product = productPage.products[0];
+
+  await addCookie(context, adminCookie);
+  await page.goto("/admin/products");
+  const filterForm = page.locator("form.admin-product-filters");
+  await filterForm.getByPlaceholder("상품명, 공급처 검색").fill(product.name);
+  await filterForm.locator('select[name="status"]').selectOption(product.status);
+  await filterForm.locator('select[name="category"]').selectOption(product.categoryCode);
+  await filterForm.locator('select[name="supplierId"]').selectOption(product.supplierId);
+  await filterForm.getByRole("button", { name: "검색" }).click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(product.name);
+  await expect(page.locator(".admin-table.products")).toContainText(product.name);
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByRole("link", { name: "초기화" }).click();
+  if (productPage.totalElements > 20) {
+    await page.getByRole("link", { name: "다음" }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("2");
+  }
+});
+
 test("admin order detail renders through selected order query", async ({ page, context }) => {
   test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin order smoke.");
 
@@ -208,18 +255,23 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
   });
 });
 
-test("mobile admin smoke screenshots remain stable", async ({ page, context }, testInfo) => {
+test("mobile admin product screenshot remains stable", async ({ page, context }, testInfo) => {
   test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Screenshots are mobile-only.");
-  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin screenshot smoke.");
 
-  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
+  await addCookie(context, await requireAdminCookie());
   await page.goto("/admin/products");
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("mobile-admin-products.png", {
     mask: [page.locator(".admin-table.products")],
   });
+});
 
+test("mobile admin order detail screenshot remains stable", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
+  test.skip(testInfo.project.name !== "mobile", "Screenshots are mobile-only.");
+
+  await addCookie(context, await requireAdminCookie());
   await page.goto("/admin/orders");
   const orderLink = await firstAdminOrderLink(page);
   await orderLink.click();

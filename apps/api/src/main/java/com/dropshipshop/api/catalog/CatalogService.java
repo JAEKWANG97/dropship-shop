@@ -3,12 +3,16 @@ package com.dropshipshop.api.catalog;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.safety.Safelist;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductChangeHistory;
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
+import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlock;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
@@ -137,10 +142,32 @@ public class CatalogService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<CatalogDtos.AdminProductResponse> listAdminProducts() {
-		return productRepository.findAllByOrderByCreatedAtDesc().stream()
-			.map(this::toAdminProductResponse)
-			.toList();
+	public CatalogDtos.AdminProductPageResponse listAdminProducts(
+		String query,
+		ProductStatus status,
+		ProductCategory category,
+		UUID supplierId,
+		int page,
+		int size
+	) {
+		String keyword = query == null || query.isBlank()
+			? null
+			: "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+		Sort sort = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+		Page<Product> products = productRepository.findAdminProducts(
+			keyword,
+			status,
+			category,
+			supplierId,
+			PageRequest.of(page, size, sort)
+		);
+		return new CatalogDtos.AdminProductPageResponse(
+			products.getContent().stream().map(this::toAdminProductResponse).toList(),
+			products.getNumber(),
+			products.getSize(),
+			products.getTotalElements(),
+			products.getTotalPages()
+		);
 	}
 
 	@Transactional(readOnly = true)
@@ -666,6 +693,8 @@ public class CatalogService {
 			.orElse(null);
 		return new CatalogDtos.ProductDetailResponse(
 			product.getId(),
+			includeSourcePrice ? product.getSupplier().getId() : null,
+			includeSourcePrice ? product.getSupplier().getName() : null,
 			product.getName(),
 			product.getSummary(),
 			includeSourcePrice ? product.getSourcePrice() : null,

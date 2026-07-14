@@ -2098,6 +2098,43 @@ textarea {
   background: var(--surface-soft);
 }
 
+.admin-product-filters {
+  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)) auto auto;
+}
+
+.admin-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.admin-pagination a,
+.admin-pagination span,
+.admin-pagination strong {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--navy);
+  text-decoration: none;
+}
+
+.admin-pagination strong {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.admin-pagination span {
+  color: var(--muted);
+  opacity: 0.65;
+}
+
 .admin-form {
   display: grid;
   gap: 14px;

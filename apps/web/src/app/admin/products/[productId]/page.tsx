@@ -6,8 +6,6 @@ import {
   getAdminPricingPolicy,
   getAdminProduct,
   getAdminProductChanges,
-  getAdminProducts,
-  type AdminProduct,
   type AdminProductChange,
   type PricingPolicy,
 } from "@/lib/admin";
@@ -35,24 +33,22 @@ const COMPLIANCE_STATUSES = ["PENDING", "NOT_REQUIRED", "VERIFIED", "REJECTED"] 
 
 async function loadProduct(productId: string) {
   try {
-    const [product, products, changes] = await Promise.all([
+    const [product, changes] = await Promise.all([
       getAdminProduct(productId),
-      getAdminProducts(),
       loadChanges(productId),
     ]);
     const pricingPolicy = await getAdminPricingPolicy();
     return {
       changes,
       error: false as const,
-      listProduct: products.find((item) => item.id === productId) ?? null,
       pricingPolicy,
       product,
     };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
-      return { changes: [], error: true as const, listProduct: null, pricingPolicy: null, product: null };
+      return { changes: [], error: true as const, pricingPolicy: null, product: null };
     }
-    return { changes: [], error: true as const, listProduct: null, pricingPolicy: null, product: null };
+    return { changes: [], error: true as const, pricingPolicy: null, product: null };
   }
 }
 
@@ -69,7 +65,7 @@ export default async function AdminProductDetailPage({
   searchParams,
 }: AdminProductDetailPageProps) {
   const [{ productId }, query] = await Promise.all([params, searchParams]);
-  const { changes, error, listProduct, pricingPolicy, product } = await loadProduct(productId);
+  const { changes, error, pricingPolicy, product } = await loadProduct(productId);
 
   if (error || !product) {
     return (
@@ -112,12 +108,12 @@ export default async function AdminProductDetailPage({
       ) : null}
 
       <section className="admin-product-layout">
-        <ProductSummaryPanel listProduct={listProduct} product={product} />
+        <ProductSummaryPanel product={product} />
         <ProductStatusPanel product={product} />
       </section>
 
       {pricingPolicy ? (
-        <ProductPricingPanel listProduct={listProduct} pricingPolicy={pricingPolicy} product={product} />
+        <ProductPricingPanel pricingPolicy={pricingPolicy} product={product} />
       ) : null}
 
       <ProductDetailBlocksPanel product={product} />
@@ -277,13 +273,7 @@ export default async function AdminProductDetailPage({
   );
 }
 
-function ProductSummaryPanel({
-  listProduct,
-  product,
-}: {
-  listProduct: AdminProduct | null;
-  product: ProductDetail;
-}) {
+function ProductSummaryPanel({ product }: { product: ProductDetail }) {
   return (
     <section className="admin-panel">
       <div className="admin-product-summary">
@@ -301,11 +291,11 @@ function ProductSummaryPanel({
             </div>
             <div>
               <dt>공급처</dt>
-              <dd>{listProduct?.supplierName ?? "목록에서 확인 불가"}</dd>
+              <dd>{product.supplierName ?? "공급처 정보 없음"}</dd>
             </div>
             <div>
               <dt>공급가</dt>
-              <dd>{formatPrice(product.sourcePrice ?? listProduct?.sourcePrice ?? product.basePrice)}</dd>
+              <dd>{formatPrice(product.sourcePrice ?? product.basePrice)}</dd>
             </div>
             <div>
               <dt>판매가</dt>
@@ -313,7 +303,7 @@ function ProductSummaryPanel({
             </div>
             <div>
               <dt>인증 검수</dt>
-              <dd>{complianceStatusLabel(product.complianceStatus ?? listProduct?.complianceStatus ?? "PENDING")}</dd>
+              <dd>{complianceStatusLabel(product.complianceStatus ?? "PENDING")}</dd>
             </div>
             <div>
               <dt>상세 버전</dt>
@@ -328,15 +318,13 @@ function ProductSummaryPanel({
 }
 
 function ProductPricingPanel({
-  listProduct,
   pricingPolicy,
   product,
 }: {
-  listProduct: AdminProduct | null;
   pricingPolicy: PricingPolicy;
   product: ProductDetail;
 }) {
-  const sourcePrice = product.sourcePrice ?? listProduct?.sourcePrice ?? product.basePrice;
+  const sourcePrice = product.sourcePrice ?? product.basePrice;
   const calculatedPrice = Math.round(
     (sourcePrice * (1 + pricingPolicy.totalMarkupRate / 100)) / pricingPolicy.roundingUnit
   ) * pricingPolicy.roundingUnit;
@@ -349,7 +337,7 @@ function ProductPricingPanel({
       </div>
       <form action={updateAdminProductPrices} className="admin-form-grid">
         <input name="productId" type="hidden" value={product.id} />
-        <input name="supplierId" type="hidden" value={listProduct?.supplierId ?? ""} />
+        <input name="supplierId" type="hidden" value={product.supplierId ?? ""} />
         <input name="name" type="hidden" value={product.name} />
         <input name="summary" type="hidden" value={product.summary} />
         <input name="categoryCode" type="hidden" value={product.categoryCode} />
@@ -363,7 +351,7 @@ function ProductPricingPanel({
         </label>
         <label>
           인증 검수
-          <select name="complianceStatus" required defaultValue={product.complianceStatus ?? listProduct?.complianceStatus ?? "PENDING"}>
+          <select name="complianceStatus" required defaultValue={product.complianceStatus ?? "PENDING"}>
             {COMPLIANCE_STATUSES.map((status) => (
               <option key={status} value={status}>{complianceStatusLabel(status)}</option>
             ))}

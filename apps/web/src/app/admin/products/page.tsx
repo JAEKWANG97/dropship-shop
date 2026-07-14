@@ -1,25 +1,35 @@
 import Link from "next/link";
-import { adminStatusLabel, getAdminProducts } from "@/lib/admin";
-import { categoryLabel } from "@/lib/categories";
+import { redirect } from "next/navigation";
+import { adminStatusLabel, getAdminProducts, getAdminSuppliers } from "@/lib/admin";
+import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
 import { formatPrice } from "@/lib/catalog";
 import { ProductImage } from "@/app/products/product-image";
 
+type ProductSearchParams = {
+  message?: string;
+  q?: string;
+  status?: string;
+  category?: string;
+  supplierId?: string;
+  page?: string;
+};
+
 type AdminProductsPageProps = {
-  searchParams: Promise<{ message?: string; q?: string; status?: string }>;
+  searchParams: Promise<ProductSearchParams>;
 };
 
 export default async function AdminProductsPage({ searchParams }: AdminProductsPageProps) {
-  const [data, params] = await Promise.all([loadProducts(), searchParams]);
-  const products = data.products;
-  const keyword = params.q?.trim().toLowerCase();
-  const status = params.status?.trim();
-  const filteredProducts = products.filter((product) => {
-    const matchesKeyword =
-      !keyword || `${product.name} ${product.summary} ${product.supplierName}`.toLowerCase().includes(keyword);
-    const matchesStatus = !status || product.status === status;
+  const params = await searchParams;
+  const requestedPage = positivePage(params.page);
+  const data = await loadProducts(params, requestedPage - 1);
 
-    return matchesKeyword && matchesStatus;
-  });
+  if (!data.error && data.products.totalPages > 0 && requestedPage > data.products.totalPages) {
+    redirect(pageHref(params, data.products.totalPages));
+  }
+
+  const products = data.error ? [] : data.products.products;
+  const currentPage = data.error ? 1 : data.products.page + 1;
+  const totalPages = data.error ? 0 : data.products.totalPages;
 
   return (
     <div className="admin-page">
@@ -48,7 +58,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
       ) : null}
 
       {!data.error ? (
-        <form action="/admin/products" className="admin-filters">
+        <form action="/admin/products" className="admin-filters admin-product-filters">
           <input name="q" placeholder="상품명, 공급처 검색" defaultValue={params.q ?? ""} />
           <select name="status" defaultValue={params.status ?? ""}>
             <option value="">전체 상태</option>
@@ -57,9 +67,32 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
             <option value="HIDDEN">숨김</option>
             <option value="STOPPED">판매중지</option>
           </select>
+          <select name="category" defaultValue={params.category ?? ""}>
+            <option value="">전체 카테고리</option>
+            {categoryGroups().map(([group, categories]) => (
+              <optgroup key={group} label={group}>
+                {categories.map((category) => (
+                  <option key={category[2]} value={category[2]}>
+                    {category[1] ? `${category[1]} · ${category[3]}` : category[3]}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <select name="supplierId" defaultValue={params.supplierId ?? ""}>
+            <option value="">전체 공급처</option>
+            {data.suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
           <button className="button" type="submit">
             검색
           </button>
+          <Link className="button" href="/admin/products">
+            초기화
+          </Link>
         </form>
       ) : null}
 
@@ -67,7 +100,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
         <section className="admin-panel">
           <div className="admin-panel-head">
             <h2>상품 목록</h2>
-            <span>총 {filteredProducts.length}개</span>
+            <span>총 {data.error ? 0 : data.products.totalElements}개</span>
           </div>
           <div className="admin-table products">
             <div className="admin-table-row admin-table-head">
@@ -79,7 +112,7 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
               <span>상태</span>
               <span>관리</span>
             </div>
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <div className="admin-table-row" key={product.id}>
                 <ProductImage
                   alt={product.name}
@@ -98,23 +131,79 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
                 </Link>
               </div>
             ))}
-            {filteredProducts.length === 0 ? (
+            {products.length === 0 ? (
               <div className="admin-empty">
-                <strong>표시할 상품이 없습니다</strong>
-                <span>검색어를 바꾸거나 상품을 먼저 등록하세요.</span>
+                <strong>조건에 맞는 상품이 없습니다</strong>
+                <span>검색어나 필터를 바꾸거나 상품을 먼저 등록하세요.</span>
               </div>
             ) : null}
           </div>
+          {totalPages > 0 ? (
+            <nav className="admin-pagination" aria-label="상품 목록 페이지">
+              {currentPage > 1 ? (
+                <Link href={pageHref(params, currentPage - 1)}>이전</Link>
+              ) : (
+                <span aria-disabled="true">이전</span>
+              )}
+              {pageNumbers(currentPage, totalPages).map((page) =>
+                page === currentPage ? (
+                  <strong aria-current="page" key={page}>{page}</strong>
+                ) : (
+                  <Link href={pageHref(params, page)} key={page}>{page}</Link>
+                ),
+              )}
+              {currentPage < totalPages ? (
+                <Link href={pageHref(params, currentPage + 1)}>다음</Link>
+              ) : (
+                <span aria-disabled="true">다음</span>
+              )}
+            </nav>
+          ) : null}
         </section>
       ) : null}
     </div>
   );
 }
 
-async function loadProducts() {
+async function loadProducts(params: ProductSearchParams, page: number) {
   try {
-    return { error: false as const, products: await getAdminProducts() };
+    const [products, suppliers] = await Promise.all([
+      getAdminProducts({
+        q: params.q?.trim(),
+        status: params.status,
+        category: params.category,
+        supplierId: params.supplierId,
+        page,
+      }),
+      getAdminSuppliers(),
+    ]);
+    return { error: false as const, products, suppliers };
   } catch {
-    return { error: true as const, products: [] };
+    return { error: true as const, products: null, suppliers: [] };
   }
+}
+
+function positivePage(value?: string) {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
+function pageHref(params: ProductSearchParams, page: number) {
+  const query = new URLSearchParams();
+  for (const key of ["q", "status", "category", "supplierId"] as const) {
+    if (params[key]) query.set(key, params[key]);
+  }
+  if (page > 1) query.set("page", String(page));
+  const value = query.toString();
+  return value ? `/admin/products?${value}` : "/admin/products";
+}
+
+function pageNumbers(currentPage: number, totalPages: number) {
+  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function categoryGroups() {
+  return Object.entries(Object.groupBy(PRODUCT_CATEGORIES, (category) => category[0]));
 }

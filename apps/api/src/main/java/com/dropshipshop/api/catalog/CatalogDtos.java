@@ -222,6 +222,15 @@ final class CatalogDtos {
 	) {
 	}
 
+	record AdminProductPageResponse(
+		List<AdminProductResponse> products,
+		int page,
+		int size,
+		long totalElements,
+		int totalPages
+	) {
+	}
+
 	record ProductSummaryResponse(
 		UUID id,
 		String name,
@@ -235,6 +244,8 @@ final class CatalogDtos {
 
 	record ProductDetailResponse(
 		UUID id,
+		@JsonInclude(JsonInclude.Include.NON_NULL) UUID supplierId,
+		@JsonInclude(JsonInclude.Include.NON_NULL) String supplierName,
 		String name,
 		String summary,
 		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourcePrice,
