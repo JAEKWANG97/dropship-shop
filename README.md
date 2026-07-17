@@ -61,7 +61,7 @@
 - Auth: Spring Security
 - Frontend: Next.js
 - Storage: EC2 EBS-backed local uploads with S3 backup; object storage serving is deferred
-- Payment: Direct bank transfer; Toss Payments is deferred
+- Payment: Direct bank transfer with manual admin confirmation
 - Deployment: Single EC2 Docker host with PostgreSQL and persistent EBS volumes
 
 ## Documentation

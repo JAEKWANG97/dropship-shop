@@ -61,7 +61,6 @@ Status: Confirmed
 
 - 결제 전 주문과 결제 완료 주문을 명확히 구분해야 한다.
 - 관리자 입금확인 시 실제 입금 금액과 서버 결제 그룹(PaymentGroup) 총액을 비교해야 한다.
-- Toss 재도입 시에는 PG 결제 승인 금액과 서버 결제 그룹(PaymentGroup) 총액을 비교해야 한다.
 - 주문 상태 변경 이력이 필요하다.
 - 결제 요청과 결제 검증은 결제 그룹(PaymentGroup) ID 또는 checkout number를 기준으로 연결되어야 한다.
 - 각 배송 그룹 주문은 결제 그룹(PaymentGroup) ID를 저장해야 한다.

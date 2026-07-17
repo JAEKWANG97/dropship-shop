@@ -9,7 +9,7 @@ AI agent가 Dropship Shop 저장소에서 작업할 때 따르는 운영 지침�
 - Project: 공급처 출고형 자사몰. 운영자가 상품을 팔고 공급처가 출고한다.
 - Backend: Spring Boot, PostgreSQL, JPA, Spring Security.
 - Frontend: `apps/web`의 Next.js customer/admin web.
-- Payment: 계좌입금과 관리자 입금확인이 현재 기본 경로다. Toss Payments는 재도입 보류 상태다.
+- Payment: 계좌입금과 관리자 입금확인만 사용한다. Toss Payments를 포함한 PG 결제는 도입하지 않는다.
 - Work unit: 기본적으로 `docs/BACKLOG.md` 항목 1개와 git commit 1개가 구현/문서/테스트 단위다.
 - Before coding: 관련 정책 문서, ERD, API 문서, `docs/BACKLOG.md`를 먼저 확인한다.
 - Before completion: 테스트와 문서 동기화를 확인한다.
