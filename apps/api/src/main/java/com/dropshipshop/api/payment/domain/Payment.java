@@ -105,25 +105,6 @@ public class Payment {
 		this.requestedAmount = requestedAmount;
 	}
 
-	public static Payment approved(
-		PaymentGroup paymentGroup,
-		String providerPaymentKey,
-		PaymentMethod method,
-		long requestedAmount,
-		long approvedAmount,
-		Instant approvedAt,
-		String rawProviderStatus,
-		Instant syncedAt
-	) {
-		Payment payment = new Payment(paymentGroup, PaymentProvider.TOSS_PAYMENTS, providerPaymentKey, method,
-			PaymentStatus.APPROVED, requestedAmount);
-		payment.approvedAmount = approvedAmount;
-		payment.approvedAt = approvedAt;
-		payment.rawProviderStatus = rawProviderStatus;
-		payment.lastSyncedAt = syncedAt;
-		return payment;
-	}
-
 	public static Payment bankTransferApproved(
 		PaymentGroup paymentGroup,
 		String providerPaymentKey,
@@ -139,74 +120,8 @@ public class Payment {
 		return payment;
 	}
 
-	public static Payment cancelRequired(
-		PaymentGroup paymentGroup,
-		String providerPaymentKey,
-		PaymentMethod method,
-		long requestedAmount,
-		Long approvedAmount,
-		PaymentExceptionReason exceptionReason,
-		String rawProviderStatus,
-		Instant syncedAt
-	) {
-		Payment payment = new Payment(paymentGroup, PaymentProvider.TOSS_PAYMENTS, providerPaymentKey, method,
-			PaymentStatus.CANCEL_REQUIRED, requestedAmount);
-		payment.approvedAmount = approvedAmount;
-		payment.exceptionReason = exceptionReason;
-		payment.rawProviderStatus = rawProviderStatus;
-		payment.lastSyncedAt = syncedAt;
-		return payment;
-	}
-
 	public void markRefundCompleted(boolean fullyRefunded) {
 		this.status = fullyRefunded ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED;
-	}
-
-	public void markRefundFailed(String failureCode, String failureMessage) {
-		this.status = PaymentStatus.REFUND_FAILED;
-		this.failureCode = failureCode;
-		this.failureMessage = failureMessage;
-	}
-
-	public void requestExceptionCancel(String idempotencyKey, Instant requestedAt) {
-		if (status == PaymentStatus.CANCELLED) {
-			return;
-		}
-		if (status != PaymentStatus.CANCEL_REQUIRED && status != PaymentStatus.CANCEL_FAILED) {
-			throw new IllegalStateException("Payment exception cancel can be requested only when cancel is required");
-		}
-		this.status = PaymentStatus.CANCEL_REQUESTED;
-		this.idempotencyKey = idempotencyKey;
-		this.cancelRequestedAt = requestedAt;
-		this.failureCode = null;
-		this.failureMessage = null;
-	}
-
-	public void completeExceptionCancel(String providerCancelTransactionKey, String rawProviderStatus, Instant cancelledAt) {
-		if (status == PaymentStatus.CANCELLED) {
-			return;
-		}
-		if (status != PaymentStatus.CANCEL_REQUESTED && status != PaymentStatus.CANCEL_FAILED) {
-			throw new IllegalStateException("Payment exception cancel has not been requested");
-		}
-		this.status = PaymentStatus.CANCELLED;
-		this.providerCancelTransactionKey = providerCancelTransactionKey;
-		this.rawProviderStatus = rawProviderStatus;
-		this.cancelledAt = cancelledAt;
-		this.failureCode = null;
-		this.failureMessage = null;
-	}
-
-	public void failExceptionCancel(String failureCode, String failureMessage) {
-		this.status = PaymentStatus.CANCEL_FAILED;
-		this.failureCode = failureCode;
-		this.failureMessage = failureMessage;
-	}
-
-	public void markReviewRequired(String failureCode, String failureMessage) {
-		this.status = PaymentStatus.REVIEW_REQUIRED;
-		this.failureCode = failureCode;
-		this.failureMessage = failureMessage;
 	}
 
 	public UUID getId() {

@@ -28,8 +28,6 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `DATABASE_URL` | PostgreSQL JDBC URL |
 | `DATABASE_USERNAME` | PostgreSQL 사용자 |
 | `DATABASE_PASSWORD` | PostgreSQL 비밀번호 |
-| `PAYMENTS_TOSS_SECRET_KEY` | B-001 Toss 재도입 시 사용하는 server secret. 현재 계좌입금 경로에는 필수 아님 |
-| `PAYMENTS_TOSS_BASE_URL` | B-001 Toss 재도입용 API URL. 기본값은 `https://api.tosspayments.com` |
 | `SMS_SENS_ENABLED` | Naver Cloud SENS SMS 발송 활성화. 운영 기본값은 `false`; 실제 SENS 자격증명과 발신번호가 준비된 뒤 명시적으로 `true`로 켠다 |
 | `SMS_SENS_ACCESS_KEY` | Naver Cloud API access key |
 | `SMS_SENS_SECRET_KEY` | Naver Cloud API secret key. 서버에서만 사용 |
@@ -40,7 +38,6 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `EMAIL_FROM_ADDRESS` | 문의 답변 발신/회신 주소. 기본값 `contact@coreable-saf.com` |
 | `APP_PUBLIC_BASE_URL` | 문의 조회 링크에 사용하는 공개 웹 origin. 운영값 `https://coreable-saf.com` |
 | `APP_INQUIRY_LOOKUP_SECRET` | 문의 조회 HMAC secret. 32자 이상 랜덤 값이며 변경 시 기존 조회 링크가 무효화됨 |
-| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | B-001 Toss 재도입 시 frontend 결제창 호출에 사용. 현재 필수 아님 |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
 | `APP_INTERNAL_SYNC_TOKEN` | 내부 배송조회 동기화 API 호출용 shared token. 서버/스케줄러에서만 사용 |
 | `APP_AUTH_JWT_SECRET` | JWT access token 서명 secret. 충분히 긴 랜덤 값 사용 |
@@ -57,7 +54,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
 
-현재 고객 결제 경로는 계좌입금이며 Toss key는 필수 운영값이 아니다. B-001에서 Toss를 재도입할 때 client key와 server secret을 분리해 설정한다. `PAYMENTS_TOSS_SECRET_KEY`, `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+현재 고객 결제 경로는 계좌입금이며, PG 결제 key는 사용하지 않는다. `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
 
 ## Health And Readiness
 
@@ -73,6 +70,22 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 배포 플랫폼의 readiness probe는 `/actuator/health/readiness`를 사용한다. 단순 외부 uptime check는 `/api/health` 또는 `/actuator/health`를 사용할 수 있다.
 
 ## Database Migration And Backup
+
+### Payment Legacy Data Check
+
+Before deploying the account-transfer-only release, check whether the production database still has a Toss payment or an unfinished former PG refund. If either query returns rows, stop the deployment and resolve the records manually; the executable Toss paths are removed by this release.
+
+```sql
+SELECT provider, status, COUNT(*)
+FROM payments
+WHERE provider = 'TOSS_PAYMENTS'
+GROUP BY provider, status;
+
+SELECT status, COUNT(*)
+FROM refunds
+WHERE status IN ('PG_CANCEL_REQUESTED', 'RETRY_REQUIRED', 'FAILED', 'MANUAL_REVIEW_REQUIRED')
+GROUP BY status;
+```
 
 - 운영 profile은 Flyway migration을 활성화한다.
 - 운영 profile은 Hibernate `ddl-auto=validate`를 사용한다. 운영 DB schema 변경은 migration 파일로만 반영한다.
@@ -151,7 +164,6 @@ curl -fsS http://localhost:8080/actuator/health/liveness
 - `git diff --check`
 - staging 또는 운영 동일 profile에서 `/api/health`, `/actuator/health/readiness`, `/actuator/health/liveness` 확인
 - `DATABASE_*`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
-- B-001 Toss 경로를 활성화하는 배포에서만 `PAYMENTS_TOSS_*`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 확인
 - `SMS_SENS_*` 설정과 SENS 발신번호 승인 상태 확인
 - SES `coreable-saf.com` identity/DKIM과 production access, EC2 role의 제한된 `ses:SendEmail` 권한 확인
 - 실제 문의 답변 이메일 도착, 조회 링크, `FAILED`/`SKIPPED` 재시도 확인
@@ -224,10 +236,8 @@ DS-76 local verification on 2026-06-29:
 - Google, Kakao, and Naver OAuth authorize endpoints returned `302` redirects to their provider domains.
 - Cookie-based customer login was verified with `/api/me`.
 - Checkout preflight was verified through required account agreement, cart item add, checkout creation, and checkout policy confirmation.
-- Local Toss confirmation with a fake key reached the payment exception path.
 
 Remaining beta gates:
 
 - Complete real browser OAuth login and callback for Google, Kakao, and Naver with provider accounts.
 - Before accepting bank-transfer orders, finalize purchase-safety service, cash-receipt operations, public refund wording, and initial product certification review.
-- Toss sandbox success/failure/cancel and payment exception monitoring remain B-001 deferred gates and are required only before enabling Toss for customers.

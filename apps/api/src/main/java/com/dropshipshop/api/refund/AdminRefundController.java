@@ -42,16 +42,6 @@ class AdminRefundController {
 		return refundService.approve(refundId, currentUser.id(authentication), request);
 	}
 
-	@PostMapping("/{refundId}/request-pg-cancel")
-	RefundDtos.AdminRefundResponse requestPgCancel(@PathVariable UUID refundId) {
-		return refundService.requestPgCancel(refundId);
-	}
-
-	@PostMapping("/{refundId}/retry")
-	RefundDtos.AdminRefundResponse retryPgCancel(@PathVariable UUID refundId) {
-		return refundService.retryPgCancel(refundId);
-	}
-
 	@PostMapping("/{refundId}/manual-review")
 	RefundDtos.AdminRefundResponse markManualReview(
 		@PathVariable UUID refundId,

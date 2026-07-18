@@ -372,7 +372,7 @@ Rules:
 - DS-11 admin order detail reads supplier, product option, shipping address snapshot, and payment summary from existing order/payment/catalog tables.
 - MVP does not create a separate `delivery_groups` table; `supplierId` is the order grouping boundary.
 - Shipping fee is 0 because shipping cost is included in product price.
-- Current bank-transfer checkout uses a 24-hour deposit deadline. Deferred PG payment can keep a shorter expiration window when reintroduced.
+- Current bank-transfer checkout uses a 24-hour deposit deadline.
 
 ## OrderItem
 
@@ -457,20 +457,19 @@ Rules:
 - Admin deposit confirmation sets approved amount/time and records admin id/reason.
 - Admin unpaid cancellation records admin id/time/reason and moves the group to `CANCELLED`.
 - Admin deposit mismatch records a memo while keeping the group `PAYMENT_PENDING`.
-- Actual PG payment attempts are stored by DS-9 for the deferred Toss path.
 
 ## Payment
 
-결제 기록. 현재 MVP 주 경로는 계좌입금이며, Toss PG 기록은 재도입 경로로 유지한다.
+결제 기록. 현재 MVP 주 경로는 계좌입금이다. 과거 PG 데이터는 조회 호환을 위해 기존 enum과 컬럼을 유지한다.
 
 Implemented fields:
 
 - id
 - paymentGroupId
-- provider: TOSS_PAYMENTS / BANK_TRANSFER
+- provider: BANK_TRANSFER (현재 생성값), TOSS_PAYMENTS (과거 기록 호환 전용)
 - providerPaymentKey
-- method: CARD / EASY_PAY / TRANSFER / BANK_TRANSFER
-- status: READY / APPROVED / FAILED / CANCEL_REQUIRED / CANCEL_REQUESTED / CANCELLED / CANCEL_FAILED / REFUND_REQUESTED / PARTIALLY_REFUNDED / REFUNDED / REFUND_FAILED / REVIEW_REQUIRED
+- method: BANK_TRANSFER (현재 생성값), CARD / EASY_PAY / TRANSFER (과거 기록 호환 전용)
+- status: 현재 계좌입금 흐름은 `APPROVED`와 수동 환불 관련 상태만 생성한다. 나머지 PG 상태값은 과거 기록 호환 전용이다.
 - requestedAmount
 - approvedAmount
 - approvedAt
@@ -488,20 +487,13 @@ Implemented fields:
 
 Rules:
 
-- DS-9 creates one `Payment` on Toss confirmation success or payment exception.
 - B-041 creates one `Payment` on admin bank-transfer deposit confirmation.
 - Bank-transfer payments use `providerPaymentKey = BANK-{checkoutNumber}` to keep the existing unique provider key invariant.
-- Same `providerPaymentKey` for the same checkout is idempotent.
-- Same `providerPaymentKey` for another checkout is rejected.
 - `APPROVED` moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
-- `CANCEL_REQUIRED` is used for payment exception paths that need PG cancel/admin follow-up.
-- Payment exception cancel requests use a stable idempotency key.
-- Successful payment exception cancel moves `Payment`, `PaymentGroup`, and linked orders to `CANCELLED`.
-- Failed payment exception cancel moves `Payment` and `PaymentGroup` to `CANCEL_FAILED` and leaves the case in the admin payment exception queue.
 
 ## PaymentEvent
 
-PG 승인, 취소, 환불, webhook, 서버 확인 요청, 계좌입금 관리자 처리 이력. 멱등 처리와 운영 대사를 위해 원본 이벤트 단위로 기록한다.
+계좌입금 관리자 처리와 환불 이력. 과거 PG 이벤트 값은 조회 호환을 위해 enum에 남긴다.
 
 Implemented fields:
 
@@ -520,9 +512,6 @@ Implemented fields:
 
 Rules:
 
-- Toss webhook events store the webhook raw payload and an idempotency key.
-- Duplicate webhook deliveries with the same idempotency key are ignored.
-- Server confirm and webhook status conflicts create a `PAYMENT_REVIEW_REQUIRED` event and move the payment to `REVIEW_REQUIRED`.
 
 ## Fulfillment
 
@@ -608,7 +597,7 @@ Suggested fields:
 - orderId
 - paymentId
 - reason: CUSTOMER_CANCEL / SUPPLIER_OUT_OF_STOCK / DELIVERY_GROUP_OUT_OF_STOCK / ADMIN_CANCEL / PAYMENT_AMOUNT_MISMATCH / RETURN_REQUESTED / EXCHANGE_REQUESTED
-- status: REQUESTED / APPROVED / PG_CANCEL_REQUESTED / PROCESSING / COMPLETED / FAILED / RETRY_REQUIRED / REJECTED / MANUAL_REVIEW_REQUIRED
+- status: REQUESTED / COMPLETED / REJECTED (현재 수동 계좌환불 흐름), PG_CANCEL_REQUESTED / APPROVED / PROCESSING / FAILED / RETRY_REQUIRED / MANUAL_REVIEW_REQUIRED (과거 기록 호환 전용)
 - refundAmount
 - refundScope: PAYMENT_GROUP / DELIVERY_GROUP_ORDER
 - providerPaymentKey
@@ -635,10 +624,7 @@ Suggested fields:
 Implemented DS-38 scope:
 
 - Refunds are created as `REQUESTED`.
-- Admin approval moves a refund to `APPROVED`; PG cancel/refund request is allowed only after approval.
-- B-041 allows admin manual bank-transfer refund completion after approval for `BANK_TRANSFER` payments.
-- First PG cancel failure moves to `RETRY_REQUIRED`; retry failure moves to `MANUAL_REVIEW_REQUIRED`.
-- Manual review can move the refund back to `APPROVED` or to `REJECTED`.
+- Admin approval moves a refund to `APPROVED`; an admin then records actual manual bank-transfer completion for `BANK_TRANSFER` payments.
 
 Planned fields:
 
@@ -653,9 +639,8 @@ Rules:
 
 - DS-15 creates refund records for approved cancellation and supplier out-of-stock.
 - MVP refund scope is the delivery-group order.
-- Actual manual bank-transfer refund completion or PG cancel/refund success is required before an order can move to `REFUNDED`.
+- Actual manual bank-transfer refund completion is required before an order can move to `REFUNDED`.
 - If the payment group still has active orders after one delivery-group order refund, the payment group and payment become `PARTIALLY_REFUNDED`.
-- PG cancel/refund failure keeps the order in `REFUND_REQUESTED` and marks the refund `RETRY_REQUIRED`.
 
 ## Claim
 
@@ -977,16 +962,16 @@ Suggested fields:
 ### Order.status
 
 - `PAYMENT_PENDING`: 현재 MVP에서는 입금대기 주문. 공급처 발주 대상이 아니다.
-- `EXPIRED`: Deferred PG 경로에서 결제 검증 없이 만료된 주문.
-- `PAYMENT_EXCEPTION`: PG 승인은 있었지만 주문 확정 검증에 실패한 주문.
+- `EXPIRED`: 입금 기한이 지나 종료된 주문.
+- `PAYMENT_EXCEPTION`: 과거 PG 데이터 호환을 위해 남긴 legacy 상태. 신규 주문에는 사용하지 않는다.
 - `SUPPLIER_ORDER_PENDING`: 결제 검증 완료 후 공급처 발주 전 주문.
 - `SUPPLIER_ORDERED`: 공급처 발주 완료 후 송장 입력 전 주문.
 - `OUT_OF_STOCK`: 공급처 품절로 고객 안내와 환불 처리가 필요한 주문.
 - `SHIPPED`: 택배사와 송장번호가 입력되어 배송 중인 주문.
 - `DELIVERED`: 배송 완료가 확인된 주문.
-- `CANCELLED`: PG 승인 전 주문 종료 또는 결제 예외 취소 완료.
+- `CANCELLED`: 미입금 주문 종료 또는 승인된 주문의 취소 처리 완료.
 - `REFUND_REQUESTED`: 결제 승인 완료 주문의 환불 처리 중 상태.
-- `REFUNDED`: 실제 수동 환불 완료 또는 PG 취소/환불 성공이 확인된 환불 완료 주문.
+- `REFUNDED`: 실제 수동 계좌환불 완료가 확인된 환불 완료 주문.
 
 ### PaymentGroup.status
 
@@ -1039,6 +1024,8 @@ Suggested fields:
 - `REJECTED`
 - `MANUAL_REVIEW_REQUIRED`
 
+`PG_CANCEL_REQUESTED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED`를 포함한 PG 환불 상태는 과거 데이터 조회 호환을 위해 보존한다. 새 계좌입금 주문과 수동 환불에서는 생성하지 않는다.
+
 - 상품과 옵션에는 실제 재고 수량을 두지 않는다.
 - 상품 전체 상태와 상품 옵션 상태를 분리한다.
 - 고객이 구매할 수 있는 조건은 상품 상태가 `ACTIVE`이고 옵션 상태도 `ACTIVE`인 경우다.
@@ -1054,24 +1041,22 @@ Suggested fields:
 - `PAYMENT_PENDING` 주문은 관리자 입금확인 전이므로 공급처 발주 대상이 아니다.
 - `PAYMENT_PENDING` 주문의 기본 입금 기한은 24시간이며, 미입금 취소는 관리자 수동 액션으로 처리한다.
 - 결제 상태와 주문 상태를 같은 필드로 합치지 않는다.
-- PG 결제가 승인됐지만 주문을 확정할 수 없으면 주문은 `PAYMENT_EXCEPTION`으로 전환하고 공급처 발주를 차단한다.
-- 결제 예외는 즉시 PG 전액 취소를 시도하고, 실패하면 관리자 긴급 확인 큐로 전환한다.
 - 결제 이벤트와 환불 이벤트는 멱등 처리와 운영 대사를 위해 별도 이력으로 기록한다.
-- MVP 결제 주 경로는 계좌입금이며, Toss 카드/간편결제/계좌이체는 재도입 경로로 유지한다.
+- MVP 결제 주 경로는 계좌입금과 관리자 입금확인이다.
 - MVP에서는 배송 그룹 주문 단위 부분 취소/부분 환불을 지원한다.
 - 상품, 옵션, 수량 단위 부분 취소/부분 환불은 MVP에서 지원하지 않는다.
 - 하나의 결제 그룹(PaymentGroup)은 여러 배송 그룹 주문을 포함할 수 있다.
 - 하나의 배송 그룹 주문은 하나의 결제 그룹(PaymentGroup)에 속한다.
 - 하나의 결제 그룹(PaymentGroup)에 일부 주문만 환불되면 결제 그룹은 `PARTIALLY_REFUNDED`가 될 수 있다.
-- 결제 승인 완료 주문은 실제 수동 환불 완료 또는 PG 취소/환불 성공 후에만 `REFUNDED`가 될 수 있다.
-- PG 취소/환불 실패는 `FAILED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED` 같은 상태로 남기고 완료 상태로 처리하지 않는다.
+- 결제 승인 완료 주문은 실제 수동 계좌환불 완료 후에만 `REFUNDED`가 될 수 있다.
+- PG 취소/환불 상태값은 과거 데이터 조회 호환 전용이며 새 주문 흐름에서는 생성하지 않는다.
 - 고객 직접 취소는 `SUPPLIER_ORDER_PENDING` 상태이면서 공급처 발주 작업이 시작되지 않은 주문에만 허용한다.
 - 공급처 발주 작업 시작 후 배송 전 취소는 `Claim`으로 접수하고 관리자 수동 심사로 처리한다.
 - 배송 후 반품/교환은 `Claim`으로 접수하고 관리자 수동 심사로 처리한다.
 - 단순 변심 반품/교환 클레임은 배송 완료일로부터 7일 이내 접수된 건만 심사한다.
 - 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 배송 완료일로부터 3개월 이내이면서 고객이 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내 접수된 건만 심사한다.
 - 상품 하자, 오배송, 상품 정보와 다름, 배송 문제 클레임은 사진 증빙을 필수로 저장한다.
-- 클레임 상태와 환불 상태는 분리하고, 클레임 승인 후 수동 환불 또는 PG 환불은 `Refund`에서 처리한다.
+- 클레임 상태와 환불 상태는 분리하고, 클레임 승인 후 수동 계좌환불은 `Refund`에서 처리한다.
 - 고객 직접 배송지 변경은 `SUPPLIER_ORDER_PENDING` 상태라도 `addressLockedAt`이 기록되면 거절한다.
 - 공급처 발주 작업 시작은 새 주문 상태를 추가하지 않고 `supplierOrderStartedAt`과 `addressLockedAt`으로 기록한다.
 - 공급처 발주 증빙으로 공급처 주문번호, 발주 주소 스냅샷, 발주 관리자, 예상 출고일, 공급처 응답 메모를 기록한다.

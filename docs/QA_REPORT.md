@@ -215,22 +215,17 @@ Not yet fully verified:
 Reason:
 - These steps require real account login/consent in Chrome. Automated page text inspection is currently limited because Chrome Apple Events JavaScript execution is disabled.
 
-### QA-008: Toss Sandbox Payment Completion Still Needs Real Keys And Browser Checkout
+### QA-008: Toss Sandbox Payment Completion (Archived)
 
 Severity: High
-Status: Open
+Status: Cancelled by B-067 (2026-07-18)
 
 Verified:
 - Checkout creation and policy confirmation are functional with cookie auth.
 - Payment exception path is functional when server confirmation fails.
 
-Not yet fully verified:
-- Toss widget/client-key browser payment.
-- Real Toss sandbox `paymentKey` confirmation.
-- Redirect from Toss success URL to server confirmation.
-
 Reason:
-- Local `.env` does not currently include Toss Payments keys. No secret or client key was printed or committed.
+- 결제 수단은 계좌입금과 관리자 입금확인으로 확정되어 Toss sandbox 결제 검증은 더 이상 수행하지 않는다. Toss 실행 코드와 환경변수는 B-067에서 제거했다.
 
 ## Current Working Tree Changes
 

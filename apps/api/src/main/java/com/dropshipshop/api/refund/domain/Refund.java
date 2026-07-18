@@ -159,34 +159,6 @@ public class Refund {
 		this.reviewedAt = reviewedAt;
 	}
 
-	public void requestPgCancel(Payment payment, String idempotencyKey, Instant requestedAt, boolean retry) {
-		if (retry) {
-			if (status != RefundStatus.RETRY_REQUIRED && status != RefundStatus.FAILED) {
-				throw new IllegalStateException("Refund is not retryable");
-			}
-		} else if (status != RefundStatus.APPROVED) {
-			throw new IllegalStateException("Refund is not ready for PG cancel request");
-		}
-		this.payment = payment;
-		this.providerPaymentKey = payment.getProviderPaymentKey();
-		this.idempotencyKey = idempotencyKey;
-		this.status = RefundStatus.PG_CANCEL_REQUESTED;
-		this.requestedAt = requestedAt;
-	}
-
-	public void complete(String providerCancelTransactionKey, String rawProviderStatus, Instant completedAt) {
-		if (status != RefundStatus.PG_CANCEL_REQUESTED) {
-			throw new IllegalStateException("Refund has not requested PG cancel");
-		}
-		this.providerCancelTransactionKey = providerCancelTransactionKey;
-		this.rawProviderStatus = rawProviderStatus;
-		this.status = RefundStatus.COMPLETED;
-		this.completedAt = completedAt;
-		this.failureCode = null;
-		this.failureMessage = null;
-		this.failedAt = null;
-	}
-
 	public void completeManualBankTransfer(
 		Payment payment,
 		UUID adminUserId,
@@ -212,20 +184,6 @@ public class Refund {
 		this.failureCode = null;
 		this.failureMessage = null;
 		this.failedAt = null;
-	}
-
-	public void markRetryRequired(String failureCode, String failureMessage, Instant failedAt) {
-		this.status = RefundStatus.RETRY_REQUIRED;
-		this.failureCode = failureCode;
-		this.failureMessage = failureMessage;
-		this.failedAt = failedAt;
-	}
-
-	public void markManualReviewRequired(String failureCode, String failureMessage, Instant failedAt) {
-		this.status = RefundStatus.MANUAL_REVIEW_REQUIRED;
-		this.failureCode = failureCode;
-		this.failureMessage = failureMessage;
-		this.failedAt = failedAt;
 	}
 
 	public UUID getId() {

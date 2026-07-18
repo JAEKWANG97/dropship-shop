@@ -2,6 +2,14 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-18
+
+- B-067 Toss Payments 미사용 코드와 문서 제거
+  - 완료 내용: 고객 Web의 Toss confirm/fail/예외 화면과 helper, 백엔드 confirm·webhook·Toss REST client·결제 예외·PG 환불 호출을 제거했다. 관리자와 고객의 결제 경로는 계좌입금 생성, 관리자 입금확인, 수동 계좌환불만 남긴다.
+  - 설정/문서: API와 Web 예제 환경변수, 배포 설정, 공개 정책과 개인정보 처리 항목, API·주문 흐름·아키텍처 문서를 계좌입금 전용으로 정리했다.
+  - 호환성: 기존 migration, `TOSS_PAYMENTS` enum과 과거 상태값은 DB 기록 해석을 위해 보존했다. 배포 전에는 production readiness의 legacy payment query로 미처리 과거 데이터를 확인한다.
+  - 검증: 전체 API 테스트, Web lint/build, 계좌입금 주문·취소·수동 환불 회귀와 삭제 endpoint의 인증 후 `404` 회귀 테스트를 통과했다.
+
 ## 2026-07-17
 
 - B-001 Toss Payments sandbox 결제 플로우 완성 (취소)

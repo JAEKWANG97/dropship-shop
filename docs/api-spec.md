@@ -77,7 +77,7 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 - Catalog: public product APIs and admin supplier/product/option/detail management.
 - Cart: current customer cart and cart item mutations.
 - Checkout/Order: payment group creation, policy confirmation, customer order history, address changes, self-service cancel.
-- Payment: admin bank-transfer confirmation/refund completion and deferred Toss confirmation/webhook handling.
+- Payment: admin bank-transfer confirmation and manual refund completion.
 - Fulfillment/Shipment: admin supplier actions, shipment entry, tracking sync, shipment correction.
 - Refund/Claim: customer claim submission and admin review/refund execution.
 - Policy Pages: public policy, business disclosure, privacy processing table, admin policy management.
@@ -391,50 +391,12 @@ POST /api/checkouts/{checkoutNumber}/policy-confirmation
 
 ## Payment APIs
 
-| Method | Path | Auth | Status | Purpose |
-| --- | --- | --- | --- | --- |
-| `POST` | `/api/payments/toss/confirm` | `CUSTOMER` | Implemented, deferred from primary path | Confirm Toss Payments approved payment server-side |
-| `POST` | `/api/payments/toss/webhook` | Provider verification | Implemented, deferred from primary path | Receive Toss Payments webhook and reconcile payment state |
-| `GET` | `/api/payments/{paymentId}` | Authenticated user | Planned | Customer-visible payment state |
-| `POST` | `/api/admin/payments/{paymentId}/retry-cancel` | `ADMIN` | Implemented | Retry failed payment exception cancel |
-| `GET` | `/api/admin/payment-exceptions` | `ADMIN` | Implemented | List payment exception queue |
-
 Rules:
 
-- Current MVP primary provider is direct bank transfer.
+- Customer payment uses direct bank transfer only.
 - Bank-transfer payment records use `PaymentProvider.BANK_TRANSFER`, `PaymentMethod.BANK_TRANSFER`, and `providerPaymentKey = BANK-{checkoutNumber}`.
-- Toss Payments remains implemented but deferred from the customer primary checkout path.
-- Deferred Toss methods: card, easy payment, account transfer.
-- Virtual account, mobile phone payment, and gift certificate payment are excluded.
-- Payment confirmation must verify amount, expiration, policy confirmation, PG key uniqueness, and product/option sellability.
-- PG-approved validation failure becomes payment exception and blocks supplier ordering.
-- Duplicate Toss confirmation with the same payment key and same checkout returns the existing payment result.
-- A payment key already attached to a different checkout is rejected as a conflict.
-- DS-9 stores payment events for confirm requested, approved, rejected, and payment exception paths.
-- Toss secret key is read from environment/config as `payments.toss.secret-key` and must not be committed.
-- PG-approved amount mismatch creates a payment exception and immediately attempts full PG cancel.
-- Payment exception cancel uses a stable idempotency key derived from the payment id.
-- Successful payment exception cancel moves the payment group and orders to `CANCELLED`.
-- Failed payment exception cancel moves the payment and payment group to `CANCEL_FAILED`.
-- The admin payment exception queue is DB state based; it lists payments in `CANCEL_REQUIRED`, `CANCEL_REQUESTED`, `CANCEL_FAILED`, or `REVIEW_REQUIRED`.
-- Admin retry reuses the stored idempotency key.
-- Toss webhook verification re-fetches the payment from Toss by `paymentKey` and compares the verified status with the webhook payload status.
-- Toss webhook idempotency uses `TossPayments-Webhook-Transmission-Id` when present, with event type, payment key, and created time as fallback.
-- Duplicate Toss webhook deliveries do not create duplicate `PaymentEvent` rows.
-- Unknown local `paymentKey` webhooks are accepted after Toss lookup verification but do not create local payment events.
-- Webhook status conflicts with the local server-confirmed payment state move the payment to `REVIEW_REQUIRED` for admin review.
-- Payment detail API remains planned.
-
-Implemented request body:
-
-```json
-POST /api/payments/toss/confirm
-{
-  "checkoutNumber": "CO123456789012",
-  "paymentKey": "toss-payment-key",
-  "amount": 10000
-}
-```
+- Deposit confirmation is an administrator action after the customer has transferred the exact checkout amount.
+- Card, easy payment, PG account transfer, virtual account, mobile phone payment, and gift certificate payment are excluded.
 
 ## Admin Order And Fulfillment APIs
 
@@ -512,8 +474,6 @@ Rules:
 | `POST` | `/api/admin/claims/{claimId}/exchange-shipped` | `ADMIN` | Planned | Mark exchange shipment |
 | `GET` | `/api/admin/refunds` | `ADMIN` | Implemented | Refund queue |
 | `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Implemented | Approve refund execution |
-| `POST` | `/api/admin/refunds/{refundId}/request-pg-cancel` | `ADMIN` | Implemented | Request PG cancel/refund |
-| `POST` | `/api/admin/refunds/{refundId}/retry` | `ADMIN` | Implemented | Retry failed refund |
 | `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Implemented | Mark manual review result |
 | `POST` | `/api/admin/refunds/{refundId}/manual-complete` | `ADMIN` | Implemented | Complete actual manual bank-transfer refund |
 
@@ -531,15 +491,12 @@ Rules:
 - `return-received` requires a `RETURN_WAITING` return claim and records return received memo/time.
 - `return-refund` requires a `RETURN_RECEIVED` return claim, creates a `RETURN_REQUESTED` refund, links it to the claim, moves the order to `REFUND_REQUESTED`, and moves the claim to `REFUND_PROCESSING`.
 - Bank-transfer refund completion moves the linked return claim to `COMPLETED`.
-- Refund execution requires admin approval before PG cancel/refund request or manual bank-transfer refund completion.
-- First PG cancel failure moves refund to `RETRY_REQUIRED`; retry failure moves refund to `MANUAL_REVIEW_REQUIRED`.
+- Refund execution requires admin approval before manual bank-transfer refund completion.
 - Manual review can approve the refund again or reject it with reason.
 - Bank-transfer refund completion requires actual manual refund completion by an admin.
 - `GET /api/orders/{orderId}` includes `claims` plus the latest `claim` summary for compatibility. `GET /api/admin/orders/{orderId}` includes the latest claim summary and claim evidence metadata.
-- Deferred PG refund completion requires PG cancel/refund success.
 - Refund records are created for approved customer cancellation and supplier out-of-stock.
-- Manual bank-transfer refund completion or PG cancel success moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
-- PG cancel failure leaves the order in `REFUND_REQUESTED`, marks the refund `RETRY_REQUIRED`, and does not expose refund completion.
+- Manual bank-transfer refund completion moves the delivery-group order to `REFUNDED`, the payment to `REFUNDED` or `PARTIALLY_REFUNDED`, and the payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
 - Delivery-group order level partial refund is supported.
 - Product, option, and quantity-level partial refund inside one delivery-group order is excluded.
 

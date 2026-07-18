@@ -1013,3 +1013,20 @@ Consequences:
 - 환불은 실제 계좌이체 후 관리자가 완료를 기록하는 기존 흐름만 사용한다.
 - 미사용 Toss endpoint, client, env, 고객 화면과 문서는 B-067에서 제거한다.
 - 과거 데이터와 migration 호환에 필요한 결제 provider/method 값은 기존 데이터 존재 여부를 확인한 뒤 보존한다.
+
+## 2026-07-18: Remove Unused Toss Payments Execution Paths
+
+Decision:
+
+계좌입금 전용 결정을 구현에도 완료 적용한다. Toss Payments confirm/webhook/client, 결제 예외 및 PG 환불 endpoint, 고객 결제 화면, 환경변수는 제거하고 기존 DB enum·migration만 과거 기록 호환을 위해 보존한다.
+
+Context:
+
+직접 계좌입금으로 결제 정책을 확정한 뒤에도 deferred PG 재도입을 위한 실행 코드와 문서가 남아 있어 실제 운영 경로와 코드 표면이 달랐다. 이 상태는 불필요한 secret 관리와 장애·보안 점검 범위를 계속 늘린다.
+
+Consequences:
+
+- 새 주문은 `BANK_TRANSFER`와 관리자 입금확인만 사용한다.
+- 환불은 실제 계좌이체 후 관리자 완료 기록만 사용한다.
+- 배포 전 과거 `TOSS_PAYMENTS` 결제와 미처리 PG 환불 상태를 조회하고, 결과가 있으면 수동 처리 후 배포한다.
+- 과거 decision log 항목은 당시 결정의 이력으로 남기되, 이 항목이 현재 결제 구현 기준이다.

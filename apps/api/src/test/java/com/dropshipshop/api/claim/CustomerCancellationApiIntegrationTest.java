@@ -822,14 +822,10 @@ class CustomerCancellationApiIntegrationTest {
 		order.getPaymentGroup().approve(amount, Instant.now());
 		paymentGroupRepository.save(order.getPaymentGroup());
 		order.markSupplierOrderPending();
-		paymentRepository.save(Payment.approved(
+		paymentRepository.save(Payment.bankTransferApproved(
 			order.getPaymentGroup(),
-			"pay-" + orderNumber,
-			PaymentMethod.CARD,
+			"BANK-" + checkoutNumber,
 			amount,
-			amount,
-			Instant.now(),
-			"DONE",
 			Instant.now()
 		));
 		return orderRepository.saveAndFlush(order);

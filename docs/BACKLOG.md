@@ -121,22 +121,6 @@ Tasks:
 
 ## Next
 
-### B-067 Toss Payments 미사용 코드와 문서 제거
-
-Status: Todo
-
-Notes:
-- 고객 결제 수단은 계좌입금과 관리자 입금확인으로 확정했다.
-- 과거 결제·환불 데이터와 enum 호환성은 보존하되 실행 가능한 Toss 경로만 제거한다.
-
-Tasks:
-- [ ] 고객용 Toss confirm/fail 화면과 Web helper를 제거한다.
-- [ ] Toss confirm/webhook API, REST client, 결제 예외·환불 PG 호출 경로를 제거한다.
-- [ ] 운영 env와 배포 설정에서 Toss key를 제거한다.
-- [ ] 공개 정책과 개인정보 처리 항목에서 미사용 PG/Toss 문구를 제거한다.
-- [ ] `docs/api-spec.md`, `docs/order-flow.md`, `docs/architecture.md`, API README를 계좌입금 전용 계약으로 정리한다.
-- [ ] 기존 계좌입금 주문·취소·수동 환불 회귀 테스트를 통과시킨다.
-
 ### B-065 관리자 주문 목록 서버 페이징과 필터
 
 Status: Todo

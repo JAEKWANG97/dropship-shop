@@ -136,7 +136,7 @@ class PolicyPageApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.items", hasSize(5)))
 			.andExpect(jsonPath("$.items[?(@.category == 'SOCIAL_LOGIN')]", hasSize(1)))
-			.andExpect(jsonPath("$.items[?(@.category == 'PAYMENT')].processorName").value(hasItem("Toss Payments")))
+			.andExpect(jsonPath("$.items[?(@.category == 'PAYMENT')]", hasSize(1)))
 			.andExpect(jsonPath("$.items[?(@.category == 'SHIPPING_ADDRESS')].purpose").value(hasItem("상품 배송")));
 	}
 
@@ -321,11 +321,11 @@ class PolicyPageApiIntegrationTest {
 		));
 		privacyProcessingItemRepository.save(new PrivacyProcessingItem(
 			"PAYMENT",
-			"주문 상품, 결제 금액, 결제 수단, PG 거래 식별자",
+			"주문 상품, 결제 금액, 결제 수단, 입금자명, 입금 확인 시각",
 			"계약 이행, 결제, 환불, 분쟁 대응",
 			"법정 보존 기간까지",
-			"Toss Payments",
-			"결제 승인, 취소, 환불 처리",
+			null,
+			null,
 			null,
 			null,
 			2,

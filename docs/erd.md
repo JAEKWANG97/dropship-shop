@@ -568,7 +568,7 @@ Open note:
 
 ### payment_groups
 
-Implemented by DS-8 as the checkout payment aggregate. DS-9 adds PG approval transitions. B-041 adds direct bank-transfer deposit metadata and manual admin deposit action fields.
+Implemented by DS-8 as the checkout payment aggregate. B-041 adds direct bank-transfer deposit metadata and manual admin deposit action fields.
 
 - `id`
 - `checkout_number`
@@ -604,7 +604,7 @@ Implemented by DS-9.
 
 - `id`
 - `payment_group_id`
-- `provider`: `TOSS_PAYMENTS` / `BANK_TRANSFER`
+- `provider`: 현재 생성값은 `BANK_TRANSFER`이며 `TOSS_PAYMENTS`는 과거 데이터 조회 호환용 enum 값으로만 보존한다.
 - `provider_payment_key`
 - `method`: `CARD` / `EASY_PAY` / `TRANSFER` / `BANK_TRANSFER`
 - `status`
@@ -625,7 +625,7 @@ Implemented by DS-9.
 
 Relationship note:
 
-- One `payment_group` is intended to represent one bank-transfer deposit or PG payment. Keep `payments` as `1:N` to preserve retry/exception history without changing the aggregate.
+- One `payment_group` represents one bank-transfer deposit. Keep `payments` as `1:N` to preserve historical payment records without changing the aggregate.
 
 ### payment_events
 
@@ -754,7 +754,7 @@ Implemented DS-15 scope:
 
 - One refund per delivery-group order in MVP.
 - Refunds are created for approved cancellation and supplier out-of-stock.
-- PG cancel result fields, retry failure fields, and bank-transfer manual refund completion fields are stored on the refund.
+- Bank-transfer manual refund completion fields are stored on the refund. Historical PG fields remain for existing data compatibility.
 
 ### claims
 
@@ -805,7 +805,7 @@ Implemented claim scope:
 
 Rule:
 
-- Claim approval does not mean refund completion. Refund completion requires PG cancel/refund success.
+- Claim approval does not mean refund completion. Refund completion requires actual manual bank-transfer completion.
 
 ## Policy, Legal, Audit, Notification
 

@@ -1,4 +1,6 @@
-# Linear Backlog
+# Linear Backlog (Historical Archive)
+
+This document records the former Linear planning draft. Current scope and payment decisions are maintained in `docs/BACKLOG.md` and `docs/decision-log.md`.
 
 This backlog is intended for the `Dropship Shop` Linear organization.
 

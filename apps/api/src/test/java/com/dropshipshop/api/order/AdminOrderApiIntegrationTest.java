@@ -312,7 +312,7 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.paymentGroup.checkoutNumber", is("ADM-CO-DETAIL-1")))
 			.andExpect(jsonPath("$.paymentGroup.status", is("APPROVED")))
 			.andExpect(jsonPath("$.payment.status", is("APPROVED")))
-			.andExpect(jsonPath("$.payment.method", is("CARD")))
+			.andExpect(jsonPath("$.payment.method", is("BANK_TRANSFER")))
 			.andExpect(jsonPath("$.items", hasSize(1)))
 			.andExpect(jsonPath("$.items[0].productName", is("Order Product ADM-DETAIL-1")))
 			.andExpect(jsonPath("$.items[0].optionName", is("Default")))
@@ -788,14 +788,10 @@ class AdminOrderApiIntegrationTest {
 		order.getPaymentGroup().approve(amount, Instant.now());
 		paymentGroupRepository.save(order.getPaymentGroup());
 		order.markSupplierOrderPending();
-		paymentRepository.save(Payment.approved(
+		paymentRepository.save(Payment.bankTransferApproved(
 			order.getPaymentGroup(),
-			"pay-" + orderNumber,
-			PaymentMethod.CARD,
+			"BANK-" + checkoutNumber,
 			amount,
-			amount,
-			Instant.now(),
-			"DONE",
 			Instant.now()
 		));
 		return orderRepository.saveAndFlush(order);

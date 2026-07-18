@@ -1,6 +1,6 @@
 # Order Flow
 
-Current payment path: direct bank transfer with manual admin deposit confirmation. Sections explicitly labeled `Deferred Toss path` describe retained PG code and are not the current customer checkout flow.
+Current payment path: direct bank transfer with manual admin deposit confirmation.
 
 ## Happy Path
 
@@ -38,18 +38,8 @@ DS-8 backend implementation notes:
 - The cart is emptied after successful checkout creation.
 - Direct-buy checkout is deferred.
 
-DS-9 deferred Toss path implementation notes:
-
-- The backend confirms Toss Payments through `POST /api/payments/toss/confirm`.
-- The server validates ownership, payment pending state, expiration, policy confirmation, amount, payment key uniqueness, and current product/option sellability before finalizing orders.
-- Successful confirmation records `Payment(APPROVED)`, moves the payment group to `APPROVED`, and moves all included orders to `SUPPLIER_ORDER_PENDING`.
-- Duplicate confirmation with the same payment key and checkout returns the existing payment result.
-- Toss-approved amount mismatch records the payment exception path and blocks supplier ordering.
-- Automatic PG cancel execution remains planned.
-
 B-041 bank-transfer implementation notes:
 
-- The current MVP customer checkout path does not launch Toss Payments.
 - Checkout creation still creates one payment group and one `PAYMENT_PENDING` order per supplier-backed delivery group.
 - `PAYMENT_PENDING` means deposit waiting.
 - Checkout detail shows bank name, account number, account holder, total amount, depositor name, deposit deadline, and cash receipt notice.
@@ -146,53 +136,6 @@ Order status: PAYMENT_PENDING
 -> Customer checks one integrated confirmation checkbox
 -> System records confirmed policy versions and confirmed time on the payment group
 -> Bank-transfer account information can be used for deposit
-```
-
-## Payment Amount Mismatch - Deferred Toss Path
-
-```text
-Order status: PAYMENT_PENDING
--> PG says payment succeeded
--> Server compares expected payment group amount and approved amount
--> Amount mismatch detected
--> Order status: PAYMENT_EXCEPTION
--> Payment status: CANCEL_REQUIRED
--> System attempts immediate full PG cancel
--> If PG cancel succeeds, payment status becomes CANCELLED and customer sees payment cancel completed
--> If PG cancel fails, payment status becomes CANCEL_FAILED and admin emergency review is required
--> Admin emergency review queue is derived from DB payment status, not a separate broker queue
-```
-
-## Payment Exception - Deferred Toss Path
-
-```text
-PG payment is approved
--> Server cannot confirm order because one validation failed:
-   - order expired
-   - amount mismatch
-   - product or option is no longer sellable
-   - duplicate or conflicting PG payment key
-   - PG confirmation error
--> Order status: PAYMENT_EXCEPTION
--> Payment exception reason is recorded
--> Supplier order is blocked
--> System attempts immediate full PG cancel with idempotency key
-
-PG cancel succeeds
--> Payment status: CANCELLED
--> Customer sees payment cancel completed
-
-PG cancel fails
--> Payment status: CANCEL_FAILED
--> Payment remains visible in the DB state-based admin emergency payment queue
--> Customer sees payment review or cancel processing status
-```
-
-## Deferred Toss / Virtual Account Flow
-
-```text
-Toss PG and virtual account payment are not the current MVP primary path.
-If Toss/virtual account is reintroduced later, server-side PG confirmation and webhook reconciliation must remain separate from the direct bank-transfer admin confirmation path.
 ```
 
 ## Customer Cancellation Before Supplier Order
@@ -354,17 +297,9 @@ Admin detects wrong operational state or shipment information
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
 - Current bank-transfer `PAYMENT_PENDING` orders have a 24-hour deposit deadline and require admin unpaid cancellation if not paid.
-- Deferred PG payment requests require checkout policy confirmation.
 - Checkout policy confirmation is recorded per payment group with policy versions and confirmation time.
 - Bank-transfer deposit must be confirmed by an admin before an order leaves `PAYMENT_PENDING`.
-- Deferred PG payment approval must be verified by the server before an order leaves `PAYMENT_PENDING`.
-- Confirmation requires order status `PAYMENT_PENDING`, completed checkout policy confirmation, amount match, unused/conflict-free payment key, and sellable product/option status.
-- If PG approves payment but order confirmation fails, the order moves to `PAYMENT_EXCEPTION` and supplier ordering is blocked.
-- Payment exceptions attempt immediate full PG cancel.
-- Immediate full PG cancel applies to payment exceptions before order confirmation, not to normal delivery-group order level refund after a payment group is confirmed.
-- Failed automatic PG cancel creates an admin emergency review item and must not be hidden from the customer.
 - The current payment method is direct bank transfer with admin deposit confirmation.
-- Toss card, easy payment, account transfer, virtual account, mobile phone payment, and gift certificate payment are disabled until B-001 defines the reintroduction scope.
 - Failed, pending, and expired payment orders are not shown in customer order history.
 - `PAYMENT_PENDING`, `EXPIRED`, and payment failure states belong to checkout/retry surfaces, not normal customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue.
@@ -405,9 +340,7 @@ Admin detects wrong operational state or shipment information
 - MVP uses one shipment per order and excludes partial shipment or split shipment.
 - Automatic tracking sync can move shipment state forward, but must not overwrite admin manual correction or move shipment state backward.
 - `REFUNDED` requires a completed refund record.
-- Paid orders can move to `REFUNDED` only after PG cancel/refund succeeds.
-- Refund without PG cancel/refund success is forbidden.
-- PG cancel/refund failure must keep the order in a processing or review-required state, not a completed state.
+- Orders can move to `REFUNDED` only after an administrator records actual manual bank-transfer completion.
 - MVP supports partial cancellation/refund only at delivery-group order level within a payment group.
 - Product, option, or quantity-level partial cancellation/refund inside one delivery-group order is excluded from MVP.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.

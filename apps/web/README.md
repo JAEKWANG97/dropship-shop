@@ -18,13 +18,11 @@ Copy `.env.example` to `.env.local` when running against a non-default API.
 ```bash
 DROPSHIP_API_BASE_URL=http://localhost:8080
 NEXT_PUBLIC_DROPSHIP_API_BASE_URL=
-NEXT_PUBLIC_TOSS_CLIENT_KEY=
 ```
 
 The backend local defaults redirect successful OAuth login to
 `http://localhost:3000/auth/callback/success`. Browser requests use the
 same-origin `/api` rewrite unless `NEXT_PUBLIC_DROPSHIP_API_BASE_URL` is set.
-Set `NEXT_PUBLIC_TOSS_CLIENT_KEY` to a Toss Payments test client key for sandbox checkout.
 
 ## Playwright E2E
 

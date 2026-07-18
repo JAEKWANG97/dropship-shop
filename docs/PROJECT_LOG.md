@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-07-18 B-067 Toss Payments 실행 경로 제거
+
+- 관련 항목: B-067
+- 작업: 계좌입금과 관리자 입금확인만 운영 결제 경로로 남기고, 고객 Toss 결제 화면·confirm helper, backend webhook/REST client, 결제 예외 및 PG 환불 API를 제거했다.
+- 결정: DB migration, `TOSS_PAYMENTS` provider enum, 이전 결제/환불 상태값은 과거 데이터 해석을 위해 삭제하지 않는다. 새 주문은 계좌입금으로만 생성되며 환불 완료도 관리자 수동 계좌이체 기준이다.
+- 운영 확인: 배포 전 `payments.provider = TOSS_PAYMENTS`와 미처리 과거 PG 환불 상태를 조회한다. 결과가 있으면 해당 기록을 수동 처리한 뒤 배포한다.
+- 검증: 계좌입금 주문·취소·수동 환불 회귀 테스트와 삭제된 Toss/PG endpoint의 인증 후 `404` 테스트를 포함한 API 전체 테스트, Web lint/build, `git diff --check`를 실행한다.
+
 ## 2026-07-17 PG 미도입과 계좌입금 전용 확정
 
 - 관련 항목: B-001, B-067

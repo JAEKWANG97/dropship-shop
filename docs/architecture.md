@@ -119,8 +119,6 @@ First admin screens:
 
 Use direct bank transfer with manual admin deposit confirmation for the current customer checkout path.
 
-Toss Payments code remains a deferred PG integration path. If it is reintroduced, the server must verify the approved amount and payment result directly with Toss Payments before approving an order.
-
 ### Object Storage
 
 Product images should be stored outside the application server.
@@ -177,4 +175,4 @@ Production baseline is tracked in [Production Readiness](production-readiness.md
 - Run Flyway migrations for schema changes; production Hibernate mode is `validate`.
 - Use `/actuator/health/readiness` for readiness probes and `/actuator/health/liveness` for liveness probes.
 - Configure CORS through `APP_CORS_ALLOWED_ORIGINS` with only the deployed customer/admin frontend origins.
-- Keep DB credentials and any deferred Toss Payments secret key in runtime environment or secret manager only.
+- Keep DB credentials and application secrets in runtime environment or secret manager only.

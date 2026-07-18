@@ -34,7 +34,7 @@
 
 적절한 작업 예:
 
-- "Toss sandbox success redirect 처리"
+- "계좌입금 주문서 안내 처리"
 - "소셜 로그인 callback 검증"
 - "관리자 주문 발주 시작 액션 연결"
 
@@ -63,7 +63,7 @@ branch 또는 PR을 쓰는 경우:
 브랜치를 쓸 때는 짧게 쓴다.
 
 ```text
-feature/toss-sandbox-payment
+feature/bank-transfer-checkout
 feature/oauth-browser-check
 fix/kakao-oauth-profile
 docs/backlog-workflow

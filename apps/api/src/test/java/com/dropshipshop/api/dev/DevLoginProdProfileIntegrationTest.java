@@ -21,7 +21,6 @@ import org.springframework.test.web.servlet.MockMvc;
 	"spring.datasource.password=",
 	"spring.flyway.enabled=false",
 	"spring.jpa.hibernate.ddl-auto=create-drop",
-	"payments.toss.secret-key=test-secret",
 	"sms.sens.access-key=test-access",
 	"sms.sens.secret-key=test-secret",
 	"sms.sens.service-id=test-service",

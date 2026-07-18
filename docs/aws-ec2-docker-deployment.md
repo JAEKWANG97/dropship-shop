@@ -202,5 +202,4 @@ Browser smoke:
 ## Current Deferrals
 
 - S3-backed application image serving, RDS, and CloudFront are deferred. S3 is already used for DB/upload backups.
-- Live Toss key switch is deferred until the test URL and legal/customer notice pages are verified.
 - Real SMS provider activation is deferred unless phone verification is required before live launch. Production default is `SMS_SENS_ENABLED=false`; set it explicitly to `true` only after real Naver SENS credentials are installed.

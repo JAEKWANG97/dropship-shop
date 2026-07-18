@@ -27,9 +27,6 @@ import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
-import com.dropshipshop.api.payment.toss.TossCancelledPayment;
-import com.dropshipshop.api.payment.toss.TossPaymentException;
-import com.dropshipshop.api.payment.toss.TossPaymentsClient;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundStatus;
@@ -45,7 +42,6 @@ public class RefundService {
 	private final CustomerOrderRepository orderRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
-	private final TossPaymentsClient tossPaymentsClient;
 	private final NotificationService notificationService;
 
 	RefundService(
@@ -56,7 +52,6 @@ public class RefundService {
 		CustomerOrderRepository orderRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
-		TossPaymentsClient tossPaymentsClient,
 		NotificationService notificationService
 	) {
 		this.refundRepository = refundRepository;
@@ -66,7 +61,6 @@ public class RefundService {
 		this.orderRepository = orderRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
-		this.tossPaymentsClient = tossPaymentsClient;
 		this.notificationService = notificationService;
 	}
 
@@ -108,18 +102,6 @@ public class RefundService {
 		} catch (IllegalStateException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
 		}
-	}
-
-	@Transactional
-	RefundDtos.AdminRefundResponse requestPgCancel(UUID refundId) {
-		Refund refund = findRefund(refundId);
-		return executePgCancel(refund, false);
-	}
-
-	@Transactional
-	RefundDtos.AdminRefundResponse retryPgCancel(UUID refundId) {
-		Refund refund = findRefund(refundId);
-		return executePgCancel(refund, true);
 	}
 
 	@Transactional
@@ -268,85 +250,9 @@ public class RefundService {
 			});
 	}
 
-	private RefundDtos.AdminRefundResponse executePgCancel(Refund refund, boolean retry) {
-		if (refund.getStatus() == RefundStatus.COMPLETED) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund is already completed");
-		}
-		if (retry && refund.getStatus() != RefundStatus.RETRY_REQUIRED && refund.getStatus() != RefundStatus.FAILED) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund is not retryable");
-		}
-		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(refund.getPaymentGroup().getId())
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved payment not found"));
-		Instant now = Instant.now();
-		String idempotencyKey = refundIdempotencyKey(refund, retry);
-		try {
-			refund.getOrder().markRefundRequested();
-			refund.requestPgCancel(payment, idempotencyKey, now, retry);
-			TossCancelledPayment cancelledPayment = tossPaymentsClient.cancel(
-				payment.getProviderPaymentKey(),
-				refund.getReason().name(),
-				refund.getRefundAmount(),
-				idempotencyKey
-			);
-			Instant completedAt = Instant.now();
-			refund.complete(cancelledPayment.cancelTransactionKey(), cancelledPayment.rawStatus(), completedAt);
-			refund.getPaymentGroup().applyRefund(refund.getRefundAmount());
-			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
-			payment.markRefundCompleted(fullyRefunded);
-			refund.getOrder().markRefunded();
-			claimRepository.findByRefund_Id(refund.getId())
-				.ifPresent(claim -> claim.complete(completedAt));
-			paymentEventRepository.save(new PaymentEvent(
-				payment,
-				refund.getPaymentGroup(),
-				payment.getProviderPaymentKey(),
-				PaymentEventType.REFUND_COMPLETED,
-				"Refund completed for order " + refund.getOrder().getOrderNumber(),
-				completedAt
-			));
-			notificationService.transactionalSms(
-				refund.getOrder().getUser(),
-				refund.getOrder(),
-				refund.getPaymentGroup(),
-				null,
-				refund,
-				NotificationType.REFUND_COMPLETED
-			);
-			return toAdminResponse(refund);
-		} catch (IllegalStateException | IllegalArgumentException exception) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
-		} catch (TossPaymentException exception) {
-			Instant failedAt = Instant.now();
-			if (retry) {
-				refund.markManualReviewRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
-			} else {
-				refund.markRetryRequired("TOSS_CANCEL_FAILED", exception.getMessage(), failedAt);
-			}
-			payment.markRefundFailed("TOSS_CANCEL_FAILED", exception.getMessage());
-			paymentEventRepository.save(new PaymentEvent(
-				payment,
-				refund.getPaymentGroup(),
-				payment.getProviderPaymentKey(),
-				PaymentEventType.REFUND_FAILED,
-				exception.getMessage(),
-				failedAt
-			));
-			return toAdminResponse(refund);
-		}
-	}
-
 	private Refund findRefund(UUID refundId) {
 		return refundRepository.findById(refundId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
 	}
 
-	private String refundIdempotencyKey(Refund refund, boolean retry) {
-		if (refund.getIdempotencyKey() != null) {
-			return refund.getIdempotencyKey();
-		}
-		if (retry) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund idempotency key is missing");
-		}
-		return "refund-" + refund.getId();
-	}
 }

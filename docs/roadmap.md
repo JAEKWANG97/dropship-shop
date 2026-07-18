@@ -6,7 +6,7 @@
 - Confirm order and payment state model
 - Confirm admin workflow
 - Confirm cancellation/refund policy
-- Choose PG provider
+- Confirm bank-transfer operations
 - Choose frontend approach
 
 Exit criteria:
@@ -86,7 +86,6 @@ Exit criteria:
 
 ## Later
 
-- Toss Payments sandbox/live reintroduction
 - Supplier CSV import
 - Product bulk upload
 - Coupon

@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ApiError, apiSendWithCookie } from "@/lib/api";
 import type { Checkout } from "@/lib/checkout";
-import { confirmTossPaymentRequest } from "@/lib/payments";
 
 const ORDER_POLICY_VERSION = "order-2026-06-01";
 const REFUND_POLICY_VERSION = "refund-2026-06-01";
@@ -134,22 +133,4 @@ export async function confirmCheckoutPolicies(formData: FormData) {
 
   revalidatePath(`/checkout/${checkoutNumber}`);
   redirect(checkoutDetailMessage(checkoutNumber, "주문서 정책 확인을 저장했습니다."));
-}
-
-export async function confirmTossPayment(formData: FormData) {
-  const checkoutNumber = value(formData, "checkoutNumber");
-
-  try {
-    await confirmTossPaymentRequest(
-      checkoutNumber,
-      value(formData, "paymentKey"),
-      Number(value(formData, "amount") || "0"),
-    );
-  } catch (error) {
-    const status = error instanceof ApiError ? `&status=${error.status}` : "";
-    redirect(`/checkout/payment/exception?checkoutNumber=${encodeURIComponent(checkoutNumber)}${status}`);
-  }
-
-  revalidatePath(`/checkout/${checkoutNumber}`);
-  redirect(`/checkout/payment/success?checkoutNumber=${encodeURIComponent(checkoutNumber)}`);
 }

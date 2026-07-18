@@ -30,14 +30,13 @@ DB_PASSWORD=dropship
 ```
 
 The local profile reads the values above from environment variables and falls back to those defaults.
-For Toss sandbox payment confirmation, also set `PAYMENTS_TOSS_SECRET_KEY`.
 For local SMS OTP testing, leave `SMS_SENS_ENABLED=false` to use the development log sender.
 
 ## Production Profile
 
 - Production runs with `SPRING_PROFILES_ACTIVE=prod`.
 - Required production variables are documented in [Production Readiness](../../docs/production-readiness.md).
-- The `prod` profile requires database, CORS, auth/OAuth, `APP_PUBLIC_BASE_URL`, and `APP_INQUIRY_LOOKUP_SECRET` values. Toss and SMS/SES provider keys are required only when those providers are enabled.
+- The `prod` profile requires database, CORS, auth/OAuth, `APP_PUBLIC_BASE_URL`, and `APP_INQUIRY_LOOKUP_SECRET` values. SMS/SES provider keys are required only when those providers are enabled.
 - Flyway is enabled and Hibernate uses `ddl-auto=validate` in production.
 
 ## Health Checks
@@ -114,13 +113,10 @@ curl http://localhost:8080/actuator/health/liveness
 
 ## Payment Foundation
 
-- Toss Payments confirmation API is available at `/api/payments/toss/confirm`.
-- Toss secret key is read from `payments.toss.secret-key` or `PAYMENTS_TOSS_SECRET_KEY`.
-- Payment confirmation verifies checkout ownership, pending state, expiration, policy confirmation, amount, payment key uniqueness, and sellability.
-- Successful confirmation moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
-- Duplicate confirmation with the same payment key and checkout is idempotent.
-- Payment exception paths record `Payment(CANCEL_REQUIRED)` and block supplier ordering.
-- Webhooks, payment detail API, automatic cancel execution, and admin retry APIs remain future work.
+- Customer payment uses direct bank transfer only.
+- Checkout detail shows the bank account, amount, depositor name, and deposit deadline.
+- Admin deposit confirmation records a `BANK_TRANSFER` payment and moves checkout orders to `SUPPLIER_ORDER_PENDING`.
+- Admin can record a deposit mismatch or cancel an unpaid checkout while it is pending.
 
 ## Customer Order Foundation
 
@@ -156,10 +152,8 @@ curl http://localhost:8080/actuator/health/liveness
 ## Refund Foundation
 
 - Admin refund queue APIs are available at `/api/admin/refunds`.
-- `POST /api/admin/refunds/{refundId}/request-pg-cancel` calls Toss Payments cancel API with an idempotency key.
-- `POST /api/admin/refunds/{refundId}/retry` retries failed PG cancel requests.
-- PG cancel success moves the order to `REFUNDED` and updates the payment/payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
-- PG cancel failure keeps the order in `REFUND_REQUESTED` and marks the refund `RETRY_REQUIRED`.
+- `POST /api/admin/refunds/{refundId}/manual-complete` records an actual manual bank-transfer refund.
+- Manual completion moves the order to `REFUNDED` and updates the payment/payment group to `REFUNDED` or `PARTIALLY_REFUNDED`.
 - Customer and admin order detail responses include refund summary when a refund exists.
 
 ## Tests
