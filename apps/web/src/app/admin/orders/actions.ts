@@ -18,7 +18,7 @@ function failureMessage(error: unknown, fallback: string) {
   return error instanceof ApiError && error.message.trim() ? error.message : fallback;
 }
 
-async function postOrderAction(orderId: string, path: string, body: Record<string, string>) {
+async function postOrderAction(orderId: string, path: string, body: Record<string, string | number>) {
   await apiSendWithCookie(`/api/admin/orders/${orderId}${path}`, (await cookies()).toString(), {
     method: "POST",
     body: JSON.stringify(body),
@@ -32,11 +32,15 @@ async function postShipmentAction(shipmentId: string, path: string, body: Record
   });
 }
 
-async function postRefundAction(refundId: string, path: string, body: Record<string, string>) {
+async function postRefundAction(refundId: string, path: string, body: Record<string, string | number>) {
   await apiSendWithCookie(`/api/admin/refunds/${refundId}${path}`, (await cookies()).toString(), {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+function koreanLocalDateTime(value: string) {
+  return value ? `${value}:00+09:00` : "";
 }
 
 async function postClaimAction(claimId: string, path: string, body: Record<string, string>) {
@@ -143,7 +147,13 @@ export async function confirmDeposit(formData: FormData) {
   const orderId = value(formData, "orderId");
 
   try {
-    await postOrderAction(orderId, "/confirm-deposit", { reason: value(formData, "reason") });
+    await postOrderAction(orderId, "/confirm-deposit", {
+      actualDepositorName: value(formData, "actualDepositorName"),
+      actualAmount: Number(value(formData, "actualAmount")),
+      depositedAt: koreanLocalDateTime(value(formData, "depositedAt")),
+      transactionReference: value(formData, "transactionReference"),
+      reason: value(formData, "reason"),
+    });
   } catch (error) {
     done(orderId, failureMessage(error, "입금 확인 처리에 실패했습니다."));
   }
@@ -188,6 +198,8 @@ export async function completeManualRefund(formData: FormData) {
       bankName: value(formData, "bankName"),
       accountNumber: value(formData, "accountNumber"),
       accountHolder: value(formData, "accountHolder"),
+		transferredAt: koreanLocalDateTime(value(formData, "transferredAt")),
+		transactionReference: value(formData, "transactionReference"),
     });
   } catch (error) {
     done(orderId, failureMessage(error, "수동 환불 완료 처리에 실패했습니다."));

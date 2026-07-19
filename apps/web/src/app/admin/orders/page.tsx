@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { adminStatusLabel, getAdminOrder, getAdminOrders, type AdminOrder } from "@/lib/admin";
+import {
+  adminStatusLabel,
+  getAdminOrder,
+  getAdminOrderActions,
+  getAdminOrders,
+  type AdminOrder,
+  type AdminOrderActionHistory,
+} from "@/lib/admin";
 import { formatPrice } from "@/lib/catalog";
 import {
   claimReasonLabel,
@@ -50,7 +57,9 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
   });
   const selectedOrderId = params.orderId ?? filteredOrders[0]?.orderId;
   const selectedSummary = filteredOrders.find((order) => order.orderId === selectedOrderId) ?? filteredOrders[0];
-  const detail = selectedOrderId ? await loadOrderDetail(selectedOrderId) : { error: false, order: null };
+  const [detail, actionHistory] = selectedOrderId
+    ? await Promise.all([loadOrderDetail(selectedOrderId), loadOrderActions(selectedOrderId)])
+    : [{ error: false as const, order: null }, { error: false as const, actions: [] }];
   const selectedOrder = mergeOrderDetail(selectedSummary, detail.order);
 
   return (
@@ -209,6 +218,8 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 </div>
               </div>
               <ClaimPanel order={selectedOrder} />
+					<RefundEvidencePanel order={selectedOrder} />
+					<AdminActionHistoryPanel actions={actionHistory.actions} error={actionHistory.error} />
               <AdminOrderActions order={selectedOrder} />
             </aside>
           ) : null}
@@ -231,6 +242,14 @@ async function loadOrderDetail(orderId: string) {
     return { error: false as const, order: await getAdminOrder(orderId) };
   } catch {
     return { error: true as const, order: null };
+  }
+}
+
+async function loadOrderActions(orderId: string) {
+  try {
+    return { error: false as const, actions: await getAdminOrderActions(orderId) };
+  } catch {
+    return { error: true as const, actions: [] as AdminOrderActionHistory[] };
   }
 }
 
@@ -302,11 +321,74 @@ function BankTransferAdminPanel({ order }: { order: AdminOrder }) {
       <SummaryItem label="입금 계좌" value={`${deposit.bankName ?? "-"} ${deposit.accountNumber ?? ""}`} />
       <SummaryItem label="예금주" value={deposit.accountHolder ?? "-"} />
       <SummaryItem label="입금자명" value={deposit.depositorName ?? "-"} />
+		<SummaryItem label="실제 입금자명" value={deposit.actualDepositorName ?? "-"} />
+		<SummaryItem label="실제 입금액" value={deposit.actualDepositAmount == null ? "-" : formatPrice(deposit.actualDepositAmount)} />
+		<SummaryItem label="입금시각" value={formatDateTime(deposit.depositReceivedAt)} />
+		<SummaryItem label="거래 식별 메모" value={deposit.depositTransactionReference ?? "-"} />
       <SummaryItem label="입금확인" value={formatDateTime(deposit.depositConfirmedAt)} />
       <SummaryItem label="입금확인 사유" value={deposit.depositConfirmationReason ?? "-"} />
       <SummaryItem label="불일치 메모" value={deposit.depositMismatchMemo ?? "-"} />
       <SummaryItem label="미입금 취소" value={formatDateTime(deposit.unpaidCancelledAt)} />
     </div>
+  );
+}
+
+function RefundEvidencePanel({ order }: { order: AdminOrder }) {
+  const refund = order.refund;
+  if (!refund?.manualRefundedAt) {
+    return null;
+  }
+
+  return (
+    <section className="admin-claim-panel">
+      <h3>환불 이체 증적</h3>
+      <div className="summary-list compact">
+        <SummaryItem label="환불 은행" value={refund.manualRefundBankName ?? "-"} />
+        <SummaryItem label="환불 계좌번호" value={refund.manualRefundAccountNumber ?? "-"} />
+        <SummaryItem label="예금주" value={refund.manualRefundAccountHolder ?? "-"} />
+        <SummaryItem label="실제 이체시각" value={formatDateTime(refund.manualRefundTransferredAt ?? null)} />
+        <SummaryItem label="거래 식별 메모" value={refund.manualRefundTransactionReference ?? "-"} />
+        <SummaryItem label="처리 사유" value={refund.manualRefundReason ?? "-"} />
+      </div>
+    </section>
+  );
+}
+
+function AdminActionHistoryPanel({ actions, error }: { actions: AdminOrderActionHistory[]; error: boolean }) {
+  return (
+    <section className="admin-claim-panel">
+      <h3>작업 이력</h3>
+      {error ? (
+        <div className="admin-empty compact">
+          <strong>작업 이력을 불러오지 못했습니다</strong>
+        </div>
+      ) : actions.length === 0 ? (
+        <div className="admin-empty compact">
+          <strong>기록된 작업 이력이 없습니다</strong>
+        </div>
+      ) : (
+        <div className="admin-list">
+          {actions.map((action) => (
+            <div key={action.actionHistoryId}>
+              <strong>{adminActionLabel(action.actionType)}</strong>
+              <span>{formatDateTime(action.createdAt)}</span>
+              <span>{action.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function adminActionLabel(actionType: string) {
+  return (
+    {
+      BANK_TRANSFER_DEPOSIT_CONFIRMED: "입금 확인",
+      BANK_TRANSFER_DEPOSIT_MISMATCH_RECORDED: "입금 불일치 기록",
+      BANK_TRANSFER_UNPAID_CANCELLED: "미입금 취소",
+      MANUAL_REFUND_COMPLETED: "수동 환불 완료",
+    }[actionType] ?? actionType
   );
 }
 
@@ -501,6 +583,22 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
         <h3>입금 처리</h3>
         <form action={confirmDeposit} className="admin-inline-form">
           <input name="orderId" type="hidden" value={order.orderId} />
+			<label>
+				실제 입금자명
+				<input name="actualDepositorName" required />
+			</label>
+			<label>
+				실제 입금액
+				<input name="actualAmount" type="number" min="1" step="1" required />
+			</label>
+			<label>
+				입금시각
+				<input name="depositedAt" type="datetime-local" step="60" required />
+			</label>
+			<label>
+				거래 식별 메모
+				<input name="transactionReference" required placeholder="예: 은행 거래번호 또는 이체 메모" />
+			</label>
           <label className="wide">
             입금 확인 사유
             <input name="reason" required placeholder="예: 입금액과 입금자명 확인" />
@@ -604,15 +702,23 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
           <input name="refundId" type="hidden" value={order.refund.refundId} />
           <label>
             환불 은행
-            <input name="bankName" placeholder="선택 입력" />
+            <input name="bankName" required />
           </label>
           <label>
-            환불 계좌 메모
-            <input name="accountNumber" placeholder="선택 입력" />
+            환불 계좌번호
+            <input name="accountNumber" required />
           </label>
           <label>
             예금주
-            <input name="accountHolder" placeholder="선택 입력" />
+            <input name="accountHolder" required />
+			</label>
+			<label>
+				실제 이체시각
+				<input name="transferredAt" type="datetime-local" step="60" required />
+			</label>
+			<label>
+				거래 식별 메모
+				<input name="transactionReference" required placeholder="예: 은행 거래번호 또는 이체 메모" />
           </label>
           <label className="wide">
             수동 환불 완료 사유

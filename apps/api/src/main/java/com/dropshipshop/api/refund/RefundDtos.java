@@ -13,6 +13,7 @@ import com.dropshipshop.api.refund.domain.RefundStatus;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 
 public final class RefundDtos {
@@ -21,7 +22,22 @@ public final class RefundDtos {
 	}
 
 	public record AdminRefundListResponse(
-		List<AdminRefundResponse> refunds
+		List<AdminRefundListItemResponse> refunds
+	) {
+	}
+
+	public record AdminRefundListItemResponse(
+		UUID refundId,
+		UUID orderId,
+		String orderNumber,
+		OrderStatus orderStatus,
+		RefundReason reason,
+		RefundStatus status,
+		long refundAmount,
+		RefundScope refundScope,
+		Instant requestedAt,
+		Instant completedAt,
+		Instant createdAt
 	) {
 	}
 
@@ -53,6 +69,8 @@ public final class RefundDtos {
 		String manualRefundBankName,
 		String manualRefundAccountNumber,
 		String manualRefundAccountHolder,
+		Instant manualRefundTransferredAt,
+		String manualRefundTransactionReference,
 		Instant requestedAt,
 		Instant completedAt,
 		Instant failedAt,
@@ -82,14 +100,25 @@ public final class RefundDtos {
 		@Size(max = 1000)
 		String reason,
 
+		@NotBlank
 		@Size(max = 100)
 		String bankName,
 
+		@NotBlank
 		@Size(max = 100)
 		String accountNumber,
 
+		@NotBlank
 		@Size(max = 100)
-		String accountHolder
+		String accountHolder,
+
+		@NotNull
+		@PastOrPresent
+		Instant transferredAt,
+
+		@NotBlank
+		@Size(max = 200)
+		String transactionReference
 	) {
 	}
 }

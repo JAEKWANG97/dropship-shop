@@ -107,6 +107,10 @@ export type AdminOrder = {
       depositConfirmedByAdminId: string | null;
       depositConfirmedAt: string | null;
       depositConfirmationReason: string | null;
+      actualDepositorName: string | null;
+      actualDepositAmount: number | null;
+      depositReceivedAt: string | null;
+      depositTransactionReference: string | null;
       depositMismatchMemo: string | null;
       depositMismatchRecordedByAdminId: string | null;
       depositMismatchRecordedAt: string | null;
@@ -142,8 +146,13 @@ export type AdminOrder = {
     status: string;
     refundAmount: number;
     failureMessage: string | null;
-    manualRefundedAt?: string | null;
-    manualRefundReason?: string | null;
+		manualRefundedAt?: string | null;
+		manualRefundReason?: string | null;
+		manualRefundBankName?: string | null;
+		manualRefundAccountNumber?: string | null;
+		manualRefundAccountHolder?: string | null;
+		manualRefundTransferredAt?: string | null;
+		manualRefundTransactionReference?: string | null;
   } | null;
   claim?: {
     claimId: string;
@@ -183,6 +192,17 @@ export type AdminOrder = {
 
 type AdminOrderListResponse = {
   orders: AdminOrder[];
+};
+
+export type AdminOrderActionHistory = {
+  actionHistoryId: string;
+  orderId: string;
+  adminUserId: string;
+  actionType: string;
+  beforeStatus: string;
+  afterStatus: string;
+  reason: string;
+  createdAt: string;
 };
 
 async function readAdmin<T>(path: string) {
@@ -239,6 +259,11 @@ export async function getAdminReferrals() {
 
 export async function getAdminOrder(orderId: string) {
 	return readAdmin<AdminOrder>(`/api/admin/orders/${orderId}`);
+}
+
+export async function getAdminOrderActions(orderId: string) {
+	const data = await readAdmin<{ actions: AdminOrderActionHistory[] }>(`/api/admin/actions?orderId=${encodeURIComponent(orderId)}`);
+	return data.actions;
 }
 
 export function adminStatusLabel(status: string) {

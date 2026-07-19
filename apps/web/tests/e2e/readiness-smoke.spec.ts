@@ -309,6 +309,11 @@ test("admin order action refreshes detail after successful memo update", async (
   const orderLink = await firstAdminOrderLink(page);
   await orderLink.click();
 
+  await expect(page.getByLabel("실제 입금자명")).toBeVisible();
+  await expect(page.getByLabel("실제 입금액")).toBeVisible();
+  await expect(page.getByLabel("입금시각")).toBeVisible();
+  await expect(page.getByLabel("거래 식별 메모").first()).toBeVisible();
+
   const memo = `E2E 입금 불일치 메모 ${Date.now()}`;
   await page.getByLabel("입금 불일치 메모").fill(memo);
   await page.getByRole("button", { name: "메모 저장" }).click();

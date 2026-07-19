@@ -792,7 +792,7 @@ Suggested fields:
 Implemented DS-44 scope:
 
 - Admin order action history is read from `admin_order_action_histories`.
-- `GET /api/admin/actions` returns order id, admin user id, action type, before/after status, reason, and created time.
+- `GET /api/admin/actions` returns order id, admin user id, action type, before/after status, reason, and created time. `orderId` query filtering is supported for the selected admin order detail.
 
 ## ProductChangeHistory
 

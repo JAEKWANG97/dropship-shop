@@ -80,6 +80,18 @@ public class PaymentGroup {
 	@Column(name = "deposit_confirmation_reason", columnDefinition = "TEXT")
 	private String depositConfirmationReason;
 
+	@Column(name = "actual_depositor_name", length = 100)
+	private String actualDepositorName;
+
+	@Column(name = "actual_deposit_amount")
+	private Long actualDepositAmount;
+
+	@Column(name = "deposit_received_at")
+	private Instant depositReceivedAt;
+
+	@Column(name = "deposit_transaction_reference", length = 200)
+	private String depositTransactionReference;
+
 	@Column(name = "deposit_mismatch_memo", columnDefinition = "TEXT")
 	private String depositMismatchMemo;
 
@@ -155,16 +167,34 @@ public class PaymentGroup {
 		this.approvedAt = approvedAt;
 	}
 
-	public void confirmBankTransferDeposit(UUID adminUserId, String reason, Instant confirmedAt) {
+	public void confirmBankTransferDeposit(
+		UUID adminUserId,
+		String actualDepositorName,
+		long actualDepositAmount,
+		Instant depositReceivedAt,
+		String depositTransactionReference,
+		String reason,
+		Instant confirmedAt
+	) {
 		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
 			throw new IllegalStateException("Deposit can be confirmed only while payment is pending");
 		}
+		if (actualDepositAmount != totalAmount) {
+			throw new IllegalArgumentException("Actual deposit amount must match the checkout total");
+		}
+		if (depositReceivedAt.isAfter(confirmedAt)) {
+			throw new IllegalArgumentException("Deposit received time cannot be in the future");
+		}
 		this.status = PaymentGroupStatus.APPROVED;
-		this.approvedAmount = totalAmount;
+		this.approvedAmount = actualDepositAmount;
 		this.approvedAt = confirmedAt;
 		this.depositConfirmedByAdminId = adminUserId;
 		this.depositConfirmedAt = confirmedAt;
-		this.depositConfirmationReason = reason;
+		this.actualDepositorName = actualDepositorName.trim();
+		this.actualDepositAmount = actualDepositAmount;
+		this.depositReceivedAt = depositReceivedAt;
+		this.depositTransactionReference = depositTransactionReference.trim();
+		this.depositConfirmationReason = reason.trim();
 	}
 
 	public void markPaymentException() {
@@ -291,6 +321,22 @@ public class PaymentGroup {
 
 	public String getDepositConfirmationReason() {
 		return depositConfirmationReason;
+	}
+
+	public String getActualDepositorName() {
+		return actualDepositorName;
+	}
+
+	public Long getActualDepositAmount() {
+		return actualDepositAmount;
+	}
+
+	public Instant getDepositReceivedAt() {
+		return depositReceivedAt;
+	}
+
+	public String getDepositTransactionReference() {
+		return depositTransactionReference;
 	}
 
 	public String getDepositMismatchMemo() {

@@ -69,7 +69,8 @@ Status: Confirmed
 - 공급처 발주 작업 시작, 발주 완료, 품절 액션은 상태 전이를 검증하고 `admin_order_action_histories`에 사유와 전후 상태를 기록한다. Implemented by DS-12.
 - 택배사/송장번호 입력 액션은 `SUPPLIER_ORDERED` 주문에만 허용하고 주문당 shipment 1개만 생성한다. Implemented by DS-13.
 - 취소 클레임 승인/거절은 관리자 권한과 사유를 검증하고 claim review fields를 기록한다. Implemented by DS-14.
-- 환불 승인/거절과 실제 계좌이체 후 수동 환불 완료는 관리자 권한 API로만 수행한다. Implemented by DS-15, DS-38, and B-044. 입금·환불 증적 필수값 강화는 B-068에서 처리한다.
+- 입금확인은 실제 입금자명, 실제 입금액, 입금시각, 거래 식별 메모, 사유를 기록하며 실제 입금액이 checkout 총액과 정확히 일치할 때만 승인한다. 불일치는 입금확인이 아니라 불일치 처리 메모로 남긴다. Implemented by B-068.
+- 환불 승인/거절과 실제 계좌이체 후 수동 환불 완료는 관리자 권한 API로만 수행한다. 수동 환불 완료에는 은행명, 계좌번호, 예금주, 이체시각, 거래 식별 메모, 사유가 필요하다. 계좌정보와 입금자명은 관리자 주문 상세에만 표시하며 고객 응답·알림·작업 이력에는 복사하지 않는다. Implemented by DS-15, DS-38, B-044, and B-068.
 - 주문 상태 변경은 action 기반으로 제한해야 한다.
 - 주문 상태 변경 이력 테이블이 필요하다. Implemented by DS-36.
 - 주요 관리자 액션 이력 테이블과 관리자 조회 API가 필요하다. Implemented by DS-44.

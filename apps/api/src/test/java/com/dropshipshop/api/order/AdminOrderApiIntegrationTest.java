@@ -162,6 +162,10 @@ class AdminOrderApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
+					  "actualDepositorName": "Receiver",
+					  "actualAmount": 45000,
+					  "depositedAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "BANK-ADM-BANK-CONFIRM-1",
 					  "reason": "Deposit amount and depositor name matched"
 					}
 					"""))
@@ -176,10 +180,24 @@ class AdminOrderApiIntegrationTest {
 		assertThat(savedPaymentGroup.getStatus()).isEqualTo(PaymentGroupStatus.APPROVED);
 		assertThat(savedPaymentGroup.getDepositConfirmedByAdminId()).isEqualTo(TestAuthentication.ADMIN_ID);
 		assertThat(savedPaymentGroup.getDepositConfirmationReason()).isEqualTo("Deposit amount and depositor name matched");
+		assertThat(savedPaymentGroup.getActualDepositorName()).isEqualTo("Receiver");
+		assertThat(savedPaymentGroup.getActualDepositAmount()).isEqualTo(45000);
+		assertThat(savedPaymentGroup.getDepositTransactionReference()).isEqualTo("BANK-ADM-BANK-CONFIRM-1");
 		assertThat(payment.getProvider()).isEqualTo(PaymentProvider.BANK_TRANSFER);
 		assertThat(payment.getMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
 		assertThat(payment.getProviderPaymentKey()).isEqualTo("BANK-ADM-BANK-CONFIRM-CO-1");
+		mockMvc.perform(get("/api/admin/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.paymentGroup.bankTransferDeposit.actualDepositorName", is("Receiver")))
+			.andExpect(jsonPath("$.paymentGroup.bankTransferDeposit.actualDepositAmount", is(45000)))
+			.andExpect(jsonPath("$.paymentGroup.bankTransferDeposit.depositTransactionReference", is("BANK-ADM-BANK-CONFIRM-1")));
+		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.paymentGroup.actualDepositAmount").doesNotExist())
+			.andExpect(jsonPath("$.paymentGroup.depositTransactionReference").doesNotExist());
 		assertThat(orderStatusHistoryRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()))
 			.extracting(OrderStatusHistory::getActionType)
 			.contains("BANK_TRANSFER_DEPOSIT_CONFIRMED");
@@ -198,10 +216,82 @@ class AdminOrderApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
+					  "actualDepositorName": "Receiver",
+					  "actualAmount": 45000,
+					  "depositedAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "BANK-ADM-BANK-CONFIRM-1-DUPLICATE",
 					  "reason": "Duplicate confirmation"
 					}
 					"""))
 			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void rejectsMismatchedDepositAmountWithoutApprovingTheOrder() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-bank-amount-mismatch");
+		CustomerOrder order = createPaymentPendingOrder(customer, "ADM-BANK-AMOUNT-MISMATCH-1", "ADM-BANK-AMOUNT-MISMATCH-CO-1", 45000);
+		order.getPaymentGroup().confirmPolicy(Instant.now());
+		paymentGroupRepository.saveAndFlush(order.getPaymentGroup());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "actualDepositorName": "Receiver",
+					  "actualAmount": 44900,
+					  "depositedAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "BANK-ADM-BANK-AMOUNT-MISMATCH-1",
+					  "reason": "Deposit amount checked"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Actual deposit amount must match the checkout total")));
+
+		PaymentGroup savedPaymentGroup = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
+		assertThat(savedPaymentGroup.getStatus()).isEqualTo(PaymentGroupStatus.PAYMENT_PENDING);
+		assertThat(savedPaymentGroup.getActualDepositAmount()).isNull();
+		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(savedPaymentGroup.getId())).isEmpty();
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+	}
+
+	@Test
+	void requiresCompletePastDepositEvidence() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-bank-evidence-validation");
+		CustomerOrder order = createPaymentPendingOrder(customer, "ADM-BANK-EVIDENCE-1", "ADM-BANK-EVIDENCE-CO-1", 45000);
+		order.getPaymentGroup().confirmPolicy(Instant.now());
+		paymentGroupRepository.saveAndFlush(order.getPaymentGroup());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "actualAmount": 45000,
+					  "depositedAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "BANK-ADM-EVIDENCE-MISSING-NAME",
+					  "reason": "Deposit amount checked"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "actualDepositorName": "Receiver",
+					  "actualAmount": 45000,
+					  "depositedAt": "%s",
+					  "transactionReference": "BANK-ADM-EVIDENCE-FUTURE",
+					  "reason": "Deposit amount checked"
+					}
+					""".formatted(Instant.now().plusSeconds(3600))))
+			.andExpect(status().isBadRequest());
+
+		PaymentGroup savedPaymentGroup = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
+		assertThat(savedPaymentGroup.getStatus()).isEqualTo(PaymentGroupStatus.PAYMENT_PENDING);
+		assertThat(savedPaymentGroup.getActualDepositAmount()).isNull();
 	}
 
 	@Test
@@ -230,9 +320,12 @@ class AdminOrderApiIntegrationTest {
 				assertThat(log.getRecipient()).isEqualTo("010-1111-2222");
 			});
 		mockMvc.perform(get("/api/admin/actions")
+				.param("orderId", order.getId().toString())
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.actions[?(@.orderId == '%s')].actionType".formatted(order.getId()), hasItem("DELAY_NOTICE_SENT")));
+			.andExpect(jsonPath("$.actions", hasSize(1)))
+			.andExpect(jsonPath("$.actions[0].orderId", is(order.getId().toString())))
+			.andExpect(jsonPath("$.actions[0].actionType", is("DELAY_NOTICE_SENT")));
 	}
 
 	@Test

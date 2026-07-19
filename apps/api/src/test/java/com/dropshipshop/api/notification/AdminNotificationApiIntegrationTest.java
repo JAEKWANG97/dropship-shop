@@ -129,6 +129,10 @@ class AdminNotificationApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
+					  "actualDepositorName": "Receiver",
+					  "actualAmount": 33000,
+					  "depositedAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "BANK-NOTIFY-FAIL-CO-1",
 					  "reason": "Deposit matched"
 					}
 					"""))

@@ -250,7 +250,15 @@ public class LocalOrderSeedData implements ApplicationRunner {
 		OrderStatus beforeStatus = order.getStatus();
 		Instant now = Instant.now();
 		PaymentGroup paymentGroup = order.getPaymentGroup();
-		paymentGroup.confirmBankTransferDeposit(admin.getId(), reason, now);
+		paymentGroup.confirmBankTransferDeposit(
+			admin.getId(),
+			paymentGroup.getBankTransferDepositorName(),
+			paymentGroup.getTotalAmount(),
+			now,
+			"LOCAL-" + paymentGroup.getCheckoutNumber(),
+			reason,
+			now
+		);
 		Payment payment = paymentRepository.save(Payment.bankTransferApproved(
 			paymentGroup,
 			"BANK-" + paymentGroup.getCheckoutNumber(),

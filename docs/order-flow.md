@@ -43,10 +43,10 @@ B-041 bank-transfer implementation notes:
 - Checkout creation still creates one payment group and one `PAYMENT_PENDING` order per supplier-backed delivery group.
 - `PAYMENT_PENDING` means deposit waiting.
 - Checkout detail shows bank name, account number, account holder, total amount, depositor name, deposit deadline, and cash receipt notice.
-- Admin deposit confirmation creates a `BANK_TRANSFER` payment with `providerPaymentKey = BANK-{checkoutNumber}`, marks the payment group `APPROVED`, and moves included orders to `SUPPLIER_ORDER_PENDING`.
+- Admin deposit confirmation requires the actual depositor name, actual amount, received time, transaction reference, and reason. It creates a `BANK_TRANSFER` payment with `providerPaymentKey = BANK-{checkoutNumber}`, marks the payment group `APPROVED`, and moves included orders to `SUPPLIER_ORDER_PENDING` only when the actual amount exactly equals the checkout total.
 - Admin unpaid cancellation moves pending orders to `CANCELLED`.
 - Admin deposit mismatch memo keeps the order pending and records the memo for operations.
-- Bank-transfer refunds are completed only after an admin records the actual manual refund completion.
+- Bank-transfer refunds are completed only after an admin records the actual manual refund completion with the recipient bank/account/holder, transferred time, transaction reference, and reason.
 
 DS-10 backend implementation notes:
 

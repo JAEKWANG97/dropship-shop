@@ -80,11 +80,19 @@ class AdminOrderPaymentService {
 
 		Instant now = Instant.now();
 		try {
-			paymentGroup.confirmBankTransferDeposit(adminUserId, request.reason(), now);
+			paymentGroup.confirmBankTransferDeposit(
+				adminUserId,
+				request.actualDepositorName(),
+				request.actualAmount(),
+				request.depositedAt(),
+				request.transactionReference(),
+				request.reason(),
+				now
+			);
 			Payment payment = paymentRepository.save(Payment.bankTransferApproved(
 				paymentGroup,
 				providerPaymentKey,
-				paymentGroup.getTotalAmount(),
+				request.actualAmount(),
 				now
 			));
 			for (CustomerOrder order : groupOrders) {

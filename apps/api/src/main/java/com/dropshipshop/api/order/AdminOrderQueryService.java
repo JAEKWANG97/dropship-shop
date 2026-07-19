@@ -119,9 +119,15 @@ class AdminOrderQueryService {
 	}
 
 	@Transactional(readOnly = true)
-	AdminOrderDtos.AdminActionHistoryListResponse listAdminActions() {
+	AdminOrderDtos.AdminActionHistoryListResponse listAdminActions(UUID orderId) {
+		if (orderId != null) {
+			orderRepository.findById(orderId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		}
 		return new AdminOrderDtos.AdminActionHistoryListResponse(
-			actionHistoryRepository.findAllByOrderByCreatedAtDesc()
+			(orderId == null
+				? actionHistoryRepository.findAllByOrderByCreatedAtDesc()
+				: actionHistoryRepository.findAllByOrder_IdOrderByCreatedAtDesc(orderId))
 				.stream()
 				.map(this::toActionHistoryResponse)
 				.toList()
@@ -250,6 +256,10 @@ class AdminOrderQueryService {
 			paymentGroup.getDepositConfirmedByAdminId(),
 			paymentGroup.getDepositConfirmedAt(),
 			paymentGroup.getDepositConfirmationReason(),
+			paymentGroup.getActualDepositorName(),
+			paymentGroup.getActualDepositAmount(),
+			paymentGroup.getDepositReceivedAt(),
+			paymentGroup.getDepositTransactionReference(),
 			paymentGroup.getDepositMismatchMemo(),
 			paymentGroup.getDepositMismatchRecordedByAdminId(),
 			paymentGroup.getDepositMismatchRecordedAt(),
@@ -293,6 +303,14 @@ class AdminOrderQueryService {
 			refund.getProviderCancelTransactionKey(),
 			refund.getFailureCode(),
 			refund.getFailureMessage(),
+			refund.getManualRefundedByAdminId(),
+			refund.getManualRefundedAt(),
+			refund.getManualRefundReason(),
+			refund.getManualRefundBankName(),
+			refund.getManualRefundAccountNumber(),
+			refund.getManualRefundAccountHolder(),
+			refund.getManualRefundTransferredAt(),
+			refund.getManualRefundTransactionReference(),
 			refund.getRequestedAt(),
 			refund.getCompletedAt(),
 			refund.getFailedAt()

@@ -10,4 +10,6 @@ import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 public interface AdminOrderActionHistoryRepository extends JpaRepository<AdminOrderActionHistory, UUID> {
 
 	List<AdminOrderActionHistory> findAllByOrderByCreatedAtDesc();
+
+	List<AdminOrderActionHistory> findAllByOrder_IdOrderByCreatedAtDesc(UUID orderId);
 }

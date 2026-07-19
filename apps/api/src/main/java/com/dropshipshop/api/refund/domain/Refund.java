@@ -101,6 +101,12 @@ public class Refund {
 	@Column(name = "manual_refund_account_holder", length = 100)
 	private String manualRefundAccountHolder;
 
+	@Column(name = "manual_refund_transferred_at")
+	private Instant manualRefundTransferredAt;
+
+	@Column(name = "manual_refund_transaction_reference", length = 200)
+	private String manualRefundTransactionReference;
+
 	@Column(name = "requested_at")
 	private Instant requestedAt;
 
@@ -166,20 +172,27 @@ public class Refund {
 		String bankName,
 		String accountNumber,
 		String accountHolder,
+		Instant transferredAt,
+		String transactionReference,
 		Instant completedAt
 	) {
 		if (status != RefundStatus.APPROVED) {
 			throw new IllegalStateException("Manual refund can be completed only after admin approval");
+		}
+		if (transferredAt.isAfter(completedAt)) {
+			throw new IllegalArgumentException("Refund transfer time cannot be in the future");
 		}
 		this.payment = payment;
 		this.providerPaymentKey = payment.getProviderPaymentKey();
 		this.status = RefundStatus.COMPLETED;
 		this.manualRefundedByAdminId = adminUserId;
 		this.manualRefundedAt = completedAt;
-		this.manualRefundReason = reason;
-		this.manualRefundBankName = bankName;
-		this.manualRefundAccountNumber = accountNumber;
-		this.manualRefundAccountHolder = accountHolder;
+		this.manualRefundReason = reason.trim();
+		this.manualRefundBankName = bankName.trim();
+		this.manualRefundAccountNumber = accountNumber.trim();
+		this.manualRefundAccountHolder = accountHolder.trim();
+		this.manualRefundTransferredAt = transferredAt;
+		this.manualRefundTransactionReference = transactionReference.trim();
 		this.completedAt = completedAt;
 		this.failureCode = null;
 		this.failureMessage = null;
@@ -276,6 +289,14 @@ public class Refund {
 
 	public String getManualRefundAccountHolder() {
 		return manualRefundAccountHolder;
+	}
+
+	public Instant getManualRefundTransferredAt() {
+		return manualRefundTransferredAt;
+	}
+
+	public String getManualRefundTransactionReference() {
+		return manualRefundTransactionReference;
 	}
 
 	public Instant getRequestedAt() {

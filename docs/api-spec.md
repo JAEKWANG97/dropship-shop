@@ -403,7 +403,7 @@ Rules:
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Supplier order pending admin queue by default; supports `status` filter |
 | `GET` | `/api/admin/orders/{orderId}` | `ADMIN` | Implemented | Admin order detail |
-| `POST` | `/api/admin/orders/{orderId}/confirm-deposit` | `ADMIN` | Implemented | Confirm direct bank-transfer deposit and move checkout orders to supplier order pending |
+| `POST` | `/api/admin/orders/{orderId}/confirm-deposit` | `ADMIN` | Implemented | Confirm exact direct bank-transfer deposit evidence and move checkout orders to supplier order pending |
 | `POST` | `/api/admin/orders/{orderId}/unpaid-cancel` | `ADMIN` | Implemented | Cancel unpaid bank-transfer checkout |
 | `POST` | `/api/admin/orders/{orderId}/deposit-mismatch` | `ADMIN` | Implemented | Record bank-transfer deposit mismatch memo |
 | `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Implemented | Lock address and mark supplier work started |
@@ -420,7 +420,7 @@ Rules:
 - Admin order queue defaults to `SUPPLIER_ORDER_PENDING` orders.
 - `GET /api/admin/orders?status=PAYMENT_PENDING` returns the bank-transfer deposit waiting queue.
 - `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
-- Admin deposit confirmation requires a reason, confirmed checkout policies, `PAYMENT_PENDING` checkout orders, and currently sellable products/options.
+- Admin deposit confirmation requires `actualDepositorName`, positive `actualAmount`, past-or-present `depositedAt`, `transactionReference`, reason, confirmed checkout policies, `PAYMENT_PENDING` checkout orders, and currently sellable products/options. `actualAmount` must exactly equal the payment group total; mismatch returns `400` without approving the payment group or orders.
 - Admin deposit confirmation creates a `BANK_TRANSFER` payment row, marks the payment group `APPROVED`, and moves all checkout orders to `SUPPLIER_ORDER_PENDING`.
 - Admin unpaid cancellation requires a reason and moves all checkout orders to `CANCELLED`.
 - Admin deposit mismatch memo keeps checkout orders `PAYMENT_PENDING`.
@@ -474,7 +474,7 @@ Rules:
 | `GET` | `/api/admin/refunds` | `ADMIN` | Implemented | Refund queue |
 | `POST` | `/api/admin/refunds/{refundId}/approve` | `ADMIN` | Implemented | Approve refund execution |
 | `POST` | `/api/admin/refunds/{refundId}/manual-review` | `ADMIN` | Implemented | Mark manual review result |
-| `POST` | `/api/admin/refunds/{refundId}/manual-complete` | `ADMIN` | Implemented | Complete actual manual bank-transfer refund |
+| `POST` | `/api/admin/refunds/{refundId}/manual-complete` | `ADMIN` | Implemented | Complete actual manual bank-transfer refund with transfer evidence |
 
 Rules:
 
@@ -488,6 +488,7 @@ Rules:
 - Evidence upload accepts `jpg/jpeg`, `png`, and `webp` images using the shared upload extension and magic-byte validation, and stores metadata in `claim_evidences`.
 - Return approval moves the claim to `RETURN_WAITING`; exchange approval keeps the claim approved until exchange shipment handling is implemented.
 - `return-received` requires a `RETURN_WAITING` return claim and records return received memo/time.
+- Manual bank-transfer refund completion requires `bankName`, `accountNumber`, `accountHolder`, past-or-present `transferredAt`, `transactionReference`, and reason. Account evidence is returned only from the selected admin order detail; it is excluded from the refund queue, customer APIs, notifications, and action histories.
 - `return-refund` requires a `RETURN_RECEIVED` return claim, creates a `RETURN_REQUESTED` refund, links it to the claim, moves the order to `REFUND_REQUESTED`, and moves the claim to `REFUND_PROCESSING`.
 - Bank-transfer refund completion moves the linked return claim to `COMPLETED`.
 - Refund execution requires admin approval before manual bank-transfer refund completion.
@@ -546,7 +547,7 @@ Rules:
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Implemented | Order status transition history |
-| `GET` | `/api/admin/actions` | `ADMIN` | Implemented | Admin order action history |
+| `GET` | `/api/admin/actions?orderId={orderId}` | `ADMIN` | Implemented | Admin order action history, optionally filtered to one order |
 | `GET` | `/api/admin/notifications?status=FAILED` | `ADMIN` | Implemented | Notification log search, optionally filtered by status |
 | `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Implemented | Retry failed or skipped notification |
 | `POST` | `/api/admin/orders/{orderId}/delay-notice` | `ADMIN` | Implemented | Send manual supplier delay notice before shipment |

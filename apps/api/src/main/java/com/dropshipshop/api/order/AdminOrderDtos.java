@@ -22,6 +22,9 @@ import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 final class AdminOrderDtos {
@@ -111,6 +114,10 @@ final class AdminOrderDtos {
 		UUID depositConfirmedByAdminId,
 		Instant depositConfirmedAt,
 		String depositConfirmationReason,
+		String actualDepositorName,
+		Long actualDepositAmount,
+		Instant depositReceivedAt,
+		String depositTransactionReference,
 		String depositMismatchMemo,
 		UUID depositMismatchRecordedByAdminId,
 		Instant depositMismatchRecordedAt,
@@ -215,6 +222,14 @@ final class AdminOrderDtos {
 		String providerCancelTransactionKey,
 		String failureCode,
 		String failureMessage,
+		UUID manualRefundedByAdminId,
+		Instant manualRefundedAt,
+		String manualRefundReason,
+		String manualRefundBankName,
+		String manualRefundAccountNumber,
+		String manualRefundAccountHolder,
+		Instant manualRefundTransferredAt,
+		String manualRefundTransactionReference,
 		Instant requestedAt,
 		Instant completedAt,
 		Instant failedAt
@@ -314,6 +329,21 @@ final class AdminOrderDtos {
 	}
 
 	record BankTransferDepositConfirmRequest(
+		@NotBlank
+		@Size(max = 100)
+		String actualDepositorName,
+
+		@Positive
+		long actualAmount,
+
+		@NotNull
+		@PastOrPresent
+		Instant depositedAt,
+
+		@NotBlank
+		@Size(max = 200)
+		String transactionReference,
+
 		@NotBlank
 		@Size(max = 1000)
 		String reason

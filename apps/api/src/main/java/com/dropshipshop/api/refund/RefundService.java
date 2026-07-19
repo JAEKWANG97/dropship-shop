@@ -88,7 +88,7 @@ public class RefundService {
 		return new RefundDtos.AdminRefundListResponse(
 			refundRepository.findAllByOrderByCreatedAtAsc()
 				.stream()
-				.map(this::toAdminResponse)
+				.map(this::toAdminListItem)
 				.toList()
 		);
 	}
@@ -148,6 +148,8 @@ public class RefundService {
 				request.bankName(),
 				request.accountNumber(),
 				request.accountHolder(),
+				request.transferredAt(),
+				request.transactionReference(),
 				now
 			);
 			refund.getPaymentGroup().applyRefund(refund.getRefundAmount());
@@ -227,9 +229,27 @@ public class RefundService {
 			refund.getManualRefundBankName(),
 			refund.getManualRefundAccountNumber(),
 			refund.getManualRefundAccountHolder(),
+			refund.getManualRefundTransferredAt(),
+			refund.getManualRefundTransactionReference(),
 			refund.getRequestedAt(),
 			refund.getCompletedAt(),
 			refund.getFailedAt(),
+			refund.getCreatedAt()
+		);
+	}
+
+	private RefundDtos.AdminRefundListItemResponse toAdminListItem(Refund refund) {
+		return new RefundDtos.AdminRefundListItemResponse(
+			refund.getId(),
+			refund.getOrder().getId(),
+			refund.getOrder().getOrderNumber(),
+			refund.getOrder().getStatus(),
+			refund.getReason(),
+			refund.getStatus(),
+			refund.getRefundAmount(),
+			refund.getRefundScope(),
+			refund.getRequestedAt(),
+			refund.getCompletedAt(),
 			refund.getCreatedAt()
 		);
 	}

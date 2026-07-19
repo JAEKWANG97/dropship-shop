@@ -580,7 +580,9 @@ class CustomerCancellationApiIntegrationTest {
 					  "reason": "Manual bank transfer refund completed",
 					  "bankName": "테스트은행",
 					  "accountNumber": "123-456",
-					  "accountHolder": "Receiver"
+					  "accountHolder": "Receiver",
+					  "transferredAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "REFUND-RETURN-1"
 					}
 					"""))
 			.andExpect(status().isOk())
@@ -590,6 +592,13 @@ class CustomerCancellationApiIntegrationTest {
 			.andExpect(jsonPath("$.paymentStatus", is("REFUNDED")));
 
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUNDED);
+		assertThat(refundRepository.findById(UUID.fromString(refundId)).orElseThrow())
+			.satisfies(refund -> {
+				assertThat(refund.getManualRefundBankName()).isEqualTo("테스트은행");
+				assertThat(refund.getManualRefundAccountNumber()).isEqualTo("123-456");
+				assertThat(refund.getManualRefundTransferredAt()).isEqualTo(Instant.parse("2020-07-19T09:00:00Z"));
+				assertThat(refund.getManualRefundTransactionReference()).isEqualTo("REFUND-RETURN-1");
+			});
 		assertThat(claimRepository.findById(UUID.fromString(claimId)).orElseThrow().getStatus().name()).isEqualTo("COMPLETED");
 		assertThat(paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow().getStatus())
 			.isEqualTo(PaymentGroupStatus.REFUNDED);
@@ -716,7 +725,12 @@ class CustomerCancellationApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "reason": "Manual bank transfer refund completed"
+					  "reason": "Manual bank transfer refund completed",
+					  "bankName": "테스트은행",
+					  "accountNumber": "123-456",
+					  "accountHolder": "Receiver",
+					  "transferredAt": "2020-07-19T09:00:00Z",
+					  "transactionReference": "REFUND-RETURN-2"
 					}
 					"""))
 			.andExpect(status().isOk())

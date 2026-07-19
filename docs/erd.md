@@ -588,6 +588,10 @@ Implemented by DS-8 as the checkout payment aggregate. B-041 adds direct bank-tr
 - `deposit_confirmed_by_admin_id`
 - `deposit_confirmed_at`
 - `deposit_confirmation_reason`
+- `actual_depositor_name`
+- `actual_deposit_amount`
+- `deposit_received_at`
+- `deposit_transaction_reference`
 - `deposit_mismatch_memo`
 - `deposit_mismatch_recorded_by_admin_id`
 - `deposit_mismatch_recorded_at`
@@ -744,6 +748,8 @@ Constraints and indexes:
 - `manual_refund_bank_name`
 - `manual_refund_account_number`
 - `manual_refund_account_holder`
+- `manual_refund_transferred_at`
+- `manual_refund_transaction_reference`
 - `requested_at`
 - `completed_at`
 - `failed_at`
