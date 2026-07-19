@@ -50,10 +50,10 @@ B-041 bank-transfer implementation notes:
 
 DS-10 backend implementation notes:
 
-- Customer order history starts after payment confirmation or customer-visible payment exception.
+- Customer order history starts after bank-transfer deposit confirmation.
 - Normal `PAYMENT_PENDING` and `EXPIRED` orders are excluded from customer order history.
 - Customer APIs return display statuses instead of raw internal order statuses.
-- Order detail includes payment, shipment, fulfillment, and refund summary surfaces; shipment, fulfillment, and refund are placeholders until later issues implement those domains.
+- Order detail includes implemented payment, shipment, fulfillment, and refund summaries.
 
 ## Multi Delivery Group Checkout
 
@@ -351,7 +351,7 @@ Admin detects wrong operational state or shipment information
 - State transitions are validated by from status, actor, action, guard, side effect, and target status.
 - Required transaction notifications are recorded in `NotificationLog` as SMS attempts.
 - Checkout creation sends one bank-transfer payment pending 안내 per payment group using the order recipient phone number.
-- Admin deposit confirmation, payment exception, out-of-stock, shipment started, delivery completed, claim status change, and refund completed create transactional notification logs.
+- Admin deposit confirmation, out-of-stock, shipment started, delivery completed, claim status change, and refund completed create transactional notification logs.
 - Supplier delay notice is a manual admin action before shipment; automatic delay scheduler is deferred.
 - SMS dispatch runs after the main order/payment transaction commits, so provider failure must not roll back the operational action.
 

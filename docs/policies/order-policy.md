@@ -155,7 +155,6 @@ Initial transaction notification triggers:
 | --- | --- | --- |
 | Payment pending | SMS, checkout detail status | `NotificationLog` |
 | Payment completed | SMS, order detail status | `NotificationLog` |
-| Payment exception or cancel processing | SMS, order detail status | `NotificationLog` |
 | Supplier out of stock | SMS, order detail status | `NotificationLog` |
 | Shipment started | SMS, order detail status | `NotificationLog` |
 | Delivery completed | SMS, order detail status | `NotificationLog` |
@@ -163,4 +162,4 @@ Initial transaction notification triggers:
 | Claim status changed | SMS, order detail status | `NotificationLog` |
 | Refund completed | SMS, order detail status | `NotificationLog` |
 
-B-011 implements transactional SMS notification logs for payment pending, payment completed, payment exception, supplier out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed. Delay notice is sent by manual admin action; automatic scheduler logic is deferred.
+B-011 implements transactional SMS notification logs for payment pending, payment completed, supplier out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed. Delay notice is sent by manual admin action; automatic scheduler logic is deferred.

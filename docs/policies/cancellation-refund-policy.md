@@ -78,9 +78,9 @@ Status: Confirmed
 - 고객 취소 버튼 노출 여부는 주문 상태로 판단해야 한다.
 - 발주 후 취소/반품/교환은 고객 셀프서비스가 아니라 클레임 접수와 관리자 처리 흐름으로 모델링해야 한다. Cancellation claim flow is implemented by DS-14; return/exchange claim creation and review are implemented by DS-37; delivered return receive/refund completion flow is implemented by B-044; customer claim list/detail and image evidence storage are implemented by B-015.
 - 환불 사유 enum이 필요하다. Implemented by DS-15.
-- 환불 상태는 PG 요청/성공/실패/재시도를 구분해야 한다. Implemented by DS-15.
-- 환불 실패 건을 처리하는 관리자 큐가 필요하다. Refund queue and retry are implemented by DS-15.
-- 환불 완료 고객 고지는 실제 계좌환불 완료 또는 PG 취소/환불 성공 이후에만 발송한다.
+- 환불 상태는 요청, 관리자 승인/거절, 실제 계좌환불 완료를 구분한다. Implemented by DS-15 and B-044.
+- 실제 계좌이체가 완료되지 않은 환불은 `COMPLETED`로 처리하지 않고 관리자 확인 대상으로 유지한다.
+- 환불 완료 고객 고지는 실제 계좌환불 완료 이후에만 발송한다.
 - 고객 취소/환불 정책 페이지는 `GET /api/policies/cancellation-refund`으로 노출한다. Implemented by DS-16.
 - 결제 후 공급처 품절 가능성과 배송 그룹 주문 단위 환불 안내는 `GET /api/policies/stock-risk`으로 노출한다. Implemented by DS-16.
 

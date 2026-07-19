@@ -745,7 +745,7 @@ Implemented B-011 scope:
 - `notification_logs` persists transactional SMS and customer inquiry email attempts.
 - Logs start as `PENDING` and move to `SENT`, `FAILED`, or `SKIPPED` after dispatch.
 - `sms.sens.enabled=false` records transactional SMS as `SKIPPED` instead of pretending to send.
-- Implemented triggers include payment pending bank-transfer 안내, payment completed, payment exception, out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed.
+- Implemented triggers include payment pending bank-transfer 안내, payment completed, out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed.
 - Order-related notifications use the order recipient phone number, not the account phone number.
 - Admin can list notification logs with `GET /api/admin/notifications?status=...` and retry failed or skipped logs with `POST /api/admin/notifications/{notificationId}/retry`.
 
@@ -1071,12 +1071,12 @@ Suggested fields:
 - MVP에서 한 주문은 하나의 배송 그룹만 포함한다.
 - 배송 그룹은 공급처 기준으로 나누지만 고객 화면에는 공급처 대신 배송 그룹으로 표시한다.
 - 고객 화면에는 내부 주문 상태를 그대로 노출하지 않고 고객용 표시 상태로 매핑한다.
-- 고객 주문 내역에는 결제 성공 후 확정된 주문과 고객에게 처리 상태를 보여줘야 하는 결제 예외 주문만 노출한다.
+- 고객 주문 내역에는 관리자 입금확인 후 확정된 주문만 노출한다.
 - `PAYMENT_PENDING`, `EXPIRED`, 결제 실패, 미입금 취소 주문은 일반 고객 주문 내역이 아니라 체크아웃 화면 또는 고객 문의에서 다룬다.
 - 공급처 발주 상태는 주문 상태와 분리하되, 고객에게 보여줄 주문 상태와 동기화 규칙을 둔다.
 - 주문 상태 변경 이력은 MVP부터 별도 테이블에 기록한다.
 - 주문 상태 변경 이력은 action, guard result, side effect summary를 남긴다.
-- 입금대기, 결제 완료, 결제 예외, 품절, 배송 시작, 배송 완료, 지연 안내, 클레임 상태 변경, 환불 완료는 `NotificationLog`에 기록한다.
+- 입금대기, 결제 완료, 품절, 배송 시작, 배송 완료, 지연 안내, 클레임 상태 변경, 환불 완료는 `NotificationLog`에 기록한다.
 - 관리자 주문 액션은 현재 상태에서 허용된 다음 액션으로만 실행한다.
 - 자동 상태 되돌리기 버튼은 MVP에서 제공하지 않고, 잘못된 상태 변경은 관리자 정정 액션과 이력으로 처리한다.
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유를 필수로 기록한다.

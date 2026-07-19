@@ -69,7 +69,7 @@ Status: Confirmed
 - 공급처 발주 작업 시작, 발주 완료, 품절 액션은 상태 전이를 검증하고 `admin_order_action_histories`에 사유와 전후 상태를 기록한다. Implemented by DS-12.
 - 택배사/송장번호 입력 액션은 `SUPPLIER_ORDERED` 주문에만 허용하고 주문당 shipment 1개만 생성한다. Implemented by DS-13.
 - 취소 클레임 승인/거절은 관리자 권한과 사유를 검증하고 claim review fields를 기록한다. Implemented by DS-14.
-- 환불 PG 취소 요청과 실패 재시도는 관리자 권한 API로만 수행한다. Implemented by DS-15. Refund approval and manual review hardening implemented by DS-38.
+- 환불 승인/거절과 실제 계좌이체 후 수동 환불 완료는 관리자 권한 API로만 수행한다. Implemented by DS-15, DS-38, and B-044. 입금·환불 증적 필수값 강화는 B-068에서 처리한다.
 - 주문 상태 변경은 action 기반으로 제한해야 한다.
 - 주문 상태 변경 이력 테이블이 필요하다. Implemented by DS-36.
 - 주요 관리자 액션 이력 테이블과 관리자 조회 API가 필요하다. Implemented by DS-44.

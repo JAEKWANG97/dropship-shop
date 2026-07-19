@@ -1,5 +1,7 @@
 # QA Report
 
+> Historical QA snapshot. This report records the 2026-06-29 test state and is not a source of truth for current payment or operating policy. See `docs/BACKLOG.md`, `docs/decision-log.md`, and `docs/policies/` for the current policy.
+
 Date: 2026-06-29 KST
 Scope: storefront, auth-aware navigation, checkout entry, admin dashboard/list pages
 

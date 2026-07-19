@@ -133,10 +133,10 @@ GROUP BY status;
 
 - 운영 logging 기본값은 root `INFO`다.
 - Hibernate SQL debug logging은 운영에서 끈다.
-- 결제 secret, 개인정보, raw PG payload는 로그에 남기지 않는다.
+- 입금자명, 입금·환불 계좌정보, 개인정보, 외부 연동 원문은 로그에 남기지 않는다.
 - 현재 CloudWatch alarm은 아직 구성되지 않았다. B-062에서 EC2 status check, CPU credit, memory/swap, container restart, backup freshness 알림을 최소 범위로 연결한다.
 - Sentry와 OpenTelemetry는 실제 장애 분석에 AWS 기본 알림만으로 부족할 때 검토한다.
-- 5xx 급증, payment exception 증가, payment webhook 검증 실패, `REVIEW_REQUIRED` 증가, refund retry 증가, DB connection failure는 운영 알림 대상으로 둔다.
+- 5xx 급증, 장기 입금대기 증가, 입금 불일치 증가, 장기 미완료 환불 증가, DB connection failure는 운영 알림 대상으로 둔다.
 
 ## Error Response Baseline
 
@@ -145,7 +145,7 @@ GROUP BY status;
 - 도메인 정책 또는 상태 전이 guard 위반은 `BUSINESS_RULE_VIOLATION`으로 반환한다.
 - 인증/권한 오류도 같은 JSON 포맷으로 반환한다.
 - 결제/환불/주문 상태 전이 오류는 잘못된 성공 응답으로 숨기지 않는다.
-- 운영 알림은 우선 5xx와 결제/환불 실패 큐 증가를 기준으로 시작한다.
+- 운영 알림은 우선 5xx, 장기 입금대기, 미완료 환불 증가를 기준으로 시작한다.
 
 ## Admin Operating Checklist
 

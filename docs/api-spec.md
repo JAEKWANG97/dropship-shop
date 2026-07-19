@@ -345,10 +345,9 @@ Rules:
 - Checkout create/read responses include `bankTransferDeposit` with bank name, account number, account holder, depositor name, amount, deadline, and cash receipt notice.
 - Policy confirmation is stored separately on the payment group before admin deposit confirmation.
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
-- Customer order history can show PG-approved payment exceptions that need customer-visible processing status.
 - Customer order list and detail are scoped to the authenticated customer.
 - Customer order APIs expose stable status codes. Customer-facing display labels are owned by the frontend.
-- Customer order detail includes payment group summary, payment summary, shipping address, order items, and placeholder fulfillment/shipment/refund summaries.
+- Customer order detail includes payment group summary, payment summary, shipping address, order items, and fulfillment/shipment/refund summaries.
 - Checkout shipping address changes are allowed only while the payment group and its orders are still `PAYMENT_PENDING`.
 - Checkout shipping address changes are rejected after checkout policy confirmation because the confirmation text includes shipping address.
 - Paid order shipping address changes are allowed only while the order is `SUPPLIER_ORDER_PENDING` and both `supplierOrderStartedAt` and `addressLockedAt` are empty.
@@ -555,7 +554,7 @@ Rules:
 Rules:
 
 - Transactional notifications are separate from marketing consent.
-- Payment pending, payment completed, payment exception, out-of-stock, shipment started, delivered, delay notice, claim changed, and refund completed should create notification logs.
+- Payment pending, payment completed, out-of-stock, shipment started, delivered, delay notice, claim changed, and refund completed should create notification logs.
 - B-011 sends transactional notifications through SMS first. Logs start as `PENDING` and become `SENT`, `FAILED`, or `SKIPPED`.
 - `sms.sens.enabled=false` is the default safe fallback and records logs as `SKIPPED`.
 - DS-44 exposes order status history and admin order action history read APIs.

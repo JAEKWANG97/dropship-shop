@@ -75,7 +75,7 @@ docs/backlog-workflow
 
 ```text
 feat: connect admin order actions
-fix: hide checkout actions after payment exception
+fix: validate actual bank-transfer deposit amount
 docs: switch workflow to markdown backlog
 ```
 

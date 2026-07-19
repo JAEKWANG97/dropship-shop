@@ -36,7 +36,7 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 
 ## Current Policy Hardening
 
-- DS-23: payment exception and refund failure policy is reflected in payment, order, refund, domain, and flow docs.
+- DS-23: 과거 PG 결제 예외 정책 이력이다. 현재 실행 경로는 B-067 이후 계좌입금과 수동 환불만 사용한다.
 - DS-24: payment group and delivery-group order refund unit is reflected in payment, order, shipping, refund, legal notice, domain, and flow docs.
 - DS-25: cancellation, return, exchange, and claim policy is reflected in cancellation/refund, legal notice, domain, requirements, and flow docs.
 - DS-26: supplier fulfillment SLA, address lock, shipment unit, and tracking correction policy is reflected in fulfillment, order, admin, domain, requirements, and flow docs.
