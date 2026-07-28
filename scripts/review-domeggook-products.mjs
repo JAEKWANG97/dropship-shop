@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const USER_AGENT =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -10,7 +12,23 @@ const DEFAULT_PRODUCTS_DIR = "tmp/domeggook-products";
 const DEFAULT_REVIEW_JSON = "tmp/domeggook-product-review.json";
 const DEFAULT_REVIEW_CSV = "tmp/domeggook-product-review.csv";
 const DEFAULT_FILTERED_MANIFEST = "tmp/domeggook-import-manifest.filtered.json";
+const DEFAULT_KOSHA_AUDIT = "tmp/domeggook-kosha-cert-audit.json";
 const CATEGORY_FILE = "apps/web/src/lib/categories.ts";
+const KOSHA_CATEGORY_CODES = new Set([
+  "PPE_SAFETY_HELMET",
+  "PPE_SAFETY_SHOES",
+  "PPE_FALL_ARREST_HARNESS",
+  "PPE_SAFETY_BELT",
+  "PPE_SAFETY_GLASSES",
+  "PPE_RESPIRATOR",
+  "PPE_EAR_PROTECTION",
+  "PPE_INSULATED_GLOVES",
+  "PPE_PROTECTIVE_CLOTHING",
+  "SMART_SAFETY_HELMET",
+  "SMART_SAFETY_HARNESS",
+  "FALL_PREVENTION_GUARDRAIL",
+  "WORK_PLATFORM",
+]);
 const DEFAULT_PRICING_POLICY = {
   commissionRate: 5,
   taxBufferRate: 10,
@@ -19,12 +37,28 @@ const DEFAULT_PRICING_POLICY = {
   roundingUnit: 100,
   totalMarkupRate: 25,
 };
+const VERIFIED_KOSHA_STATUSES = new Set([
+  "KOSHA_REGISTRY_MODEL_VERIFIED",
+]);
+const AUTO_NOT_REQUIRED_CATEGORY_CODES = new Set(["BARRIER_TAPE"]);
+const COREABLE_AS_INFO =
+  "A/S 및 상품 문의: 코어블SAF 고객센터 010-8277-7369 / contact@coreable-saf.com / 평일 10:00-18:00";
+const COREABLE_RETURN_EXCHANGE_INFO =
+  "단순 변심 반품·교환은 배송 완료일부터 7일 이내 접수하며 반환 비용은 고객 부담입니다. 하자·오배송은 운영자 부담을 기본으로 하며 자세한 기준은 /policies/cancellation-refund에서 확인할 수 있습니다.";
 
-const CATEGORY_KEYWORD_OVERRIDES = {
+export const CATEGORY_KEYWORD_OVERRIDES = {
   PPE_SAFETY_HELMET: ["안전모", "헬멧", "산업용 헬멧", "현장 헬멧"],
   PPE_SAFETY_SHOES: ["안전화", "작업화", "건설화", "안전 신발", "작업 신발"],
   PPE_FALL_ARREST_HARNESS: ["안전대", "추락방지용 안전대", "전체식 안전대"],
-  PPE_SAFETY_BELT: ["안전벨트", "보조벨트"],
+  PPE_SAFETY_BELT: [
+    "안전벨트",
+    "보조벨트",
+    "산업 안전벨트",
+    "작업용 안전벨트",
+    "추락방지 안전벨트",
+    "주상 안전벨트",
+    "안전그네",
+  ],
   PPE_SAFETY_GLASSES: ["보안경", "고글", "보호안경", "보호경"],
   PPE_RESPIRATOR: ["방진마스크", "방독마스크", "분진마스크", "호흡보호구"],
   PPE_EAR_PROTECTION: ["귀마개", "귀덮개", "이어플러그"],
@@ -50,14 +84,14 @@ const CATEGORY_KEYWORD_OVERRIDES = {
   WARNING_LIGHT: ["경광등", "경고등", "점멸등"],
   SIGNAL_BATON: ["신호봉", "유도봉"],
   BARRIER_TAPE: ["안전띠", "차단테이프", "위험테이프"],
-  GAS_DETECTOR: ["가스측정기", "가스감지기"],
-  OXYGEN_METER: ["산소농도측정기", "산소측정기"],
+  GAS_DETECTOR: ["가스측정기", "가스감지기", "가스검지기", "가스누설검지기"],
+  OXYGEN_METER: ["산소농도측정기", "산소측정기", "산소 측정기"],
   NOISE_METER: ["소음측정기", "소음계", "데시벨측정기"],
   LIGHT_METER: ["조도측정기", "조도계"],
   ANEMOMETER: ["풍속계", "풍속측정기"],
   DUST_METER: ["분진측정기", "분진계"],
   VIBRATION_METER: ["진동측정기", "진동계"],
-  THERMAL_CAMERA_INSPECTION: ["열화상카메라", "열감지 카메라"],
+  THERMAL_CAMERA_INSPECTION: ["열화상카메라", "열화상 카메라", "열감지 카메라"],
   FIRST_AID_KIT: ["구급함", "구급상자"],
   FIRST_AID_SUPPLIES: ["응급처치용품", "응급처치 키트"],
   AED: ["AED", "자동심장충격기"],
@@ -90,7 +124,7 @@ const CATEGORY_KEYWORD_OVERRIDES = {
   WORKER_SOS_EMERGENCY_CALL: ["SOS 비상호출", "비상호출 시스템"],
   HEAVY_EQUIPMENT_PROXIMITY_ALARM: ["중장비 접근경보", "접근경보장치"],
   HEAVY_EQUIPMENT_COLLISION_PREVENTION: ["충돌방지장치", "중장비 충돌방지"],
-  HEAVY_EQUIPMENT_REAR_DETECTOR: ["후방감지장치", "후방감지"],
+  HEAVY_EQUIPMENT_REAR_DETECTOR: ["후방감지장치", "후방감지", "후방 감지기", "후방센서", "백부저"],
   HEAVY_EQUIPMENT_PINCH_PREVENTION: ["협착방지장치", "협착방지"],
   CRANE_PROXIMITY_ALARM: ["크레인 접근경보", "크레인 경보"],
   OPENING_PROXIMITY_ALARM: ["개구부 접근경보", "개구부 경보"],
@@ -104,7 +138,7 @@ const CATEGORY_KEYWORD_OVERRIDES = {
   IOT_ANEMOMETER: ["IoT 풍속계"],
 };
 
-const NON_SAFETY_KEYWORDS = [
+export const NON_SAFETY_KEYWORDS = [
   "완구",
   "장난감",
   "키링",
@@ -120,22 +154,33 @@ const NON_SAFETY_KEYWORDS = [
   "캠핑",
   "반려동물",
   "애견",
+  "도어벨",
+  "홈캠",
   "주방",
   "욕실",
 ];
 
-const CUSTOMER_EXPOSURE_KEYWORDS = ["도매꾹", "도매매"];
-const REVIEW_KEYWORDS = [
-  "3M",
-  "DUPONT",
-  "OTOS",
+export const CUSTOMER_EXPOSURE_KEYWORDS = ["도매꾹", "도매매"];
+export const NON_COMPLETE_PRODUCT_KEYWORDS = [
+  "악세사리",
+  "액세서리",
+  "교체용",
+  "리필",
+  "호환",
+  "부속품",
+  "부품",
+  "거치대",
+  "스티커",
+  "보호필름",
+];
+export const CATEGORY_NON_COMPLETE_PRODUCT_KEYWORDS = {
+  PPE_SAFETY_HELMET: ["내피", "턱끈", "햇빛가리개", "땀받이", "패드", "헤드랜턴", "헬멧랜턴"],
+};
+export const REVIEW_KEYWORDS = [
   "판촉",
   "사은품",
   "기념품",
-  "인쇄",
   "로고",
-  "정품",
-  "브랜드",
   "벌초",
   "예초기",
   "산림",
@@ -143,42 +188,19 @@ const REVIEW_KEYWORDS = [
   "양봉",
   "휠체어",
   "억제대",
-  "층간소음",
-  "생활소음",
   "발렛파킹",
-  "주차금지",
-  "호환",
-  "리필",
-  "교체용",
-  "부속",
-  "부품",
-  "패드",
-  "내피",
-  "턱끈",
-  "햇빛가리개",
-  "그늘막",
-  "차광막",
-  "차양",
-  "땀받이",
-  "쿨링",
-  "아이스젤",
-  "헤드랜턴",
-  "랜턴",
-  "커버",
-  "케이스",
-  "거치대",
-  "스티커",
-  "필름",
-  "끈",
 ];
+export const CUSTOM_OPTION_KEYWORDS = ["주문인쇄", "맞춤", "로고", "문구선택", "시안"];
 
 function usage() {
   console.log(`Usage:
   node scripts/review-domeggook-products.mjs
   node scripts/review-domeggook-products.mjs --api http://localhost:8080 --cookie-file tmp/admin-cookie.txt
+  node scripts/review-domeggook-products.mjs --self-check
 
 Options:
   --products-dir tmp/domeggook-products
+  --kosha-audit tmp/domeggook-kosha-cert-audit.json
   --api http://localhost:8080
   --cookie "ACCESS_TOKEN=..."
   --cookie-file tmp/admin-cookie.txt
@@ -199,8 +221,10 @@ function numberArg(argv, name, fallback) {
 
 function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
+  if (argv.includes("--self-check")) return { selfCheck: true };
   return {
     productsDir: argValue(argv, "--products-dir", DEFAULT_PRODUCTS_DIR),
+    koshaAudit: argValue(argv, "--kosha-audit", DEFAULT_KOSHA_AUDIT),
     api: argValue(argv, "--api", DEFAULT_API),
     cookie: argValue(argv, "--cookie"),
     cookieFile: argValue(argv, "--cookie-file"),
@@ -208,6 +232,22 @@ function parseArgs(argv) {
     shippingConcurrency: numberArg(argv, "--shipping-concurrency", 4),
     fetchShipping: !argv.includes("--no-fetch-shipping"),
   };
+}
+
+export function koshaCollectionGate(categoryCode, audit) {
+  if (!KOSHA_CATEGORY_CODES.has(categoryCode)) {
+    return { hardReason: "", status: "NOT_APPLICABLE" };
+  }
+  if (!audit || audit.categoryCode !== categoryCode) {
+    return { hardReason: "", status: "MISSING" };
+  }
+  if (audit.status === "NOT_APPLICABLE") {
+    return { hardReason: "", status: "MISSING" };
+  }
+  if (audit.collectionDecision === "EXCLUDE") {
+    return { hardReason: "KOSHA_COLLECTION_EXCLUDED", status: audit.status };
+  }
+  return { hardReason: "", status: audit.status };
 }
 
 function htmlDecode(value) {
@@ -284,11 +324,42 @@ function summaryFor(product) {
     product.minOrderQuantityText,
     product.origin ? `원산지 ${product.origin}` : "",
     product.manufacturer ? `제조사 ${product.manufacturer}` : "",
-    "인증/KC 및 상품고시 검수 필요",
   ].filter(Boolean).join(" / "));
 }
 
-function readCategoryDefinitions() {
+export function complianceStatusFor(product, categoryCode, koshaStatus) {
+  if (VERIFIED_KOSHA_STATUSES.has(koshaStatus)) return "VERIFIED";
+  if (
+    koshaStatus === "NOT_APPLICABLE"
+    && (
+      AUTO_NOT_REQUIRED_CATEGORY_CODES.has(categoryCode)
+      || /(?:인증|허가|KC).{0,12}(?:미대상|비대상|해당\s*없음)|해당\s*사항?\s*없음/i.test(sourceCertificationText(product))
+    )
+  ) return "NOT_REQUIRED";
+  return "PENDING";
+}
+
+function sourceCertificationText(product) {
+  const item = (product.productInfoDuty?.item || []).find((entry) => /인증|허가/.test(entry.name || ""));
+  return cleanText(item?.desc || "");
+}
+
+function productInfoNoticeFor(product, complianceStatus, audit) {
+  const certificationNumbers = Array.isArray(audit?.certificationNumbers)
+    ? audit.certificationNumbers.filter(Boolean)
+    : [];
+  const certification = complianceStatus === "VERIFIED" && certificationNumbers.length
+    ? `KOSHA 인증번호 ${certificationNumbers.join(", ")}`
+    : sourceCertificationText(product) || (complianceStatus === "NOT_REQUIRED" ? "해당 없음" : "상품 상세 설명 참조");
+  return [
+    `품명 및 모델명: ${cleanText(product.title)}`,
+    `제조국 또는 원산지: ${cleanText(product.origin) || "상품 상세 설명 참조"}`,
+    `제조사: ${cleanText(product.manufacturer) || "상품 상세 설명 참조"}`,
+    `인증·허가 사항: ${certification}`,
+  ].join("\n");
+}
+
+export function readCategoryDefinitions() {
   const text = existsSync(CATEGORY_FILE) ? readFileSync(CATEGORY_FILE, "utf8") : "";
   return [...text.matchAll(/\["([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)"\]/g)]
     .map(([, group, subgroup, code, label]) => ({
@@ -304,7 +375,7 @@ function readCategoryDefinitions() {
     }));
 }
 
-function scoreCategory(product, categories) {
+export function scoreCategory(product, categories) {
   const optionNames = (product.options || []).map((option) => option.name).join(" ");
   const source = normalize(`${product.title || ""} ${optionNames}`);
   const scored = categories.map((category) => {
@@ -331,6 +402,77 @@ function scoreCategory(product, categories) {
     confidence: highConfidence ? "HIGH" : best.score >= 3 ? "LOW" : "NONE",
     candidateCode: best.code,
     candidateLabel: best.label,
+  };
+}
+
+function firstKeywordIndex(source, keywords) {
+  return keywords.reduce((first, keyword) => {
+    const index = source.indexOf(normalize(keyword));
+    return index === -1 ? first : Math.min(first, index);
+  }, Number.POSITIVE_INFINITY);
+}
+
+function businessCategoryCode(product, scored) {
+  const source = normalize(`${product.title || ""} ${(product.options || []).map((option) => option.name).join(" ")}`);
+  const pair = new Set([product.collectionCategoryCode, scored.code].filter(Boolean));
+
+  if (pair.has("OXYGEN_METER") && pair.has("GAS_DETECTOR") && /산소|o2/.test(source)) {
+    return "OXYGEN_METER";
+  }
+  if (pair.has("OPENING_COVER") && pair.has("FALL_PREVENTION_NET") && /개구부.{0,6}덮개|철제덮개/.test(source)) {
+    return "OPENING_COVER";
+  }
+  if (pair.has("FIRST_AID_SUPPLIES") && pair.has("FIRST_AID_KIT") && /구급함|구급상자|응급처치키트|구급약.{0,4}파우치|약보관함/.test(source)) {
+    return "FIRST_AID_KIT";
+  }
+  if (pair.has("BARRICADE") && pair.has("SAFETY_FENCE")) {
+    return /바리케이드|바리케이트/.test(source) ? "BARRICADE" : "SAFETY_FENCE";
+  }
+  if (pair.has("PPE_FALL_ARREST_HARNESS") && pair.has("PPE_SAFETY_BELT")) {
+    const harnessIndex = firstKeywordIndex(source, ["전신하네스", "전체식", "상체식", "그네식", "하네스"]);
+    const beltIndex = firstKeywordIndex(source, ["주상용", "주상안전", "허리벨트", "둔부", "벨트형"]);
+    if (Number.isFinite(harnessIndex) || Number.isFinite(beltIndex)) {
+      return harnessIndex <= beltIndex ? "PPE_FALL_ARREST_HARNESS" : "PPE_SAFETY_BELT";
+    }
+  }
+  return "";
+}
+
+export function resolveReviewCategory(product, categories) {
+  const scored = scoreCategory(product, categories);
+  const collected = categories.find((category) => category.code === product.collectionCategoryCode);
+  if (!collected) return { ...scored, resolution: "SCORED" };
+
+  const ruledCode = businessCategoryCode(product, scored);
+  if (ruledCode) {
+    const ruled = categories.find((category) => category.code === ruledCode);
+    return {
+      ...scored,
+      code: ruled.code,
+      label: ruled.label,
+      confidence: "HIGH",
+      resolution: "BUSINESS_RULE",
+      collectedCode: collected.code,
+    };
+  }
+
+  const source = normalize(`${product.title || ""} ${(product.options || []).map((option) => option.name).join(" ")}`);
+  const matchedKeywords = collected.keywords.filter((keyword) => {
+    const normalizedKeyword = normalize(keyword);
+    return normalizedKeyword && source.includes(normalizedKeyword);
+  });
+  if (!matchedKeywords.length) return { ...scored, resolution: "SCORED" };
+  if (scored.code && scored.code !== collected.code) {
+    return { ...scored, resolution: "CATEGORY_CONFLICT", collectedCode: collected.code };
+  }
+
+  return {
+    ...scored,
+    code: collected.code,
+    label: collected.label,
+    confidence: "HIGH",
+    resolution: "COLLECTION_TARGET",
+    matchedKeywords,
   };
 }
 
@@ -449,6 +591,14 @@ function normalizeOptions(options) {
   }));
 }
 
+export function stopCustomOptions(options) {
+  return options.map((option) => (
+    hasAny(option.name, CUSTOM_OPTION_KEYWORDS).length
+      ? { ...option, status: "STOPPED" }
+      : option
+  ));
+}
+
 function manifestOptionsFor(sourcePrice, basePrice, options, policy) {
   return options.map((option) => {
     const sourceOptionPrice = sourcePrice + Number(option.sourceAdditionalPrice || 0);
@@ -470,44 +620,65 @@ async function reviewProduct(entry, context) {
   const { product, productFile } = entry;
   const title = String(product.title || "");
   const options = normalizeOptions(product.options);
-  const activeOptions = options.filter((option) => option.status === "ACTIVE");
+  const saleOptions = stopCustomOptions(options);
+  const customOptionCount = saleOptions.filter((option, index) => option.status !== options[index].status).length;
+  const activeOptions = saleOptions.filter((option) => option.status === "ACTIVE");
   const sourcePrice = parsePrice(product.priceText);
   const minOrderQuantity = parseQuantity(product.minOrderQuantityText);
   const detailImagePaths = Array.isArray(product.detailImagePaths) ? product.detailImagePaths : [];
-  const category = scoreCategory(product, context.categories);
+  const category = resolveReviewCategory(product, context.categories);
   const shipping = await shippingInfoFor(product, context.fetchShipping);
   const thumbnailSize = await fileSize(product.thumbnailImagePath);
   const detailSizes = await Promise.all(detailImagePaths.map(fileSize));
   const hardReasons = [];
-  const reviewReasons = [];
-  const textForKeyword = `${title} ${(options || []).map((option) => option.name).join(" ")}`;
+  const categoryResolved = ["COLLECTION_TARGET", "BUSINESS_RULE"].includes(category.resolution);
+  const reviewReasons = (Array.isArray(product.collectionReviewReasons)
+    ? [...product.collectionReviewReasons]
+    : [])
+    .filter((reason) => (
+      reason !== "DOMAIN_OR_CUSTOM_PRODUCT_SUSPECT"
+      && reason !== "OPTION_COUNT_GT_20"
+      && (!categoryResolved || !["CATEGORY_AMBIGUOUS", "CATEGORY_LOW_CONFIDENCE"].includes(reason))
+    ));
+  const textForKeyword = `${title} ${saleOptions.filter((option) => option.status !== "STOPPED").map((option) => option.name).join(" ")}`;
+  const koshaAudit = context.koshaAudit.get(String(product.itemNo));
+  const koshaGate = koshaCollectionGate(category.code, koshaAudit);
 
   if (!sourcePrice) hardReasons.push("PRICE_MISSING");
+  if (product.sourceStatus === "NOT_FOUND") hardReasons.push("SOURCE_ITEM_UNAVAILABLE");
   if (!String(product.imageUsage || "").includes("허용")) hardReasons.push("IMAGE_USAGE_NOT_ALLOWED");
-  if (activeOptions.length === 0) hardReasons.push("NO_ACTIVE_OPTIONS");
+  if (activeOptions.length === 0) {
+    hardReasons.push(customOptionCount === options.length ? "CUSTOM_OPTIONS_ONLY" : "NO_ACTIVE_OPTIONS");
+  }
   if (detailImagePaths.length === 0) hardReasons.push("DETAIL_IMAGE_MISSING");
   if (!product.thumbnailImagePath || thumbnailSize === 0) hardReasons.push("THUMBNAIL_MISSING");
   if (hasAny(textForKeyword, CUSTOMER_EXPOSURE_KEYWORDS).length) hardReasons.push("CUSTOMER_EXPOSURE_KEYWORD");
   if (hasAny(textForKeyword, NON_SAFETY_KEYWORDS).length) hardReasons.push("NON_SAFETY_KEYWORD");
+  if (
+    hasAny(textForKeyword, NON_COMPLETE_PRODUCT_KEYWORDS).length
+    || hasAny(textForKeyword, CATEGORY_NON_COMPLETE_PRODUCT_KEYWORDS[category.code] || []).length
+  ) {
+    hardReasons.push("NON_COMPLETE_PRODUCT");
+  }
   if (context.existingProductNames.has(title)) hardReasons.push("DUPLICATE_NAME");
+  if (koshaGate.hardReason) hardReasons.push(koshaGate.hardReason);
 
   if (category.confidence !== "HIGH") reviewReasons.push("CATEGORY_LOW_CONFIDENCE");
-  if (minOrderQuantity > 1) reviewReasons.push("MIN_ORDER_QUANTITY_GT_1");
+  if (minOrderQuantity > 1) hardReasons.push("MIN_ORDER_QUANTITY_GT_1");
   if (!shipping.known) reviewReasons.push("SHIPPING_FEE_MISSING");
-  if (shipping.conditional) reviewReasons.push("SHIPPING_FEE_CONDITIONAL");
-  if (options.length > 20) reviewReasons.push("OPTION_COUNT_GT_20");
+  if (shipping.conditional) hardReasons.push("SHIPPING_FEE_CONDITIONAL");
   if (!String(product.origin || "").trim() || !String(product.manufacturer || "").trim()) reviewReasons.push("ORIGIN_OR_MANUFACTURER_MISSING");
-  if (thumbnailSize > 0 && thumbnailSize < 15_000) reviewReasons.push("THUMBNAIL_QUALITY_SUSPECT");
-  if (detailSizes.some((size) => size > 0 && size < 30_000)) reviewReasons.push("DETAIL_IMAGE_QUALITY_SUSPECT");
-  if (hasAny(textForKeyword, REVIEW_KEYWORDS).length) reviewReasons.push("BRAND_PROMO_ACCESSORY_SUSPECT");
+  if (hasAny(textForKeyword, REVIEW_KEYWORDS).length) reviewReasons.push("DOMAIN_OR_CUSTOM_PRODUCT_SUSPECT");
 
   const effectiveSourcePrice = shipping.known ? sourcePrice + Number(shipping.fee || 0) : null;
   const calculatedBasePrice = effectiveSourcePrice ? calculateBasePrice(effectiveSourcePrice, context.policy) : null;
-  const decision = hardReasons.length ? "EXCLUDE" : reviewReasons.length ? "REVIEW" : "IMPORT";
-  const reasonCodes = [...hardReasons, ...reviewReasons];
+  const reasonCodes = [...new Set([...hardReasons, ...reviewReasons])];
+  const decision = reasonCodes.length ? "EXCLUDE" : "IMPORT";
+  const complianceStatus = complianceStatusFor(product, category.code, koshaGate.status);
+  const status = decision === "IMPORT" && complianceStatus !== "REJECTED" ? "ACTIVE" : "HIDDEN";
   const manifestOptions = effectiveSourcePrice && calculatedBasePrice
-    ? manifestOptionsFor(effectiveSourcePrice, calculatedBasePrice, options, context.policy)
-    : manifestOptionsFor(sourcePrice, calculateBasePrice(sourcePrice, context.policy), options, context.policy);
+    ? manifestOptionsFor(effectiveSourcePrice, calculatedBasePrice, saleOptions, context.policy)
+    : manifestOptionsFor(sourcePrice, calculateBasePrice(sourcePrice, context.policy), saleOptions, context.policy);
 
   return {
     itemNo: product.itemNo,
@@ -517,6 +688,11 @@ async function reviewProduct(entry, context) {
     reasonCodes,
     categoryCode: category.code,
     categoryConfidence: category,
+    categoryResolution: category.resolution,
+    collectionCategoryCode: product.collectionCategoryCode || "",
+    collectionCategoryLabel: product.collectionCategoryLabel || "",
+    sourceCategoryCode: product.sourceCategoryCode || "",
+    sourceCategoryPath: product.sourceCategoryPath || "",
     sourcePrice,
     shippingFee: shipping.fee,
     shippingFeeKnown: shipping.known,
@@ -528,6 +704,16 @@ async function reviewProduct(entry, context) {
     minOrderQuantity,
     optionCount: options.length,
     activeOptionCount: activeOptions.length,
+    customOptionCount,
+    sellerReviewCount: Number(product.sellerReviewCount),
+    sellerSatisfaction: product.sellerSatisfaction !== null
+      && product.sellerSatisfaction !== undefined
+      && product.sellerSatisfaction !== ""
+      && Number.isFinite(Number(product.sellerSatisfaction))
+      ? Number(product.sellerSatisfaction)
+      : null,
+    koshaAuditStatus: koshaGate.status,
+    koshaCollectionDecision: context.koshaAudit.get(String(product.itemNo))?.collectionDecision || "",
     detailImageCount: detailImagePaths.length,
     thumbnailSize,
     minDetailImageSize: detailSizes.length ? Math.min(...detailSizes) : 0,
@@ -539,7 +725,8 @@ async function reviewProduct(entry, context) {
       reasonCodes,
       productFile,
       categoryCode: decision === "IMPORT" ? category.code : "",
-      status: "HIDDEN",
+      status,
+      complianceStatus,
       name: title,
       summary: summaryFor(product),
       sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
@@ -547,13 +734,13 @@ async function reviewProduct(entry, context) {
       basePrice: calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
       options: manifestOptions,
       supplierName: product.sellerName || "외부 공급처",
-      productInfoNotice: "",
+      productInfoNotice: productInfoNoticeFor(product, complianceStatus, koshaAudit),
       shippingInfo: shipping.known
         ? `배송비 포함 가격입니다. 공급처 기본 배송비 ${Number(shipping.fee || 0).toLocaleString("ko-KR")}원을 원가에 반영했습니다.`
         : "",
-      asInfo: "",
-      returnExchangeInfo: "",
-      memo: `B-054 review=${decision}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; ACTIVE 전환 전 인증/KC, 상품고시, 이미지 품질 확인`,
+      asInfo: COREABLE_AS_INFO,
+      returnExchangeInfo: COREABLE_RETURN_EXCHANGE_INFO,
+      memo: `B-054 review=${decision}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; KOSHA=${koshaGate.status}; compliance=${complianceStatus}; target=${status}`,
     },
   };
 }
@@ -601,10 +788,30 @@ async function loadPricingPolicy(args) {
 async function loadExistingProductNames(args) {
   try {
     if (!(await cookieHeader(args))) return new Set();
-    const products = await apiFetch(args, "/api/admin/products");
-    return new Set((Array.isArray(products) ? products : []).map((product) => product.name).filter(Boolean));
+    const names = new Set();
+    let page = 0;
+    let totalPages = 1;
+    do {
+      const response = await apiFetch(args, `/api/admin/products?page=${page}&size=100`);
+      const products = Array.isArray(response) ? response : response.products || [];
+      for (const product of products) {
+        if (product.name) names.add(product.name);
+      }
+      totalPages = Array.isArray(response) ? 1 : Number(response.totalPages || 0);
+      page += 1;
+    } while (page < totalPages);
+    return names;
   } catch {
     return new Set();
+  }
+}
+
+async function loadKoshaAudit(file) {
+  try {
+    const audit = JSON.parse(await readFile(file, "utf8"));
+    return new Map((audit.items || []).map((item) => [String(item.itemNo), item]));
+  } catch {
+    return new Map();
   }
 }
 
@@ -613,8 +820,11 @@ function reviewCsv(items) {
     "itemNo",
     "decision",
     "reasonCodes",
+    "collectionCategoryCode",
     "categoryCode",
     "categoryConfidence",
+    "categoryResolution",
+    "sourceCategoryPath",
     "sourcePrice",
     "shippingFee",
     "effectiveSourcePrice",
@@ -622,7 +832,11 @@ function reviewCsv(items) {
     "minOrderQuantity",
     "optionCount",
     "activeOptionCount",
+    "sellerReviewCount",
+    "sellerSatisfaction",
     "detailImageCount",
+    "koshaAuditStatus",
+    "koshaCollectionDecision",
     "name",
   ];
   const rows = items.map((item) => headers.map((header) => {
@@ -636,7 +850,6 @@ function summarize(items) {
   const summary = {
     total: items.length,
     import: items.filter((item) => item.decision === "IMPORT").length,
-    review: items.filter((item) => item.decision === "REVIEW").length,
     exclude: items.filter((item) => item.decision === "EXCLUDE").length,
     reasonCounts: {},
   };
@@ -651,6 +864,40 @@ function summarize(items) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return usage();
+  if (args.selfCheck) {
+    assert.equal(koshaCollectionGate("TRAFFIC_CONE").status, "NOT_APPLICABLE");
+    assert.equal(koshaCollectionGate("PPE_SAFETY_HELMET").hardReason, "");
+    assert.equal(koshaCollectionGate("WORK_PLATFORM", {
+      categoryCode: "WORK_PLATFORM",
+      status: "NOT_APPLICABLE",
+      collectionDecision: "ALLOW",
+    }).status, "MISSING");
+    assert.equal(koshaCollectionGate("PPE_SAFETY_HELMET", {
+      categoryCode: "PPE_SAFETY_HELMET",
+      status: "KOSHA_REGISTRY_MODEL_VERIFIED",
+      collectionDecision: "ALLOW",
+    }).hardReason, "");
+    assert.equal(koshaCollectionGate("PPE_SAFETY_HELMET", {
+      categoryCode: "PPE_SAFETY_HELMET",
+      status: "OUT_OF_SCOPE_LIGHT_DUTY_HEADGEAR",
+      collectionDecision: "EXCLUDE",
+    }).hardReason, "KOSHA_COLLECTION_EXCLUDED");
+    assert.equal(complianceStatusFor({}, "BARRIER_TAPE", "NOT_APPLICABLE"), "NOT_REQUIRED");
+    assert.equal(complianceStatusFor({
+      productInfoDuty: { item: [{ name: "인증·허가 사항", desc: "KC 인증 미대상 품목" }] },
+    }, "HEAVY_EQUIPMENT_REAR_DETECTOR", "NOT_APPLICABLE"), "NOT_REQUIRED");
+    assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "KOSHA_REGISTRY_MODEL_VERIFIED"), "VERIFIED");
+    assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "KOSHA_REGISTRY_VERIFIED"), "PENDING");
+    assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "SOURCE_EVIDENCE_MISSING"), "PENDING");
+    assert.match(productInfoNoticeFor({
+      title: "안전용품",
+      origin: "대한민국",
+      manufacturer: "코어블",
+      productInfoDuty: { item: [{ name: "인증·허가 사항", desc: "해당 없음" }] },
+    }, "NOT_REQUIRED"), /품명 및 모델명: 안전용품/);
+    console.log("Domeggook product review self-check passed");
+    return;
+  }
 
   const categories = readCategoryDefinitions();
   if (categories.length !== 81) {
@@ -660,22 +907,24 @@ async function main() {
   let entries = await readCollectedProducts(args.productsDir);
   if (args.limit) entries = entries.slice(0, args.limit);
 
-  const [policy, existingProductNames] = await Promise.all([
+  const [policy, existingProductNames, koshaAudit] = await Promise.all([
     loadPricingPolicy(args),
     loadExistingProductNames(args),
+    loadKoshaAudit(args.koshaAudit),
   ]);
   const context = {
     categories,
     fetchShipping: args.fetchShipping,
     policy,
     existingProductNames,
+    koshaAudit,
   };
 
   const reviewed = await mapLimit(entries, args.shippingConcurrency, (entry) => reviewProduct(entry, context));
   const summary = summarize(reviewed);
   const manifest = {
     generatedAt: new Date().toISOString(),
-    source: "B-054 domeggook product review",
+    source: "B-054 domeggook product selection",
     summary,
     items: reviewed.map((item) => item.manifestItem),
   };
@@ -689,13 +938,15 @@ async function main() {
   await writeFile(DEFAULT_REVIEW_CSV, reviewCsv(reviewed));
   await writeFile(DEFAULT_FILTERED_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
 
-  console.log(`review 완료: total=${summary.total}, IMPORT=${summary.import}, REVIEW=${summary.review}, EXCLUDE=${summary.exclude}`);
+  console.log(`선별 완료: total=${summary.total}, IMPORT=${summary.import}, EXCLUDE=${summary.exclude}`);
   console.log(`- ${DEFAULT_REVIEW_JSON}`);
   console.log(`- ${DEFAULT_REVIEW_CSV}`);
   console.log(`- ${DEFAULT_FILTERED_MANIFEST}`);
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

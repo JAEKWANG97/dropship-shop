@@ -183,6 +183,7 @@ Suggested fields:
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
 - complianceStatus: PENDING / NOT_REQUIRED / VERIFIED / REJECTED
+- `PENDING`은 운영 참고 상태이며 판매를 차단하지 않는다. `REJECTED`만 판매 준비 실패로 처리한다.
 - thumbnailImageUrl: optional denormalized cache of the thumbnail `ProductImage`
 - createdAt
 - updatedAt

@@ -1,5 +1,146 @@
 # Decision Log
 
+## 2026-07-27: Collected Products Activate Only After Automated Evidence Completion
+
+Decision:
+
+Generate product notice and operating-policy fields during collection review, derive compliance from explicit evidence, and activate eligible imports automatically only after every required resource has been stored.
+
+Context:
+
+The filtered manifest previously hardcoded every import as `HIDDEN`, so even deterministic non-certification items required a person to repeat notice entry, compliance selection, and status transition. Direct `ACTIVE` creation is intentionally blocked by B-056.
+
+Consequences:
+
+- The importer always creates `HIDDEN`, then stores options, thumbnail, detail images, notice, and compliance before requesting `ACTIVE` as its last operation.
+- Only an exact official KOSHA model match becomes `VERIFIED`; an exact number without model evidence remains `PENDING`.
+- `NOT_REQUIRED` requires explicit source evidence or a maintained simple-product rule. A broad category inference is not sufficient.
+- Missing or unresolved evidence remains `HIDDEN` automatically; it does not create a manual review queue.
+- Work platforms and prefabricated safety rails are included in temporary-equipment compliance scope.
+
+## 2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit
+
+Decision:
+
+Keep customer payment as direct bank transfer with admin confirmation. After confirmation, create and pay the supplier order through the approved Domeggook Private API using prefunded e-money.
+
+Context:
+
+The Domeggook `setOrder` API creates a paid order using e-money already held by the Coreable SAF operator account. It does not collect the customer's payment and does not replace the customer-facing purchase-safety requirement.
+
+Consequences:
+
+- Customer deposit evidence and Domeggook supplier payment are separate money records.
+- Only deposit-confirmed shipping-group orders can trigger supplier ordering.
+- Product status, option, quantity, source price, and supplier shipping fee are revalidated immediately before ordering.
+- External timeout is reconciled against Domeggook purchase orders before retrying; blind retries are prohibited.
+- Domeggook order number, actual supplier payment, e-money balance failure, cancellation, carrier, and tracking number are retained as operational evidence.
+- Customer bank refund completion remains separate from Domeggook purchase cancellation or e-money return.
+- Recipient data disclosure to the supplier and carrier must be reflected in the privacy policy.
+- This work is tracked by B-072.
+
+## 2026-07-27: Collected Products Require Established Seller Feedback
+
+Decision:
+
+Automatically selected products require at least 10 seller purchase reviews from the latest 180 days and seller satisfaction of at least 90%. Missing or lower seller feedback produces `EXCLUDE`; it never creates a manual review queue.
+
+Context:
+
+The Domeggook product-list API has no purchase-review sort or product-specific review count. Product detail exposes only seller-level `seller.score.cnt` and `seller.score.avg`. Ranking results also include accessories, so seller feedback is applied only after complete-product, category, shipping, option, and image rules.
+
+Consequences:
+
+- Existing collected products receive seller feedback through metadata-only backfill without downloading images again.
+- New Open API collection stores the same seller feedback fields.
+- `IMPORT` and `EXCLUDE` remain the only collection decisions.
+- Seller feedback proves supplier activity, not product-specific customer satisfaction.
+
+## 2026-07-26: Collected PPE Requires Official KOSHA Number And Model Match
+
+Decision:
+
+For collected protective equipment, treat source-page certification text as evidence to verify, not a collection prerequisite. Collect otherwise valid products as `HIDDEN` with compliance `PENDING`; verify the exact certification number and model before activation.
+
+Context:
+
+Supplier detail images may omit certification data, contain unrelated KC or radio certificates, or show certificates for a neighboring model. Missing evidence alone does not prove that a product is uncertified. Some light-duty headgear explicitly states that it is not KCS-certified and must not be used at hazardous worksites.
+
+Consequences:
+
+- Products without verifiable KOSHA evidence may enter the import manifest but cannot be activated.
+- Light-duty headgear with a non-KCS warning is excluded from the industrial safety-helmet catalog.
+- A cancelled registration or exact official-registry mismatch excludes the product from collection.
+- The B-054 selection consumes the certification audit as metadata; missing evidence does not remove a popular product candidate.
+- Collection uses only `IMPORT` and `EXCLUDE`; every unresolved condition is an exclusion reason rather than a manual review queue.
+- `DATA_GO_KR_SERVICE_KEY_DECODED` and `DATA_GO_KR_SERVICE_KEY_ENCODED` are used locally for the official protective-equipment certification API and are never committed. The decoded key is preferred and the encoded key is retained only as an authentication fallback.
+
+## 2026-07-25: Collected Category Uses Target With Explicit Product Evidence
+
+Decision:
+
+Treat the supplier category as reference metadata, not authoritative classification. Use the collection target as the product category only when its explicit keyword appears in the product title or options and the classifier does not identify a different high-confidence category.
+
+Context:
+
+Every Open API product includes a supplier category, but valid safety signs and measuring instruments are sometimes registered under design signs or kitchen tools. Using that category alone would discard valid products.
+
+Consequences:
+
+- Explicit collection-target matches can clear category review without another API request.
+- Adjacent categories use deterministic product-form precedence: full-body and harness terms map to fall-arrest harnesses; pole-climbing, waist, hip, and belt-form terms map to safety belts.
+- Barricade wording takes precedence over safety-fence wording, and oxygen, opening-cover, and first-aid-kit terms take precedence over generic neighboring categories.
+- Custom-print, personalized, logo, selectable-text, and proof-required options are imported as `STOPPED`; products without a standard option are excluded.
+- Supplier category code and path remain available as review evidence.
+
+## 2026-07-25: Collected Image Quality Does Not Block Import
+
+Decision:
+
+Do not reject or review collected products based on thumbnail or detail-image file size and resolution. Exclude only products whose required images are missing, fail to download, or are not licensed for use.
+
+Context:
+
+Image quality can be replaced or corrected during product operation, while byte-size thresholds produced many false review items without proving that the image was unusable.
+
+Consequences:
+
+- `THUMBNAIL_QUALITY_SUSPECT` and `DETAIL_IMAGE_QUALITY_SUSPECT` no longer affect collection review.
+- Image presence and image-use permission remain mandatory.
+- Administrators may replace visibly unsuitable images before publishing, but image quality does not block `HIDDEN` import.
+
+## 2026-07-25: Collected Catalog Contains Complete Products Only
+
+Decision:
+
+Only collect complete products that a customer can use without buying or assembling a separate main product. Exclude replacement parts, refills, compatible accessories, mounts, stickers, and protective films. Apply category-specific terms such as internal liners, chin straps, and pads only to the relevant main-product category. A brand name alone is not a review or exclusion reason.
+
+Context:
+
+The previous review rule combined brands, promotional products, and accessories under one reason. It delayed valid branded products while still requiring a person to identify obvious non-complete products.
+
+Consequences:
+
+- Explicit non-complete-product keywords produce `NON_COMPLETE_PRODUCT` and `EXCLUDE`.
+- Brand names such as 3M and DUPONT do not block complete products.
+- Custom-printing and non-industrial-use clues remain review reasons until their sale suitability is confirmed.
+
+## 2026-07-25: Collected Products Require Predictable Supplier Shipping
+
+Decision:
+
+Only collect products with a minimum order quantity of one and either free supplier shipping or a fixed prepaid supplier shipping fee. Exclude quantity-proportional, quantity-tiered, cash-on-delivery, and prepaid-or-cash-on-delivery shipping products.
+
+Context:
+
+Customers are not charged a separate shipping fee, so supplier shipping must be included in the product sale price. Conditional shipping cannot be represented accurately by the current fixed product price when order quantity changes.
+
+Consequences:
+
+- Collection and review classify conditional supplier shipping as `EXCLUDE`, not `REVIEW`.
+- Fixed supplier shipping remains part of `effectiveSourcePrice`; customer-visible shipping remains zero.
+- Supporting conditional shipping later requires an explicit quantity-based pricing or shipping-cost model.
+
 ## 2026-07-14: Product Activation Requires Explicit Sale Readiness
 
 Decision:
@@ -16,6 +157,18 @@ Consequences:
 - Existing products start `PENDING`, and existing `ACTIVE` products move to `HIDDEN` because no prior compliance evidence exists.
 - Activation and mutations that could invalidate an active product use the same backend readiness validation.
 - B-064 may display richer review reasons, but it must reuse this backend rule rather than define a second activation policy.
+
+## 2026-07-28: Pending Certification Does Not Block Product Activation
+
+Decision:
+
+Treat certification review as operational metadata. `PENDING`, `NOT_REQUIRED`, and `VERIFIED` products may be activated when price, thumbnail, active option, and product notice are ready. Only `REJECTED` blocks activation.
+
+Consequences:
+
+- Collection and import no longer keep otherwise sale-ready products `HIDDEN` only because certification review is pending.
+- Certification status remains available to administrators and in product change history.
+- This decision supersedes the certification gating portion of the 2026-07-14 decision.
 
 ## 2026-07-13: Customer Inquiry Consent, Retention, And Reply Channel
 
@@ -1047,3 +1200,19 @@ Consequences:
 - 입금자명과 환불 계좌·거래 메모는 선택한 관리자 주문 상세에만 노출한다. 고객 API, 환불 목록, 알림 로그와 action history에는 복사하지 않는다.
 - `GET /api/admin/actions?orderId=`로 선택한 주문의 작업 이력을 함께 확인한다.
 - 은행 API·가상계좌 자동 대사·자동 환불은 별도 운영 규모와 계약이 필요하므로 이번 범위에서 도입하지 않는다.
+
+## 2026-07-28: Seller Feedback Is Metadata, Not A Catalog Gate
+
+Decision:
+
+도매꾹 판매자 후기 수와 만족도는 수집 상품의 참고 metadata로만 저장하고 자동 수집·공개 제외 기준으로 사용하지 않는다.
+
+Context:
+
+해당 값은 상품별 구매·후기 지표가 아니라 판매자 전체 지표다. 신규 판매자나 판매자 계정이 다른 정상 상품을 대량 제외해 실제 상품 적합성을 판별하는 기준으로 부정확하다.
+
+Consequences:
+
+- 후기 10건 미만, 만족도 90% 미만, 후기 정보 누락만으로 상품을 제외하지 않는다.
+- 가격, 최소구매수량, 고정 배송비, 완제품, 카테고리, 옵션, 이미지 사용 가능 여부는 계속 자동 판정한다.
+- 상품 인기도는 정확한 구매 건수 대신 도매꾹 인기·랭킹순 검색 결과 포함 여부를 참고한다.

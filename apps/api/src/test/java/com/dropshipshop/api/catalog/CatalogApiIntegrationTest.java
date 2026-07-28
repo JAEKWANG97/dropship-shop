@@ -141,7 +141,6 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.saleReady", is(false)))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("THUMBNAIL")))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("PRODUCT_NOTICE")))
-			.andExpect(jsonPath("$.saleBlockers", hasItem("COMPLIANCE")))
 			.andExpect(jsonPath("$.optionCount", is(1)))
 			.andExpect(jsonPath("$.hasThumbnail", is(false)))
 			.andExpect(jsonPath("$.hasProductNotice", is(false)))
@@ -306,8 +305,7 @@ class CatalogApiIntegrationTest {
 					}
 					""".formatted(supplierId)))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.message", containsString("판매가")))
-			.andExpect(jsonPath("$.message", containsString("인증 검수")));
+			.andExpect(jsonPath("$.message", containsString("판매가")));
 
 		mockMvc.perform(get("/api/admin/products/{productId}", productId)
 				.with(authentication(TestAuthentication.admin())))
@@ -500,12 +498,11 @@ class CatalogApiIntegrationTest {
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.saleReady", is(false)))
-			.andExpect(jsonPath("$.saleBlockers", hasSize(5)))
+			.andExpect(jsonPath("$.saleBlockers", hasSize(4)))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("BASE_PRICE")))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("THUMBNAIL")))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("ACTIVE_OPTION")))
-			.andExpect(jsonPath("$.saleBlockers", hasItem("PRODUCT_NOTICE")))
-			.andExpect(jsonPath("$.saleBlockers", hasItem("COMPLIANCE")));
+			.andExpect(jsonPath("$.saleBlockers", hasItem("PRODUCT_NOTICE")));
 
 		mockMvc.perform(patch("/api/admin/products/{productId}/status", idFrom(hiddenProduct))
 				.with(authentication(TestAuthentication.admin()))
@@ -520,8 +517,7 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.message", containsString("판매가")))
 			.andExpect(jsonPath("$.message", containsString("대표 이미지")))
 			.andExpect(jsonPath("$.message", containsString("판매 가능한 옵션")))
-			.andExpect(jsonPath("$.message", containsString("상품 고시")))
-			.andExpect(jsonPath("$.message", containsString("인증 검수")));
+			.andExpect(jsonPath("$.message", containsString("상품 고시")));
 	}
 
 	@Test

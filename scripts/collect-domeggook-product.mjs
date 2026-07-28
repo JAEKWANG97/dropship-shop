@@ -2,84 +2,83 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import {
+  CATEGORY_KEYWORD_OVERRIDES,
+  CUSTOMER_EXPOSURE_KEYWORDS,
+  CATEGORY_NON_COMPLETE_PRODUCT_KEYWORDS,
+  NON_COMPLETE_PRODUCT_KEYWORDS,
+  NON_SAFETY_KEYWORDS,
+  readCategoryDefinitions,
+  resolveReviewCategory,
+  scoreCategory,
+  stopCustomOptions,
+} from "./review-domeggook-products.mjs";
 
 const USER_AGENT =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 const DEFAULT_OUT_DIR = "tmp/domeggook-products";
 const CATEGORY_FILE = "apps/web/src/lib/categories.ts";
 const COVERAGE_OUT_DIR = "tmp/domeggook-category-coverage";
+const OPEN_API_COVERAGE_OUT_DIR = "tmp/domeggook-open-api-coverage";
 const OPTION_BACKFILL_REPORT = "tmp/domeggook-option-backfill-report.json";
-
-const CATEGORY_KEYWORD_OVERRIDES = {
-  PPE_RESPIRATOR: ["방진마스크", "방독마스크", "호흡보호구"],
-  PPE_EAR_PROTECTION: ["귀마개", "귀덮개", "이어플러그"],
-  PPE_PROTECTIVE_CLOTHING: ["보호복", "방호복", "유해물질 보호복"],
-  FALLING_OBJECT_NET: ["낙하물방지망", "낙하방지망"],
-  OPENING_COVER: ["개구부덮개", "개구부 덮개"],
-  LIFELINE: ["생명줄", "수직 생명줄", "수평 생명줄"],
-  DANGER_AREA_BARRIER: ["위험구역 차단시설", "안전 바리케이드"],
-  ACCESS_CONTROL_FACILITY: ["출입통제시설", "출입통제"],
-  BARRIER_TAPE: ["안전띠", "차단테이프"],
-  THERMAL_CAMERA_INSPECTION: ["열화상카메라", "열감지 카메라"],
-  FIRST_AID_SUPPLIES: ["응급처치용품", "응급처치 키트"],
-  AED: ["AED", "자동심장충격기"],
-  EYEWASH_STATION: ["세안기", "눈세척기"],
-  HEAT_COLD_PREVENTION_SUPPLIES: ["온열질환 예방", "냉감용품", "혹한기 용품"],
-  VENTILATION_EQUIPMENT: ["환기설비", "유해작업 환기"],
-  SMART_WATCH: ["스마트워치 낙상감지", "SOS 스마트워치"],
-  SMART_CCTV_AI_VIDEO_ANALYTICS: ["AI 영상분석", "AI CCTV"],
-  SMART_CCTV_AI_SAFETY_MANAGEMENT: ["AI 안전관리 CCTV", "안전관리 CCTV"],
-  SMART_CCTV_AI_HELMET_DETECTION: ["AI 안전모 착용 인식 CCTV", "안전모 인식 CCTV"],
-  SMART_CCTV_AI_VEST_DETECTION: ["AI 안전조끼 착용 인식 CCTV", "안전조끼 인식 CCTV"],
-  SMART_CCTV_AI_DANGER_ZONE_INTRUSION: ["AI 위험구역 침입감지 CCTV", "침입감지 CCTV"],
-  SMART_CCTV_AI_FALL_RISK_DETECTION: ["AI 추락위험 감지 CCTV", "추락 감지 CCTV"],
-  SMART_CCTV_AI_FALLEN_WORKER_DETECTION: ["AI 쓰러짐 감지 CCTV", "낙상 감지 CCTV"],
-  SMART_CCTV_AI_FIRE_SMOKE_DETECTION: ["AI 화재 연기 감지 CCTV", "화재 연기 감지 CCTV"],
-  SMART_CCTV_GENERAL_SPECIAL: ["CCTV", "특수 CCTV"],
-  SMART_CCTV_SOLAR_MOBILE: ["태양광 이동형 CCTV", "태양광 CCTV"],
-  SMART_CCTV_PTZ: ["PTZ CCTV", "회전형 CCTV"],
-  SMART_CCTV_DUAL_SPECTRUM: ["듀얼스펙트럼 CCTV", "열화상 광학 CCTV"],
-  WORKER_LOCATION_ACCESS_MANAGEMENT: ["위치 출입 관리", "작업자 출입관리"],
-  WORKER_LOCATION_TRACKING: ["작업자 위치추적", "UWB 위치추적", "BLE 위치추적", "RFID 위치추적"],
-  WORKER_ACCESS_CONTROL: ["출입관리 시스템", "작업자 출입관리"],
-  WORKER_ELECTRONIC_ACCESS_CONTROL: ["전자출입관리 시스템", "전자 출입관리"],
-  WORKER_SOS_EMERGENCY_CALL: ["SOS 비상호출 시스템", "비상호출 시스템"],
-  HEAVY_EQUIPMENT_PROXIMITY_ALARM: ["중장비 접근경보장치", "접근경보장치"],
-  HEAVY_EQUIPMENT_COLLISION_PREVENTION: ["충돌방지장치", "중장비 충돌방지"],
-  HEAVY_EQUIPMENT_REAR_DETECTOR: ["후방감지장치", "중장비 후방감지"],
-  HEAVY_EQUIPMENT_PINCH_PREVENTION: ["협착방지장치", "중장비 협착방지"],
-  CRANE_PROXIMITY_ALARM: ["크레인 접근경보장치", "크레인 경보장치"],
-  OPENING_PROXIMITY_ALARM: ["개구부 접근경보장치", "개구부 경보장치"],
-  FALL_DETECTION_SYSTEM: ["추락감지 시스템", "추락 감지"],
-  SCAFFOLD_DISPLACEMENT_MONITORING: ["비계 변위 모니터링", "비계 계측"],
-  RETAINING_WALL_MEASUREMENT_SYSTEM: ["흙막이 계측 시스템", "흙막이 계측"],
-  IOT_TEMPERATURE_HUMIDITY_METER: ["IoT 온습도측정기", "IoT 온도 습도 측정기"],
-};
+const SELLER_SCORE_BACKFILL_REPORT = "tmp/domeggook-seller-score-backfill-report.json";
+const OPEN_API_COLLECTOR_VERSION = 4;
+const OPEN_API_DAILY_LIMIT = 5000;
 
 function usage() {
   console.log(`Usage:
   node scripts/collect-domeggook-product.mjs https://mobile.domeggook.com/8667274
   node scripts/collect-domeggook-product.mjs --file tmp/domeggook-urls.txt
   node scripts/collect-domeggook-product.mjs --backfill-options --limit 5
+  node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --fresh
+  node scripts/collect-domeggook-product.mjs --self-check
 
 Output:
   tmp/domeggook-products/{itemNo}/product.json
   tmp/domeggook-products/{itemNo}/product.csv
   tmp/domeggook-products/{itemNo}/images/*
   tmp/domeggook-option-backfill-report.json
-  tmp/domeggook-category-coverage/*`);
+  tmp/domeggook-seller-score-backfill-report.json
+  tmp/domeggook-category-coverage/*
+  tmp/domeggook-open-api-coverage/*`);
 }
 
 function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
+  if (argv.includes("--self-check")) return { selfCheck: true };
+
+  if (argv.includes("--open-api-coverage")) {
+    return {
+      openApiCoverage: true,
+      category: stringArg(argv, "--category"),
+      targetPerCategory: numberArg(argv, "--target-per-category", 10),
+      exactCount: numberArg(argv, "--exact-count", 30),
+      rankingCount: numberArg(argv, "--ranking-count", numberArg(argv, "--popular-count", 30)),
+      maxCategories: numberArg(argv, "--max-categories", 0),
+      delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
+      fresh: argv.includes("--fresh"),
+    };
+  }
 
   if (argv.includes("--backfill-options")) {
     return {
       backfillOptions: true,
       limit: numberArg(argv, "--limit", 0),
       delayMs: numberArg(argv, "--delay-ms", 250),
+    };
+  }
+
+  if (argv.includes("--backfill-seller-score")) {
+    return {
+      backfillSellerScore: true,
+      limit: numberArg(argv, "--limit", 0),
+      delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
+      fresh: argv.includes("--fresh"),
     };
   }
 
@@ -110,6 +109,11 @@ function numberArg(argv, name, fallback) {
   if (index === -1) return fallback;
   const value = Number(argv[index + 1]);
   return Number.isFinite(value) ? value : fallback;
+}
+
+function stringArg(argv, name, fallback = "") {
+  const index = argv.indexOf(name);
+  return index === -1 ? fallback : argv[index + 1] || fallback;
 }
 
 async function readUrls(args) {
@@ -339,6 +343,8 @@ async function writeOutputs(product, dir) {
     "priceText",
     "minOrderQuantityText",
     "sellerName",
+    "sellerReviewCount",
+    "sellerSatisfaction",
     "origin",
     "manufacturer",
     "imageUsage",
@@ -538,6 +544,967 @@ async function searchUrls(keyword) {
   return [...new Set(itemNos)].map((itemNo) => `https://mobile.domeggook.com/${itemNo}`);
 }
 
+const OBVIOUS_ACCESSORY_KEYWORDS = [
+  "악세사리",
+  "액세서리",
+  "교체용",
+  "리필",
+  "부속품",
+  "부품",
+  "내피",
+  "턱끈",
+  "햇빛가리개",
+  "햇빛 가리개",
+  "땀받이",
+  "헤드랜턴",
+  "헬멧랜턴",
+  "보관 케이스",
+  "전용 케이스",
+  "거치대",
+  "스티커",
+  "보호필름",
+];
+
+const CATEGORY_ACCESSORY_KEYWORDS = {
+  PPE_SAFETY_HELMET: [
+    "차양",
+    "썬캡",
+    "그늘이",
+    "햇빛가리개",
+    "귀덮개",
+    "귀마개덮개",
+    "방한패딩",
+    "턱끈",
+    "내피",
+    "땀받이",
+    "쿨링패드",
+    "쿨링 패드",
+    "아이스젤",
+    "헬멧쿨러",
+    "활선접근경보기",
+    "클립",
+    "걸이대",
+    "보관대",
+    "보관함",
+    "안전모외피",
+    "안전모덮개",
+    "헬멧커버",
+    "이름표",
+    "식별표",
+    "아이스팩",
+    "쿨패드",
+    "안면보호구",
+    "보안면",
+    "쉴드",
+    "부착식",
+    "귀보호대",
+    "식별띠",
+    "그늘막",
+    "가이드 LED",
+  ],
+  PPE_SAFETY_SHOES: ["깔창", "인솔", "신발끈", "덧신"],
+  PPE_RESPIRATOR: ["필터", "정화통", "흡수관", "면체부품"],
+  PPE_SAFETY_GLASSES: ["보호필름", "교체렌즈", "보안경렌즈", "안경줄"],
+  SAFETY_FENCE: [
+    "하부베이스",
+    "연결클램프",
+    "파이프클램프",
+    "휀스부속",
+    "펜스부속",
+    "랙보호",
+    "모서리보호",
+  ],
+};
+
+const OPEN_API_REQUIRED_TITLE_KEYWORDS = {
+  PPE_SAFETY_HELMET: ["안전모", "산업용헬멧", "건설헬멧", "현장헬멧", "작업용헬멧"],
+  PPE_SAFETY_SHOES: ["안전화", "산업용작업화", "건설작업화"],
+  PPE_FALL_ARREST_HARNESS: ["안전대", "추락방지하네스", "전체식하네스", "전신하네스"],
+  PPE_SAFETY_BELT: ["산업안전벨트", "작업용안전벨트", "추락방지안전벨트", "주상안전벨트", "안전그네"],
+  PPE_SAFETY_GLASSES: ["보안경", "보호안경", "산업용고글", "작업용고글"],
+  PPE_EAR_PROTECTION: [
+    "산업용귀마개",
+    "작업용귀마개",
+    "산업용귀덮개",
+    "청력보호",
+    "공장용귀마개",
+    "현장용귀마개",
+  ],
+  WORK_PLATFORM: ["작업발판", "작업대", "우마"],
+  OPENING_COVER: ["개구부덮개", "개구부안전덮개", "맨홀커버"],
+  SAFETY_BLOCK: ["안전블록", "안전블럭"],
+  GAS_DETECTOR: ["가스감지기", "가스검지기", "누출감지기", "복합가스측정기", "휴대용가스측정기"],
+  LIGHT_METER: ["조도계", "조명조도", "광량측정", "LUX", "LX"],
+  VIBRATION_METER: ["디지털진동측정기", "휴대용진동측정기", "산업용진동측정기", "진동계", "진동분석기"],
+  EYEWASH_STATION: ["비상세안기", "응급세안기", "산업용세안기", "눈세척기", "아이워시"],
+  ACCESS_CONTROL_FACILITY: ["출입통제시스템", "출입통제게이트", "출입차단기", "턴스타일", "출입리더기", "출입단말기"],
+  WORKER_LOCATION_TRACKING: ["작업자위치추적", "UWB위치추적", "BLE위치추적", "RFID위치추적", "위치추적태그"],
+  SMART_WATCH: ["낙상감지", "SOS스마트워치", "산업용스마트워치", "작업자스마트워치"],
+};
+
+const OPEN_API_DISALLOWED_TITLE_KEYWORDS = {
+  PPE_SAFETY_HELMET: [
+    "오토바이",
+    "바이크",
+    "자전거",
+    "라이딩",
+    "스키",
+    "스노우보드",
+    "도난방지",
+    "자물쇠",
+    "꾸미기",
+    "인형",
+    "이너캡",
+    "헤어밴드",
+  ],
+  PPE_SAFETY_BELT: [
+    "자동차",
+    "차량",
+    "카시트",
+    "유아",
+    "아기",
+    "고정클립",
+    "스토퍼",
+    "안전벨트커버",
+    "안전벨트락",
+  ],
+  PPE_SAFETY_GLASSES: ["수영", "물안경", "오토바이", "바이크", "스키", "스노우보드"],
+  PPE_EAR_PROTECTION: ["이어폰", "헤드폰", "블루투스", "수능", "집중력", "수면", "코골이"],
+  FALL_PREVENTION_GUARDRAIL: [
+    "나무",
+    "목재",
+    "핸드레일",
+    "브라켓",
+    "부속",
+    "복도",
+    "계단",
+    "벽손잡이",
+    "디자인난간",
+  ],
+  FALL_PREVENTION_NET: ["화물차", "트럭", "자동차", "차량", "적재함", "개구부덮개", "배수로"],
+  FALLING_OBJECT_NET: ["화물차", "트럭", "자동차", "차량", "적재함"],
+  WORK_PLATFORM: ["의류매장", "가정용", "화물차", "크레인", "유압", "계단사다리", "발판사다리"],
+  OPENING_COVER: ["타공분진", "집진", "먼지방지", "전동공구"],
+  SAFE_PASSAGE: ["웨빙띠", "폴리스라인", "접근금지", "차단테이프"],
+  LIFELINE: ["안전블록", "안전블럭"],
+  TRAFFIC_CONE: ["축구", "운동", "게임", "어린이", "운동회", "스포츠"],
+  GAS_DETECTOR: ["잔량", "가스통", "저장탱크", "게이지", "탐지제", "점검제", "스프레이"],
+  OXYGEN_METER: ["PH", "산가", "측정종이", "페이퍼", "당도", "전자파"],
+  LIGHT_METER: [
+    "토양",
+    "PH",
+    "토질",
+    "수분측정",
+    "표면조도",
+    "윤곽",
+    "내경",
+    "3차원",
+    "버니어",
+    "캘리퍼스",
+    "링게이지",
+    "당도",
+    "알코올",
+  ],
+  VIBRATION_METER: ["다이얼게이지", "다이알게이지", "측정봉", "게이지팁", "평탄도", "공구부속"],
+  AED: ["보관함", "월케비넷", "벽걸이함", "캐비닛"],
+  EYEWASH_STATION: ["클렌징", "피부", "화장품", "버블", "거품", "진동세안"],
+  HEAT_COLD_PREVENTION_SUPPLIES: ["이불", "침구", "매트리스", "바디필로우", "베개", "쿠션"],
+  VENTILATION_EQUIPMENT: ["그릴", "배기구커버", "환기구덮개", "환풍구커버"],
+  SMART_CCTV_GENERAL_SPECIAL: ["표지판", "안내판", "안내문", "알림판", "사인"],
+  SMART_CCTV_SOLAR_MOBILE: ["가짜", "모형", "더미"],
+  WORKER_LOCATION_TRACKING: ["RFID차단", "지갑", "여권", "카드지갑", "파우치"],
+  WORKER_ACCESS_CONTROL: ["리본", "카트리지", "소모품"],
+  HEAVY_EQUIPMENT_COLLISION_PREVENTION: ["고양이", "반려", "문고정", "도어"],
+  HEAVY_EQUIPMENT_REAR_DETECTOR: ["승용차", "주차도우미"],
+  HEAVY_EQUIPMENT_PINCH_PREVENTION: ["장갑", "손가락"],
+  IOT_TEMPERATURE_HUMIDITY_METER: ["아날로그"],
+  ACCESS_CONTROL_FACILITY: ["표지판", "사인", "테이프", "안전띠", "출입금지띠"],
+};
+
+const OPEN_API_REQUIRED_CONTEXT_KEYWORDS = {
+  PPE_EAR_PROTECTION: ["산업", "작업", "현장", "공장", "청력보호", "3M"],
+  FALL_PREVENTION_GUARDRAIL: [
+    "건설현장",
+    "공사장",
+    "추락방지",
+    "단부",
+    "철골",
+    "갱폼",
+    "가설",
+    "슬라브",
+    "시스템비계",
+  ],
+  WORK_PLATFORM: ["산업안전", "건설", "현장", "말비계", "우마", "고소작업", "비계"],
+  SAFE_PASSAGE: ["보행", "작업통로", "통로발판", "가설통로", "공사장통로"],
+  SAFETY_BLOCK: ["추락", "고소", "구명줄", "생명줄"],
+  TRAFFIC_CONE: ["도로", "공사", "주차", "차량", "안전", "차단", "교통"],
+  WARNING_SIGN: [
+    "산업안전",
+    "공사",
+    "현장",
+    "위험",
+    "추락",
+    "감전",
+    "화재",
+    "출입금지",
+    "보호구",
+    "고압",
+    "낙하",
+  ],
+  SIGNAL_BATON: ["교통", "주차", "안전", "유도", "신호수"],
+  BARRIER_TAPE: ["위험", "안전", "통제", "공사", "출입금지"],
+  HEAT_COLD_PREVENTION_SUPPLIES: ["산업", "작업", "현장", "온열질환", "폭염", "혹한", "안전", "근로자"],
+  EYEWASH_STATION: ["비상", "응급", "산업", "실험실", "화학", "작업장", "안전"],
+  VENTILATION_EQUIPMENT: ["산업", "작업장", "공장", "유해", "송풍", "배풍"],
+  SMART_CCTV_GENERAL_SPECIAL: ["카메라", "CCTV세트", "감시시스템", "녹화기", "NVR", "DVR"],
+  WORKER_ACCESS_CONTROL: ["단말기", "리더기", "출입통제시스템", "출입관리시스템", "게이트", "도어락"],
+  HEAVY_EQUIPMENT_COLLISION_PREVENTION: ["중장비", "지게차", "굴착기", "크레인", "건설기계"],
+  HEAVY_EQUIPMENT_REAR_DETECTOR: ["중장비", "지게차", "굴착기", "트럭", "화물차", "건설기계"],
+  HEAVY_EQUIPMENT_PINCH_PREVENTION: ["중장비", "지게차", "굴착기", "크레인", "센서", "경보", "시스템"],
+  IOT_TEMPERATURE_HUMIDITY_METER: ["IoT", "와이파이", "WiFi", "원격", "클라우드", "스마트센서"],
+};
+
+const OPEN_API_SUPPLEMENTAL_KEYWORD_EXCLUDES = {
+  PPE_SAFETY_HELMET: ["헬멧"],
+  PPE_SAFETY_SHOES: ["작업화", "작업 신발"],
+  PPE_SAFETY_BELT: ["보조벨트"],
+  PPE_SAFETY_GLASSES: ["고글"],
+  WORK_PLATFORM: ["사다리"],
+  SMART_WATCH: ["스마트워치"],
+};
+
+async function readOpenApiKey() {
+  if (process.env.DOMEGGOOK_OPEN_API_KEY) return process.env.DOMEGGOOK_OPEN_API_KEY;
+  if (!existsSync(".env")) throw new Error("DOMEGGOOK_OPEN_API_KEY가 필요합니다.");
+  const env = await readFile(".env", "utf8");
+  const value = env.match(/^(?:export\s+)?DOMEGGOOK_OPEN_API_KEY\s*=\s*(.+)$/m)?.[1]
+    ?.trim()
+    .replace(/^(['"])(.*)\1$/, "$2");
+  if (!value) throw new Error("DOMEGGOOK_OPEN_API_KEY가 필요합니다.");
+  return value;
+}
+
+function koreaDate() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
+
+async function recordOpenApiCall(mode) {
+  const date = koreaDate();
+  const file = path.join("tmp", `domeggook-api-usage-${date}.json`);
+  const usage = existsSync(file)
+    ? JSON.parse(await readFile(file, "utf8"))
+    : { date, calls: 0, byMode: {} };
+  if (usage.calls >= OPEN_API_DAILY_LIMIT) {
+    throw new Error(`Open API 자체 일일 한도 ${OPEN_API_DAILY_LIMIT}회를 초과했습니다.`);
+  }
+  usage.calls += 1;
+  usage.byMode[mode] = (usage.byMode[mode] || 0) + 1;
+  usage.updatedAt = new Date().toISOString();
+  await mkdir("tmp", { recursive: true });
+  await writeFile(file, `${JSON.stringify(usage, null, 2)}\n`);
+}
+
+async function openApiRequest(apiKey, params) {
+  const url = new URL("https://domeggook.com/ssl/api/");
+  const query = {
+    aid: apiKey,
+    market: "supply",
+    om: "json",
+    ...params,
+  };
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+  }
+  await recordOpenApiCall(params.mode);
+  const response = await fetch(url, {
+    headers: {
+      "user-agent": USER_AGENT,
+      accept: "application/json",
+    },
+  });
+  if (response.status === 429) {
+    throw new Error("Open API 호출 제한(429)이 발생해 수집을 중단합니다.");
+  }
+  if (!response.ok) throw new Error(`Open API 접근 실패: ${response.status} ${response.statusText}`);
+  const result = await response.json();
+  const error = result.domeggook?.error || result.error || result.errors;
+  if (error) {
+    throw new Error(`Open API 오류: ${error.dcode || error.code || ""} ${error.dmessage || error.message || error.msg || JSON.stringify(error)}`.trim());
+  }
+  if (!result.domeggook) throw new Error("Open API 오류: 응답 본문이 없습니다.");
+  return result.domeggook;
+}
+
+function arrayValue(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+async function openApiList(apiKey, keyword, sort, size) {
+  const result = await openApiRequest(apiKey, {
+    ver: "4.1",
+    mode: "getItemList",
+    kw: keyword,
+    so: sort,
+    sz: size,
+    pg: 1,
+    mxq: 1,
+    dfos: false,
+  });
+  return {
+    total: Number(result.header?.numberOfItems || 0),
+    items: arrayValue(result.list?.item),
+  };
+}
+
+async function openApiDetail(apiKey, itemNo) {
+  return openApiRequest(apiKey, {
+    ver: "4.6",
+    mode: "getItemView",
+    no: itemNo,
+  });
+}
+
+function openApiSellerScore(detail) {
+  return {
+    sellerReviewCount: numberOrNull(detail.seller?.score?.cnt) ?? 0,
+    sellerSatisfaction: numberOrNull(String(detail.seller?.score?.avg || "").replace("%", "")),
+  };
+}
+
+async function backfillSellerScore(args) {
+  const apiKey = await readOpenApiKey();
+  const entries = (await readdir(DEFAULT_OUT_DIR, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((itemNo) => existsSync(path.join(DEFAULT_OUT_DIR, itemNo, "product.json")))
+    .sort();
+  const allTargets = [];
+  let skipped = 0;
+  for (const itemNo of entries) {
+    const filePath = path.join(DEFAULT_OUT_DIR, itemNo, "product.json");
+    const product = JSON.parse(await readFile(filePath, "utf8"));
+    if (!args.fresh && Object.hasOwn(product, "sellerReviewCount")) {
+      skipped += 1;
+      continue;
+    }
+    allTargets.push({ itemNo, product });
+  }
+  const targets = args.limit > 0 ? allTargets.slice(0, args.limit) : allTargets;
+  const report = { attempted: 0, succeeded: 0, skipped, unavailable: [], failed: [] };
+
+  for (const { itemNo, product } of targets) {
+    report.attempted += 1;
+    try {
+      const detail = await openApiDetail(apiKey, itemNo);
+      Object.assign(product, openApiSellerScore(detail), {
+        sellerScoreUpdatedAt: new Date().toISOString(),
+      });
+      await writeOutputs(product, path.join(DEFAULT_OUT_DIR, itemNo));
+      report.succeeded += 1;
+      console.log(
+        `${itemNo} 판매자 후기 backfill 완료: ${product.sellerReviewCount}건, 만족도 ${product.sellerSatisfaction ?? "-"}%`,
+      );
+    } catch (error) {
+      if (String(error.message).includes("ITEM_ERROR")) {
+        Object.assign(product, {
+          sourceStatus: "NOT_FOUND",
+          sellerReviewCount: 0,
+          sellerSatisfaction: null,
+          sellerScoreUpdatedAt: new Date().toISOString(),
+        });
+        await writeOutputs(product, path.join(DEFAULT_OUT_DIR, itemNo));
+        report.unavailable.push({ itemNo, reason: error.message });
+        console.log(`${itemNo} 판매 종료 상품 자동 제외`);
+        await writeFile(SELLER_SCORE_BACKFILL_REPORT, `${JSON.stringify(report, null, 2)}\n`);
+        await sleep(args.delayMs);
+        continue;
+      }
+      report.failed.push({ itemNo, reason: error.message });
+      if (String(error.message).includes("429")) {
+        await writeFile(SELLER_SCORE_BACKFILL_REPORT, `${JSON.stringify(report, null, 2)}\n`);
+        throw error;
+      }
+      console.error(`${itemNo} 판매자 후기 backfill 실패: ${error.message}`);
+    }
+    await writeFile(SELLER_SCORE_BACKFILL_REPORT, `${JSON.stringify(report, null, 2)}\n`);
+    await sleep(args.delayMs);
+  }
+
+  await writeFile(SELLER_SCORE_BACKFILL_REPORT, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(`${SELLER_SCORE_BACKFILL_REPORT} 저장 완료`);
+}
+
+function booleanValue(value) {
+  return value === true || value === 1 || ["true", "1", "y"].includes(String(value).toLowerCase());
+}
+
+function normalizedText(value) {
+  return cleanText(value).toLowerCase().replace(/\s+/g, "");
+}
+
+function titleHasAny(title, keywords) {
+  const normalized = normalizedText(title);
+  return keywords.some((keyword) => normalized.includes(normalizedText(keyword)));
+}
+
+function listCandidateIssue(item, category) {
+  const title = String(item.title || "");
+  const categoryKeywords = OPEN_API_REQUIRED_TITLE_KEYWORDS[category.code] || [
+    cleanKeyword(category.label),
+    ...(CATEGORY_KEYWORD_OVERRIDES[category.code] || []),
+  ];
+  if (!item.no) return "ITEM_NO_MISSING";
+  if (numberOrNull(item.price) <= 0) return "PRICE_MISSING";
+  if (numberOrNull(item.unitQty) !== 1) return "MIN_ORDER_QUANTITY_NOT_ONE";
+  if (booleanValue(item.adultOnly)) return "ADULT_ONLY";
+  if (booleanValue(item.deli?.fromOversea)) return "OVERSEAS_DIRECT";
+  if (item.market?.supply !== undefined && !booleanValue(item.market.supply)) return "SUPPLY_MARKET_INACTIVE";
+  if (titleHasAny(title, CUSTOMER_EXPOSURE_KEYWORDS)) return "CUSTOMER_EXPOSURE_KEYWORD";
+  if (titleHasAny(title, NON_SAFETY_KEYWORDS)) return "NON_SAFETY_KEYWORD";
+  if (titleHasAny(title, OPEN_API_DISALLOWED_TITLE_KEYWORDS[category.code] || [])) {
+    return "CATEGORY_MISMATCH";
+  }
+  if (!titleHasAny(title, categoryKeywords)) return "CATEGORY_MISMATCH";
+  if (
+    OPEN_API_REQUIRED_CONTEXT_KEYWORDS[category.code]
+    && !titleHasAny(title, OPEN_API_REQUIRED_CONTEXT_KEYWORDS[category.code])
+  ) {
+    return "CATEGORY_MISMATCH";
+  }
+  if (
+    category.code !== "OPENING_COVER"
+    && titleHasAny(title, [...OBVIOUS_ACCESSORY_KEYWORDS, ...NON_COMPLETE_PRODUCT_KEYWORDS])
+  ) {
+    return "ACCESSORY_SUSPECT";
+  }
+  if (titleHasAny(title, [
+    ...(CATEGORY_ACCESSORY_KEYWORDS[category.code] || []),
+    ...(CATEGORY_NON_COMPLETE_PRODUCT_KEYWORDS[category.code] || []),
+  ])) return "ACCESSORY_SUSPECT";
+  return "";
+}
+
+function parseOpenApiOptions(value) {
+  if (!value) return [defaultOption()];
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  const entries = Object.entries(parsed.data || {});
+  if (entries.length === 0) return [defaultOption()];
+  return entries.map(([code, option], index) => {
+    const stock = numberOrNull(option.qty);
+    const enabled = option.sup === undefined ? String(option.dom ?? "1") !== "0" : String(option.sup) !== "0";
+    const visible = String(option.hid ?? "0") === "0";
+    return {
+      sourceOptionCode: code,
+      name: cleanText(option.name || option.title || code),
+      sourceAdditionalPrice: numberOrNull(option.supPrice ?? option.domPrice) ?? 0,
+      sourceStockQuantity: stock,
+      status: enabled && visible && (stock === null || stock > 0) ? "ACTIVE" : "SOLD_OUT",
+      sortOrder: index,
+    };
+  });
+}
+
+function openApiDetailImageUrls(detail) {
+  const html = [
+    detail.desc?.contents?.item,
+    detail.desc?.contents?.deli,
+  ].filter(Boolean).join("\n");
+  const urls = [...html.matchAll(/<img\b[^>]*(?:src|data-src)=["']([^"']+)["']/gi)]
+    .map(([, src]) => htmlDecode(src).trim())
+    .filter((src) => src && !src.startsWith("data:"))
+    .map((src) => {
+      try {
+        return new URL(src, "https://domeggook.com").href;
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean);
+  return [...new Set(urls)];
+}
+
+function openApiShipping(detail) {
+  const deli = detail.deli || {};
+  const selected = deli.supply || deli.dome || {};
+  const pay = String(selected.pay || deli.pay || "");
+  const type = String(selected.type || "");
+  const table = String(selected.tbl || "");
+  let fee = numberOrNull(selected.fee);
+  if (pay.includes("무료")) fee = 0;
+  if (fee === null && table) fee = numberOrNull(table.match(/\+(\d[\d,]*)/)?.[1]);
+  const conditional = /수량|차등|비례|금액비노출|착불|구매자선택/.test(`${type} ${pay}`);
+  return {
+    known: fee !== null,
+    fee,
+    conditional,
+    text: [pay, type, table || (fee !== null ? `${fee}원` : "")].filter(Boolean).join(" / "),
+  };
+}
+
+function openApiCategoryPath(detail) {
+  const parents = arrayValue(detail.category?.parents?.elem).map((item) => item.name).filter(Boolean);
+  const current = detail.category?.current?.name;
+  return [...parents, current].filter(Boolean).join(" > ");
+}
+
+function openApiProduct(detail, candidate, category, keyword, sorts, scoringCategories) {
+  const itemNo = String(detail.basis?.no || candidate.no || "");
+  const title = cleanText(detail.basis?.title || candidate.title);
+  const sourcePrice = numberOrNull(detail.price?.supply ?? candidate.price);
+  const minOrderQuantity = numberOrNull(candidate.unitQty ?? detail.qty?.supplyUnit ?? detail.qty?.domeMoq);
+  const detailImageUrls = openApiDetailImageUrls(detail);
+  const options = parseOpenApiOptions(detail.selectOpt);
+  const shipping = openApiShipping(detail);
+  const sellerScore = openApiSellerScore(detail);
+  const hardReasons = [];
+  const reviewReasons = [];
+
+  if (detail.basis?.status !== "판매중") hardReasons.push("NOT_ON_SALE");
+  if (!sourcePrice || sourcePrice <= 0) hardReasons.push("PRICE_MISSING");
+  if (minOrderQuantity !== 1) hardReasons.push("MIN_ORDER_QUANTITY_NOT_ONE");
+  if (!booleanValue(detail.desc?.license?.usable)) hardReasons.push("IMAGE_USAGE_NOT_ALLOWED");
+  if (detailImageUrls.length === 0) hardReasons.push("DETAIL_IMAGE_MISSING");
+  if (!options.some((option) => option.status === "ACTIVE")) hardReasons.push("NO_ACTIVE_OPTIONS");
+  if (booleanValue(detail.deli?.fromOversea)) hardReasons.push("OVERSEAS_DIRECT");
+  if (!shipping.known) reviewReasons.push("SHIPPING_FEE_MISSING");
+  if (shipping.conditional) hardReasons.push("SHIPPING_FEE_CONDITIONAL");
+  if (!String(detail.detail?.country || "").trim() || !String(detail.detail?.manufacturer || "").trim()) {
+    reviewReasons.push("ORIGIN_OR_MANUFACTURER_MISSING");
+  }
+  if (options.length > 20) reviewReasons.push("OPTION_COUNT_GT_20");
+  const categoryScore = scoreCategory({ title, options }, scoringCategories);
+  if (
+    categoryScore.code !== category.code
+    || categoryScore.secondScore >= categoryScore.score - 4
+  ) {
+    reviewReasons.push("CATEGORY_AMBIGUOUS");
+  }
+  hardReasons.push(...reviewReasons);
+  reviewReasons.length = 0;
+
+  return {
+    product: {
+      sourceUrl: `https://mobile.domeggook.com/${itemNo}`,
+      itemNo,
+      title,
+      priceText: String(sourcePrice || ""),
+      minOrderQuantityText: `${minOrderQuantity || 0}개`,
+      sellerName: cleanText(detail.seller?.nick || detail.seller?.id || detail.seller?.company?.name),
+      ...sellerScore,
+      sellerScoreUpdatedAt: new Date().toISOString(),
+      origin: cleanText(detail.detail?.country),
+      manufacturer: cleanText(detail.detail?.manufacturer),
+      imageUsage: "허용 (Open API)",
+      thumbnailImageUrl: detail.thumb?.original || detail.thumb?.large || candidate.thumb || "",
+      detailImageUrls,
+      options,
+      shippingFee: shipping.fee,
+      shippingFeeText: shipping.text,
+      shippingConditional: shipping.conditional,
+      collectionCategoryCode: category.code,
+      collectionCategoryLabel: category.label,
+      collectionKeyword: keyword,
+      collectionSorts: sorts,
+      collectionDecision: "IMPORT_CANDIDATE",
+      collectionReviewReasons: [],
+      sourceStatus: detail.basis?.status || "",
+      sourceCategoryCode: detail.category?.current?.code || "",
+      sourceCategoryPath: openApiCategoryPath(detail),
+      collectionCategoryScore: categoryScore,
+      safetyCert: arrayValue(detail.detail?.safetyCert),
+      productInfoDuty: detail.detail?.infoDuty || null,
+      collectedAt: new Date().toISOString(),
+    },
+    hardReasons,
+    reviewReasons,
+  };
+}
+
+async function saveOpenApiProduct(product) {
+  const existing = await readExistingProduct(product.itemNo);
+  const dir = path.join(DEFAULT_OUT_DIR, product.itemNo);
+  const imageDir = path.join(dir, "images");
+  await mkdir(imageDir, { recursive: true });
+
+  product.thumbnailImagePath = existing?.thumbnailImagePath && existsSync(existing.thumbnailImagePath)
+    ? existing.thumbnailImagePath
+    : await downloadImage(product.thumbnailImageUrl, path.join(imageDir, "thumb"));
+  product.detailImagePaths = Array.isArray(existing?.detailImagePaths)
+    ? existing.detailImagePaths.filter((filePath) => existsSync(filePath))
+    : [];
+  for (let index = product.detailImagePaths.length; index < product.detailImageUrls.length; index += 1) {
+    const number = String(index + 1).padStart(2, "0");
+    product.detailImagePaths.push(
+      await downloadImage(product.detailImageUrls[index], path.join(imageDir, `detail-${number}`)),
+    );
+  }
+  await writeOutputs(product, dir);
+}
+
+async function loadOpenApiOwners() {
+  const owners = new Map();
+  if (!existsSync(DEFAULT_OUT_DIR)) return owners;
+  const entries = await readdir(DEFAULT_OUT_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    try {
+      const product = JSON.parse(await readFile(path.join(DEFAULT_OUT_DIR, entry.name, "product.json"), "utf8"));
+      if (
+        product.collectionCategoryCode
+        && !product.collectionReviewReasons?.includes("CATEGORY_AMBIGUOUS")
+      ) {
+        owners.set(String(product.itemNo), product.collectionCategoryCode);
+      }
+    } catch {
+      // 깨진 수집 파일은 이번 실행에서 다시 수집한다.
+    }
+  }
+  return owners;
+}
+
+function mergeListCandidates(target, items, keyword, sort) {
+  for (const item of items) {
+    const itemNo = String(item.no || "");
+    if (!itemNo) continue;
+    const existing = target.get(itemNo);
+    if (existing) {
+      existing.matches.push({ keyword, sort });
+    } else {
+      target.set(itemNo, { ...item, matches: [{ keyword, sort }] });
+    }
+  }
+}
+
+async function collectOpenApiCategory(apiKey, category, args, owners, scoringCategories) {
+  const report = {
+    collectorVersion: OPEN_API_COLLECTOR_VERSION,
+    generatedAt: new Date().toISOString(),
+    categoryCode: category.code,
+    categoryLabel: category.label,
+    target: args.targetPerCategory,
+    queries: [],
+    valid: [],
+    excluded: [],
+    duplicates: [],
+    shortfall: false,
+  };
+  const seen = new Set();
+  const primaryKeyword = cleanKeyword(category.label);
+  const supplementalKeywords = (CATEGORY_KEYWORD_OVERRIDES[category.code] || [])
+    .map(cleanKeyword)
+    .filter((keyword) => keyword && normalizedText(keyword) !== normalizedText(primaryKeyword))
+    .filter((keyword) => !(OPEN_API_SUPPLEMENTAL_KEYWORD_EXCLUDES[category.code] || []).includes(keyword));
+  const acceptedCount = () => report.valid.length;
+
+  async function runKeyword(keyword, supplemental) {
+    const candidates = new Map();
+    for (const [sort, size] of [["se", args.exactCount], ["rd", args.rankingCount]]) {
+      const result = await openApiList(apiKey, keyword, sort, size);
+      report.queries.push({ keyword, sort, requested: size, returned: result.items.length, total: result.total, supplemental });
+      mergeListCandidates(candidates, result.items, keyword, sort);
+      await sleep(args.delayMs);
+    }
+
+    for (const candidate of candidates.values()) {
+      if (acceptedCount() >= args.targetPerCategory) break;
+      const itemNo = String(candidate.no);
+      if (seen.has(itemNo)) continue;
+      seen.add(itemNo);
+
+      const owner = owners.get(itemNo);
+      if (owner && owner !== category.code) {
+        report.duplicates.push({ itemNo, owner });
+        continue;
+      }
+      const listIssue = listCandidateIssue(candidate, category);
+      if (listIssue) {
+        report.excluded.push({ itemNo, title: candidate.title, reasons: [listIssue], stage: "list" });
+        continue;
+      }
+
+      try {
+        const existing = await readExistingProduct(itemNo);
+        if (
+          !args.fresh
+          && existing?.collectionCategoryCode === category.code
+          && existsSync(existing.thumbnailImagePath || "")
+          && existing.detailImagePaths?.some((filePath) => existsSync(filePath))
+          && existing.options?.some((option) => option.status === "ACTIVE")
+          && Object.hasOwn(existing, "sellerReviewCount")
+        ) {
+          if (!existing.collectionReviewReasons?.includes("CATEGORY_AMBIGUOUS")) {
+            owners.set(itemNo, category.code);
+          }
+          const entry = { itemNo, title: existing.title, reasons: existing.collectionReviewReasons || [], reused: true };
+          if (existing.collectionDecision === "IMPORT_CANDIDATE") report.valid.push(entry);
+          else report.excluded.push({ ...entry, stage: "existing" });
+          continue;
+        }
+
+        const detail = await openApiDetail(apiKey, itemNo);
+        const parsed = openApiProduct(
+          detail,
+          candidate,
+          category,
+          candidate.matches[0]?.keyword || keyword,
+          [...new Set(candidate.matches.map((match) => match.sort))],
+          scoringCategories,
+        );
+        if (parsed.hardReasons.length) {
+          report.excluded.push({ itemNo, title: candidate.title, reasons: parsed.hardReasons, stage: "detail" });
+          continue;
+        }
+
+        await saveOpenApiProduct(parsed.product);
+        owners.set(itemNo, category.code);
+        const entry = {
+          itemNo,
+          title: parsed.product.title,
+          reasons: [],
+          sourceCategoryPath: parsed.product.sourceCategoryPath,
+        };
+        report.valid.push(entry);
+        console.log(`${category.code}: ${parsed.product.collectionDecision} ${itemNo} ${parsed.product.title}`);
+      } catch (error) {
+        report.excluded.push({ itemNo, title: candidate.title, reasons: [error.message], stage: "collect" });
+      }
+      await sleep(args.delayMs);
+    }
+  }
+
+  await runKeyword(primaryKeyword, false);
+  for (const keyword of supplementalKeywords) {
+    if (acceptedCount() >= args.targetPerCategory) break;
+    await runKeyword(keyword, true);
+  }
+  report.candidateCount = acceptedCount();
+  report.shortfall = report.candidateCount < args.targetPerCategory;
+  return report;
+}
+
+async function openApiCoverage(args) {
+  const apiKey = await readOpenApiKey();
+  let categories = await readCategories();
+  if (categories.length !== 81) throw new Error(`카테고리 정의가 81개가 아닙니다: ${categories.length}`);
+  if (args.category) {
+    categories = categories.filter((category) => category.code === args.category);
+    if (categories.length === 0) throw new Error(`알 수 없는 카테고리: ${args.category}`);
+  } else if (args.maxCategories > 0) {
+    categories = categories.slice(0, args.maxCategories);
+  }
+
+  await mkdir(OPEN_API_COVERAGE_OUT_DIR, { recursive: true });
+  const owners = await loadOpenApiOwners();
+  const scoringCategories = readCategoryDefinitions();
+  const reports = [];
+  for (const category of categories) {
+    const reportPath = path.join(OPEN_API_COVERAGE_OUT_DIR, `${category.code}.json`);
+    let report;
+    if (!args.fresh && existsSync(reportPath)) {
+      const previous = JSON.parse(await readFile(reportPath, "utf8"));
+      const reusable =
+        previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
+        && previous.target === args.targetPerCategory
+        && previous.queries?.length > 0;
+      if (reusable) {
+        report = previous;
+        console.log(`${category.code}: 기존 완료 보고서 재사용`);
+      }
+    }
+    if (!report) {
+      report = await collectOpenApiCategory(apiKey, category, args, owners, scoringCategories);
+    }
+    reports.push(report);
+    await writeFile(
+      reportPath,
+      `${JSON.stringify(report, null, 2)}\n`,
+    );
+    console.log(`${category.code}: valid=${report.valid.length}, shortfall=${report.shortfall}`);
+  }
+
+  const summary = {
+    collectorVersion: OPEN_API_COLLECTOR_VERSION,
+    generatedAt: new Date().toISOString(),
+    categoryCount: reports.length,
+    targetPerCategory: args.targetPerCategory,
+    exactCount: args.exactCount,
+    rankingCount: args.rankingCount,
+    coveredCategories: reports.filter((report) => !report.shortfall).length,
+    shortfallCategories: reports.filter((report) => report.shortfall).map((report) => ({
+      categoryCode: report.categoryCode,
+      categoryLabel: report.categoryLabel,
+      valid: report.valid.length,
+    })),
+    validProducts: reports.reduce((sum, report) => sum + report.valid.length, 0),
+    excludedCandidates: reports.reduce((sum, report) => sum + report.excluded.length, 0),
+  };
+  await writeFile(
+    path.join(OPEN_API_COVERAGE_OUT_DIR, "summary.json"),
+    `${JSON.stringify(summary, null, 2)}\n`,
+  );
+  console.log(`${OPEN_API_COVERAGE_OUT_DIR}/summary.json 저장 완료`);
+}
+
+function selfCheck() {
+  if (listCandidateIssue({
+    no: "1",
+    title: "안전모 헬멧 통기 패드",
+    price: "1000",
+    unitQty: "1",
+  }, {
+    code: "PPE_SAFETY_HELMET",
+    label: "안전모",
+  }) !== "ACCESSORY_SUSPECT") {
+    throw new Error("Open API 완제품 필터 self-check 실패");
+  }
+  const options = parseOpenApiOptions(JSON.stringify({
+    data: {
+      "00": { name: "백색", sup: "1", supPrice: "500", qty: "2", hid: "0" },
+      "01": { name: "주황색", sup: "1", supPrice: "0", qty: "0", hid: "1" },
+    },
+  }));
+  if (options.length !== 2 || options[0].status !== "ACTIVE" || options[1].status !== "SOLD_OUT") {
+    throw new Error("Open API 옵션 파서 self-check 실패");
+  }
+  const shipping = openApiShipping({ deli: { supply: { pay: "선결제", type: "고정배송비", fee: "3000" } } });
+  if (!shipping.known || shipping.fee !== 3000 || shipping.conditional) {
+    throw new Error("Open API 배송비 파서 self-check 실패");
+  }
+  const sellerScore = openApiSellerScore({ seller: { score: { cnt: "10", avg: "97%" } } });
+  if (sellerScore.sellerReviewCount !== 10 || sellerScore.sellerSatisfaction !== 97) {
+    throw new Error("Open API 판매자 후기 파서 self-check 실패");
+  }
+  const images = openApiDetailImageUrls({ desc: { contents: { item: '<img src="//example.com/a.jpg"><img data-src="/b.png">' } } });
+  if (images.length !== 2 || !images[0].startsWith("https://")) {
+    throw new Error("Open API 상세 이미지 파서 self-check 실패");
+  }
+  const helmetIssue = listCandidateIssue({
+    no: "1",
+    title: "안전모 이름표 식별표 24개입",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "PPE_SAFETY_HELMET" });
+  if (helmetIssue !== "ACCESSORY_SUSPECT") throw new Error("부속품 필터 self-check 실패");
+  const mismatch = listCandidateIssue({
+    no: "2",
+    title: "회전형 전기 모기채 2중안전버튼",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "PPE_SAFETY_HELMET", label: "안전모" });
+  if (mismatch !== "CATEGORY_MISMATCH") throw new Error("카테고리 연관성 self-check 실패");
+  const vehicleBelt = listCandidateIssue({
+    no: "3",
+    title: "자동차 안전벨트 고정클립",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "PPE_SAFETY_BELT", label: "안전벨트" });
+  if (vehicleBelt !== "CATEGORY_MISMATCH") throw new Error("산업 안전 맥락 self-check 실패");
+  const replacementLens = listCandidateIssue({
+    no: "4",
+    title: "보안경렌즈 교체형 투명커버 10개입",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "PPE_SAFETY_GLASSES", label: "보안경" });
+  if (replacementLens !== "ACCESSORY_SUSPECT") throw new Error("보안경 부속품 self-check 실패");
+  const householdRail = listCandidateIssue({
+    no: "5",
+    title: "나무 핸드레일 계단 안전난간",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "FALL_PREVENTION_GUARDRAIL", label: "안전난간" });
+  if (householdRail !== "CATEGORY_MISMATCH") throw new Error("주택용 난간 self-check 실패");
+  const truckNet = listCandidateIssue({
+    no: "6",
+    title: "화물차 추락방지망 안전망",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "FALL_PREVENTION_NET", label: "추락방지망" });
+  if (truckNet !== "CATEGORY_MISMATCH") throw new Error("차량용 안전망 self-check 실패");
+  const householdLadder = listCandidateIssue({
+    no: "7",
+    title: "가정용 계단사다리 알루미늄 작업발판",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "WORK_PLATFORM", label: "작업발판" });
+  if (householdLadder !== "CATEGORY_MISMATCH") throw new Error("일반 사다리 self-check 실패");
+  const genericWarningSign = listCandidateIssue({
+    no: "8",
+    title: "화장실 안내 경고표지판 깨끗이 사용합시다",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "WARNING_SIGN", label: "경고표지" });
+  if (genericWarningSign !== "CATEGORY_MISMATCH") throw new Error("일반 안내판 self-check 실패");
+  const surfaceRoughness = listCandidateIssue({
+    no: "9",
+    title: "윤곽 게이지 표면조도측정기 내경측정기",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "LIGHT_METER", label: "조도측정기" });
+  if (surfaceRoughness !== "CATEGORY_MISMATCH") throw new Error("표면조도 측정기 self-check 실패");
+  const categories = readCategoryDefinitions();
+  const resolvedGasDetector = resolveReviewCategory({
+    title: "휴대용 가스누설검지기",
+    collectionCategoryCode: "GAS_DETECTOR",
+    options: [],
+  }, categories);
+  if (resolvedGasDetector.code !== "GAS_DETECTOR" || resolvedGasDetector.resolution !== "COLLECTION_TARGET") {
+    throw new Error("수집 목표 카테고리 재분류 self-check 실패");
+  }
+  const categoryConflict = resolveReviewCategory({
+    title: "이동식 바리케이드 안전휀스",
+    collectionCategoryCode: "BARRICADE",
+    options: [],
+  }, categories);
+  if (categoryConflict.code !== "BARRICADE" || categoryConflict.resolution !== "BUSINESS_RULE") {
+    throw new Error("바리케이드 우선순위 self-check 실패");
+  }
+  const ruledHarness = resolveReviewCategory({
+    title: "전체식 안전벨트 추락방지 안전대",
+    collectionCategoryCode: "PPE_FALL_ARREST_HARNESS",
+    options: [],
+  }, categories);
+  if (ruledHarness.code !== "PPE_FALL_ARREST_HARNESS" || ruledHarness.resolution !== "BUSINESS_RULE") {
+    throw new Error("안전대 형태 우선순위 self-check 실패");
+  }
+  const filteredOptions = stopCustomOptions([
+    { name: "기성 피스식", status: "ACTIVE" },
+    { name: "주문인쇄 피스식", status: "ACTIVE" },
+  ]);
+  if (filteredOptions[0].status !== "ACTIVE" || filteredOptions[1].status !== "STOPPED") {
+    throw new Error("주문제작 옵션 차단 self-check 실패");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(koreaDate())) throw new Error("호출 장부 날짜 self-check 실패");
+  console.log("Open API collector self-check 통과");
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -548,9 +1515,21 @@ async function main() {
     usage();
     return;
   }
+  if (args.selfCheck) {
+    selfCheck();
+    return;
+  }
+  if (args.openApiCoverage) {
+    await openApiCoverage(args);
+    return;
+  }
 
   if (args.backfillOptions) {
     await backfillOptions(args);
+    return;
+  }
+  if (args.backfillSellerScore) {
+    await backfillSellerScore(args);
     return;
   }
 

@@ -7,6 +7,6 @@ public enum ProductComplianceStatus {
 	REJECTED;
 
 	public boolean allowsSale() {
-		return this == NOT_REQUIRED || this == VERIFIED;
+		return this != REJECTED;
 	}
 }

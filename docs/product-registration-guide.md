@@ -41,35 +41,66 @@
 1. 처음에는 10~20개만 등록한다.
 2. 대표 이미지는 정사각형으로 맞춘 뒤 업로드한다.
 3. 상세 이미지는 16:9로 맞춘 뒤 상세 이미지 블록으로 추가한다.
-4. 안전모, 안전화, 안전대, 마스크, 보안경 같은 보호구는 인증서, 인증번호, KC 또는 안전인증 대상 여부를 먼저 확인한다.
+4. 공급처가 제공한 인증서나 인증번호가 있으면 관리자 인증 상태에 기록한다.
 5. 상품 고시에 제조사/수입자, 원산지, 재질, 규격, 인증번호, AS/반품 기준을 입력한다.
 6. 공급가는 운영자 전용으로 입력하고, 판매가는 가격 정책 기준 계산가를 적용한 뒤 필요하면 수동 조정한다.
-7. 인증 비대상은 `NOT_REQUIRED`, 인증 확인 완료 상품은 `VERIFIED`로 기록한다.
-8. 판매가, 대표 이미지, 판매 가능한 옵션, 상품 고시, 인증 검수 상태를 모두 확인한 뒤 `ACTIVE`로 전환한다.
+7. 인증 비대상은 `NOT_REQUIRED`, 인증 확인 완료 상품은 `VERIFIED`, 미확인은 `PENDING`으로 기록한다.
+8. 판매가, 대표 이미지, 판매 가능한 옵션, 상품 고시를 확인한 뒤 `ACTIVE`로 전환한다. `PENDING`은 공개를 차단하지 않는다.
 9. `/products`, `/products/{productId}`, `/cart`에서 이미지와 가격 표시를 확인한다.
 10. 이상 없으면 다음 상품 묶음을 등록한다.
 
 ## Domeggook Collection
 
-도매꾹 상품은 자동 등록하지 않고 수동 검수용으로만 수집한다.
+도매꾹 상품은 자동 수집·선별하며 상품별 수동 `REVIEW` 큐를 만들지 않는다.
 
 ```bash
 node scripts/collect-domeggook-product.mjs https://mobile.domeggook.com/8667274
 node scripts/collect-domeggook-product.mjs --file tmp/domeggook-urls.txt
 node scripts/collect-domeggook-product.mjs --backfill-options --limit 5
+node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
 node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
+node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
+node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10
+node scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
+node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
+node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs
 ```
 
 - 결과는 `tmp/domeggook-products/{상품번호}/`에 저장된다.
+- 공공데이터포털 키는 `.env`의 `DATA_GO_KR_SERVICE_KEY_DECODED`, `DATA_GO_KR_SERVICE_KEY_ENCODED`에 저장한다. 감사 도구는 디코딩 키를 먼저 사용하고 인증 실패 시 인코딩 키로 한 번 재시도한다.
+- 공식 Open API 수집은 로컬 `.env`의 `DOMEGGOOK_OPEN_API_KEY`를 사용하며 key를 산출물이나 git에 남기지 않는다.
+- `--open-api-coverage`는 카테고리별 정확도순 30개와 도매꾹 랭킹순 30개를 합치고 상품번호 중복을 제거한다. 랭킹순은 정확한 구매 건수를 제공하지 않지만 검색 정확도, 실제 구매 실적, 고객 선호도를 반영한다.
+- 기본 검색에서 유효 후보가 목표 수량보다 적을 때만 해당 카테고리 동의어를 추가 조회한다.
+- 분당 호출 제한을 피하기 위해 호출 간격을 최소 1초로 강제하고 일일 자체 한도는 5,000회로 제한한다.
+- 호출 횟수는 `tmp/domeggook-api-usage-YYYY-MM-DD.json`에 기록한다. `429` 응답이면 재시도하지 않고 실행을 중단한다.
+- 기존 수집본은 `--backfill-seller-score`로 이미지를 다시 받지 않고 최근 180일 판매자 후기 수와 만족도만 보강한다. 완료 상품은 재실행 시 건너뛴다.
+- 판매자 후기 수와 만족도는 판매자 단위 참고 metadata로만 저장하며 자동 수집·공개 제외 기준으로 사용하지 않는다.
+- 중단 후 같은 명령을 다시 실행하면 완료된 카테고리 보고서를 재사용한다. 필터 변경 후 전체 재수집이 필요할 때만 `--fresh`를 사용한다.
+- Open API coverage 결과는 `tmp/domeggook-open-api-coverage/`에 저장된다.
 - `이미지사용` 값이 `허용`인 상품만 대표 이미지와 상세 이미지를 다운로드한다.
+- 이미지 파일 크기와 해상도는 자동 수집 제외 기준으로 사용하지 않는다. 이미지가 없거나 다운로드되지 않은 상품만 제외한다.
+- 최소구매수량이 1개인 상품만 수집한다.
+- 고객이 별도 부품을 조립하거나 추가 구매하지 않아도 사용할 수 있는 완제품만 수집한다. 교체용·리필·호환품·부속품·내피·턱끈·패드 같은 단품 부속은 자동 제외한다.
+- 무료배송 또는 금액이 확정된 고정 선결제 배송 상품만 수집한다.
+- 수량별 비례·차등 배송비, 착불, 선불·착불 선택 상품은 고객 무료배송 가격을 확정할 수 없으므로 자동 제외한다.
+- 공식 Open API의 공급처 카테고리는 참고값으로 저장한다. 공급처 오분류가 있으므로 이 값만으로 상품을 제외하거나 우리 카테고리를 확정하지 않는다.
+- 수집 목표 카테고리의 명시적 키워드가 상품명·옵션에 있고 자동 분류가 다른 카테고리와 충돌하지 않으면 수집 목표를 확정 카테고리로 사용한다.
+- 전체식·상체식·그네식·하네스는 안전대, 주상용·허리·둔부·벨트형은 안전벨트로 분류하며 먼저 명시된 형태를 우선한다.
+- 바리케이드 명시는 안전휀스보다 우선한다. 산소·O2, 개구부 덮개, 구급함·키트·파우치처럼 더 구체적인 용도는 일반 가스측정기·추락방지망·응급처치용품보다 우선한다.
+- 주차금지, 층간소음, 생활소음, 인쇄형이라는 표현만으로 안전용품을 검수 대상으로 만들지 않는다.
+- 주문인쇄·맞춤·로고·문구선택·시안 옵션은 `STOPPED`로 적재한다. 기성 옵션이 없으면 상품을 자동 제외한다.
 - 기존 수집본은 `--backfill-options`로 이미지를 다시 받지 않고 옵션 정보만 보강한다.
 - 전체 카테고리 후보는 `--coverage-scan`으로 카테고리별 검색 후보와 부족 카테고리 리포트를 만든다.
-- 수집 후 상품명, 가격, 카테고리, 인증/KC, 상품고시, 이미지 품질을 확인한다.
-- 이미지는 필요한 크기로 수동 보정한 뒤 관리자 화면에서 업로드한다.
+- 수집 선별에서 확정할 수 없는 가격, 카테고리, 배송, 옵션 조건은 `REVIEW`로 보내지 않고 자동 제외한다.
+- 보호구 인증 감사 결과는 `tmp/domeggook-kosha-cert-audit.json`과 CSV로 저장한다.
+- `review-domeggook-products.mjs`는 감사 결과를 자동으로 읽고 인증 미확인 상품은 compliance `PENDING`으로 기록한다.
+- 원본의 인증번호는 공공데이터포털 보호구 인증현황 API에서 정확히 일치하는 번호를 조회하고, 공식 등록 모델과 판매 모델까지 일치해야 인증 확인 완료로 본다.
+- 인증 증적이 없거나 공식 조회가 실행되지 않은 상품도 다른 판매 준비 조건을 충족하면 공개할 수 있다.
+- `KCS 인증제품이 아님`과 `위험 작업 현장 사용 금지`를 명시한 경작업모는 산업용 안전모 수집 대상에서 제외한다.
 
 ## Domeggook Import
 
-도매꾹 수집 상품은 먼저 자동 리뷰로 걸러낸 뒤, `IMPORT` 후보만 관리자 API를 통해 `HIDDEN` 상태로 적재한다.
+도매꾹 수집 상품은 자동 리뷰로 걸러낸 뒤 관리자 API로 먼저 `HIDDEN` 상태로 완성한다. 상품 고시와 인증 상태까지 저장한 후 판매 준비 조건을 충족한 상품을 마지막 단계에서 자동으로 `ACTIVE` 전환한다. 인증 `PENDING`은 공개 차단 조건이 아니다.
 
 ```bash
 node scripts/import-domeggook-products.mjs --init-manifest
@@ -83,16 +114,18 @@ node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manif
 
 - `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`, `options`를 먼저 확인한다.
 - 생성된 manifest는 기본적으로 `import: false`, `status: "HIDDEN"`이다.
-- 실제 운영 적재 전에는 `tmp/domeggook-product-review.csv`를 먼저 확인한다.
-- 자동 리뷰 결과는 `IMPORT`, `REVIEW`, `EXCLUDE`로 나뉜다.
+- 자동 선별 결과는 `IMPORT`, `EXCLUDE`로만 나뉜다.
 - `IMPORT` 대상만 `tmp/domeggook-import-manifest.filtered.json`에서 `import: true`가 된다.
-- `REVIEW` 상품은 최소구매수량, 조건부 배송비, 낮은 카테고리 확신, 부속품/브랜드/도메인 이탈 의심, 이미지 품질 같은 이유가 있으므로 관리자에 넣기 전 수동 판단한다.
-- `EXCLUDE` 상품은 가격 없음, 이미지 사용 미허용, 활성 옵션 없음, 상세 이미지 없음, 명백한 비안전용품, 고객 노출 금지 키워드 같은 하드 실패 사유가 있는 상품이다.
+- `EXCLUDE` 상품은 가격 없음, 이미지 사용 미허용, 활성 옵션 없음, 상세 이미지 없음, 카테고리 불명확, 원산지·제조사 누락, 명백한 비안전용품, 고객 노출 금지 키워드, 최소구매수량 2개 이상, 조건부·수량별·착불 배송 상품이다.
 - `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 반올림한 값이다.
 - `tmp/domeggook-import-manifest.filtered.json`의 `sourcePrice`는 수집 원가에 공급처 기본 배송비를 더한 `effectiveSourcePrice`다.
 - 옵션이 있는 상품은 옵션별 원본 공급가(`sourcePrice + sourceAdditionalPrice`)에 가격 정책을 적용하고, 가장 낮은 옵션 판매가를 상품 `basePrice`로 둔다. 각 옵션의 `additionalPrice`는 `옵션 판매가 - basePrice`로 계산한다.
 - `sourceOptionCode`, `sourceAdditionalPrice`, `sourceStockQuantity`, `sortOrder`는 관리자 검수용 메타데이터이며 고객 화면에는 노출하지 않는다.
-- 숫자 가격이 없는 상품은 import 실패 또는 `HIDDEN` 유지 대상으로 보고 수동 검수한다.
-- `ACTIVE` 전환은 관리자 화면에서 상품 고시, 인증/KC, 가격, 이미지 품질을 확인한 뒤 진행한다.
+- 숫자 가격이 없는 상품은 자동 제외한다.
+- filtered manifest는 수집 상품의 상품명·원산지·제조사·인증 문구로 상품 고시를 만들고 코어블SAF의 배송, A/S, 반품/교환 안내를 채운다.
+- 공식 등록 모델 일치는 `VERIFIED`, 명시적 인증 비대상 근거나 관리되는 단순 비인증 품목은 `NOT_REQUIRED`, 나머지는 `PENDING`으로 기록한다.
+- importer는 생성 요청에 항상 `HIDDEN`을 사용한다. 옵션·대표 이미지·상세 이미지·상품 고시 저장이 모두 성공한 뒤 manifest 목표 상태가 `ACTIVE`인 상품만 상태 API로 공개한다.
+- 같은 `sourceUrl` 상품이 이미 있으면 부분 실패 지점부터 이어서 처리한다. 상세 이미지 블록은 backend 허용 한도인 앞 50개까지 저장한다.
+- 인증 상태가 명시적으로 `REJECTED`인 상품만 자동 공개하지 않는다.
 - import 결과는 `tmp/domeggook-import-result.json`에 저장된다.
 - 대량 적재 전에는 filtered manifest를 10개 정도로 제한한 임시 manifest를 만들어 먼저 `--apply` 한다.

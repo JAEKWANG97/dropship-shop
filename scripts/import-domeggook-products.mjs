@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -6,6 +7,8 @@ const DEFAULT_API = "http://localhost:8080";
 const DEFAULT_PRODUCTS_DIR = "tmp/domeggook-products";
 const DEFAULT_MANIFEST = "tmp/domeggook-import-manifest.json";
 const DEFAULT_RESULT = "tmp/domeggook-import-result.json";
+const MAX_DETAIL_BLOCKS = 50;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const DEFAULT_PRICING_POLICY = {
   commissionRate: 5,
   taxBufferRate: 10,
@@ -21,6 +24,7 @@ function usage() {
   node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json
   node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json --cookie "ACCESS_TOKEN=..." --apply
   node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.json --cookie-file tmp/admin-cookie.txt --apply
+  node scripts/import-domeggook-products.mjs --self-check
 
 Options:
   --api http://localhost:8080
@@ -34,6 +38,7 @@ function argValue(argv, name, fallback = "") {
 
 function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
+  if (argv.includes("--self-check")) return { selfCheck: true };
   return {
     initManifest: argv.includes("--init-manifest"),
     apply: argv.includes("--apply"),
@@ -208,6 +213,7 @@ async function initManifest() {
       productFile: path.join(DEFAULT_PRODUCTS_DIR, product.itemNo, "product.json"),
       categoryCode: "",
       status: "HIDDEN",
+      complianceStatus: "PENDING",
       name: product.title,
       summary: summaryFor(product),
       sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
@@ -269,10 +275,34 @@ async function allAdminProducts(args) {
   }
 }
 
-async function uploadImage(args, productId, filePath) {
-  const form = new FormData();
+function imageFormat(bytes) {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { extension: "jpg", type: "image/jpeg" };
+  }
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return { extension: "png", type: "image/png" };
+  }
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP") {
+    return { extension: "webp", type: "image/webp" };
+  }
+  return null;
+}
+
+async function prepareImage(filePath) {
   const bytes = await readFile(filePath);
-  form.set("file", new File([bytes], path.basename(filePath)));
+  if (bytes.length > MAX_IMAGE_SIZE) return null;
+  const format = imageFormat(bytes);
+  if (!format) return null;
+  return {
+    bytes,
+    filename: `${path.parse(filePath).name}.${format.extension}`,
+    type: format.type,
+  };
+}
+
+async function uploadImage(args, productId, image) {
+  const form = new FormData();
+  form.set("file", new File([image.bytes], image.filename, { type: image.type }));
   return apiFetch(args, `/api/admin/products/${productId}/images/upload`, { method: "POST", body: form });
 }
 
@@ -296,7 +326,12 @@ function manifestIssue(item, pricing) {
   if (!pricing.options.length) return "options are required";
   const invalidOption = pricing.options.find((option) => !option.name || !Number.isFinite(option.calculatedSalePrice) || option.calculatedSalePrice <= 0);
   if (invalidOption) return `invalid option price: ${invalidOption.name || invalidOption.sourceOptionCode}`;
-  if (item.status === "ACTIVE" && !item.productInfoNotice) return "ACTIVE import requires product notice";
+  if (item.status === "ACTIVE" && item.complianceStatus === "REJECTED") {
+    return "ACTIVE import rejects products with rejected compliance";
+  }
+  if (item.status === "ACTIVE" && ![item.productInfoNotice, item.shippingInfo, item.asInfo, item.returnExchangeInfo].every(Boolean)) {
+    return "ACTIVE import requires complete product notice";
+  }
   return "";
 }
 
@@ -308,26 +343,49 @@ async function importItem(args, item, product, suppliers, products, policy) {
   item.summary = sanitizePublicSummary(item.summary || summaryFor(product));
   const issue = manifestIssue(item, pricing);
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
-  if (products.some((existing) => existing.name === item.name)) {
-    return { itemNo: item.itemNo, status: "SKIPPED", reason: "same product name already exists" };
-  }
+  const sourceUrl = item.sourceUrl || product.sourceUrl || null;
+  const existing = products.find((candidate) => sourceUrl && candidate.sourceUrl === sourceUrl)
+    || products.find((candidate) => !candidate.sourceUrl && candidate.name === item.name);
 
-  const supplier = await ensureSupplier(args, suppliers, item.supplierName);
-  const created = await apiFetch(args, "/api/admin/products", {
-    method: "POST",
-    body: JSON.stringify({
-      supplierId: supplier.id,
-      name: item.name,
-      summary: item.summary,
-      sourcePrice: pricing.sourcePrice,
-      sourceUrl: item.sourceUrl || product.sourceUrl || null,
-      basePrice: pricing.basePrice,
-      categoryCode: item.categoryCode,
-      status: item.status || "HIDDEN",
-    }),
-  });
+  const supplier = existing
+    ? suppliers.find((candidate) => candidate.id === existing.supplierId)
+    : await ensureSupplier(args, suppliers, item.supplierName);
+  let created = existing
+    ? await apiFetch(args, `/api/admin/products/${existing.id}`)
+    : await apiFetch(args, "/api/admin/products", {
+        method: "POST",
+        body: JSON.stringify({
+          supplierId: supplier.id,
+          name: item.name,
+          summary: item.summary,
+          sourcePrice: pricing.sourcePrice,
+          sourceUrl,
+          basePrice: pricing.basePrice,
+          categoryCode: item.categoryCode,
+          status: "HIDDEN",
+        }),
+      });
+  if (existing && sourceUrl && !existing.sourceUrl) {
+    created = await apiFetch(args, `/api/admin/products/${created.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        supplierId: created.supplierId,
+        name: item.name,
+        summary: item.summary,
+        sourcePrice: pricing.sourcePrice,
+        sourceUrl,
+        basePrice: pricing.basePrice,
+        categoryCode: item.categoryCode,
+        complianceStatus: created.complianceStatus,
+        reason: "기존 수집 상품 원본 연결",
+      }),
+    });
+    existing.sourceUrl = sourceUrl;
+  }
+  const existingOptionKeys = new Set((created.options || []).map((option) => option.sourceOptionCode || option.name));
 
   for (const option of pricing.options) {
+    if (existingOptionKeys.has(option.sourceOptionCode || option.name)) continue;
     await apiFetch(args, `/api/admin/products/${created.id}/options`, {
       method: "POST",
       body: JSON.stringify({
@@ -342,27 +400,35 @@ async function importItem(args, item, product, suppliers, products, policy) {
     });
   }
 
-  const thumbnail = await uploadImage(args, created.id, product.thumbnailImagePath);
-  await apiFetch(args, `/api/admin/products/${created.id}/images`, {
-    method: "PUT",
-    body: JSON.stringify({
-      images: [{ type: "THUMBNAIL", imageUrl: thumbnail.imageUrl, sortOrder: 0, altText: item.name }],
-      reason: "도매꾹 import 대표 이미지 설정",
-    }),
-  });
-
-  const detailBlocks = [];
-  const detailImagePaths = product.detailImagePaths || [];
-  for (let index = 0; index < detailImagePaths.length; index += 1) {
-    const uploaded = await uploadImage(args, created.id, detailImagePaths[index]);
-    detailBlocks.push({ type: "IMAGE", imageUrl: uploaded.imageUrl, htmlContent: null, sortOrder: index, altText: item.name });
+  if (!created.thumbnailImageUrl) {
+    const thumbnailImage = await prepareImage(product.thumbnailImagePath);
+    if (!thumbnailImage) throw new Error("thumbnail must be jpg, png, or webp and at most 10MB");
+    const thumbnail = await uploadImage(args, created.id, thumbnailImage);
+    await apiFetch(args, `/api/admin/products/${created.id}/images`, {
+      method: "PUT",
+      body: JSON.stringify({
+        images: [{ type: "THUMBNAIL", imageUrl: thumbnail.imageUrl, sortOrder: 0, altText: item.name }],
+        reason: "도매꾹 import 대표 이미지 설정",
+      }),
+    });
   }
-  await apiFetch(args, `/api/admin/products/${created.id}/detail-blocks`, {
-    method: "PUT",
-    body: JSON.stringify({ detailBlocks, reason: "도매꾹 import 상세 이미지 설정" }),
-  });
 
-  if (item.productInfoNotice) {
+  const detailImagePaths = (product.detailImagePaths || []).slice(0, MAX_DETAIL_BLOCKS);
+  const detailImages = (await Promise.all(detailImagePaths.map(prepareImage))).filter(Boolean);
+  if (detailImages.length === 0) throw new Error("at least one supported detail image is required");
+  if ((created.detailBlocks || []).length !== detailImages.length) {
+    const detailBlocks = [];
+    for (let index = 0; index < detailImages.length; index += 1) {
+      const uploaded = await uploadImage(args, created.id, detailImages[index]);
+      detailBlocks.push({ type: "IMAGE", imageUrl: uploaded.imageUrl, htmlContent: null, sortOrder: index, altText: item.name });
+    }
+    await apiFetch(args, `/api/admin/products/${created.id}/detail-blocks`, {
+      method: "PUT",
+      body: JSON.stringify({ detailBlocks, reason: "도매꾹 import 상세 이미지 설정" }),
+    });
+  }
+
+  if (item.productInfoNotice && !created.productNotice) {
     await apiFetch(args, `/api/admin/products/${created.id}/notice`, {
       method: "PUT",
       body: JSON.stringify({
@@ -375,15 +441,44 @@ async function importItem(args, item, product, suppliers, products, policy) {
     });
   }
 
-  products.push(created);
+  if (item.complianceStatus && item.complianceStatus !== "PENDING") {
+    await apiFetch(args, `/api/admin/products/${created.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        supplierId: created.supplierId,
+        name: item.name,
+        summary: item.summary,
+        sourcePrice: pricing.sourcePrice,
+        sourceUrl,
+        basePrice: pricing.basePrice,
+        categoryCode: item.categoryCode,
+        complianceStatus: item.complianceStatus,
+        reason: "자동 수집 상품 인증 상태 반영",
+      }),
+    });
+  }
+
+  if (created.status !== item.status) {
+    await apiFetch(args, `/api/admin/products/${created.id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: item.status || "HIDDEN",
+        reason: item.status === "ACTIVE" ? "자동 검수 조건 충족 상품 공개" : "자동 검수 대기 상품 비공개",
+      }),
+    });
+  }
+
+  if (!existing) products.push({ ...created, status: item.status || "HIDDEN" });
   return {
     itemNo: item.itemNo,
-    status: "IMPORTED",
+    status: existing ? "UPDATED" : "IMPORTED",
     productId: created.id,
     supplierId: supplier.id,
     sourcePrice: pricing.sourcePrice,
     basePrice: pricing.basePrice,
     optionCount: pricing.options.length,
+    complianceStatus: item.complianceStatus || "PENDING",
+    productStatus: item.status || "HIDDEN",
   };
 }
 
@@ -407,6 +502,8 @@ async function runManifest(args) {
           optionCount: pricing.options.length,
           minOptionSalePrice: pricing.basePrice,
           maxOptionSalePrice: Math.max(...pricing.options.map((option) => option.calculatedSalePrice)),
+          complianceStatus: item.complianceStatus || "PENDING",
+          productStatus: item.status || "HIDDEN",
         });
       } catch (error) {
         results.push({ itemNo: item.itemNo, status: "FAILED", reason: error.message });
@@ -436,12 +533,36 @@ async function runManifest(args) {
     }
   }
   await writeFile(DEFAULT_RESULT, `${JSON.stringify(results, null, 2)}\n`);
-  console.log(`import 완료: ${results.filter((result) => result.status === "IMPORTED").length}개`);
+  console.log(`import 완료: 신규 ${results.filter((result) => result.status === "IMPORTED").length}개, 이어서 처리 ${results.filter((result) => result.status === "UPDATED").length}개`);
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return usage();
+  if (args.selfCheck) {
+    const pricing = { sourcePrice: 1000, basePrice: 1300, options: [{ name: "기본", calculatedSalePrice: 1300 }] };
+    const active = {
+      import: true,
+      categoryCode: "TRAFFIC_CONE",
+      summary: "라바콘",
+      status: "ACTIVE",
+      complianceStatus: "NOT_REQUIRED",
+      productInfoNotice: "상품 고시",
+      shippingInfo: "배송 안내",
+      asInfo: "A/S 안내",
+      returnExchangeInfo: "반품 안내",
+    };
+    assert.equal(manifestIssue(active, pricing), "");
+    assert.equal(manifestIssue({ ...active, complianceStatus: "PENDING" }, pricing), "");
+    assert.match(manifestIssue({ ...active, complianceStatus: "REJECTED" }, pricing), /compliance/);
+    assert.match(manifestIssue({ ...active, asInfo: "" }, pricing), /product notice/);
+    assert.equal(imageFormat(Buffer.from([0xff, 0xd8, 0xff])).extension, "jpg");
+    assert.equal(imageFormat(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])).extension, "png");
+    assert.equal(imageFormat(Buffer.from("RIFF0000WEBP")).extension, "webp");
+    assert.equal(imageFormat(Buffer.from("GIF89a")), null);
+    console.log("Domeggook product import self-check passed");
+    return;
+  }
   if (args.initManifest) return initManifest();
   return runManifest(args);
 }
