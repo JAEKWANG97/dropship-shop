@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-07-28 B-002 카카오 소셜 로그인 운영 검증 완료
+
+- 관련 항목: B-002, B-074
+- 배포: 커밋 `f47493b`를 GitHub Actions run `30374501413`으로 배포했다. verify, ARM64 image build/push, EC2 deploy가 성공했고 API/Web 컨테이너와 내부·공개 readiness가 정상이다.
+- 실브라우저 검증: 실제 카카오 계정으로 이메일 제공에 동의하고 운영 callback을 거쳐 `/account`로 복귀했다. 기존 placeholder 이메일이 인증된 카카오 이메일로 교체됐고 로그인 세션이 유지됐다.
+- 필수정보: 실제 배송 연락처를 저장한 뒤 이름, 이메일, 휴대폰 번호 기준 `필수 정보 완료` 상태를 확인했다. 주소는 주문서 배송지 입력과 별도 저장 배송지 도메인으로 관리하며 B-002 완료 기준에는 포함하지 않는다.
+- 실패 흐름: authorize URL의 `profile_nickname account_email` scope와 운영 callback URI를 확인했다. `error=access_denied` callback은 구조화된 `400 BUSINESS_RULE_VIOLATION` 응답을 반환했다.
+
 ## 2026-07-28 B-074 카카오 로그인 단일 노출과 휴대폰 OTP 필수 제거
 
 - 관련 항목: B-074, B-002

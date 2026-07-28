@@ -4,6 +4,11 @@
 
 ## 2026-07-28
 
+- B-002 카카오 소셜 로그인 실브라우저 검증
+  - 완료 내용: 운영 `/login?redirectTo=/account`에서 카카오 로그인만 노출하고, 실제 카카오 계정의 이메일 제공 동의부터 callback, HttpOnly 로그인 세션, `/account` 이동까지 확인했다.
+  - 계정 반영: 기존 `@oauth.local` placeholder 이메일이 인증된 카카오 이메일로 교체됐고, 실제 배송 연락처 저장 후 이름·이메일·휴대폰 번호 기준 `필수 정보 완료` 상태를 확인했다.
+  - 실패 흐름: 카카오 authorize 요청에 `profile_nickname account_email` scope와 운영 callback URI가 포함되며, `error=access_denied` callback은 빈 화면 대신 구조화된 `400 BUSINESS_RULE_VIOLATION` 응답을 반환한다.
+  - 배포: 커밋 `f47493b`를 GitHub Actions run `30374501413`으로 배포했고 API/Web 새 이미지, EC2 컨테이너와 공개 readiness `UP`을 확인했다.
 - B-074 카카오 로그인 단일 노출과 휴대폰 OTP 필수 제거
   - 완료 내용: 고객 로그인 화면에는 카카오만 노출하고 Google/Naver OAuth 백엔드는 기존 계정 호환용으로 유지한다. 카카오 닉네임·이메일 동의를 요청하고 유효·인증된 이메일을 저장하며, 프로필 저장에 배송 연락처를 포함하고 이름, 연락 가능한 이메일, 형식이 유효한 휴대폰 번호만으로 주문 필수 정보를 완료한다.
   - 호환성: 기존 SMS OTP API, 인증 기록, `phone_verified_at`은 삭제하지 않는다. 전화번호가 바뀌면 이전 인증 시각만 초기화하며 checkout은 인증 여부를 요구하지 않는다.
