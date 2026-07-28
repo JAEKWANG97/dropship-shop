@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
 import { orderStatusLabel, paymentGroupStatusLabel } from "@/lib/orders";
 import { getCurrentUser } from "@/lib/session";
+import { AddressFields } from "../../address-fields";
 import { SubmitButton } from "../../submit-button";
 import {
   confirmCheckoutPolicies,
@@ -179,18 +180,7 @@ function ShippingAddressForm({ checkout }: { checkout: Checkout }) {
         연락처
         <input name="recipientPhone" required />
       </label>
-      <label>
-        우편번호
-        <input name="postalCode" required />
-      </label>
-      <label>
-        주소
-        <input name="address1" required />
-      </label>
-      <label>
-        상세 주소
-        <input name="address2" />
-      </label>
+      <AddressFields />
       <SubmitButton className="button" pendingLabel="변경 중...">
         배송지 변경
       </SubmitButton>

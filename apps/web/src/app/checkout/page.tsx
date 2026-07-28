@@ -5,6 +5,7 @@ import { getAddresses, getAgreementState, type Address } from "@/lib/account";
 import { getCart, type Cart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
+import { AddressFields } from "../address-fields";
 import { SubmitButton } from "../submit-button";
 import { agreeRequiredPolicies, createCheckout } from "./actions";
 
@@ -218,18 +219,11 @@ function CreateCheckoutForm({
           defaultValue={defaultAddress?.recipientPhone ?? ""}
         />
       </label>
-      <label>
-        우편번호
-        <input name="postalCode" required defaultValue={defaultAddress?.postalCode ?? ""} />
-      </label>
-      <label>
-        주소
-        <input name="address1" required defaultValue={defaultAddress?.address1 ?? ""} />
-      </label>
-      <label>
-        상세 주소
-        <input name="address2" defaultValue={defaultAddress?.address2 ?? ""} />
-      </label>
+      <AddressFields
+        postalCode={defaultAddress?.postalCode}
+        address1={defaultAddress?.address1}
+        address2={defaultAddress?.address2 ?? undefined}
+      />
       <label>
         입금자명
         <input name="depositorName" placeholder="비워두면 받는 사람 이름으로 안내됩니다" />

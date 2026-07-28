@@ -1758,6 +1758,29 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.address-fields {
+  display: contents;
+}
+
+.address-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.address-search-row .button {
+  grid-column: auto;
+  min-height: 40px;
+}
+
+.address-fields .field-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
 .checkout-summary-card {
   display: grid;
   gap: 14px;
@@ -3168,6 +3191,10 @@ textarea {
   .checkout-main-form,
   .cart-item {
     grid-template-columns: 1fr;
+  }
+
+  .address-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .summary-list > div {

@@ -17,6 +17,7 @@ import {
   type OrderDetail,
 } from "@/lib/orders";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
+import { AddressFields } from "../../address-fields";
 import { SubmitButton } from "../../submit-button";
 import { cancelOrder, createClaim, updateOrderShippingAddress } from "../actions";
 import { ClaimEvidenceInput } from "../claim-evidence-input";
@@ -293,18 +294,11 @@ function OrderShippingAddressForm({ order }: { order: OrderDetail }) {
         연락처
         <input name="recipientPhone" required defaultValue={address.recipientPhone} />
       </label>
-      <label>
-        우편번호
-        <input name="postalCode" required defaultValue={address.postalCode} />
-      </label>
-      <label>
-        주소
-        <input name="address1" required defaultValue={address.address1} />
-      </label>
-      <label>
-        상세 주소
-        <input name="address2" defaultValue={address.address2 ?? ""} />
-      </label>
+      <AddressFields
+        postalCode={address.postalCode}
+        address1={address.address1}
+        address2={address.address2 ?? undefined}
+      />
       <SubmitButton className="button" pendingLabel="변경 중...">
         배송지 변경
       </SubmitButton>

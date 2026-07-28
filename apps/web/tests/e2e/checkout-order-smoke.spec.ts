@@ -7,6 +7,9 @@ import {
   requireSeedOrderByStatus,
 } from "./helpers";
 
+const POSTCODE_SCRIPT =
+  "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+
 test("checkout detail shows bank-transfer deposit instructions", async ({ page, context }) => {
   const [customerCookie, paymentPendingOrder] = await Promise.all([
     requireCustomerCookie(),
@@ -25,6 +28,27 @@ test("checkout detail shows bank-transfer deposit instructions", async ({ page, 
   await expect(page.locator("body")).toContainText("입금 금액");
   await expect(page.locator("body")).toContainText("입금 기한");
   await expectNoHorizontalOverflow(page);
+});
+
+test("checkout address search fills the shipping address", async ({ page, context }) => {
+  const [customerCookie, paymentPendingOrder] = await Promise.all([
+    requireCustomerCookie(),
+    requireSeedOrderByStatus("PAYMENT_PENDING"),
+  ]);
+  await page.route(POSTCODE_SCRIPT, async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `window.daum={Postcode:function(options){this.open=function(){options.oncomplete({zonecode:"05555",roadAddress:"서울특별시 송파구 테스트로 1",jibunAddress:"",userSelectedType:"R"});};}};`,
+    });
+  });
+  await addCookie(context, customerCookie);
+  await page.goto(`/checkout/${paymentPendingOrder.checkoutNumber}`);
+
+  await page.getByRole("button", { name: "주소 검색" }).click();
+
+  await expect(page.getByLabel("우편번호")).toHaveValue("05555");
+  await expect(page.getByLabel("주소", { exact: true })).toHaveValue("서울특별시 송파구 테스트로 1");
+  await expect(page.getByLabel("상세 주소")).toBeFocused();
 });
 
 test("customer orders page links to order detail with claim form and claim status", async ({ page, context }) => {
