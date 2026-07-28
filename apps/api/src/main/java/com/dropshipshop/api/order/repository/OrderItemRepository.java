@@ -10,4 +10,6 @@ import com.dropshipshop.api.order.domain.OrderItem;
 public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
 	List<OrderItem> findAllByOrder_IdOrderByCreatedAtAsc(UUID orderId);
+
+	long countByOrder_Id(UUID orderId);
 }

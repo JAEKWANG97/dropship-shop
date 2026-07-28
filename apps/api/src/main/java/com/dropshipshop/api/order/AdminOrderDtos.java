@@ -46,6 +46,7 @@ final class AdminOrderDtos {
 		UUID customerId,
 		String customerEmail,
 		String checkoutNumber,
+		long itemCount,
 		long totalAmount,
 		Instant createdAt
 	) {

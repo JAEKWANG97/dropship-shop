@@ -139,7 +139,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 >
                   <strong>{order.orderNumber}</strong>
                   <span>{order.customerEmail}</span>
-                  <span>{order.items?.length ?? 0}개</span>
+                  <span>{order.itemCount}개</span>
                   <span>{formatPrice(order.totalAmount)}</span>
                   <span className={`admin-badge ${order.status.toLowerCase()}`}>
                     {adminStatusLabel(order.status)}

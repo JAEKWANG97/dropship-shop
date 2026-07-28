@@ -54,7 +54,10 @@ export async function activeProductId() {
   if (isLocalTarget()) {
     expect(primaryProduct, `Local seed product '${PRIMARY_PRODUCT_NAME}' is required`).toBeTruthy();
   }
-  const product = primaryProduct ?? products[0];
+  const fallbackProducts = primaryProduct
+    ? products
+    : ((await (await fetch(`${API_BASE_URL}/api/products?size=1`)).json()) as ProductPage).products;
+  const product = primaryProduct ?? fallbackProducts[0];
   expect(product, "At least one active product is required").toBeTruthy();
   return product.id;
 }

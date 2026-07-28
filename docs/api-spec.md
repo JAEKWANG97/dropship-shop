@@ -431,6 +431,7 @@ Rules:
 - Admin actions must map to valid transition table actions.
 - Admin order queue defaults to `SUPPLIER_ORDER_PENDING` orders.
 - `GET /api/admin/orders?status=PAYMENT_PENDING` returns the bank-transfer deposit waiting queue.
+- Admin order summaries include `itemCount` so the list does not depend on detail API data.
 - `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
 - Admin deposit confirmation requires `actualDepositorName`, positive `actualAmount`, past-or-present `depositedAt`, `transactionReference`, reason, confirmed checkout policies, `PAYMENT_PENDING` checkout orders, and currently sellable products/options. `actualAmount` must exactly equal the payment group total; mismatch returns `400` without approving the payment group or orders.
 - Admin deposit confirmation creates a `BANK_TRANSFER` payment row, marks the payment group `APPROVED`, and moves all checkout orders to `SUPPLIER_ORDER_PENDING`.

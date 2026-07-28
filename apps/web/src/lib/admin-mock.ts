@@ -101,6 +101,7 @@ export const adminOrders: AdminOrder[] = [
     supplierName: "대림건설자재",
     customerEmail: "honggd@safebuild.co.kr",
     checkoutNumber: "CK-20240522-123",
+    itemCount: 3,
     totalAmount: 2450000,
     createdAt: "2024-05-22T14:32:00Z",
     items: [
@@ -118,6 +119,7 @@ export const adminOrders: AdminOrder[] = [
     supplierName: "현대산업안전",
     customerEmail: "order@hyundai-safe.co.kr",
     checkoutNumber: "CK-20240522-122",
+    itemCount: 1,
     totalAmount: 1890000,
     createdAt: "2024-05-22T13:11:00Z",
     items: [{ productName: "K2 안전화 K2-67S", optionName: "265mm", quantity: 8, unitPrice: 48500 }],
@@ -131,6 +133,7 @@ export const adminOrders: AdminOrder[] = [
     supplierName: "포스코안전",
     customerEmail: "site@posco-safe.co.kr",
     checkoutNumber: "CK-20240521-119",
+    itemCount: 1,
     totalAmount: 4680000,
     createdAt: "2024-05-21T17:03:00Z",
     items: [{ productName: "포스탑 추락방지 세트", optionName: "FS-2020", quantity: 21, unitPrice: 89000 }],

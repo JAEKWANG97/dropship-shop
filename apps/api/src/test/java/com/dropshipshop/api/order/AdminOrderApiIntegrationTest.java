@@ -132,7 +132,8 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].displayStatus".formatted(pending.getId())).doesNotExist())
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].supplierName".formatted(pending.getId()), hasItem("Supplier ADM-QUEUE-1")))
 			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].customerEmail".formatted(pending.getId()), hasItem("admin-order-customer-1@example.com")))
-			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].checkoutNumber".formatted(pending.getId()), hasItem("ADM-CO-1")));
+			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].checkoutNumber".formatted(pending.getId()), hasItem("ADM-CO-1")))
+			.andExpect(jsonPath("$.orders[?(@.orderId == '%s')].itemCount".formatted(pending.getId()), hasItem(1)));
 	}
 
 	@Test

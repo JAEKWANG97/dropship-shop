@@ -146,6 +146,7 @@ class AdminOrderQueryService {
 			customer.getId(),
 			customer.getEmail(),
 			order.getPaymentGroup().getCheckoutNumber(),
+			orderItemRepository.countByOrder_Id(order.getId()),
 			order.getTotalAmount(),
 			order.getCreatedAt()
 		);

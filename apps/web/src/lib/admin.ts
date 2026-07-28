@@ -90,6 +90,7 @@ export type AdminOrder = {
   supplierName: string;
   customerEmail: string;
   checkoutNumber: string;
+  itemCount: number;
   totalAmount: number;
   createdAt: string;
   paymentGroup?: {
