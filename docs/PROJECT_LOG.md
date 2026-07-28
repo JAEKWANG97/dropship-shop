@@ -1,12 +1,20 @@
 # Project Log
 
+## 2026-07-28 운영 입금계좌 설정과 QA 수정 배포
+
+- 관련 항목: B-030
+- 작업: 운영 EC2의 `APP_BANK_TRANSFER_BANK_NAME`, `APP_BANK_TRANSFER_ACCOUNT_NUMBER`, `APP_BANK_TRANSFER_ACCOUNT_HOLDER`를 실제 값으로 설정했다. 계좌번호는 저장소와 로그에 기록하지 않았다.
+- 보호: `prod` 프로필에서 세 환경변수를 필수로 만들고, deploy workflow가 값 존재 여부만 확인한 뒤 컨테이너를 교체하게 했다.
+- 배포: 커밋 `b36221e`를 GitHub Actions run `30347649037`로 배포했으며 verify, ARM64 image build/push, EC2 deploy가 모두 성공했다.
+- 검증: EC2 API readiness와 공개 health/products가 정상이고, 새 QA 주문 `OD926961301550`에서 실제 계좌 안내와 관리자 목록 상품수 `1개`를 확인했다. 실제 입금 없이 관리자 미입금 취소로 종료했다.
+
 ## 2026-07-28 운영 주문 흐름 QA
 
 - 관련 항목: B-026, B-030, B-065
 - 검증: 운영 전용 QA 고객으로 실제 판매 상품 1개를 장바구니에 담아 `4,600원` 계좌입금 주문을 생성하고, 주문서 정책 확인, 관리자 입금확인, 공급처 발주 시작까지 처리했다. 실제 송금과 공급처 주문은 수행하지 않았고 주문·작업 이력에 QA 사유를 남겼다.
 - 수정: 배포 E2E가 로컬 대표 상품명만 검색해 운영 상품을 찾지 못하던 문제를 일반 공개 상품 fallback으로 고쳤다. 관리자 주문 목록의 상품수가 상세 API에만 의존해 `0개`로 표시되던 문제는 summary의 `itemCount`로 고쳤다.
 - 자동 검증: API 전체 테스트, Web lint/build, 운영 URL 고객 Playwright 4건, `git diff --check`를 통과했다.
-- 출시 차단: 운영 `APP_BANK_TRANSFER_BANK_NAME`과 `APP_BANK_TRANSFER_ACCOUNT_NUMBER`가 아직 `입금 계좌 준비중`이다. 실제 계좌값 설정과 구매안전서비스 고지 확정 전에는 주문을 받아서는 안 된다.
+- 발견 당시 출시 차단: 운영 계좌가 `입금 계좌 준비중`으로 표시됐다. 같은 날 실제 계좌 설정과 배포 검증을 완료했으며, 구매안전서비스 고지는 계속 별도 출시 차단 항목으로 유지한다.
 
 ## 2026-07-28 운영 배포와 판매 상품 반영
 
