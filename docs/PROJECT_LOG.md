@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-28 운영 배포와 판매 상품 반영
+
+- 관련 항목: B-026, B-073
+- 배포: `main` 커밋 `087e97e`를 GitHub Actions run `30336534473`으로 배포했고 verify, ARM64 image build/push, EC2 deploy가 모두 성공했다.
+- 상품: 최신 filtered manifest의 판매 후보 300개를 기존 관리자 API로 반영했다. 신규 285개, 기존 상품 보완 15개, 제외 52개, 실패 0개이며 운영 DB는 `ACTIVE 300 / HIDDEN 123`이다.
+- 이미지: 운영 DB에 상품 이미지 metadata 312개, 상세 블록 1,487개가 저장됐다. 대표 이미지와 상세 이미지의 공개 URL `200`을 확인했다.
+- 백업: 반영 전 `s3://coreable-backups-prod/db/coreable-db-20260728-160419.dump`, 반영 후 `s3://coreable-backups-prod/db/coreable-db-20260728-163354.dump`를 생성했다. 반영 후 업로드 파일 1,827개를 S3에 동기화했다.
+- 검증: 공개 API `300개 / 13페이지`, readiness `UP`, 배포 URL Playwright smoke `8 passed`, EC2 디스크 사용률 40%를 확인했다.
+
 ## 2026-07-28 B-073 고객 상품 목록 서버 페이지네이션
 
 - 관련 항목: B-073, B-026

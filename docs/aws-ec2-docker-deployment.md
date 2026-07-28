@@ -21,7 +21,7 @@ This is the low-cost first production-style deployment shape. S3 is used for bac
 
 EventBridge Scheduler limits EC2 runtime while the service is not yet accepting real orders:
 
-Current state: paused on `2026-07-13`; the EC2 instance is stopped and both schedules are disabled until development resumes.
+Current state: manually running on `2026-07-28`; both automatic schedules remain disabled.
 
 - Start: every day at `09:00 KST` (`coreable-ec2-start-daily`).
 - Backup: every day at `00:10 KST` (`15:10 UTC` host cron) through `/etc/cron.d/coreable-backup`.
@@ -47,8 +47,8 @@ Current deployment:
 
 - EC2 instance id: `i-0c795cb4b0f0b4177`
 - Elastic IP: `43.200.135.171`
-- Latest successful deploy workflow: `28566566959`
-- Deployed image tag: `22ea493554d4f0eb81a0237fb9ce879ee85f12d3`
+- Latest successful deploy workflow: `30336534473`
+- Deployed image tag: `087e97e7b84e504705f98890f5f24d4afe2c49e4`
 
 Security group baseline:
 
