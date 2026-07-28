@@ -131,6 +131,32 @@ Deploy is skipped when only `docs/**`, `README.md`, or `AGENTS.md` changes. Work
 
 Deploy workflow concurrency is `deploy-production` with `cancel-in-progress: false`. Consecutive pushes wait in order instead of running two EC2 deploy scripts at the same time.
 
+## Production Bank Transfer Account
+
+Before deploying an account-transfer release, edit `/opt/coreable/.env` directly on EC2:
+
+```sh
+sudoedit /opt/coreable/.env
+```
+
+The following values are required and must not be committed or copied into deployment logs:
+
+```dotenv
+APP_BANK_TRANSFER_BANK_NAME=
+APP_BANK_TRANSFER_ACCOUNT_NUMBER=
+APP_BANK_TRANSFER_ACCOUNT_HOLDER=
+```
+
+Check only that each value exists without printing the account information:
+
+```sh
+for key in APP_BANK_TRANSFER_BANK_NAME APP_BANK_TRANSFER_ACCOUNT_NUMBER APP_BANK_TRANSFER_ACCOUNT_HOLDER; do
+  sudo grep -Eq "^${key}=.+" /opt/coreable/.env || exit 1
+done
+```
+
+The deploy workflow runs the same non-empty check before replacing containers. The `prod` Spring profile also requires all three environment variables, while local and test profiles keep their development defaults.
+
 ## Runtime Memory Limits
 
 The first deployment runs on `t4g.micro`, so Docker services have conservative memory limits:

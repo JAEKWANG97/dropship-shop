@@ -135,6 +135,12 @@ jobs:
             sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.pem
             sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.key
             sudo test -f /opt/coreable/.env
+            for required_key in APP_BANK_TRANSFER_BANK_NAME APP_BANK_TRANSFER_ACCOUNT_NUMBER APP_BANK_TRANSFER_ACCOUNT_HOLDER; do
+              if ! sudo grep -Eq "^${required_key}=.+" /opt/coreable/.env; then
+                echo "::error::${required_key} must be configured in /opt/coreable/.env"
+                exit 1
+              fi
+            done
             echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
             sudo sed -i "s|^API_IMAGE=.*|API_IMAGE=${API_IMAGE}|" /opt/coreable/.env
             sudo sed -i "s|^WEB_IMAGE=.*|WEB_IMAGE=${WEB_IMAGE}|" /opt/coreable/.env

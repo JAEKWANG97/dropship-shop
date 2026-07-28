@@ -19,6 +19,10 @@ sms:
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL}
+  bank-transfer:
+    bank-name: ${APP_BANK_TRANSFER_BANK_NAME}
+    account-number: ${APP_BANK_TRANSFER_ACCOUNT_NUMBER}
+    account-holder: ${APP_BANK_TRANSFER_ACCOUNT_HOLDER}
   inquiry:
     lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET}
   email:
