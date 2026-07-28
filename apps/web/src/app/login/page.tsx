@@ -4,12 +4,6 @@ import { publicApiUrl } from "@/lib/api";
 import { safeRedirectTo } from "@/lib/redirect";
 import { getCurrentUser } from "@/lib/session";
 
-const providers = [
-  { id: "kakao", label: "카카오로 계속하기" },
-  { id: "google", label: "구글로 계속하기" },
-  { id: "naver", label: "네이버로 계속하기" },
-];
-
 type LoginPageProps = {
   searchParams: Promise<{ redirectTo?: string | string[] }>;
 };
@@ -58,17 +52,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <span>주문·배송 조회</span>
             </div>
             <div className="button-stack">
-              {providers.map((provider) => (
-                <a
-                  className={`oauth-button ${provider.id}`}
-                  href={publicApiUrl(`/api/auth/oauth2/${provider.id}/authorize${redirectQuery}`)}
-                  key={provider.id}
-                >
-                  {provider.label}
-                </a>
-              ))}
+              <a
+                className="oauth-button kakao"
+                href={publicApiUrl(`/api/auth/oauth2/kakao/authorize${redirectQuery}`)}
+              >
+                카카오로 계속하기
+              </a>
             </div>
-            <p className="auth-helper">주문과 배송 안내를 위해 로그인 후 이름, 이메일, 휴대폰 인증이 필요할 수 있습니다.</p>
+            <p className="auth-helper">주문 전 이름, 이메일, 배송 연락처를 입력해 주세요.</p>
           </>
         )}
       </div>

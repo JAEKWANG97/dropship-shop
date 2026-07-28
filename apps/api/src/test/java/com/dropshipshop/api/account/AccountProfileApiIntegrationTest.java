@@ -47,7 +47,7 @@ class AccountProfileApiIntegrationTest {
 	private CapturingSmsSender smsSender;
 
 	@Test
-	void updatesProfileAndVerifiesPhoneNumber() throws Exception {
+	void completesRequiredProfileWithoutPhoneVerification() throws Exception {
 		UserAccount customer = createCustomer("profile-customer", "profile-customer@oauth.local");
 
 		mockMvc.perform(get("/api/me/profile-completion")
@@ -63,12 +63,21 @@ class AccountProfileApiIntegrationTest {
 				.content("""
 					{
 					  "displayName": "홍길동",
-					  "email": "customer@example.com"
+					  "email": "customer@example.com",
+					  "phoneNumber": "010-1234-5678"
 					}
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.emailRequired", is(false)))
-			.andExpect(jsonPath("$.emailComplete", is(true)));
+			.andExpect(jsonPath("$.emailComplete", is(true)))
+			.andExpect(jsonPath("$.phoneNumber", is("01012345678")))
+			.andExpect(jsonPath("$.phoneVerified", is(false)))
+			.andExpect(jsonPath("$.requiredInfoComplete", is(true)));
+	}
+
+	@Test
+	void keepsOptionalPhoneVerificationAvailable() throws Exception {
+		UserAccount customer = createCustomer("profile-customer-verification", "profile-verification@example.com");
 
 		mockMvc.perform(post("/api/me/phone-verifications")
 				.with(authentication(TestAuthentication.customer(customer.getId())))
@@ -95,6 +104,24 @@ class AccountProfileApiIntegrationTest {
 			.andExpect(jsonPath("$.phoneVerified", is(true)))
 			.andExpect(jsonPath("$.phoneNumber", is("01012345678")))
 			.andExpect(jsonPath("$.requiredInfoComplete", is(true)));
+	}
+
+	@Test
+	void rejectsInvalidProfilePhoneNumber() throws Exception {
+		UserAccount customer = createCustomer("profile-customer-phone-invalid", "profile-phone-invalid@example.com");
+
+		mockMvc.perform(patch("/api/me/profile")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "displayName": "홍길동",
+					  "email": "customer@example.com",
+					  "phoneNumber": "1234"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Phone number format is invalid")));
 	}
 
 	@Test

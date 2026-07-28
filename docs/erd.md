@@ -268,8 +268,13 @@ Implemented by B-017.
 
 Purpose:
 
-- Stores SMS OTP verification attempts for customer phone number ownership checks.
+- Stores optional legacy SMS OTP verification attempts.
 - Code values are stored as hashes, not plaintext.
+
+Current policy:
+
+- Checkout requires a valid saved delivery phone number, not OTP completion.
+- Existing rows and endpoints remain for compatibility and are not removed by B-074.
 
 Current fields:
 

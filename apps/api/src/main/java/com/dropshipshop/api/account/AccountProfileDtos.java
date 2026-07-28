@@ -26,7 +26,8 @@ final class AccountProfileDtos {
 
 	record ProfileUpdateRequest(
 		@NotBlank @Size(max = 100) String displayName,
-		@NotBlank @Email @Size(max = 320) String email
+		@NotBlank @Email @Size(max = 320) String email,
+		@NotBlank @Size(max = 30) String phoneNumber
 	) {
 	}
 

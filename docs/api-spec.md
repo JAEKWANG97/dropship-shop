@@ -103,9 +103,9 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 | `POST` | `/api/auth/logout` | Authenticated user | Implemented | Clear current access token cookie |
 | `GET` | `/api/me` | Authenticated user | Implemented | Current user identity |
 | `GET` | `/api/me/profile-completion` | Authenticated user | Implemented | Current required customer info completion state |
-| `PATCH` | `/api/me/profile` | Authenticated user | Implemented | Update display name and contact email |
-| `POST` | `/api/me/phone-verifications` | Authenticated user | Implemented | Request SMS OTP phone verification |
-| `POST` | `/api/me/phone-verifications/confirm` | Authenticated user | Implemented | Confirm SMS OTP phone verification |
+| `PATCH` | `/api/me/profile` | Authenticated user | Implemented | Update display name, contact email, and delivery phone number |
+| `POST` | `/api/me/phone-verifications` | Authenticated user | Implemented | Optional legacy SMS OTP request; not required for checkout |
+| `POST` | `/api/me/phone-verifications/confirm` | Authenticated user | Implemented | Optional legacy SMS OTP confirmation; not required for checkout |
 | `GET` | `/api/me/referral` | Authenticated user | Implemented | Return current user's referral code and whether a referrer is registered. Lazily creates a code if missing. |
 | `POST` | `/api/me/referral` | Authenticated user | Implemented | Register a referrer by referral code once |
 | `GET` | `/api/me/agreements` | Authenticated user | Implemented | Current user policy agreement state |
@@ -118,18 +118,19 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 
 Notes:
 
-- MVP supports only Kakao, Google, and Naver social login.
+- The customer login page exposes Kakao only. Google and Naver OAuth endpoints remain implemented for existing-account compatibility.
 - Email/password signup and login are excluded.
 - Guest checkout is excluded.
 - Admin users use the same social login flow, but admin access comes only from DB role.
 - OAuth login uses provider authorization-code callbacks, provider token/userinfo requests, and social identity lookup by provider plus provider user id.
+- Kakao authorization requests `profile_nickname account_email`. A verified provider email replaces only an existing internal `@oauth.local` placeholder and never overwrites a customer-edited email.
 - Successful login sets `ACCESS_TOKEN` as an HttpOnly cookie with `SameSite=Lax`; production must use `Secure`.
 - Access tokens are stateless JWTs signed by the API. Refresh tokens are deferred from MVP auth foundation.
 - Current required versions start as `terms-2026-06-01` and `privacy-2026-06-01`.
 - `POST /api/me/agreements` requires both `termsAgreed=true` and `privacyAgreed=true` with current required versions.
 - Reposting the same current versions is idempotent and returns the existing agreement record.
-- Required customer info is display name, reachable contact email, and verified phone number.
-- Phone verification uses SMS OTP with hashed code storage, expiration, resend cooldown, and attempt limits.
+- Required customer info is display name, reachable contact email, and a valid delivery phone number.
+- Existing SMS OTP endpoints retain hashed code storage, expiration, resend cooldown, and attempt limits, but phone verification is not a checkout requirement.
 - Referral code collection runs after first social-login account creation through web onboarding. `GET /api/me` remains unchanged; referral state is only exposed through `/api/me/referral`.
 - Referrer registration rejects unknown codes, inactive referrer accounts, self referral, and duplicate registration.
 - Customer referral responses never expose the referrer's name or email.
@@ -158,15 +159,16 @@ GET /api/me/profile-completion
   "emailRequired": false,
   "emailComplete": true,
   "phoneNumber": "01012345678",
-  "phoneVerified": true,
-  "phoneVerifiedAt": "2026-06-29T00:00:00Z",
+  "phoneVerified": false,
+  "phoneVerifiedAt": null,
   "requiredInfoComplete": true
 }
 
 PATCH /api/me/profile
 {
   "displayName": "Customer",
-  "email": "customer@example.com"
+  "email": "customer@example.com",
+  "phoneNumber": "010-1234-5678"
 }
 
 POST /api/me/phone-verifications

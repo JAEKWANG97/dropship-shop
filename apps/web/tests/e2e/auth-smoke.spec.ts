@@ -6,9 +6,9 @@ test("login page renders social provider entry points", async ({ page }) => {
 
   await expect(page.getByRole("heading")).toContainText("안전용품");
   await expect(page.getByText("소셜 로그인").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "구글로 계속하기" })).toBeVisible();
   await expect(page.getByRole("link", { name: "카카오로 계속하기" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "네이버로 계속하기" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "구글로 계속하기" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "네이버로 계속하기" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 
@@ -28,5 +28,7 @@ test("logged-in login page honors redirectTo without provider automation", async
 
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("heading", { name: "내 계정" })).toBeVisible();
+  await expect(page.getByLabel("배송 연락처")).toBeVisible();
+  await expect(page.getByRole("button", { name: "인증번호 받기" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });

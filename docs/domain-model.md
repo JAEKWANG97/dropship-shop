@@ -73,9 +73,9 @@ DS-32 implementation notes:
 B-017 implementation notes:
 
 - 고객 회원 유형은 구분하지 않는다.
-- 로그인 후 필수 정보 완료 상태는 이름, 연락 가능한 이메일, 인증된 휴대폰 번호로 판단한다.
+- 로그인 후 필수 정보 완료 상태는 이름, 연락 가능한 이메일, 형식이 유효한 배송 연락처로 판단한다.
 - 소셜 로그인 placeholder 이메일은 고객 연락 주소로 보지 않는다.
-- 휴대폰 번호는 SMS OTP 성공 후 `phone`/`phoneVerifiedAt`에 저장한다.
+- 휴대폰 번호는 프로필에서 직접 저장한다. 기존 SMS OTP 성공 기록은 `phoneVerifiedAt`에 보존하지만 주문 조건으로 사용하지 않는다.
 
 B-014 implementation notes:
 
@@ -93,7 +93,7 @@ B-050 implementation notes:
 
 ## SocialAccount
 
-카카오, 구글, 네이버 소셜 로그인 식별 정보를 나타낸다.
+카카오, 구글, 네이버 소셜 로그인 식별 정보를 나타낸다. 고객 로그인 화면은 카카오만 노출하고 Google/Naver 연결은 기존 계정 호환용으로 유지한다.
 
 Planned fields:
 

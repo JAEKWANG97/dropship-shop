@@ -112,6 +112,9 @@ class OAuthLoginService {
 				profile.displayName(),
 				UserRole.CUSTOMER
 			)));
+		if (!newUser && user.useProviderEmailWhenPlaceholder(profile.email())) {
+			userAccountRepository.save(user);
+		}
 
 		String token = jwtAccessTokenService.issue(user);
 		return ResponseEntity.status(HttpStatus.FOUND)

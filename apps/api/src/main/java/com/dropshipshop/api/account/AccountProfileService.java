@@ -54,7 +54,11 @@ public class AccountProfileService {
 		AccountProfileDtos.ProfileUpdateRequest request
 	) {
 		UserAccount user = findUser(userId);
-		user.updateProfile(request.displayName().trim(), request.email().trim());
+		user.updateProfile(
+			request.displayName().trim(),
+			request.email().trim(),
+			normalizePhone(request.phoneNumber())
+		);
 		return toCompletion(user);
 	}
 
@@ -125,6 +129,7 @@ public class AccountProfileService {
 		boolean displayNameComplete = user.getDisplayName() != null && !user.getDisplayName().isBlank();
 		boolean emailRequired = isPlaceholderEmail(user.getEmail());
 		boolean emailComplete = !emailRequired && user.getEmail() != null && !user.getEmail().isBlank();
+		boolean phoneComplete = user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank();
 		boolean phoneVerified = user.getPhoneVerifiedAt() != null;
 		return new AccountProfileDtos.ProfileCompletionResponse(
 			user.getDisplayName(),
@@ -135,7 +140,7 @@ public class AccountProfileService {
 			user.getPhoneNumber(),
 			phoneVerified,
 			user.getPhoneVerifiedAt(),
-			displayNameComplete && emailComplete && phoneVerified
+			displayNameComplete && emailComplete && phoneComplete
 		);
 	}
 

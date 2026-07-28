@@ -3,12 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfileCompletion, getReferralState } from "@/lib/account";
 import { getCurrentUser } from "@/lib/session";
 import { SubmitButton } from "../submit-button";
-import {
-  confirmPhoneVerification,
-  requestAccountDeletion,
-  requestPhoneVerification,
-  updateProfile,
-} from "./actions";
+import { requestAccountDeletion, updateProfile } from "./actions";
 
 type AccountPageProps = {
   searchParams: Promise<{ message?: string }>;
@@ -47,7 +42,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <>
           <div className={profile.data.requiredInfoComplete ? "notice success" : "notice"}>
             <strong>{profile.data.requiredInfoComplete ? "필수 정보 완료" : "필수 정보 필요"}</strong>
-            <span>주문 전 이름, 연락 가능한 이메일, 인증된 휴대폰 번호가 필요합니다.</span>
+            <span>주문 전 이름, 연락 가능한 이메일, 배송 연락처가 필요합니다.</span>
           </div>
           <form action={updateProfile} className="account-form">
             <label>
@@ -58,46 +53,19 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               이메일
               <input name="email" required type="email" defaultValue={profile.data.email} />
             </label>
+            <label>
+              배송 연락처
+              <input
+                name="phoneNumber"
+                required
+                inputMode="tel"
+                placeholder="01012345678"
+                defaultValue={profile.data.phoneNumber ?? ""}
+              />
+              <span className="field-help">주문 확인과 배송 연락에 사용할 휴대폰 번호를 입력해 주세요.</span>
+            </label>
             <SubmitButton className="button" pendingLabel="저장 중...">
               기본 정보 저장
-            </SubmitButton>
-          </form>
-          <form action={requestPhoneVerification} className="account-form">
-            <h2>휴대폰 번호 인증</h2>
-            <p className="field-help">주문과 배송 안내를 받을 번호로 6자리 인증번호를 발송합니다.</p>
-            <label>
-              휴대폰 번호
-              <input
-                name="phoneNumber"
-                required
-                inputMode="tel"
-                placeholder="01012345678"
-                defaultValue={profile.data.phoneNumber ?? ""}
-              />
-            </label>
-            <SubmitButton className="button" pendingLabel="발송 중...">
-              인증번호 받기
-            </SubmitButton>
-          </form>
-          <form action={confirmPhoneVerification} className="account-form">
-            <h2>인증번호 입력</h2>
-            <p className="field-help">문자로 받은 6자리 번호를 입력하면 주문 전 필수 정보가 완료됩니다.</p>
-            <label>
-              인증할 휴대폰 번호
-              <input
-                name="phoneNumber"
-                required
-                inputMode="tel"
-                placeholder="01012345678"
-                defaultValue={profile.data.phoneNumber ?? ""}
-              />
-            </label>
-            <label>
-              인증번호
-              <input name="code" required inputMode="numeric" minLength={6} maxLength={6} />
-            </label>
-            <SubmitButton className="button primary" pendingLabel="확인 중...">
-              휴대폰 인증 완료
             </SubmitButton>
           </form>
         </>

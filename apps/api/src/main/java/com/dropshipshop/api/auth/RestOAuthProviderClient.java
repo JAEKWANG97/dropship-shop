@@ -85,9 +85,13 @@ class RestOAuthProviderClient implements OAuthProviderClient {
 		Map<String, Object> account = map(response.get("kakao_account"));
 		Map<String, Object> profile = map(account.get("profile"));
 		String providerUserId = string(response.get("id"));
+		String email = Boolean.TRUE.equals(account.get("is_email_valid"))
+			&& Boolean.TRUE.equals(account.get("is_email_verified"))
+			? string(account.get("email"))
+			: null;
 		return profile(
 			providerUserId,
-			firstNonBlank(string(account.get("email")), "kakao-" + providerUserId + "@oauth.local"),
+			firstNonBlank(email, "kakao-" + providerUserId + "@oauth.local"),
 			string(profile.get("nickname"))
 		);
 	}

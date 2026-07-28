@@ -300,7 +300,7 @@ class CheckoutApiIntegrationTest {
 			providerUserId,
 			UserRole.CUSTOMER
 		));
-		customer.verifyPhone("01011112222", Instant.now());
+		customer.updateProfile(providerUserId, providerUserId + "@example.com", "01011112222");
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,

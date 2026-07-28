@@ -4,6 +4,10 @@
 
 ## 2026-07-28
 
+- B-074 카카오 로그인 단일 노출과 휴대폰 OTP 필수 제거
+  - 완료 내용: 고객 로그인 화면에는 카카오만 노출하고 Google/Naver OAuth 백엔드는 기존 계정 호환용으로 유지한다. 카카오 닉네임·이메일 동의를 요청하고 유효·인증된 이메일을 저장하며, 프로필 저장에 배송 연락처를 포함하고 이름, 연락 가능한 이메일, 형식이 유효한 휴대폰 번호만으로 주문 필수 정보를 완료한다.
+  - 호환성: 기존 SMS OTP API, 인증 기록, `phone_verified_at`은 삭제하지 않는다. 전화번호가 바뀌면 이전 인증 시각만 초기화하며 checkout은 인증 여부를 요구하지 않는다.
+  - 검증: Account/Checkout API 통합 테스트, 전체 API 테스트, Web lint/build, Playwright desktop 로그인 smoke 3건, `git diff --check`.
 - B-073 고객 상품 목록 서버 페이지네이션
   - 완료 내용: 공개 상품 목록을 전체 배열 조회에서 24개 단위 서버 페이지 조회로 전환했다. 검색어, 카테고리·대분류, 가격, 정렬 조건을 API에서 처리하고 Web은 URL query를 유지하며 이전·다음과 페이지 번호를 표시한다.
   - 정합성: 홈과 관련 상품은 첫 6개만 요청하고, 공개 API 응답은 `{ products, page, size, totalElements, totalPages, categoryCounts }`로 통일했다.

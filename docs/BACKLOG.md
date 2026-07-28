@@ -88,9 +88,7 @@ Notes:
 - 고객 사업자 프로필은 현재 범위에서 제외한다.
 
 Tasks:
-- [ ] Google 실계정 로그인, callback, session cookie를 브라우저에서 확인한다.
 - [ ] Kakao 실계정 로그인, callback, session cookie를 브라우저에서 확인한다.
-- [ ] Naver 실계정 로그인, callback, session cookie를 브라우저에서 확인한다.
 - [ ] 로그인 후 `/account`에서 현재 사용자 정보와 필수정보 입력 흐름을 확인한다.
 - [ ] provider 취소/거절과 callback 실패가 빈 화면이 아닌 오류 흐름으로 보이는지 확인한다.
 

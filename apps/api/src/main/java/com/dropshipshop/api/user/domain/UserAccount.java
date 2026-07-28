@@ -163,9 +163,23 @@ public class UserAccount {
 		return referredAt;
 	}
 
-	public void updateProfile(String displayName, String email) {
+	public void updateProfile(String displayName, String email, String phoneNumber) {
 		this.displayName = displayName;
 		this.email = email;
+		if (!phoneNumber.equals(this.phoneNumber)) {
+			this.phoneVerifiedAt = null;
+		}
+		this.phoneNumber = phoneNumber;
+	}
+
+	public boolean useProviderEmailWhenPlaceholder(String providerEmail) {
+		if (!email.endsWith("@oauth.local")
+			|| providerEmail == null
+			|| providerEmail.endsWith("@oauth.local")) {
+			return false;
+		}
+		email = providerEmail;
+		return true;
 	}
 
 	public void assignReferralCode(String referralCode) {

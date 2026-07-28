@@ -70,12 +70,12 @@ class OAuthLoginApiIntegrationTest {
 	}
 
 	@Test
-	void kakaoAuthorizeRequestsNicknameOnlyByDefault() throws Exception {
+	void kakaoAuthorizeRequestsNicknameAndEmailByDefault() throws Exception {
 		mockMvc.perform(get("/api/auth/oauth2/kakao/authorize"))
 			.andExpect(status().isFound())
 			.andExpect(header().string(HttpHeaders.LOCATION, containsString("https://kauth.kakao.com/oauth/authorize")))
-			.andExpect(header().string(HttpHeaders.LOCATION, containsString("scope=profile_nickname")))
-			.andExpect(header().string(HttpHeaders.LOCATION, not(containsString("account_email"))));
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("profile_nickname")))
+			.andExpect(header().string(HttpHeaders.LOCATION, containsString("account_email")));
 	}
 
 	@Test
@@ -205,6 +205,32 @@ class OAuthLoginApiIntegrationTest {
 				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.userId", is(admin.getId().toString())));
+	}
+
+	@Test
+	void replacesPlaceholderEmailWithProviderEmailOnNextLogin() throws Exception {
+		UserAccount customer = userAccountRepository.save(new UserAccount(
+			SocialProvider.KAKAO,
+			"kakao-email-user",
+			"kakao-kakao-email-user@oauth.local",
+			"Kakao",
+			UserRole.CUSTOMER
+		));
+		fakeOAuthProviderClient.profile(
+			SocialProvider.KAKAO,
+			"kakao-email-code",
+			new OAuthProfile("kakao-email-user", "customer@kakao.com", "Kakao")
+		);
+
+		Cookie stateCookie = stateCookie();
+		mockMvc.perform(get("/api/auth/oauth2/kakao/callback")
+				.param("code", "kakao-email-code")
+				.param("state", stateCookie.getValue())
+				.cookie(stateCookie))
+			.andExpect(status().isFound());
+
+		UserAccount updated = userAccountRepository.findById(customer.getId()).orElseThrow();
+		assertThat(updated.getEmail()).isEqualTo("customer@kakao.com");
 	}
 
 	@Test

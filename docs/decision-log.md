@@ -1216,3 +1216,21 @@ Consequences:
 - 후기 10건 미만, 만족도 90% 미만, 후기 정보 누락만으로 상품을 제외하지 않는다.
 - 가격, 최소구매수량, 고정 배송비, 완제품, 카테고리, 옵션, 이미지 사용 가능 여부는 계속 자동 판정한다.
 - 상품 인기도는 정확한 구매 건수 대신 도매꾹 인기·랭킹순 검색 결과 포함 여부를 참고한다.
+
+## 2026-07-28: Kakao-Only Login Entry And Phone Input Without OTP
+
+Decision:
+
+Expose only Kakao on the customer login page. Keep Google and Naver OAuth backend paths for existing-account compatibility. Collect a valid mobile phone number directly as a required delivery contact without requiring SMS OTP completion.
+
+Context:
+
+The shop already identifies accounts through social OAuth and uses the phone number for order and delivery contact, not real-name, adult, or duplicate-identity verification. Requiring a separate Naver Cloud business account and sender-number approval only to confirm possession of the delivery number adds an external launch dependency without changing the customer identity model.
+
+Consequences:
+
+- Required customer information is display name, reachable email, and a valid saved mobile phone number.
+- Checkout does not require `phoneVerifiedAt`.
+- Changing the phone number clears an old verification timestamp, but does not start a new OTP flow.
+- Existing OTP endpoints, records, and Google/Naver OAuth backend support remain for compatibility.
+- Kakao AlimTalk is a separate optional notification integration and is not enabled by Kakao Login alone.

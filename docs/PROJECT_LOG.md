@@ -1,5 +1,12 @@
 # Project Log
 
+## 2026-07-28 B-074 카카오 로그인 단일 노출과 휴대폰 OTP 필수 제거
+
+- 관련 항목: B-074, B-002
+- 결정: 고객 로그인 화면에는 카카오만 노출하고, 주문 전 연락처는 SMS OTP 없이 직접 입력받아 형식만 검증한다. Google/Naver OAuth 백엔드와 기존 OTP 데이터/API는 호환성을 위해 유지한다.
+- 구현: 카카오 인가 요청에 `account_email`을 추가하고 유효·인증된 이메일만 저장한다. 기존 `@oauth.local` placeholder는 다음 로그인 때 실제 카카오 이메일로 교체하되 고객이 직접 수정한 이메일은 덮어쓰지 않는다. `PATCH /api/me/profile`은 이름, 이메일, 휴대폰 번호를 함께 저장한다. 필수 정보 완료 기준에서 `phoneVerifiedAt`을 제외하고, 전화번호 변경 시 과거 인증 시각만 초기화한다. 계정 화면의 인증번호 발송/확인 폼은 배송 연락처 입력으로 교체했다.
+- 검증: `./gradlew test --tests '*AccountProfileApiIntegrationTest' --tests '*CheckoutApiIntegrationTest'`, 전체 `./gradlew test`, `npm run lint`, `npm run build`, `npx playwright test tests/e2e/auth-smoke.spec.ts --project=desktop`가 통과했다. lint에는 기존 `<img>` 경고 3건만 남았다.
+
 ## 2026-07-28 운영 입금계좌 설정과 QA 수정 배포
 
 - 관련 항목: B-030
