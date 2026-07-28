@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { PRODUCT_CATEGORIES, categoryLabel } from "@/lib/categories";
-import { formatPrice, getProducts, type ProductSummary } from "@/lib/catalog";
+import { redirect } from "next/navigation";
+import { PRODUCT_CATEGORIES, categoryLabel, type ProductCategoryCode } from "@/lib/categories";
+import { formatPrice, getProducts } from "@/lib/catalog";
 import { ProductImage } from "./product-image";
+
+const PAGE_SIZE = 24;
 
 type ProductsPageProps = {
   searchParams: Promise<ProductSearchParams>;
@@ -14,21 +17,52 @@ type ProductSearchParams = {
   minPrice?: string;
   q?: string;
   sort?: string;
+  page?: string;
 };
 
-async function loadProducts() {
+async function loadProducts(params: ProductSearchParams, page: number, activeGroup: string) {
   try {
-    return { products: await getProducts(), error: false };
+    const category = productCategoryCode(params.category);
+    const categories = !category && params.group === activeGroup
+      ? PRODUCT_CATEGORIES
+          .filter((item) => item[0] === activeGroup)
+          .map((item) => item[2])
+      : undefined;
+    return {
+      result: await getProducts({
+        q: params.q?.trim(),
+        category,
+        categories,
+        minPrice: nonNegativeNumber(params.minPrice),
+        maxPrice: nonNegativeNumber(params.maxPrice),
+        sort: productSort(params.sort),
+        page,
+        size: PAGE_SIZE,
+      }),
+      error: false as const,
+    };
   } catch {
-    return { products: [] as ProductSummary[], error: true };
+    return { result: null, error: true as const };
   }
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const [{ products, error }, params] = await Promise.all([loadProducts(), searchParams]);
-  const filteredProducts = filterProducts(products, params);
+  const params = await searchParams;
   const groups = categoryGroups();
   const activeGroup = selectedGroup(params.group, params.category);
+  const requestedPage = positivePage(params.page);
+  const { result, error } = await loadProducts(params, requestedPage - 1, activeGroup);
+
+  if (!error && result.totalPages > 0 && requestedPage > result.totalPages) {
+    redirect(pageHref(params, result.totalPages));
+  }
+
+  const products = result?.products ?? [];
+  const currentPage = result ? result.page + 1 : 1;
+  const totalPages = result?.totalPages ?? 0;
+  const totalElements = result?.totalElements ?? 0;
+  const categoryCounts = result?.categoryCounts ?? {};
+  const allProductCount = Object.values(categoryCounts).reduce((sum, count) => sum + (count ?? 0), 0);
   const visibleCategories = PRODUCT_CATEGORIES.filter((category) => category[0] === activeGroup);
 
   return (
@@ -39,7 +73,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <h1>안전장비 상품 목록</h1>
           <p>건설현장과 산업현장에 필요한 안전장비를 바로 구매하세요.</p>
         </div>
-        <span>총 {filteredProducts.length}개 상품</span>
+        <span>총 {totalElements}개 상품</span>
       </div>
 
       {error ? (
@@ -49,7 +83,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
       ) : null}
 
-      {!error && filteredProducts.length === 0 ? (
+      {!error && products.length === 0 ? (
         <div className="notice empty">
           <strong>판매중인 상품이 없습니다</strong>
           <span>검색 조건을 바꾸거나 관리자에서 상품을 등록해 주세요.</span>
@@ -60,25 +94,27 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <aside className="catalog-sidebar">
           <CategoryFilterPanel
             activeGroup={activeGroup}
+            categoryCounts={categoryCounts}
             groups={groups}
             params={params}
-            products={products}
+            totalProducts={allProductCount}
             visibleCategories={visibleCategories}
           />
         </aside>
 
         <div className="catalog-results">
           <div className="catalog-tools">
-            <span>전체 {filteredProducts.length}개 상품</span>
+            <span>전체 {totalElements}개 상품</span>
             <div>
               <details className="catalog-mobile-filters">
                 <summary>필터</summary>
                 <div>
                   <CategoryFilterPanel
                     activeGroup={activeGroup}
+                    categoryCounts={categoryCounts}
                     groups={groups}
                     params={params}
-                    products={products}
+                    totalProducts={allProductCount}
                     visibleCategories={visibleCategories}
                   />
                 </div>
@@ -89,7 +125,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </div>
 
           <div className="product-grid">
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <Link className="product-card" href={`/products/${product.id}`} key={product.id}>
                 <ProductImage
                   alt={product.name}
@@ -107,6 +143,27 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </Link>
             ))}
           </div>
+          {totalPages > 0 ? (
+            <nav className="catalog-pagination" aria-label="상품 목록 페이지">
+              {currentPage > 1 ? (
+                <Link href={pageHref(params, currentPage - 1)}>이전</Link>
+              ) : (
+                <span aria-disabled="true">이전</span>
+              )}
+              {pageNumbers(currentPage, totalPages).map((page) =>
+                page === currentPage ? (
+                  <strong aria-current="page" key={page}>{page}</strong>
+                ) : (
+                  <Link href={pageHref(params, page)} key={page}>{page}</Link>
+                ),
+              )}
+              {currentPage < totalPages ? (
+                <Link href={pageHref(params, currentPage + 1)}>다음</Link>
+              ) : (
+                <span aria-disabled="true">다음</span>
+              )}
+            </nav>
+          ) : null}
         </div>
       </div>
     </section>
@@ -115,22 +172,24 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
 function CategoryFilterPanel({
   activeGroup,
+  categoryCounts,
   groups,
   params,
-  products,
+  totalProducts,
   visibleCategories,
 }: {
   activeGroup: string;
+  categoryCounts: Partial<Record<ProductCategoryCode, number>>;
   groups: string[];
   params: ProductSearchParams;
-  products: ProductSummary[];
+  totalProducts: number;
   visibleCategories: (typeof PRODUCT_CATEGORIES)[number][];
 }) {
   return (
     <>
       <h2>카테고리</h2>
       <Link className={!params.category && !params.group ? "active" : ""} href="/products">
-        전체 상품 <span>{products.length}</span>
+        전체 상품 <span>{totalProducts}</span>
       </Link>
       <h2>대분류</h2>
       <div className="catalog-group-list">
@@ -140,7 +199,7 @@ function CategoryFilterPanel({
             href={withGroup(params, group)}
             key={group}
           >
-            {group} <span>{groupProductCount(products, group)}</span>
+            {group} <span>{groupProductCount(categoryCounts, group)}</span>
           </Link>
         ))}
       </div>
@@ -165,29 +224,6 @@ function CategoryFilterPanel({
   );
 }
 
-function filterProducts(
-  products: ProductSummary[],
-  params: ProductSearchParams,
-) {
-  const keyword = params.q?.trim().toLowerCase();
-  const minPrice = Number(params.minPrice ?? 0);
-  const maxPrice = Number(params.maxPrice ?? Number.MAX_SAFE_INTEGER);
-  const filtered = products.filter((product) => {
-    const matchesKeyword = keyword
-      ? `${product.name} ${product.summary}`.toLowerCase().includes(keyword)
-      : true;
-    const matchesCategory = params.category ? product.categoryCode === params.category : true;
-    const matchesGroup = params.category || !params.group ? true : productGroup(product) === params.group;
-    return matchesKeyword && matchesCategory && matchesGroup && product.basePrice >= minPrice && product.basePrice <= maxPrice;
-  });
-
-  return filtered.sort((a, b) => {
-    if (params.sort === "price-asc") return a.basePrice - b.basePrice;
-    if (params.sort === "price-desc") return b.basePrice - a.basePrice;
-    return 0;
-  });
-}
-
 function categoryGroups() {
   return [...new Set(PRODUCT_CATEGORIES.map((category) => category[0]))];
 }
@@ -199,12 +235,32 @@ function selectedGroup(group: string | undefined, categoryCode: string | undefin
   return PRODUCT_CATEGORIES[0][0];
 }
 
-function groupProductCount(products: ProductSummary[], group: string) {
-  return products.filter((product) => productGroup(product) === group).length;
+function groupProductCount(
+  categoryCounts: Partial<Record<ProductCategoryCode, number>>,
+  group: string,
+) {
+  return PRODUCT_CATEGORIES
+    .filter((category) => category[0] === group)
+    .reduce((count, category) => count + (categoryCounts[category[2]] ?? 0), 0);
 }
 
-function productGroup(product: ProductSummary) {
-  return PRODUCT_CATEGORIES.find((item) => item[2] === product.categoryCode)?.[0];
+function productCategoryCode(value?: string) {
+  return PRODUCT_CATEGORIES.find((category) => category[2] === value)?.[2];
+}
+
+function nonNegativeNumber(value?: string) {
+  if (value === undefined || value === "") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+function productSort(value?: string) {
+  return value === "price-asc" || value === "price-desc" ? value : "latest";
+}
+
+function positivePage(value?: string) {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
 }
 
 function withSort(params: ProductSearchParams, sort: string) {
@@ -248,4 +304,20 @@ function withPriceRange(params: ProductSearchParams, minPrice?: string, maxPrice
   if (maxPrice) searchParams.set("maxPrice", maxPrice);
   const query = searchParams.toString();
   return query ? `/products?${query}` : "/products";
+}
+
+function pageHref(params: ProductSearchParams, page: number) {
+  const searchParams = new URLSearchParams();
+  for (const key of ["category", "group", "maxPrice", "minPrice", "q", "sort"] as const) {
+    if (params[key]) searchParams.set(key, params[key]);
+  }
+  if (page > 1) searchParams.set("page", String(page));
+  const query = searchParams.toString();
+  return query ? `/products?${query}` : "/products";
+}
+
+function pageNumbers(currentPage: number, totalPages: number) {
+  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }

@@ -2,6 +2,8 @@ package com.dropshipshop.api.catalog;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -155,9 +157,7 @@ public class CatalogService {
 		int page,
 		int size
 	) {
-		String keyword = query == null || query.isBlank()
-			? null
-			: "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+		String keyword = normalizeKeyword(query);
 		Sort sort = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 		Page<Product> products = productRepository.findAdminProducts(
 			keyword,
@@ -423,10 +423,59 @@ public class CatalogService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<CatalogDtos.ProductSummaryResponse> listPublicProducts() {
-		return productRepository.findAllByStatus(ProductStatus.ACTIVE).stream()
-			.map(this::toProductSummaryResponse)
-			.toList();
+	public CatalogDtos.PublicProductPageResponse listPublicProducts(
+		String query,
+		ProductCategory category,
+		List<ProductCategory> categories,
+		long minPrice,
+		Long maxPrice,
+		String sort,
+		int page,
+		int size
+	) {
+		if (maxPrice != null && minPrice > maxPrice) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minPrice must not exceed maxPrice");
+		}
+		List<ProductCategory> selectedCategories = category != null
+			? List.of(category)
+			: categories == null || categories.isEmpty()
+				? Arrays.asList(ProductCategory.values())
+				: categories.stream().distinct().toList();
+		String keyword = normalizeKeyword(query);
+		Page<Product> result = productRepository.findPublicProducts(
+			keyword,
+			selectedCategories,
+			minPrice,
+			maxPrice,
+			PageRequest.of(page, size, publicProductSort(sort))
+		);
+		Map<ProductCategory, Long> categoryCounts = new EnumMap<>(ProductCategory.class);
+		Arrays.stream(ProductCategory.values()).forEach(value -> categoryCounts.put(value, 0L));
+		productRepository.countPublicProductsByCategory()
+			.forEach(count -> categoryCounts.put(count.getCategoryCode(), count.getProductCount()));
+		return new CatalogDtos.PublicProductPageResponse(
+			result.getContent().stream().map(this::toProductSummaryResponse).toList(),
+			result.getNumber(),
+			result.getSize(),
+			result.getTotalElements(),
+			result.getTotalPages(),
+			Map.copyOf(categoryCounts)
+		);
+	}
+
+	private Sort publicProductSort(String value) {
+		return switch (value) {
+			case "latest", "" -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+			case "price-asc" -> Sort.by(Sort.Order.asc("basePrice"), Sort.Order.desc("id"));
+			case "price-desc" -> Sort.by(Sort.Order.desc("basePrice"), Sort.Order.desc("id"));
+			default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported product sort");
+		};
+	}
+
+	private String normalizeKeyword(String value) {
+		return value == null || value.isBlank()
+			? null
+			: "%" + value.trim().toLowerCase(Locale.ROOT) + "%";
 	}
 
 	@Transactional(readOnly = true)

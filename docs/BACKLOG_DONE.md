@@ -2,6 +2,13 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-07-28
+
+- B-073 고객 상품 목록 서버 페이지네이션
+  - 완료 내용: 공개 상품 목록을 전체 배열 조회에서 24개 단위 서버 페이지 조회로 전환했다. 검색어, 카테고리·대분류, 가격, 정렬 조건을 API에서 처리하고 Web은 URL query를 유지하며 이전·다음과 페이지 번호를 표시한다.
+  - 정합성: 홈과 관련 상품은 첫 6개만 요청하고, 공개 API 응답은 `{ products, page, size, totalElements, totalPages, categoryCounts }`로 통일했다.
+  - 검증: 로컬 실제 데이터 `ACTIVE 308개` 기준 13페이지, 마지막 페이지 20개, 안전모 10개 필터, 가격 정렬, 범위 밖 페이지 보정, Desktop/Mobile overflow 없음, API 테스트와 Web lint/build를 확인했다.
+
 ## 2026-07-27
 
 - B-070 KOSHA 보호구 인증 증적 자동 검증

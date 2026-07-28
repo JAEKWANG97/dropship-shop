@@ -3,6 +3,7 @@ package com.dropshipshop.api.catalog;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -249,6 +250,16 @@ final class CatalogDtos {
 		ProductCategory categoryCode,
 		ProductStatus status,
 		String thumbnailImageUrl
+	) {
+	}
+
+	record PublicProductPageResponse(
+		List<ProductSummaryResponse> products,
+		int page,
+		int size,
+		long totalElements,
+		int totalPages,
+		Map<ProductCategory, Long> categoryCounts
 	) {
 	}
 

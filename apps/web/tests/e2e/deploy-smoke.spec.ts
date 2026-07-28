@@ -7,10 +7,14 @@ type ProductSummary = {
   id: string;
 };
 
+type ProductPage = {
+  products: ProductSummary[];
+};
+
 async function deployedProductId() {
-  const response = await fetch(`${apiBaseUrl}/api/products`);
+  const response = await fetch(`${apiBaseUrl}/api/products?size=1`);
   expect(response.ok).toBeTruthy();
-  const products = (await response.json()) as ProductSummary[];
+  const products = ((await response.json()) as ProductPage).products;
   expect(products.length).toBeGreaterThan(0);
   return products[0].id;
 }

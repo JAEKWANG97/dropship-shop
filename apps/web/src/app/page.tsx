@@ -67,7 +67,7 @@ const SITE_BUNDLES = [
 
 async function loadProducts() {
   try {
-    return (await getProducts()).slice(0, 6);
+    return (await getProducts({ size: 6 })).products;
   } catch {
     return [] as ProductSummary[];
   }

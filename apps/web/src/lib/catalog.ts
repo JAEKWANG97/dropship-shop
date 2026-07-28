@@ -18,6 +18,26 @@ export type ProductSummary = {
   thumbnailImageUrl: string | null;
 };
 
+export type ProductPage = {
+  products: ProductSummary[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  categoryCounts: Partial<Record<ProductCategoryCode, number>>;
+};
+
+export type ProductQuery = {
+  q?: string;
+  category?: ProductCategoryCode;
+  categories?: ProductCategoryCode[];
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: string;
+  page?: number;
+  size?: number;
+};
+
 export type ProductImage = {
   id: string;
   type: ProductImageType;
@@ -82,8 +102,18 @@ export type ProductDetail = ProductSummary & {
   policyLinks: PolicyLink[];
 };
 
-export function getProducts() {
-  return apiGet<ProductSummary[]>("/api/products");
+export function getProducts(query: ProductQuery = {}) {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.category) params.set("category", query.category);
+  query.categories?.forEach((category) => params.append("categories", category));
+  if (query.minPrice !== undefined) params.set("minPrice", String(query.minPrice));
+  if (query.maxPrice !== undefined) params.set("maxPrice", String(query.maxPrice));
+  if (query.sort) params.set("sort", query.sort);
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.size !== undefined) params.set("size", String(query.size));
+  const value = params.toString();
+  return apiGet<ProductPage>(value ? `/api/products?${value}` : "/api/products");
 }
 
 export function getProduct(productId: string) {

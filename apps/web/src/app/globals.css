@@ -2142,7 +2142,8 @@ textarea {
   grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr)) auto auto;
 }
 
-.admin-pagination {
+.admin-pagination,
+.catalog-pagination {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -2151,7 +2152,10 @@ textarea {
 
 .admin-pagination a,
 .admin-pagination span,
-.admin-pagination strong {
+.admin-pagination strong,
+.catalog-pagination a,
+.catalog-pagination span,
+.catalog-pagination strong {
   display: grid;
   place-items: center;
   min-width: 38px;
@@ -2164,13 +2168,15 @@ textarea {
   text-decoration: none;
 }
 
-.admin-pagination strong {
+.admin-pagination strong,
+.catalog-pagination strong {
   border-color: var(--navy);
   background: var(--navy);
   color: #ffffff;
 }
 
-.admin-pagination span {
+.admin-pagination span,
+.catalog-pagination span {
   color: var(--muted);
   opacity: 0.65;
 }

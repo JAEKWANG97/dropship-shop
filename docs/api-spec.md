@@ -209,13 +209,25 @@ PATCH /api/me/addresses/{addressId}
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/products` | Public | Implemented | List customer-visible active products |
+| `GET` | `/api/products` | Public | Implemented | Page customer-visible active products with search, category, price, and sort filters |
 | `GET` | `/api/products/{productId}` | Public | Implemented | Product detail with options, images, detail blocks, and customer policy links |
 
 Customer visibility rules:
 
 - Show only products customer can view.
 - Purchase is allowed only when product status is `ACTIVE` and option status is `ACTIVE`.
+
+`GET /api/products` query:
+
+- `q`: product name and summary keyword.
+- `category`: one leaf category. Takes precedence over `categories`.
+- `categories`: repeated leaf categories used for a category group.
+- `minPrice`, `maxPrice`: inclusive customer sale price range.
+- `sort`: `latest` (default), `price-asc`, or `price-desc`.
+- `page`: zero-based page, default `0`.
+- `size`: default `24`, range `1..100`.
+
+The response is `{ products, page, size, totalElements, totalPages, categoryCounts }`. `categoryCounts` contains active product counts for each leaf category and is used by the customer category filter.
 - Do not expose raw supplier information to customers.
 - Product detail responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notices so operational policy is not embedded only in arbitrary product HTML/images.
 

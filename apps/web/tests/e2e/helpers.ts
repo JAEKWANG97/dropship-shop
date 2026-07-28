@@ -21,6 +21,10 @@ export type ProductSummary = {
   name: string;
 };
 
+type ProductPage = {
+  products: ProductSummary[];
+};
+
 export type AdminOrderSummary = {
   orderId: string;
   orderNumber: string;
@@ -41,9 +45,11 @@ export type CustomerOrderDetail = CustomerOrderSummary & {
 };
 
 export async function activeProductId() {
-  const response = await fetch(`${API_BASE_URL}/api/products`);
+  const response = await fetch(
+    `${API_BASE_URL}/api/products?q=${encodeURIComponent(PRIMARY_PRODUCT_NAME)}&size=10`,
+  );
   expect(response.ok).toBeTruthy();
-  const products = (await response.json()) as ProductSummary[];
+  const products = ((await response.json()) as ProductPage).products;
   const primaryProduct = products.find((product) => product.name === PRIMARY_PRODUCT_NAME);
   if (isLocalTarget()) {
     expect(primaryProduct, `Local seed product '${PRIMARY_PRODUCT_NAME}' is required`).toBeTruthy();

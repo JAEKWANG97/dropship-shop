@@ -31,7 +31,7 @@ async function loadProduct(productId: string) {
 
 async function loadRelatedProducts(productId: string) {
   try {
-    return (await getProducts()).filter((product) => product.id !== productId).slice(0, 5);
+    return (await getProducts({ size: 6 })).products.filter((product) => product.id !== productId).slice(0, 5);
   } catch {
     return [] as ProductSummary[];
   }

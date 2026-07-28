@@ -55,7 +55,9 @@ class CatalogApiIntegrationTest {
 	void managesCatalogAndExposesPublicProducts() throws Exception {
 		mockMvc.perform(get("/api/products"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$", hasSize(0)));
+			.andExpect(jsonPath("$.products", hasSize(0)))
+			.andExpect(jsonPath("$.totalElements", is(0)))
+			.andExpect(jsonPath("$.totalPages", is(0)));
 
 		mockMvc.perform(get("/api/admin/products"))
 			.andExpect(status().isUnauthorized());
@@ -244,9 +246,31 @@ class CatalogApiIntegrationTest {
 
 		mockMvc.perform(get("/api/products"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$", hasSize(1)))
-			.andExpect(jsonPath("$[0].id", is(productId.toString())))
-			.andExpect(jsonPath("$[0].sourcePrice").doesNotExist());
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].id", is(productId.toString())))
+			.andExpect(jsonPath("$.products[0].sourcePrice").doesNotExist())
+			.andExpect(jsonPath("$.page", is(0)))
+			.andExpect(jsonPath("$.size", is(24)))
+			.andExpect(jsonPath("$.totalElements", is(1)))
+			.andExpect(jsonPath("$.totalPages", is(1)))
+			.andExpect(jsonPath("$.categoryCounts.PPE_SAFETY_HELMET", is(1)));
+
+		mockMvc.perform(get("/api/products")
+				.param("q", "product")
+				.param("category", "PPE_SAFETY_HELMET")
+				.param("minPrice", "30000")
+				.param("maxPrice", "40000")
+				.param("sort", "price-desc")
+				.param("page", "0")
+				.param("size", "1"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].id", is(productId.toString())));
+
+		for (String query : List.of("page=-1", "size=101", "sort=unknown", "minPrice=40000&maxPrice=30000")) {
+			mockMvc.perform(get("/api/products?" + query))
+				.andExpect(status().isBadRequest());
+		}
 
 		mockMvc.perform(get("/api/products/{productId}", productId))
 			.andExpect(status().isOk())

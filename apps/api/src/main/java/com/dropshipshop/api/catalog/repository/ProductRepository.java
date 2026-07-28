@@ -25,6 +25,44 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 	@Query(
 		value = """
 			select product from Product product
+			where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+			and (:keyword is null
+				or lower(product.name) like :keyword
+				or lower(product.summary) like :keyword)
+			and product.categoryCode in :categories
+			and product.basePrice >= :minPrice
+			and (:maxPrice is null or product.basePrice <= :maxPrice)
+			""",
+		countQuery = """
+			select count(product) from Product product
+			where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+			and (:keyword is null
+				or lower(product.name) like :keyword
+				or lower(product.summary) like :keyword)
+			and product.categoryCode in :categories
+			and product.basePrice >= :minPrice
+			and (:maxPrice is null or product.basePrice <= :maxPrice)
+			"""
+	)
+	Page<Product> findPublicProducts(
+		@Param("keyword") String keyword,
+		@Param("categories") List<ProductCategory> categories,
+		@Param("minPrice") long minPrice,
+		@Param("maxPrice") Long maxPrice,
+		Pageable pageable
+	);
+
+	@Query("""
+		select product.categoryCode as categoryCode, count(product) as productCount
+		from Product product
+		where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+		group by product.categoryCode
+		""")
+	List<ProductCategoryCount> countPublicProductsByCategory();
+
+	@Query(
+		value = """
+			select product from Product product
 			join fetch product.supplier supplier
 			where (:keyword is null
 				or lower(product.name) like :keyword
@@ -88,4 +126,10 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 		@Param("saleReady") Boolean saleReady,
 		Pageable pageable
 	);
+
+	interface ProductCategoryCount {
+		ProductCategory getCategoryCode();
+
+		long getProductCount();
+	}
 }
