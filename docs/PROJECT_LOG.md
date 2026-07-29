@@ -7,6 +7,7 @@
 - 중복 방지: 요청 fingerprint와 시도 이력을 저장하며, timeout/응답 유실은 `RECONCILIATION_REQUIRED`로 전환해 구매 주문 목록 대사 전 재시도를 금지한다.
 - 운영: 관리자 주문 상세에 예상/실제 공급처 결제액, 주문번호, 오류, 동기화·취소 상태와 검증·재시도·대사·취소 액션을 연결했다. 공급처 주문취소와 고객 계좌환불은 별도 증적으로 유지한다.
 - 검증: API 전체 테스트와 PostgreSQL migration smoke, Web lint/build, 운영 compose 설정 검사를 통과했다. 실제 e-money 차감이 발생하는 `setOrder`는 수행하지 않았다.
+- 운영 설정: EC2에 도매꾹 API key, 구매 계정, 로그인 자격증명과 고정 client IP를 secret으로 설정했다. 자동 주문은 비활성화한 상태에서 `setLogin`과 `getMyAsset` 호출이 성공했고 e-money 잔액 존재를 확인했다. 잔액과 자격증명 값은 로그에 남기지 않았다.
 - 배포 제한: e-money 충전과 최저가 실제 상품 1건의 주문·조회·취소 검증 전까지 `DOMEGGOOK_AUTO_ORDER_ENABLED=false`를 유지한다.
 
 ## 2026-07-28 B-002 카카오 소셜 로그인 운영 검증 완료
