@@ -127,6 +127,8 @@ Consequences:
 
 ## 2026-07-25: Collected Products Require Predictable Supplier Shipping
 
+Superseded for price calculation by `2026-07-28: Supplier Shipping Is Excluded From Product Markup`.
+
 Decision:
 
 Only collect products with a minimum order quantity of one and either free supplier shipping or a fixed prepaid supplier shipping fee. Exclude quantity-proportional, quantity-tiered, cash-on-delivery, and prepaid-or-cash-on-delivery shipping products.
@@ -1215,7 +1217,57 @@ Consequences:
 
 - 후기 10건 미만, 만족도 90% 미만, 후기 정보 누락만으로 상품을 제외하지 않는다.
 - 가격, 최소구매수량, 고정 배송비, 완제품, 카테고리, 옵션, 이미지 사용 가능 여부는 계속 자동 판정한다.
-- 상품 인기도는 정확한 구매 건수 대신 도매꾹 인기·랭킹순 검색 결과 포함 여부를 참고한다.
+- 상품 후보는 도매꾹 많은판매단위순 검색 결과를 사용한다.
+
+## 2026-07-28: Supplier Shipping Is Excluded From Product Markup
+
+Decision:
+
+Calculate product sale prices from supplier item prices only. Do not add supplier shipping fees before applying the active 25% pricing policy.
+
+Context:
+
+Adding a fixed supplier shipping fee to every unit made single-item prices look substantially higher than their supplier prices and repeated the same shipping cost when customers bought multiple units.
+
+Consequences:
+
+- `sourcePrice` stores the supplier item price without shipping.
+- `basePrice` is `sourcePrice * 1.25`, rounded by the active pricing policy.
+- Supplier shipping remains an operating cost and customers are not charged a separate shipping fee.
+- Shipping conditions are still collected and quantity-based or conditional shipping products remain excluded from automatic import.
+
+## 2026-07-28: Catalog Collection Uses Sales Unit Sort Only
+
+Decision:
+
+Search each category only with Domeggook's many-sales-units sort (`qd`). Do not merge relevance, ranking, or popularity results.
+
+Context:
+
+Ranking results selected higher-priced products even when the same complete product had cheaper listings with larger wholesale selling units.
+
+Consequences:
+
+- Each primary or supplemental keyword makes one list request for up to 60 sales-unit-sorted candidates.
+- Supplemental synonyms are queried only when the category target is still short.
+- Existing product validation for category, options, minimum quantity, images, and shipping conditions remains unchanged.
+
+## 2026-07-28: Prefer Reliable Single-Unit Suppliers Within Sales-Unit Results
+
+Decision:
+
+Limit Domeggook list candidates to fast-delivery products, good sellers, and a maximum minimum-order quantity of one. After detail lookup, require seller rank 1 or 2 and evaluate lower supplier prices first within the sales-unit-sorted candidate set.
+
+Context:
+
+The `lwp` lowest-price verification filter returned no results for the `슈퍼그립200` sample even though fast-delivery single-unit listings existed. Requiring the badge would exclude valid lower-priced products.
+
+Consequences:
+
+- List requests use `qd`, `fdl=true`, `sgd=true`, and `mxq=1`.
+- Detail validation requires `seller.rank <= 2` and `seller.good=true`.
+- `lwp` remains recorded metadata, not an exclusion rule.
+- "Many sales units" remains a candidate-pool sort, not evidence of cumulative purchases.
 
 ## 2026-07-28: Kakao-Only Login Entry And Phone Input Without OTP
 
