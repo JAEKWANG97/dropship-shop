@@ -120,23 +120,6 @@ Tasks:
 - [ ] SSH 22를 현재 관리자 IP로 즉시 제한하고, 이후 SSM Session Manager 전환 여부를 B-052와 함께 결정한다.
 - [ ] Next.js/PostCSS moderate advisory가 해소되는 패치 버전으로 갱신하고 `npm audit`를 다시 확인한다.
 
-### B-033 상품 원가/판매가/마진 정책 관리
-
-Status: In Progress
-
-Notes:
-- 공급처 원가와 고객 판매가를 분리한다.
-- 기본 판매가는 공급가 25% 증액 후 100원 단위 반올림으로 계산한다.
-- 정산, 세금 신고, 공급처별 마진율은 현재 범위에서 제외한다.
-
-Tasks:
-- [x] `products.source_price`와 active pricing policy schema를 추가한다.
-- [x] 관리자 상품 API에 `sourcePrice`를 추가하고 공개 API에는 노출하지 않는다.
-- [x] 관리자 가격 정책 화면을 추가한다.
-- [x] 관리자 상품 상세에서 계산 판매가를 적용할 수 있게 한다.
-- [x] 상품 import가 원가와 계산 판매가를 분리해 적재하게 한다.
-- [ ] 기존 등록 상품의 원가, 배송비 포함 원가, 판매가, 마진을 운영자가 검수한다.
-
 ### B-065 관리자 주문 목록 서버 페이징과 필터
 
 Status: Todo

@@ -118,7 +118,7 @@ node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manif
 - `IMPORT` 대상만 `tmp/domeggook-import-manifest.filtered.json`에서 `import: true`가 된다.
 - `EXCLUDE` 상품은 가격 없음, 이미지 사용 미허용, 활성 옵션 없음, 상세 이미지 없음, 카테고리 불명확, 원산지·제조사 누락, 명백한 비안전용품, 고객 노출 금지 키워드, 최소구매수량 2개 이상, 조건부·수량별·착불 배송 상품이다.
 - `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 반올림한 값이다.
-- `tmp/domeggook-import-manifest.filtered.json`의 `sourcePrice`는 수집 원가에 공급처 기본 배송비를 더한 `effectiveSourcePrice`다.
+- `tmp/domeggook-import-manifest.filtered.json`의 `sourcePrice`는 공급처 상품가만 사용한다. 공급처 배송비는 판매가 계산에 더하지 않는다.
 - 옵션이 있는 상품은 옵션별 원본 공급가(`sourcePrice + sourceAdditionalPrice`)에 가격 정책을 적용하고, 가장 낮은 옵션 판매가를 상품 `basePrice`로 둔다. 각 옵션의 `additionalPrice`는 `옵션 판매가 - basePrice`로 계산한다.
 - `sourceOptionCode`, `sourceAdditionalPrice`, `sourceStockQuantity`, `sortOrder`는 관리자 검수용 메타데이터이며 고객 화면에는 노출하지 않는다.
 - 숫자 가격이 없는 상품은 자동 제외한다.

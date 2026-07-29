@@ -670,15 +670,17 @@ async function reviewProduct(entry, context) {
   if (!String(product.origin || "").trim() || !String(product.manufacturer || "").trim()) reviewReasons.push("ORIGIN_OR_MANUFACTURER_MISSING");
   if (hasAny(textForKeyword, REVIEW_KEYWORDS).length) reviewReasons.push("DOMAIN_OR_CUSTOM_PRODUCT_SUSPECT");
 
-  const effectiveSourcePrice = shipping.known ? sourcePrice + Number(shipping.fee || 0) : null;
-  const calculatedBasePrice = effectiveSourcePrice ? calculateBasePrice(effectiveSourcePrice, context.policy) : null;
+  const calculatedBasePrice = sourcePrice ? calculateBasePrice(sourcePrice, context.policy) : null;
   const reasonCodes = [...new Set([...hardReasons, ...reviewReasons])];
   const decision = reasonCodes.length ? "EXCLUDE" : "IMPORT";
   const complianceStatus = complianceStatusFor(product, category.code, koshaGate.status);
   const status = decision === "IMPORT" && complianceStatus !== "REJECTED" ? "ACTIVE" : "HIDDEN";
-  const manifestOptions = effectiveSourcePrice && calculatedBasePrice
-    ? manifestOptionsFor(effectiveSourcePrice, calculatedBasePrice, saleOptions, context.policy)
-    : manifestOptionsFor(sourcePrice, calculateBasePrice(sourcePrice, context.policy), saleOptions, context.policy);
+  const manifestOptions = manifestOptionsFor(
+    sourcePrice,
+    calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
+    saleOptions,
+    context.policy,
+  );
 
   return {
     itemNo: product.itemNo,
@@ -699,7 +701,6 @@ async function reviewProduct(entry, context) {
     shippingFeeConditional: shipping.conditional,
     shippingText: shipping.text,
     shippingSource: shipping.source,
-    effectiveSourcePrice,
     calculatedBasePrice,
     minOrderQuantity,
     optionCount: options.length,
@@ -730,14 +731,12 @@ async function reviewProduct(entry, context) {
       name: title,
       summary: summaryFor(product),
       sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
-      sourcePrice: effectiveSourcePrice || sourcePrice,
+      sourcePrice,
       basePrice: calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
       options: manifestOptions,
       supplierName: product.sellerName || "외부 공급처",
       productInfoNotice: productInfoNoticeFor(product, complianceStatus, koshaAudit),
-      shippingInfo: shipping.known
-        ? `배송비 포함 가격입니다. 공급처 기본 배송비 ${Number(shipping.fee || 0).toLocaleString("ko-KR")}원을 원가에 반영했습니다.`
-        : "",
+      shippingInfo: shipping.known ? "고객에게 별도 배송비를 청구하지 않습니다." : "",
       asInfo: COREABLE_AS_INFO,
       returnExchangeInfo: COREABLE_RETURN_EXCHANGE_INFO,
       memo: `B-054 review=${decision}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; KOSHA=${koshaGate.status}; compliance=${complianceStatus}; target=${status}`,
@@ -827,7 +826,6 @@ function reviewCsv(items) {
     "sourceCategoryPath",
     "sourcePrice",
     "shippingFee",
-    "effectiveSourcePrice",
     "calculatedBasePrice",
     "minOrderQuantity",
     "optionCount",
@@ -865,6 +863,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return usage();
   if (args.selfCheck) {
+    assert.equal(calculateBasePrice(3700), 4600);
     assert.equal(koshaCollectionGate("TRAFFIC_CONE").status, "NOT_APPLICABLE");
     assert.equal(koshaCollectionGate("PPE_SAFETY_HELMET").hardReason, "");
     assert.equal(koshaCollectionGate("WORK_PLATFORM", {
