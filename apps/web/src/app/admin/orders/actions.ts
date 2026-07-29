@@ -188,6 +188,50 @@ export async function recordDepositMismatch(formData: FormData) {
   done(orderId, "입금 불일치 메모를 저장했습니다.");
 }
 
+export async function validateSupplierPurchase(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  try {
+    await postOrderAction(orderId, "/supplier-order/validate", {});
+  } catch (error) {
+    done(orderId, failureMessage(error, "공급처 주문 검증에 실패했습니다."));
+  }
+  revalidatePath("/admin/orders");
+  done(orderId, "공급처 재고·가격·배송비를 검증했습니다.");
+}
+
+export async function retrySupplierPurchase(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  try {
+    await postOrderAction(orderId, "/supplier-order/retry", {});
+  } catch (error) {
+    done(orderId, failureMessage(error, "자동 발주 재시도 등록에 실패했습니다."));
+  }
+  revalidatePath("/admin/orders");
+  done(orderId, "자동 발주 재시도를 등록했습니다.");
+}
+
+export async function reconcileSupplierPurchase(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  try {
+    await postOrderAction(orderId, "/supplier-order/reconcile", {});
+  } catch (error) {
+    done(orderId, failureMessage(error, "공급처 주문 대사에 실패했습니다."));
+  }
+  revalidatePath("/admin/orders");
+  done(orderId, "공급처 주문 대사를 완료했습니다.");
+}
+
+export async function cancelSupplierPurchase(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  try {
+    await postOrderAction(orderId, "/supplier-order/cancel", { reason: value(formData, "reason") });
+  } catch (error) {
+    done(orderId, failureMessage(error, "공급처 주문 취소 요청에 실패했습니다."));
+  }
+  revalidatePath("/admin/orders");
+  done(orderId, "공급처 주문 취소를 요청했습니다.");
+}
+
 export async function completeManualRefund(formData: FormData) {
   const orderId = value(formData, "orderId");
   const refundId = value(formData, "refundId");

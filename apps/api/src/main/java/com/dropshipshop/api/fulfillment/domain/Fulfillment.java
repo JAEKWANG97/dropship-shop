@@ -65,6 +65,31 @@ public class Fulfillment {
 	@Column(name = "out_of_stock_reason", columnDefinition = "TEXT")
 	private String outOfStockReason;
 
+	@Column(name = "purchase_provider", length = 30)
+	private String purchaseProvider;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "purchase_status", length = 40)
+	private SupplierPurchaseStatus purchaseStatus;
+
+	@Column(name = "expected_source_amount")
+	private Long expectedSourceAmount;
+
+	@Column(name = "actual_source_amount")
+	private Long actualSourceAmount;
+
+	@Column(name = "request_fingerprint", length = 64)
+	private String requestFingerprint;
+
+	@Column(name = "last_purchase_error", columnDefinition = "TEXT")
+	private String lastPurchaseError;
+
+	@Column(name = "purchase_synced_at")
+	private Instant purchaseSyncedAt;
+
+	@Column(name = "supplier_cancel_status", length = 40)
+	private String supplierCancelStatus;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -126,8 +151,87 @@ public class Fulfillment {
 		this.outOfStockReason = reason;
 	}
 
+	public void queueDomeggookPurchase(long expectedSourceAmount, String requestFingerprint) {
+		this.purchaseProvider = "DOMEGGOOK";
+		this.purchaseStatus = SupplierPurchaseStatus.READY;
+		this.expectedSourceAmount = expectedSourceAmount;
+		this.requestFingerprint = requestFingerprint;
+		this.lastPurchaseError = null;
+	}
+
+	public void markPurchaseProcessing() {
+		if (purchaseStatus != SupplierPurchaseStatus.READY && purchaseStatus != SupplierPurchaseStatus.FAILED) {
+			throw new IllegalStateException("Supplier purchase can process only from ready or failed");
+		}
+		this.purchaseStatus = SupplierPurchaseStatus.PROCESSING;
+		this.lastPurchaseError = null;
+	}
+
+	public void retryPurchase() {
+		if (purchaseStatus != SupplierPurchaseStatus.FAILED) {
+			throw new IllegalStateException("Only failed supplier purchases can be retried");
+		}
+		this.purchaseStatus = SupplierPurchaseStatus.READY;
+		this.lastPurchaseError = null;
+	}
+
+	public void updateExpectedSourceAmount(long expectedSourceAmount) {
+		this.expectedSourceAmount = expectedSourceAmount;
+	}
+
+	public void markPurchaseOrdered(
+		String supplierOrderNumber,
+		long actualSourceAmount,
+		String orderedAddressSnapshot,
+		UUID orderedByAdminId,
+		Instant orderedAt
+	) {
+		markOrdered(supplierOrderNumber, orderedAddressSnapshot, orderedByAdminId, null, "Domeggook automatic order", orderedAt);
+		this.purchaseStatus = SupplierPurchaseStatus.ORDERED;
+		this.actualSourceAmount = actualSourceAmount;
+		this.purchaseSyncedAt = orderedAt;
+		this.lastPurchaseError = null;
+	}
+
+	public void markPurchaseFailed(String error) {
+		this.purchaseStatus = SupplierPurchaseStatus.FAILED;
+		this.lastPurchaseError = error;
+	}
+
+	public void markPurchaseReconciliationRequired(String error) {
+		this.purchaseStatus = SupplierPurchaseStatus.RECONCILIATION_REQUIRED;
+		this.lastPurchaseError = error;
+	}
+
+	public void markPurchaseSynced(Instant syncedAt) {
+		this.purchaseSyncedAt = syncedAt;
+	}
+
+	public void markSupplierCancelRequested(String status, Instant syncedAt) {
+		this.purchaseStatus = SupplierPurchaseStatus.CANCEL_REQUESTED;
+		this.supplierCancelStatus = status;
+		this.purchaseSyncedAt = syncedAt;
+	}
+
+	public void markSupplierCancelled(String status, Instant syncedAt) {
+		this.purchaseStatus = SupplierPurchaseStatus.CANCELLED;
+		this.supplierCancelStatus = status;
+		this.purchaseSyncedAt = syncedAt;
+		this.status = FulfillmentStatus.CANCELLED;
+	}
+
+	public void markSupplierCancelFailed(String error, Instant syncedAt) {
+		this.supplierCancelStatus = "FAILED";
+		this.lastPurchaseError = error;
+		this.purchaseSyncedAt = syncedAt;
+	}
+
 	public UUID getId() {
 		return id;
+	}
+
+	public CustomerOrder getOrder() {
+		return order;
 	}
 
 	public FulfillmentStatus getStatus() {
@@ -160,5 +264,37 @@ public class Fulfillment {
 
 	public String getOutOfStockReason() {
 		return outOfStockReason;
+	}
+
+	public String getPurchaseProvider() {
+		return purchaseProvider;
+	}
+
+	public SupplierPurchaseStatus getPurchaseStatus() {
+		return purchaseStatus;
+	}
+
+	public Long getExpectedSourceAmount() {
+		return expectedSourceAmount;
+	}
+
+	public Long getActualSourceAmount() {
+		return actualSourceAmount;
+	}
+
+	public String getRequestFingerprint() {
+		return requestFingerprint;
+	}
+
+	public String getLastPurchaseError() {
+		return lastPurchaseError;
+	}
+
+	public Instant getPurchaseSyncedAt() {
+		return purchaseSyncedAt;
+	}
+
+	public String getSupplierCancelStatus() {
+		return supplierCancelStatus;
 	}
 }

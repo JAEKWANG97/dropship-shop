@@ -29,6 +29,7 @@ import com.dropshipshop.api.payment.domain.PaymentEventType;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.procurement.DomeggookPurchaseService;
 
 @Service
 class AdminOrderPaymentService {
@@ -41,6 +42,7 @@ class AdminOrderPaymentService {
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final NotificationService notificationService;
+	private final DomeggookPurchaseService domeggookPurchaseService;
 
 	AdminOrderPaymentService(
 		CustomerOrderRepository orderRepository,
@@ -50,7 +52,8 @@ class AdminOrderPaymentService {
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
-		NotificationService notificationService
+		NotificationService notificationService,
+		DomeggookPurchaseService domeggookPurchaseService
 	) {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
@@ -60,6 +63,7 @@ class AdminOrderPaymentService {
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.notificationService = notificationService;
+		this.domeggookPurchaseService = domeggookPurchaseService;
 	}
 
 	@Transactional
@@ -98,6 +102,7 @@ class AdminOrderPaymentService {
 			for (CustomerOrder order : groupOrders) {
 				OrderStatus beforeStatus = order.getStatus();
 				order.confirmBankTransferDeposit();
+				domeggookPurchaseService.queueAfterDeposit(order, adminUserId);
 				recordHistory(
 					order,
 					adminUserId,

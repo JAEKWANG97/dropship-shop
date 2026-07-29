@@ -12,6 +12,7 @@ export type AdminProduct = {
   name: string;
   summary: string;
   sourcePrice: number;
+  sourceItemNo: string | null;
   sourceUrl: string | null;
   basePrice: number;
   categoryCode: ProductCategoryCode;
@@ -122,10 +123,18 @@ export type AdminOrder = {
   };
   payment?: { provider: string | null; status: string; method: string | null; approvedAmount: number | null };
   fulfillment?: {
+    fulfillmentId: string | null;
     status: string;
     supplierOrderStartedAt: string | null;
     supplierOrderNumber: string | null;
     expectedShipDate: string | null;
+    purchaseProvider: string | null;
+    purchaseStatus: string | null;
+    expectedSourceAmount: number | null;
+    actualSourceAmount: number | null;
+    lastPurchaseError: string | null;
+    purchaseSyncedAt: string | null;
+    supplierCancelStatus: string | null;
   } | null;
   shipment?: {
     shipmentId: string;

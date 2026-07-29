@@ -368,6 +368,13 @@ class AdminOrderQueryService {
 				null,
 				null,
 				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
 				null
 			);
 		}
@@ -382,7 +389,14 @@ class AdminOrderQueryService {
 			fulfillment.getOrderedAt(),
 			fulfillment.getExpectedShipDate(),
 			fulfillment.getSupplierResponseMemo(),
-			fulfillment.getOutOfStockReason()
+			fulfillment.getOutOfStockReason(),
+			fulfillment.getPurchaseProvider(),
+			fulfillment.getPurchaseStatus(),
+			fulfillment.getExpectedSourceAmount(),
+			fulfillment.getActualSourceAmount(),
+			fulfillment.getLastPurchaseError(),
+			fulfillment.getPurchaseSyncedAt(),
+			fulfillment.getSupplierCancelStatus()
 		);
 	}
 

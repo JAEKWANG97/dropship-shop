@@ -66,6 +66,15 @@ public class OrderItem {
 	@Column(name = "line_amount", nullable = false)
 	private long lineAmount;
 
+	@Column(name = "source_item_no", length = 50)
+	private String sourceItemNo;
+
+	@Column(name = "source_option_code", length = 100)
+	private String sourceOptionCode;
+
+	@Column(name = "source_unit_price")
+	private Long sourceUnitPrice;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -94,6 +103,10 @@ public class OrderItem {
 		this.unitPrice = product.getBasePrice() + productOption.getAdditionalPrice();
 		this.quantity = quantity;
 		this.lineAmount = unitPrice * quantity;
+		this.sourceItemNo = product.getSourceItemNo();
+		this.sourceOptionCode = productOption.getSourceOptionCode();
+		this.sourceUnitPrice = product.getSourcePrice()
+			+ (productOption.getSourceAdditionalPrice() == null ? 0 : productOption.getSourceAdditionalPrice());
 	}
 
 	@PrePersist
@@ -154,5 +167,17 @@ public class OrderItem {
 
 	public long getLineAmount() {
 		return lineAmount;
+	}
+
+	public String getSourceItemNo() {
+		return sourceItemNo;
+	}
+
+	public String getSourceOptionCode() {
+		return sourceOptionCode;
+	}
+
+	public Long getSourceUnitPrice() {
+		return sourceUnitPrice;
 	}
 }

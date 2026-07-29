@@ -43,6 +43,9 @@ public class Product {
 	@Column(name = "source_url", length = 2000)
 	private String sourceUrl;
 
+	@Column(name = "source_item_no", length = 50)
+	private String sourceItemNo;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "category_code", nullable = false, length = 80)
 	private ProductCategory categoryCode;
@@ -136,6 +139,10 @@ public class Product {
 		this.sourceUrl = sourceUrl;
 	}
 
+	public void updateSourceItemNo(String sourceItemNo) {
+		this.sourceItemNo = sourceItemNo;
+	}
+
 	public void updateThumbnailImageUrl(String thumbnailImageUrl) {
 		this.thumbnailImageUrl = thumbnailImageUrl;
 	}
@@ -170,6 +177,10 @@ public class Product {
 
 	public String getSourceUrl() {
 		return sourceUrl;
+	}
+
+	public String getSourceItemNo() {
+		return sourceItemNo;
 	}
 
 	public ProductCategory getCategoryCode() {

@@ -10,6 +10,7 @@ import com.dropshipshop.api.claim.domain.ClaimStatus;
 import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
+import com.dropshipshop.api.fulfillment.domain.SupplierPurchaseStatus;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
@@ -150,7 +151,21 @@ final class AdminOrderDtos {
 		Instant orderedAt,
 		LocalDate expectedShipDate,
 		String supplierResponseMemo,
-		String outOfStockReason
+		String outOfStockReason,
+		String purchaseProvider,
+		SupplierPurchaseStatus purchaseStatus,
+		Long expectedSourceAmount,
+		Long actualSourceAmount,
+		String lastPurchaseError,
+		Instant purchaseSyncedAt,
+		String supplierCancelStatus
+	) {
+	}
+
+	record SupplierPurchaseValidationResponse(
+		long expectedAmount,
+		long itemAmount,
+		long shippingAmount
 	) {
 	}
 
@@ -362,6 +377,13 @@ final class AdminOrderDtos {
 		@NotBlank
 		@Size(max = 2000)
 		String memo
+	) {
+	}
+
+	record SupplierPurchaseCancelRequest(
+		@NotBlank
+		@Size(max = 500)
+		String reason
 	) {
 	}
 }

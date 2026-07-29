@@ -328,6 +328,7 @@ Relationships:
 - `name`
 - `summary`
 - `source_price`: supplier cost, admin-only
+- `source_item_no`: nullable supplier product number used by automated ordering, admin-only
 - `source_url`: nullable supplier source URL, admin-only, maximum 2,000 characters
 - `base_price`
 - `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
@@ -544,12 +545,15 @@ Status set:
 - `unit_price`
 - `quantity`
 - `line_amount`
+- `source_item_no`
+- `source_option_code`
+- `source_unit_price`
 - `created_at`
 - `updated_at`
 
 Rule:
 
-- Product price and display text must not change for paid orders after product edits.
+- Product price, display text, and supplier purchase source values must not change for paid orders after product edits.
 
 ### order_policy_agreements
 
@@ -669,6 +673,14 @@ Implemented by DS-9 for payment confirmation events.
 - `expected_ship_date`
 - `supplier_response_memo`
 - `out_of_stock_reason`
+- `purchase_provider`
+- `purchase_status`: `READY` / `PROCESSING` / `RECONCILIATION_REQUIRED` / `ORDERED` / `FAILED` / `CANCEL_REQUESTED` / `CANCELLED`
+- `expected_source_amount`
+- `actual_source_amount`
+- `request_fingerprint`
+- `last_purchase_error`
+- `purchase_synced_at`
+- `supplier_cancel_status`
 - `created_at`
 - `updated_at`
 
@@ -676,6 +688,27 @@ Constraints and indexes:
 
 - Unique `order_id`
 - Indexes on `order_id`, `supplier_id`, and `status`
+- Index on `purchase_status`
+- Unique non-null `supplier_order_number`
+
+### supplier_purchase_attempts
+
+- `id`
+- `fulfillment_id`
+- `action`: `ORDER` / `RECONCILE` / `CANCEL`
+- `status`: `STARTED` / `SUCCEEDED` / `FAILED` / `UNKNOWN`
+- `request_fingerprint`
+- `external_order_number`
+- `expected_amount`
+- `actual_amount`
+- `failure_code`
+- `failure_message`
+- `created_at`
+- `completed_at`
+
+Rule:
+
+- A response loss after `setOrder` is recorded as `UNKNOWN` and requires purchase-order reconciliation before retry.
 
 ### admin_order_action_histories
 

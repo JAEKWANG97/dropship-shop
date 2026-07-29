@@ -85,6 +85,7 @@ export type ProductDetail = ProductSummary & {
   supplierId?: string;
   supplierName?: string;
   sourcePrice?: number;
+  sourceItemNo?: string | null;
   sourceUrl?: string | null;
   complianceStatus?: ProductComplianceStatus;
   saleReady?: boolean;

@@ -428,6 +428,10 @@ class AdminOrderApiIntegrationTest {
 					}
 					"""))
 			.andExpect(status().isForbidden());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/supplier-order/validate", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isForbidden());
 	}
 
 	@Test

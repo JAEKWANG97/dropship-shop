@@ -422,6 +422,10 @@ Rules:
 | `POST` | `/api/admin/orders/{orderId}/deposit-mismatch` | `ADMIN` | Implemented | Record bank-transfer deposit mismatch memo |
 | `POST` | `/api/admin/orders/{orderId}/supplier-work-start` | `ADMIN` | Implemented | Lock address and mark supplier work started |
 | `POST` | `/api/admin/orders/{orderId}/supplier-order-completed` | `ADMIN` | Implemented | Mark manual supplier order completed |
+| `POST` | `/api/admin/orders/{orderId}/supplier-order/validate` | `ADMIN` | Implemented | Revalidate source item, option, price, and shipping before automated purchase |
+| `POST` | `/api/admin/orders/{orderId}/supplier-order/retry` | `ADMIN` | Implemented | Queue a failed, known-safe automated purchase for retry |
+| `POST` | `/api/admin/orders/{orderId}/supplier-order/reconcile` | `ADMIN` | Implemented | Reconcile an uncertain purchase against Domeggook orders without blind retry |
+| `POST` | `/api/admin/orders/{orderId}/supplier-order/cancel` | `ADMIN` | Implemented | Request supplier purchase cancellation with a required reason |
 | `POST` | `/api/admin/orders/{orderId}/out-of-stock` | `ADMIN` | Implemented | Mark supplier out-of-stock and prepare refund flow |
 | `POST` | `/api/admin/orders/{orderId}/shipments` | `ADMIN` | Implemented | Enter carrier and tracking number |
 | `PATCH` | `/api/admin/orders/{orderId}/shipment-correction` | `ADMIN` | Planned | Manually correct shipment state with reason |
@@ -443,6 +447,10 @@ Rules:
 - Admin order detail exposes internal order/payment/fulfillment statuses plus supplier, product option, customer shipping, and payment summary fields.
 - Supplier work start requires a reason and records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId`.
 - Supplier order completion requires `supplierOrderNumber` and reason. `expectedShipDate` and `supplierResponseMemo` are optional evidence fields.
+- Deposit-confirmed orders whose items all contain Domeggook source snapshots are queued for automated purchase.
+- Automated purchase checks live sale/option state, source price, fixed shipping, and e-money balance before `setOrder`.
+- A transport failure after an order request becomes `RECONCILIATION_REQUIRED`; it cannot use the retry endpoint until order-list reconciliation proves no duplicate purchase.
+- Admin order detail includes purchase status, expected/actual supplier amount, supplier order number, last error, sync time, and cancellation status.
 - Supplier out-of-stock requires a reason and moves the order to `OUT_OF_STOCK`.
 - Shipment creation requires `carrier` and `trackingNumber`, creates one shipment for the order, and moves the order to `SHIPPED`.
 - MVP allows only one shipment per order; duplicate shipment creation is rejected.

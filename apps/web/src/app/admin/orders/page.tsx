@@ -20,6 +20,7 @@ import {
 } from "@/lib/orders";
 import {
   cancelUnpaidDeposit,
+  cancelSupplierPurchase,
   completeManualRefund,
   completeSupplierOrder,
   confirmDeposit,
@@ -28,10 +29,13 @@ import {
   markOrderOutOfStock,
   recordDepositMismatch,
   recordReturnReceived,
+  reconcileSupplierPurchase,
   rejectClaim,
   startSupplierWork,
   startReturnRefund,
   syncShipmentTracking,
+  retrySupplierPurchase,
+  validateSupplierPurchase,
 } from "./actions";
 
 type AdminOrdersPageProps = {
@@ -198,6 +202,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 </div>
               </div>
               <BankTransferAdminPanel order={selectedOrder} />
+              <SupplierPurchasePanel order={selectedOrder} />
               <h3>운영 상태</h3>
               <div className="summary-list compact">
                 <div>
@@ -633,6 +638,10 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
     );
   }
 
+  if (order.fulfillment?.purchaseProvider === "DOMEGGOOK") {
+    return null;
+  }
+
   return (
     <div className="admin-order-actions">
       <h3>처리 액션</h3>
@@ -731,4 +740,74 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
       ) : null}
     </div>
   );
+}
+
+function SupplierPurchasePanel({ order }: { order: AdminOrder }) {
+  const purchase = order.fulfillment;
+  if (purchase?.purchaseProvider !== "DOMEGGOOK") {
+    return null;
+  }
+  const status = purchase.purchaseStatus ?? "READY";
+
+  return (
+    <section className="admin-claim-panel">
+      <h3>도매꾹 자동 발주</h3>
+      <div className="summary-list compact">
+        <SummaryItem label="자동 발주 상태" value={supplierPurchaseStatusLabel(status)} />
+        <SummaryItem
+          label="예상 공급처 결제액"
+          value={purchase.expectedSourceAmount == null ? "-" : formatPrice(purchase.expectedSourceAmount)}
+        />
+        <SummaryItem
+          label="실제 공급처 결제액"
+          value={purchase.actualSourceAmount == null ? "-" : formatPrice(purchase.actualSourceAmount)}
+        />
+        <SummaryItem label="공급처 주문번호" value={purchase.supplierOrderNumber ?? "-"} />
+        <SummaryItem label="최근 동기화" value={formatDateTime(purchase.purchaseSyncedAt)} />
+        <SummaryItem label="최근 오류" value={purchase.lastPurchaseError ?? "-"} />
+      </div>
+      <div className="admin-inline-form">
+        {status === "READY" ? (
+          <form action={validateSupplierPurchase}>
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <button className="button" type="submit">재고·가격 검증</button>
+          </form>
+        ) : null}
+        {status === "FAILED" ? (
+          <form action={retrySupplierPurchase}>
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <button className="button" type="submit">자동 발주 재시도</button>
+          </form>
+        ) : null}
+        {status === "PROCESSING" || status === "RECONCILIATION_REQUIRED" ? (
+          <form action={reconcileSupplierPurchase}>
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <button className="button" type="submit">공급처 주문 대사</button>
+          </form>
+        ) : null}
+        {status === "ORDERED" ? (
+          <form action={cancelSupplierPurchase}>
+            <input name="orderId" type="hidden" value={order.orderId} />
+            <label>
+              취소 사유
+              <input name="reason" required maxLength={500} />
+            </label>
+            <button className="button" type="submit">공급처 주문 취소 요청</button>
+          </form>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function supplierPurchaseStatusLabel(status: string) {
+  return {
+    READY: "자동 발주 대기",
+    PROCESSING: "자동 발주 처리 중",
+    RECONCILIATION_REQUIRED: "중복 방지 대사 필요",
+    ORDERED: "공급처 주문 완료",
+    FAILED: "자동 발주 실패",
+    CANCEL_REQUESTED: "공급처 취소 요청",
+    CANCELLED: "공급처 취소 완료",
+  }[status] ?? status;
 }

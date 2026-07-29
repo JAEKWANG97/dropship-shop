@@ -23,6 +23,13 @@ app:
     bank-name: ${APP_BANK_TRANSFER_BANK_NAME}
     account-number: ${APP_BANK_TRANSFER_ACCOUNT_NUMBER}
     account-holder: ${APP_BANK_TRANSFER_ACCOUNT_HOLDER}
+  domeggook:
+    enabled: ${DOMEGGOOK_PURCHASE_ENABLED:false}
+    auto-order-enabled: ${DOMEGGOOK_AUTO_ORDER_ENABLED:false}
+    api-key: ${DOMEGGOOK_OPEN_API_KEY:}
+    user-id: ${DOMEGGOOK_PURCHASE_USER_ID:}
+    password: ${DOMEGGOOK_PURCHASE_USER_PASSWORD:}
+    client-ip: ${DOMEGGOOK_PURCHASE_CLIENT_IP:}
   inquiry:
     lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET}
   email:

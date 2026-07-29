@@ -53,8 +53,16 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_NAVER_CLIENT_ID` | Naver OAuth client id |
 | `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
+| `DOMEGGOOK_PURCHASE_ENABLED` | Private API 읽기·동기화 활성화. 실주문 검증 전 기본값 `false` |
+| `DOMEGGOOK_AUTO_ORDER_ENABLED` | 입금확인 주문의 `setOrder` 자동 실행. e-money 충전과 실주문·취소 검증 후에만 `true` |
+| `DOMEGGOOK_OPEN_API_KEY` | 승인된 Domeggook API key |
+| `DOMEGGOOK_PURCHASE_USER_ID` | 일반 Domeggook 구매 계정 ID |
+| `DOMEGGOOK_PURCHASE_USER_PASSWORD` | 일반 Domeggook 구매 계정 비밀번호. 서버에서만 사용 |
+| `DOMEGGOOK_PURCHASE_CLIENT_IP` | Private API에 등록한 고정 client IP |
 
 현재 고객 결제 경로는 계좌입금이며, PG 결제 key는 사용하지 않는다. `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+
+`DOMEGGOOK_PURCHASE_ENABLED=true`, `DOMEGGOOK_AUTO_ORDER_ENABLED=false`로 먼저 로그인·상품 검증·자산 조회와 관리자 상태 화면을 확인한다. 최저가 실제 상품의 주문 생성·조회·취소와 e-money 반환까지 확인하기 전에는 자동 주문을 켜지 않는다.
 
 ## Health And Readiness
 

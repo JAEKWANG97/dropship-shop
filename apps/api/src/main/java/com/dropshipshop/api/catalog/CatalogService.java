@@ -214,6 +214,7 @@ public class CatalogService {
 			request.categoryCode(),
 			request.status()
 		);
+		product.updateSourceItemNo(request.sourceItemNo());
 		product.updateSourceUrl(request.sourceUrl());
 		return toAdminProductResponse(productRepository.save(product));
 	}
@@ -245,6 +246,7 @@ public class CatalogService {
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
 		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
+		product.updateSourceItemNo(valueOrDefault(request.sourceItemNo(), product.getSourceItemNo()));
 		product.updateSourceUrl(request.sourceUrl());
 		product.updateComplianceStatus(valueOrDefault(request.complianceStatus(), product.getComplianceStatus()));
 		validateIfActive(product);
@@ -767,6 +769,7 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			product.getSourcePrice(),
+			product.getSourceItemNo(),
 			product.getSourceUrl(),
 			product.getBasePrice(),
 			product.getCategoryCode(),
@@ -830,6 +833,7 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			includeSourcePrice ? product.getSourcePrice() : null,
+			includeSourcePrice ? product.getSourceItemNo() : null,
 			includeSourcePrice ? product.getSourceUrl() : null,
 			product.getBasePrice(),
 			product.getCategoryCode(),

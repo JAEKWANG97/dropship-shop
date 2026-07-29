@@ -15,10 +15,10 @@ Customer selects product option
 -> Admin confirms actual deposit
 -> Payment status: APPROVED
 -> All delivery-group orders in the payment group move to SUPPLIER_ORDER_PENDING
--> Admin starts supplier order work
--> Supplier order started time is recorded
--> Shipping address is locked
--> Admin places supplier order manually
+-> Domeggook source snapshot order is queued for automated purchase
+-> Supplier item, option, source price, shipping, and e-money are revalidated
+-> System places the supplier order with prefunded e-money
+-> Non-Domeggook order stays on the existing manual supplier-order path
 -> Fulfillment status: ORDERED
 -> Order status: SUPPLIER_ORDERED
 -> Admin enters carrier and tracking number
@@ -47,6 +47,14 @@ B-041 bank-transfer implementation notes:
 - Admin unpaid cancellation moves pending orders to `CANCELLED`.
 - Admin deposit mismatch memo keeps the order pending and records the memo for operations.
 - Bank-transfer refunds are completed only after an admin records the actual manual refund completion with the recipient bank/account/holder, transferred time, transaction reference, and reason.
+
+B-072 supplier purchase notes:
+
+- Only deposit-confirmed orders with complete supplier source snapshots enter the automated queue.
+- The customer payment and Domeggook e-money purchase are separate money records.
+- A known failure may be retried. A timeout or lost response must be reconciled against recent supplier orders first.
+- Supplier cancellation does not complete the customer refund; the admin records the bank refund separately.
+- Domeggook carrier/tracking data creates the existing shipment record when one unambiguous shipment is returned.
 
 DS-10 backend implementation notes:
 

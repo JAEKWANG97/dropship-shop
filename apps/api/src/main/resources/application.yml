@@ -46,3 +46,10 @@ app:
     account-holder: ${APP_BANK_TRANSFER_ACCOUNT_HOLDER:가라사니}
     deposit-deadline-hours: ${APP_BANK_TRANSFER_DEPOSIT_DEADLINE_HOURS:24}
     cash-receipt-notice: ${APP_BANK_TRANSFER_CASH_RECEIPT_NOTICE:현금영수증은 요청 시 홈택스에서 발급하며, 의무발행 대상 거래는 요청 여부와 관계없이 발급합니다.}
+  domeggook:
+    enabled: ${DOMEGGOOK_PURCHASE_ENABLED:false}
+    auto-order-enabled: ${DOMEGGOOK_AUTO_ORDER_ENABLED:false}
+    api-key: ${DOMEGGOOK_OPEN_API_KEY:}
+    user-id: ${DOMEGGOOK_PURCHASE_USER_ID:}
+    password: ${DOMEGGOOK_PURCHASE_USER_PASSWORD:}
+    client-ip: ${DOMEGGOOK_PURCHASE_CLIENT_IP:}

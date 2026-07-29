@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.auth.security.CurrentUser;
+import com.dropshipshop.api.procurement.DomeggookPurchaseService;
 
 import jakarta.validation.Valid;
 
@@ -27,6 +29,7 @@ class AdminOrderController {
 	private final AdminOrderFulfillmentService adminOrderFulfillmentService;
 	private final AdminOrderPaymentService adminOrderPaymentService;
 	private final AdminOrderShipmentService adminOrderShipmentService;
+	private final DomeggookPurchaseService domeggookPurchaseService;
 	private final CurrentUser currentUser;
 
 	AdminOrderController(
@@ -34,12 +37,14 @@ class AdminOrderController {
 		AdminOrderFulfillmentService adminOrderFulfillmentService,
 		AdminOrderPaymentService adminOrderPaymentService,
 		AdminOrderShipmentService adminOrderShipmentService,
+		DomeggookPurchaseService domeggookPurchaseService,
 		CurrentUser currentUser
 	) {
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.adminOrderFulfillmentService = adminOrderFulfillmentService;
 		this.adminOrderPaymentService = adminOrderPaymentService;
 		this.adminOrderShipmentService = adminOrderShipmentService;
+		this.domeggookPurchaseService = domeggookPurchaseService;
 		this.currentUser = currentUser;
 	}
 
@@ -141,5 +146,52 @@ class AdminOrderController {
 		Authentication authentication
 	) {
 		return adminOrderPaymentService.recordBankTransferDepositMismatch(orderId, currentUser.id(authentication), request);
+	}
+
+	@PostMapping("/{orderId}/supplier-order/validate")
+	AdminOrderDtos.SupplierPurchaseValidationResponse validateSupplierOrder(@PathVariable UUID orderId) {
+		try {
+			DomeggookPurchaseService.ValidationResult result = domeggookPurchaseService.validate(orderId);
+			return new AdminOrderDtos.SupplierPurchaseValidationResponse(
+				result.expectedAmount(),
+				result.itemAmount(),
+				result.shippingAmount()
+			);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
+	@PostMapping("/{orderId}/supplier-order/retry")
+	AdminOrderDtos.AdminOrderDetailResponse retrySupplierOrder(@PathVariable UUID orderId) {
+		try {
+			domeggookPurchaseService.retry(orderId);
+			return adminOrderQueryService.getOrder(orderId);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
+	@PostMapping("/{orderId}/supplier-order/reconcile")
+	AdminOrderDtos.AdminOrderDetailResponse reconcileSupplierOrder(@PathVariable UUID orderId) {
+		try {
+			domeggookPurchaseService.reconcile(orderId);
+			return adminOrderQueryService.getOrder(orderId);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
+	}
+
+	@PostMapping("/{orderId}/supplier-order/cancel")
+	AdminOrderDtos.AdminOrderDetailResponse cancelSupplierOrder(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.SupplierPurchaseCancelRequest request
+	) {
+		try {
+			domeggookPurchaseService.cancel(orderId, request.reason());
+			return adminOrderQueryService.getOrder(orderId);
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		}
 	}
 }
