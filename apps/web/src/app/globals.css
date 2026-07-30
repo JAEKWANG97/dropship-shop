@@ -518,6 +518,47 @@ p {
   margin-top: 2px;
 }
 
+.account-address-list {
+  display: grid;
+}
+
+.account-address-editor {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-address-editor summary {
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.account-address-editor summary span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.account-address-editor summary em {
+  color: var(--success);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.account-address-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.account-address-form h3 {
+  margin: 0;
+}
+
+.account-address-editor > form:last-child {
+  margin-top: 8px;
+}
+
 .auth-page {
   display: grid;
   place-items: start center;

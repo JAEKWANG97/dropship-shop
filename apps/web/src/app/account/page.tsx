@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getProfileCompletion, getReferralState } from "@/lib/account";
+import { getAddresses, getProfileCompletion, getReferralState } from "@/lib/account";
 import { getCurrentUser } from "@/lib/session";
+import { AddressFields } from "../address-fields";
 import { SubmitButton } from "../submit-button";
-import { requestAccountDeletion, updateProfile } from "./actions";
+import {
+  createAddress,
+  deleteAddress,
+  requestAccountDeletion,
+  updateAddress,
+  updateProfile,
+} from "./actions";
 
 type AccountPageProps = {
   searchParams: Promise<{ message?: string }>;
@@ -17,7 +24,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     redirect("/login?redirectTo=%2Faccount");
   }
 
-  const [profile, referral] = await Promise.all([loadProfileCompletion(), loadReferralState()]);
+  const [profile, referral, addresses] = await Promise.all([
+    loadProfileCompletion(),
+    loadReferralState(),
+    loadAddresses(),
+  ]);
 
   return (
     <section className="narrow-page">
@@ -96,6 +107,102 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
         </section>
       )}
+      <section className="account-form">
+        <h2>배송지 관리</h2>
+        {addresses.error ? (
+          <div className="notice danger">
+            <strong>배송지를 불러오지 못했습니다</strong>
+            <span>로그인 상태를 확인한 뒤 다시 시도해 주세요.</span>
+          </div>
+        ) : (
+          <>
+            <div className="account-address-list">
+              {addresses.data.addresses.length === 0 ? (
+                <p className="field-help">저장된 배송지가 없습니다.</p>
+              ) : (
+                addresses.data.addresses.map((address) => (
+                  <details className="account-address-editor" key={address.id}>
+                    <summary>
+                      <strong>{address.recipientName}</strong>
+                      <span>
+                        {address.address1} {address.address2}
+                      </span>
+                      {address.defaultAddress ? <em>기본 배송지</em> : null}
+                    </summary>
+                    <form action={updateAddress} className="account-address-form">
+                      <input name="addressId" type="hidden" value={address.id} />
+                      <label>
+                        받는 사람
+                        <input name="recipientName" required defaultValue={address.recipientName} />
+                      </label>
+                      <label>
+                        연락처
+                        <input
+                          name="recipientPhone"
+                          required
+                          inputMode="tel"
+                          defaultValue={address.recipientPhone}
+                        />
+                      </label>
+                      <AddressFields
+                        postalCode={address.postalCode}
+                        address1={address.address1}
+                        address2={address.address2 ?? ""}
+                      />
+                      <label className="checkbox-label">
+                        <input
+                          name="defaultAddress"
+                          type="checkbox"
+                          value="true"
+                          defaultChecked={address.defaultAddress}
+                        />
+                        <span>기본 배송지로 사용</span>
+                      </label>
+                      <SubmitButton className="button" pendingLabel="수정 중...">
+                        배송지 수정
+                      </SubmitButton>
+                    </form>
+                    <form action={deleteAddress}>
+                      <input name="addressId" type="hidden" value={address.id} />
+                      <SubmitButton className="button secondary" pendingLabel="삭제 중...">
+                        배송지 삭제
+                      </SubmitButton>
+                    </form>
+                  </details>
+                ))
+              )}
+            </div>
+            <form action={createAddress} className="account-address-form">
+              <h3>새 배송지</h3>
+              <label>
+                받는 사람
+                <input
+                  name="recipientName"
+                  required
+                  defaultValue={profile.error ? "" : profile.data.displayName}
+                />
+              </label>
+              <label>
+                연락처
+                <input
+                  name="recipientPhone"
+                  required
+                  inputMode="tel"
+                  defaultValue={profile.error ? "" : (profile.data.phoneNumber ?? "")}
+                />
+              </label>
+              <AddressFields />
+              <label className="checkbox-label">
+                <input name="defaultAddress" type="checkbox" value="true" defaultChecked />
+                <span>기본 배송지로 사용</span>
+              </label>
+              <SubmitButton className="button" pendingLabel="저장 중...">
+                배송지 저장
+              </SubmitButton>
+            </form>
+          </>
+        )}
+      </section>
       <div className="link-list">
         <Link href="/products">상품 보기</Link>
         <Link href="/orders">주문 내역</Link>
@@ -137,6 +244,14 @@ async function loadProfileCompletion() {
 async function loadReferralState() {
   try {
     return { error: false as const, data: await getReferralState() };
+  } catch {
+    return { error: true as const, data: null };
+  }
+}
+
+async function loadAddresses() {
+  try {
+    return { error: false as const, data: await getAddresses() };
   } catch {
     return { error: true as const, data: null };
   }
