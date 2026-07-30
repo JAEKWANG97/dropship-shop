@@ -1,6 +1,5 @@
 package com.dropshipshop.api.cart;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -138,13 +137,32 @@ class CartApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
 			.andExpect(jsonPath("$.items[0].sellable", is(false)))
-			.andExpect(jsonPath("$.items[0].unavailableReason", containsString("SOLD_OUT")));
+			.andExpect(jsonPath("$.items[0].unavailableReason", is(
+				"현재 선택한 옵션은 판매가 중지되었습니다. 삭제 후 다른 옵션을 선택해 주세요."
+			)));
 
 		mockMvc.perform(post("/api/cart/validate")
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
-			.andExpect(jsonPath("$.issues[0].cartItemId", is(cartItemId.toString())));
+			.andExpect(jsonPath("$.issues[0].cartItemId", is(cartItemId.toString())))
+			.andExpect(jsonPath("$.issues[0].message", is(
+				"현재 선택한 옵션은 판매가 중지되었습니다. 삭제 후 다른 옵션을 선택해 주세요."
+			)));
+
+		option.updateStatus(ProductOptionStatus.ACTIVE);
+		productOptionRepository.saveAndFlush(option);
+		option.getProduct().updateStatus(ProductStatus.HIDDEN);
+		productRepository.saveAndFlush(option.getProduct());
+
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
+			.andExpect(jsonPath("$.items[0].sellable", is(false)))
+			.andExpect(jsonPath("$.items[0].unavailableReason", is(
+				"판매가 중지된 상품입니다. 삭제 후 주문해 주세요."
+			)));
 
 		mockMvc.perform(delete("/api/cart/items/{cartItemId}", cartItemId)
 				.with(authentication(TestAuthentication.customer(customer.getId()))))

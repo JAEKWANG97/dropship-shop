@@ -38,6 +38,8 @@ test("mobile purchase bar submits the product form", async ({ page }, testInfo) 
   await expect(mobileBar).toBeVisible();
   await expect(mobileBar.getByRole("button", { name: "장바구니 담기" })).toBeVisible();
   await expect(mobileBar.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
+  await expect(mobileBar.locator(".mobile-purchase-price")).toHaveCount(0);
+  expect((await mobileBar.boundingBox())?.height).toBeLessThanOrEqual(70);
   await expectNoHorizontalOverflow(page);
 
   await mobileBar.getByRole("button", { name: "장바구니 담기" }).click();
@@ -46,6 +48,20 @@ test("mobile purchase bar submits the product form", async ({ page }, testInfo) 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/login");
   expect(url.searchParams.get("redirectTo")).toBe(`/products/${productId}`);
+});
+
+test("product category selection follows the actual query", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop sidebar exposes the category state.");
+
+  await page.goto("/products");
+  const sidebar = page.locator("aside.catalog-sidebar");
+  await expect(sidebar.getByRole("link", { name: /전체 상품/ })).toHaveClass(/active/);
+  await expect(sidebar.getByRole("link", { name: /개인보호구/ })).not.toHaveClass(/active/);
+
+  await sidebar.getByRole("link", { name: /개인보호구/ }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("group")).toBe("개인보호구");
+  await expect(sidebar.getByRole("link", { name: /전체 상품/ })).not.toHaveClass(/active/);
+  await expect(sidebar.getByRole("link", { name: /개인보호구/ })).toHaveClass(/active/);
 });
 
 test("customer can add product detail item to cart", async ({ page, context }) => {

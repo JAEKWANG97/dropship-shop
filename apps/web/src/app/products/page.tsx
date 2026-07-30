@@ -195,7 +195,7 @@ function CategoryFilterPanel({
       <div className="catalog-group-list">
         {groups.map((group) => (
           <Link
-            className={!params.category && activeGroup === group ? "active" : ""}
+            className={!params.category && params.group === group ? "active" : ""}
             href={withGroup(params, group)}
             key={group}
           >

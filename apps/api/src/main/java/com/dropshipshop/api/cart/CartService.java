@@ -168,10 +168,10 @@ public class CartService {
 
 	private String unavailableReason(Product product, ProductOption option) {
 		if (product.getStatus() != ProductStatus.ACTIVE) {
-			return "Product status is " + product.getStatus().name();
+			return "판매가 중지된 상품입니다. 삭제 후 주문해 주세요.";
 		}
 		if (option.getStatus() != ProductOptionStatus.ACTIVE) {
-			return "Product option status is " + option.getStatus().name();
+			return "현재 선택한 옵션은 판매가 중지되었습니다. 삭제 후 다른 옵션을 선택해 주세요.";
 		}
 		return null;
 	}

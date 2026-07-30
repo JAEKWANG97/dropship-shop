@@ -21,10 +21,9 @@ export default async function RootLayout({
       <body>
         <div className="site-utility">
           <nav aria-label="Utility navigation">
-            <Link href="/products">입점상품</Link>
-            <Link href="/orders">주문배송</Link>
-            <Link href="/cart">장바구니</Link>
+            <Link href="/products">상품목록</Link>
             <Link href="/support">고객문의</Link>
+            <Link href="/company">회사정보</Link>
             {admin ? <Link className="admin-entry" href="/admin">운영관리</Link> : null}
           </nav>
         </div>
