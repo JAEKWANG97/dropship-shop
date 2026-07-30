@@ -50,6 +50,7 @@ import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.common.StorefrontSalesProperties;
 import com.dropshipshop.api.common.storage.FileStorage;
 import com.dropshipshop.api.common.storage.ImageFileValidator;
 import com.dropshipshop.api.common.storage.StoredFile;
@@ -91,6 +92,7 @@ public class CatalogService {
 	private final CustomerPolicyLinkService customerPolicyLinkService;
 	private final FileStorage fileStorage;
 	private final ImageFileValidator imageFileValidator;
+	private final StorefrontSalesProperties salesProperties;
 
 	public CatalogService(
 		SupplierRepository supplierRepository,
@@ -103,7 +105,8 @@ public class CatalogService {
 		ProductChangeHistoryRepository productChangeHistoryRepository,
 		CustomerPolicyLinkService customerPolicyLinkService,
 		FileStorage fileStorage,
-		ImageFileValidator imageFileValidator
+		ImageFileValidator imageFileValidator,
+		StorefrontSalesProperties salesProperties
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -116,6 +119,7 @@ public class CatalogService {
 		this.customerPolicyLinkService = customerPolicyLinkService;
 		this.fileStorage = fileStorage;
 		this.imageFileValidator = imageFileValidator;
+		this.salesProperties = salesProperties;
 	}
 
 	@Transactional(readOnly = true)
@@ -838,7 +842,9 @@ public class CatalogService {
 			product.getBasePrice(),
 			product.getCategoryCode(),
 			product.getStatus(),
-			includeSourcePrice ? product.getComplianceStatus() : null,
+			salesProperties.enabled(),
+			salesProperties.enabled() ? null : salesProperties.closedNotice(),
+			product.getComplianceStatus(),
 			product.getThumbnailImageUrl(),
 			product.getDetailVersion(),
 			notice == null ? null : notice.version(),

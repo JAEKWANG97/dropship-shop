@@ -58,7 +58,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   }
 
   const activeOptions = product.options.filter((option) => option.status === "ACTIVE");
-  const purchasable = product.status === "ACTIVE" && activeOptions.length > 0;
+  const purchasable = product.salesEnabled && product.status === "ACTIVE" && activeOptions.length > 0;
   const galleryImages = product.images.filter((image) => image.type === "GALLERY");
   const policyPages = product.policyLinks
     .map((policy) => policyPageForType(policy.policyType))
@@ -108,7 +108,17 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <span>최소 주문</span>
               <strong>옵션별 1개</strong>
               <span>판매 상태</span>
-              <strong>{purchasable ? "주문 가능" : "구매 불가"}</strong>
+              <strong>{product.salesEnabled ? (purchasable ? "주문 가능" : "구매 불가") : "판매 준비 중"}</strong>
+              <span>인증 정보</span>
+              <strong>{complianceStatusLabel(product.complianceStatus)}</strong>
+              {product.productNotice ? (
+                <>
+                  <span>배송 안내</span>
+                  <strong>{product.productNotice.shippingInfo}</strong>
+                  <span>반품 안내</span>
+                  <strong>{product.productNotice.returnExchangeInfo}</strong>
+                </>
+              ) : null}
             </div>
             {purchasable ? (
               <form action={addCartItem} className="cart-add-form" id={purchaseFormId}>
@@ -148,8 +158,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               </form>
             ) : (
               <div className="notice empty">
-                <strong>현재 구매할 수 없습니다</strong>
-                <span>판매 상태 또는 선택 가능한 옵션을 확인해 주세요.</span>
+                <strong>{product.salesEnabled ? "현재 구매할 수 없습니다" : "판매 준비 중"}</strong>
+                <span>
+                  {product.salesEnabled
+                    ? "판매 상태 또는 선택 가능한 옵션을 확인해 주세요."
+                    : product.salesNotice}
+                </span>
               </div>
             )}
           </div>
@@ -341,4 +355,10 @@ function formatOptionPrice(value: number) {
     return "추가금 없음";
   }
   return `+${formatPrice(value)}`;
+}
+
+function complianceStatusLabel(status: ProductDetail["complianceStatus"]) {
+  if (status === "VERIFIED") return "인증 정보 확인 완료";
+  if (status === "NOT_REQUIRED") return "인증 비대상 또는 별도 확인";
+  return "상품 정보 확인 필요";
 }

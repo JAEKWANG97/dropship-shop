@@ -23,6 +23,9 @@ management:
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
+  sales:
+    enabled: ${APP_SALES_ENABLED:false}
+    closed-notice: ${APP_SALES_CLOSED_NOTICE:구매안전서비스 준비 후 판매를 시작합니다. 현재 주문은 받지 않습니다.}
   inquiry:
     lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET:local-inquiry-lookup-secret-change-me-123456}
     consent-policy-version: support-inquiry-privacy-2026-07-13

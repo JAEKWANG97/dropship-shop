@@ -16,6 +16,7 @@
 - Non-user-authenticated access is allowed for public product pages, public policy/business/legal pages, health checks, OAuth start/callback, and verified provider webhooks. Internal scheduler endpoints require their configured internal token.
 - Basic login and form login are disabled. Social OAuth issues a stateless JWT access token in an HttpOnly cookie.
 - Server calculates all order, payment, refund, and shipping amounts.
+- Production storefront sales default to disabled. When `app.sales.enabled=false`, product detail and cart responses expose the closed state, while cart item creation and checkout creation return `409`.
 - Client-submitted totals are never trusted.
 - Mutating admin actions that affect order, refund, shipment, claim, or product status should record audit history.
 - API errors use the standard response shape defined below.
@@ -66,6 +67,12 @@ Initial error codes:
 - `CONFLICT`: request conflicts with an existing resource or idempotency boundary.
 - `UPSTREAM_SERVICE_ERROR`: external provider or upstream service failed.
 - `INTERNAL_SERVER_ERROR`: unexpected server error.
+
+Public product detail and cart responses include:
+
+- `salesEnabled`: whether storefront purchasing is open.
+- `salesNotice`: customer-facing closure notice when sales are disabled.
+- Public product detail also includes `complianceStatus`; supplier-only source metadata remains admin-only.
 
 Order and payment state conflicts caused by optimistic locking return `409 CONFLICT` with code `CONFLICT` and the message `Order state was just changed. Please refresh and try again.` The client should not retry automatically; the user or admin should reload the latest state before submitting another action.
 

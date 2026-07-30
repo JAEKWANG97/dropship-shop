@@ -28,6 +28,8 @@ export type Cart = {
   cartId: string;
   items: CartItem[];
   subtotalAmount: number;
+  salesEnabled: boolean;
+  salesNotice: string | null;
   checkoutAvailable: boolean;
   issues: CartIssue[];
 };

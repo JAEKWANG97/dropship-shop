@@ -26,7 +26,7 @@ export const BUSINESS_PROFILE = {
   privacyOfficerPhone: "010-8277-7369",
   hostingProvider: "Amazon Web Services",
   purchaseSafetyNotice:
-    "계좌입금 구매안전서비스는 실제 판매 시작 전에 제공 방식과 이용 방법을 안내합니다. 제공 전에는 실제 주문을 받지 않습니다.",
+    "구매안전서비스 준비 후 판매를 시작합니다. 현재 주문은 받지 않습니다.",
   businessRegistryUrl: "https://www.ftc.go.kr/www/bizContents.do?key=253",
 } as const;
 

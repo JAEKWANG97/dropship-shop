@@ -67,6 +67,13 @@ export default async function CartPage({ searchParams }: CartPageProps) {
         </div>
       ) : null}
 
+      {!cart.salesEnabled ? (
+        <div className="notice">
+          <strong>판매 준비 중</strong>
+          <span>{cart.salesNotice}</span>
+        </div>
+      ) : null}
+
       {cart.items.length === 0 ? <EmptyCart /> : <CartContents cart={cart} />}
     </section>
   );
@@ -103,6 +110,8 @@ function EmptyCart() {
 }
 
 function CartContents({ cart }: { cart: Cart }) {
+  const itemIssues = cart.issues.filter((issue) => issue.code !== "SALES_NOT_OPEN");
+
   return (
     <div className="cart-layout">
       <div>
@@ -158,10 +167,10 @@ function CartContents({ cart }: { cart: Cart }) {
           ))}
         </div>
 
-        {cart.issues.length > 0 ? (
+        {itemIssues.length > 0 ? (
           <div className="notice danger">
             <strong>주문 불가 항목</strong>
-            {cart.issues.map((issue) => (
+            {itemIssues.map((issue) => (
               <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
             ))}
           </div>

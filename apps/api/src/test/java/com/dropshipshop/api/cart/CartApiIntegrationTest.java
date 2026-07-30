@@ -76,6 +76,7 @@ class CartApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.items", hasSize(0)))
+			.andExpect(jsonPath("$.salesEnabled", is(true)))
 			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
 			.andExpect(jsonPath("$.issues[0].code", is("EMPTY_CART")));
 

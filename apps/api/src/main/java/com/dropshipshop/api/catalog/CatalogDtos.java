@@ -278,6 +278,8 @@ final class CatalogDtos {
 		long basePrice,
 		ProductCategory categoryCode,
 		ProductStatus status,
+		boolean salesEnabled,
+		@JsonInclude(JsonInclude.Include.NON_NULL) String salesNotice,
 		@JsonInclude(JsonInclude.Include.NON_NULL) ProductComplianceStatus complianceStatus,
 		String thumbnailImageUrl,
 		int detailVersion,

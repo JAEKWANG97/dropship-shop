@@ -49,6 +49,19 @@
 9. `/products`, `/products/{productId}`, `/cart`에서 이미지와 가격 표시를 확인한다.
 10. 이상 없으면 다음 상품 묶음을 등록한다.
 
+## Sale Catalog Audit
+
+추천 상품 후보는 관리자 상품을 자동 감사해 실제 정보가 있는 상품만 사용한다.
+
+```bash
+node scripts/audit-sale-catalog.mjs --cookie-file tmp/admin-cookie.txt
+```
+
+- 결과: `tmp/sale-catalog-audit.json`, `tmp/sale-catalog-audit.csv`
+- 자동 차단: 판매 준비 조건 미충족, 중복 상품명, 60자 초과 또는 키워드 과다 상품명, placeholder, 모델명·제조사·원산지·배송·반품 정보 누락
+- 경고만 기록: 인증 `PENDING`. 기존 정책대로 판매 자체를 차단하지 않으며 상품 상세에는 `상품 정보 확인 필요`로 표시한다.
+- 감사 도구는 상품 정보를 추측하거나 자동 생성하지 않는다.
+
 ## Domeggook Collection
 
 도매꾹 상품은 자동 수집·선별하며 상품별 수동 `REVIEW` 큐를 만들지 않는다.

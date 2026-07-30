@@ -27,6 +27,7 @@ import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
+import com.dropshipshop.api.common.StorefrontSalesProperties;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
@@ -62,6 +63,7 @@ public class CheckoutService {
 	private final CustomerPolicyLinkService customerPolicyLinkService;
 	private final BankTransferProperties bankTransferProperties;
 	private final NotificationService notificationService;
+	private final StorefrontSalesProperties salesProperties;
 	private final Clock clock;
 
 	public CheckoutService(
@@ -77,7 +79,8 @@ public class CheckoutService {
 		AccountProfileService accountProfileService,
 		CustomerPolicyLinkService customerPolicyLinkService,
 		BankTransferProperties bankTransferProperties,
-		NotificationService notificationService
+		NotificationService notificationService,
+		StorefrontSalesProperties salesProperties
 	) {
 		this.cartRepository = cartRepository;
 		this.cartItemRepository = cartItemRepository;
@@ -92,11 +95,13 @@ public class CheckoutService {
 		this.customerPolicyLinkService = customerPolicyLinkService;
 		this.bankTransferProperties = bankTransferProperties;
 		this.notificationService = notificationService;
+		this.salesProperties = salesProperties;
 		this.clock = Clock.systemUTC();
 	}
 
 	@Transactional
 	public CheckoutDtos.CheckoutResponse createCheckout(UUID userId, CheckoutDtos.CreateCheckoutRequest request) {
+		salesProperties.requireEnabled();
 		UserAccount user = findUser(userId);
 		accountAgreementService.requireCurrentAgreement(userId);
 		accountProfileService.requireRequiredInfo(userId);

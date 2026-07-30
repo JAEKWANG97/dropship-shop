@@ -82,6 +82,8 @@ export type PolicyLink = {
 };
 
 export type ProductDetail = ProductSummary & {
+  salesEnabled: boolean;
+  salesNotice: string | null;
   supplierId?: string;
   supplierName?: string;
   sourcePrice?: number;

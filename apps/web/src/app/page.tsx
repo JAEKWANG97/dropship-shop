@@ -67,7 +67,22 @@ const SITE_BUNDLES = [
 
 async function loadProducts() {
   try {
-    return (await getProducts({ size: 6 })).products;
+    const products = (await getProducts({ size: 100 })).products;
+    const names = new Set<string>();
+    return products.filter((product) => {
+      const name = product.name.trim();
+      if (
+        name.length > 60 ||
+        !product.thumbnailImageUrl ||
+        /수입산__|제조사\s*별도표기|상세\s*참조/i.test(`${name} ${product.summary}`)
+      ) {
+        return false;
+      }
+      const key = name.replace(/\s+/g, " ").toLowerCase();
+      if (names.has(key)) return false;
+      names.add(key);
+      return true;
+    }).slice(0, 20).slice(0, 6);
   } catch {
     return [] as ProductSummary[];
   }

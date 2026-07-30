@@ -30,6 +30,8 @@ final class CartDtos {
 		UUID cartId,
 		List<CartItemResponse> items,
 		long subtotalAmount,
+		boolean salesEnabled,
+		String salesNotice,
 		boolean checkoutAvailable,
 		List<CartValidationIssueResponse> issues
 	) {

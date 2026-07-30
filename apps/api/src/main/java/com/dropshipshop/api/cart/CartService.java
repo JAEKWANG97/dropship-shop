@@ -18,6 +18,7 @@ import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
+import com.dropshipshop.api.common.StorefrontSalesProperties;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
@@ -30,17 +31,20 @@ public class CartService {
 	private final CartItemRepository cartItemRepository;
 	private final ProductOptionRepository productOptionRepository;
 	private final UserAccountRepository userAccountRepository;
+	private final StorefrontSalesProperties salesProperties;
 
 	public CartService(
 		CartRepository cartRepository,
 		CartItemRepository cartItemRepository,
 		ProductOptionRepository productOptionRepository,
-		UserAccountRepository userAccountRepository
+		UserAccountRepository userAccountRepository,
+		StorefrontSalesProperties salesProperties
 	) {
 		this.cartRepository = cartRepository;
 		this.cartItemRepository = cartItemRepository;
 		this.productOptionRepository = productOptionRepository;
 		this.userAccountRepository = userAccountRepository;
+		this.salesProperties = salesProperties;
 	}
 
 	@Transactional
@@ -51,6 +55,7 @@ public class CartService {
 
 	@Transactional
 	public CartDtos.CartResponse addItem(UUID userId, CartDtos.AddCartItemRequest request) {
+		salesProperties.requireEnabled();
 		Cart cart = getOrCreateCart(userId);
 		ProductOption option = findOption(request.productOptionId());
 		Product product = option.getProduct();
@@ -122,7 +127,15 @@ public class CartService {
 		long subtotalAmount = itemResponses.stream()
 			.mapToLong(CartDtos.CartItemResponse::lineAmount)
 			.sum();
-		return new CartDtos.CartResponse(cart.getId(), itemResponses, subtotalAmount, issues.isEmpty(), issues);
+		return new CartDtos.CartResponse(
+			cart.getId(),
+			itemResponses,
+			subtotalAmount,
+			salesProperties.enabled(),
+			salesProperties.enabled() ? null : salesProperties.closedNotice(),
+			issues.isEmpty(),
+			issues
+		);
 	}
 
 	private List<CartDtos.CartValidationIssueResponse> validationIssues(Cart cart) {
@@ -134,6 +147,13 @@ public class CartService {
 		if (items.isEmpty()) {
 			issues.add(new CartDtos.CartValidationIssueResponse(null, "EMPTY_CART", "Cart is empty"));
 			return issues;
+		}
+		if (!salesProperties.enabled()) {
+			issues.add(new CartDtos.CartValidationIssueResponse(
+				null,
+				"SALES_NOT_OPEN",
+				salesProperties.closedNotice()
+			));
 		}
 		for (CartItem item : items) {
 			String reason = unavailableReason(item.getProduct(), item.getProductOption());

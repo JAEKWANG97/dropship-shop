@@ -1286,3 +1286,19 @@ Consequences:
 - Changing the phone number clears an old verification timestamp, but does not start a new OTP flow.
 - Existing OTP endpoints, records, and Google/Naver OAuth backend support remain for compatibility.
 - Kakao AlimTalk is a separate optional notification integration and is not enabled by Kakao Login alone.
+
+## 2026-07-30: Storefront Sales Stay Closed Until Purchase Safety Is Ready
+
+Decision:
+
+구매안전서비스 계약과 고객 선택 흐름이 준비되기 전에는 운영 주문을 받지 않는다. 운영 `APP_SALES_ENABLED` 기본값을 `false`로 두고 상품 상세, 장바구니, 장바구니 추가 API, 주문서 생성 API를 같은 서버 설정으로 차단한다.
+
+Context:
+
+계좌입금 주문 버튼이 활성화된 화면과 푸터의 `실제 주문을 받지 않습니다` 안내가 충돌했다. 프론트 문구만 닫으면 직접 API 호출로 주문이 생성될 수 있다.
+
+Consequences:
+
+- 로컬과 테스트는 기존 구매 흐름 검증을 위해 판매를 활성화한다.
+- 운영 판매 개시는 구매안전서비스 확인 뒤 환경변수를 명시적으로 변경하는 작업이다.
+- 인증 `PENDING` 상품은 기존 결정대로 공개할 수 있으나 상품 상세에 확인 상태를 표시하고 품질 감사 보고서에 남긴다.

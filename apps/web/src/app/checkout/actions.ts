@@ -79,7 +79,7 @@ export async function createCheckout(formData: FormData) {
       redirect(checkoutMessage("이미 주문이 접수되었습니다. 주문서 또는 장바구니를 확인해 주세요."));
     }
     if (error instanceof ApiError && error.status === 409) {
-      redirect(checkoutMessage("주문 상태가 방금 변경되었습니다. 새로고침 후 다시 시도해 주세요."));
+      redirect(checkoutMessage(error.responseMessage));
     }
     redirect(checkoutMessage("주문서를 생성하지 못했습니다. 장바구니와 약관 동의를 확인해 주세요."));
   }

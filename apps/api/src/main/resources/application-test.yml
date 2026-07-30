@@ -11,6 +11,8 @@ spring:
       ddl-auto: create-drop
 
 app:
+  sales:
+    enabled: true
   internal:
     sync-token: test-internal-sync-token
   auth:

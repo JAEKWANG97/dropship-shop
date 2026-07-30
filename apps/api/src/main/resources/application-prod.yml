@@ -19,6 +19,8 @@ sms:
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL}
+  sales:
+    enabled: ${APP_SALES_ENABLED:false}
   bank-transfer:
     bank-name: ${APP_BANK_TRANSFER_BANK_NAME}
     account-number: ${APP_BANK_TRANSFER_ACCOUNT_NUMBER}

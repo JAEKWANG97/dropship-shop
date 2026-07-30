@@ -75,6 +75,13 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
         </div>
       ) : null}
 
+      {!data.cart.salesEnabled ? (
+        <div className="notice">
+          <strong>판매 준비 중</strong>
+          <span>{data.cart.salesNotice}</span>
+        </div>
+      ) : null}
+
       {data.cart.items.length === 0 ? (
         <div className="notice empty">
           <strong>장바구니가 비어 있습니다</strong>
@@ -150,6 +157,8 @@ function RequiredAgreementForm({
 }
 
 function CheckoutCartSummary({ cart }: { cart: Cart }) {
+  const itemIssues = cart.issues.filter((issue) => issue.code !== "SALES_NOT_OPEN");
+
   return (
     <aside className="checkout-summary-card">
       <div className="catalog-heading">
@@ -181,9 +190,10 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
       {!cart.checkoutAvailable ? (
         <div className="notice danger">
           <strong>주문 불가</strong>
-          {cart.issues.map((issue) => (
+          {itemIssues.map((issue) => (
             <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
           ))}
+          {!cart.salesEnabled ? <span>{cart.salesNotice}</span> : null}
         </div>
       ) : null}
     </aside>

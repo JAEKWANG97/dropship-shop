@@ -25,6 +25,8 @@ sms:
     from-number: ${SMS_SENS_FROM_NUMBER:}
 
 app:
+  sales:
+    enabled: ${APP_SALES_ENABLED:true}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
