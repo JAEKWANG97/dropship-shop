@@ -67,7 +67,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
   const selectedOrder = mergeOrderDetail(selectedSummary, detail.order);
 
   return (
-    <div className="admin-page">
+    <div className={`admin-page${params.orderId ? " has-selected-order" : ""}`}>
       <div className="admin-heading">
         <div>
           <h1>주문 관리</h1>
@@ -161,6 +161,9 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
 
           {selectedOrder ? (
             <aside className="admin-panel admin-order-detail">
+              <Link className="admin-order-back-link" href={orderListHref(params)}>
+                주문 목록으로
+              </Link>
               <div className="admin-panel-head">
                 <h2>주문 상세</h2>
                 <span className={`admin-badge ${selectedOrder.status.toLowerCase()}`}>
@@ -295,6 +298,16 @@ function orderHref(
   return `/admin/orders?${search.toString()}`;
 }
 
+function orderListHref(params: { from?: string; q?: string; status?: string; to?: string }) {
+  const search = new URLSearchParams();
+  for (const key of ["from", "q", "status", "to"] as const) {
+    if (params[key]) {
+      search.set(key, params[key]);
+    }
+  }
+  return `/admin/orders${search.size ? `?${search.toString()}` : ""}`;
+}
+
 function shippingAddressText(address: AdminOrder["shippingAddress"]) {
   if (!address) {
     return "배송지 상세는 주문 상세 API에서 확인합니다.";
@@ -426,7 +439,8 @@ function ShipmentPanel({ order }: { order: AdminOrder }) {
         <SummaryItem label="수동 보정" value={shipment.manualOverride ? "적용됨" : "없음"} />
         <SummaryItem label="보정 사유" value={shipment.manualCorrectionReason ?? "-"} />
       </div>
-      <div className="admin-order-actions">
+      {order.status === "SHIPPED" ? (
+        <div className="admin-order-actions">
         <form action={syncShipmentTracking} className="admin-inline-form">
           <input name="orderId" type="hidden" value={order.orderId} />
           <input name="shipmentId" type="hidden" value={shipment.shipmentId} />
@@ -465,7 +479,8 @@ function ShipmentPanel({ order }: { order: AdminOrder }) {
             수동 배송완료
           </button>
         </form>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -638,106 +653,146 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
     );
   }
 
+  if (order.refund?.status === "APPROVED") {
+    return <ManualRefundForm order={order} />;
+  }
+
   if (order.fulfillment?.purchaseProvider === "DOMEGGOOK") {
     return null;
   }
 
-  return (
-    <div className="admin-order-actions">
-      <h3>처리 액션</h3>
-      <form action={startSupplierWork} className="admin-inline-form">
-        <input name="orderId" type="hidden" value={order.orderId} />
-        <label>
-          발주 시작 사유
-          <input name="reason" required placeholder="예: 결제 확인 후 공급처 발주 준비" />
-        </label>
-        <button className="button" type="submit">
-          발주 시작
-        </button>
-      </form>
-
-      <form action={completeSupplierOrder} className="admin-inline-form">
-        <input name="orderId" type="hidden" value={order.orderId} />
-        <label>
-          공급처 발주번호
-          <input name="supplierOrderNumber" required placeholder="공급처 주문번호" />
-        </label>
-        <label>
-          예상 출고일
-          <input name="expectedShipDate" type="date" />
-        </label>
-        <label>
-          공급처 메모
-          <input name="supplierResponseMemo" placeholder="선택 입력" />
-        </label>
-        <label>
-          처리 사유
-          <input name="reason" required placeholder="예: 공급처 발주 완료" />
-        </label>
-        <button className="button" type="submit">
-          발주 완료
-        </button>
-      </form>
-
-      <form action={markOrderOutOfStock} className="admin-inline-form">
-        <input name="orderId" type="hidden" value={order.orderId} />
-        <label>
-          품절 사유
-          <input name="reason" required placeholder="예: 공급처 재고 없음" />
-        </label>
-        <button className="button" type="submit">
-          품절 처리
-        </button>
-      </form>
-
-      <form action={createOrderShipment} className="admin-inline-form">
-        <input name="orderId" type="hidden" value={order.orderId} />
-        <label>
-          택배사
-          <input name="carrier" required placeholder="예: CJ대한통운" />
-        </label>
-        <label>
-          송장번호
-          <input name="trackingNumber" required />
-        </label>
-        <button className="button" type="submit">
-          송장 입력
-        </button>
-      </form>
-
-      {order.refund?.status === "APPROVED" ? (
-        <form action={completeManualRefund} className="admin-inline-form">
+  if (order.status === "SUPPLIER_ORDER_PENDING" && !order.fulfillment?.supplierOrderStartedAt) {
+    return (
+      <div className="admin-order-actions">
+        <h3>다음 처리</h3>
+        <form action={startSupplierWork} className="admin-inline-form">
           <input name="orderId" type="hidden" value={order.orderId} />
-          <input name="refundId" type="hidden" value={order.refund.refundId} />
           <label>
-            환불 은행
-            <input name="bankName" required />
+            발주 시작 사유
+            <input name="reason" required placeholder="예: 결제 확인 후 공급처 발주 준비" />
           </label>
-          <label>
-            환불 계좌번호
-            <input name="accountNumber" required />
-          </label>
-          <label>
-            예금주
-            <input name="accountHolder" required />
-			</label>
-			<label>
-				실제 이체시각
-				<input name="transferredAt" type="datetime-local" step="60" required />
-			</label>
-			<label>
-				거래 식별 메모
-				<input name="transactionReference" required placeholder="예: 은행 거래번호 또는 이체 메모" />
-          </label>
-          <label className="wide">
-            수동 환불 완료 사유
-            <input name="reason" required placeholder="예: 고객 계좌로 환불 이체 완료" />
-          </label>
-          <button className="button" type="submit">
-            수동 환불 완료
+          <button className="button primary" type="submit">
+            발주 시작
           </button>
         </form>
-      ) : null}
+      </div>
+    );
+  }
+
+  if (order.status === "SUPPLIER_ORDER_PENDING") {
+    return (
+      <div className="admin-order-actions">
+        <h3>다음 처리</h3>
+        <form action={completeSupplierOrder} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label>
+            공급처 발주번호
+            <input name="supplierOrderNumber" required placeholder="공급처 주문번호" />
+          </label>
+          <label>
+            예상 출고일
+            <input name="expectedShipDate" type="date" />
+          </label>
+          <label>
+            공급처 메모
+            <input name="supplierResponseMemo" placeholder="선택 입력" />
+          </label>
+          <label>
+            처리 사유
+            <input name="reason" required placeholder="예: 공급처 발주 완료" />
+          </label>
+          <button className="button primary" type="submit">
+            발주 완료
+          </button>
+        </form>
+
+        <form action={markOrderOutOfStock} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label>
+            품절 사유
+            <input name="reason" required placeholder="예: 공급처 재고 없음" />
+          </label>
+          <button className="button" type="submit">
+            품절 처리
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  if (order.status === "SUPPLIER_ORDERED") {
+    return (
+      <div className="admin-order-actions">
+        <h3>다음 처리</h3>
+        <form action={createOrderShipment} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label>
+            택배사
+            <input name="carrier" required placeholder="예: CJ대한통운" />
+          </label>
+          <label>
+            송장번호
+            <input name="trackingNumber" required />
+          </label>
+          <button className="button primary" type="submit">
+            송장 입력
+          </button>
+        </form>
+
+        <form action={markOrderOutOfStock} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <label>
+            품절 사유
+            <input name="reason" required placeholder="예: 공급처 재고 없음" />
+          </label>
+          <button className="button" type="submit">
+            품절 처리
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function ManualRefundForm({ order }: { order: AdminOrder }) {
+  if (!order.refund) return null;
+
+  return (
+    <div className="admin-order-actions">
+      <h3>다음 처리</h3>
+      <form action={completeManualRefund} className="admin-inline-form">
+        <input name="orderId" type="hidden" value={order.orderId} />
+        <input name="refundId" type="hidden" value={order.refund.refundId} />
+        <label>
+          환불 은행
+          <input name="bankName" required />
+        </label>
+        <label>
+          환불 계좌번호
+          <input name="accountNumber" required />
+        </label>
+        <label>
+          예금주
+          <input name="accountHolder" required />
+        </label>
+        <label>
+          실제 이체시각
+          <input name="transferredAt" type="datetime-local" step="60" required />
+        </label>
+        <label>
+          거래 식별 메모
+          <input name="transactionReference" required placeholder="예: 은행 거래번호 또는 이체 메모" />
+        </label>
+        <label className="wide">
+          수동 환불 완료 사유
+          <input name="reason" required placeholder="예: 고객 계좌로 환불 이체 완료" />
+        </label>
+        <button className="button primary" type="submit">
+          수동 환불 완료
+        </button>
+      </form>
     </div>
   );
 }

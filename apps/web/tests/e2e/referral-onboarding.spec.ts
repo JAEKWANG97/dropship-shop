@@ -42,6 +42,7 @@ test("account shows my referral code", async ({ page, context }) => {
   await page.goto("/account");
 
   await expect(page.getByRole("heading", { name: "내 계정" })).toBeVisible();
+  await page.getByText("추천 코드", { exact: true }).click();
   await expect(page.getByText("내 추천 코드")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

@@ -323,20 +323,17 @@ test("admin order action refreshes detail after successful memo update", async (
   await expectNoHorizontalOverflow(page);
 });
 
-test("admin order action failure shows backend reason", async ({ page, context }) => {
+test("admin order detail hides actions that do not match the current state", async ({ page, context }) => {
   test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin order action smoke.");
 
   await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
-  await page.goto("/admin/orders?status=DELIVERED");
+  await page.goto("/admin/orders?status=SUPPLIER_ORDER_PENDING");
   const orderLink = await firstAdminOrderLink(page);
   await orderLink.click();
 
-  await page.getByLabel("발주 시작 사유").fill("E2E 실패 메시지 확인");
-  await page.getByRole("button", { name: "발주 시작" }).click();
-
-  await expect(page.locator(".notice").first()).toContainText(
-    "Supplier order work can start only once from supplier order pending",
-  );
+  await expect(page.getByRole("button", { name: "발주 시작" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "발주 완료" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "송장 입력" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 

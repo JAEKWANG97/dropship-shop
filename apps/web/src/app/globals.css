@@ -1934,6 +1934,17 @@ textarea {
   overflow: hidden;
 }
 
+body:has(.admin-shell) > .site-utility,
+body:has(.admin-shell) > .site-header,
+body:has(.admin-shell) > .site-footer {
+  display: none;
+}
+
+body:has(.admin-shell) > .page-shell {
+  max-width: none;
+  padding: 0;
+}
+
 .admin-sidebar {
   display: grid;
   align-content: start;
@@ -2090,6 +2101,10 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 14px;
   align-items: start;
+}
+
+.admin-order-back-link {
+  display: none;
 }
 
 .admin-panel {
@@ -3233,6 +3248,25 @@ textarea {
 
   .admin-order-detail {
     position: static;
+  }
+
+  body:has(.admin-page.has-selected-order) .admin-topbar,
+  .admin-page.has-selected-order > .admin-heading,
+  .admin-page.has-selected-order > .admin-filters,
+  .admin-page.has-selected-order > .admin-metrics,
+  .admin-page.has-selected-order .admin-orders-layout > section {
+    display: none;
+  }
+
+  .admin-page.has-selected-order .admin-orders-layout {
+    display: block;
+  }
+
+  .admin-page.has-selected-order .admin-order-back-link {
+    display: inline-flex;
+    width: fit-content;
+    color: var(--muted);
+    font-weight: 800;
   }
 
   .admin-page {
