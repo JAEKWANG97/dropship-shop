@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-07-31 B-075~B-077 운영 배포 검증
+
+- 관련 항목: B-075, B-076, B-077, B-030
+- 배포: 커밋 `0b8d827`까지 `main`에 push했고 GitHub Actions run `30593637924`의 verify, ARM64 image build/push, EC2 deploy가 모두 성공했다. 운영 API/Web image tag와 readiness를 새 커밋 기준으로 확인했다.
+- 판매 차단: 운영 EC2에 `APP_SALES_ENABLED=false`를 명시했다. 공개 상품 상세는 구매 form 대신 `판매 준비 중` 안내를 표시하며 구매안전서비스 준비 전에는 장바구니 추가와 주문서 생성을 받지 않는다.
+- 브라우저 검증: 운영 `/products`에서 실제 `group` query에 해당하는 대분류 하나만 선택되고, 고객 장바구니에 영문 내부 상태가 노출되지 않음을 확인했다. 관리자 주문 목록·상세는 고객용 헤더 없이 렌더링되며 Desktop `1440x1000`, Mobile `390x844`에서 horizontal overflow가 없다.
+- 인증 검증: 10분짜리 임시 ADMIN/CUSTOMER 세션으로 관리자 주문 API, 고객 계정·장바구니 API와 화면을 읽기 전용 확인했다. 임시 토큰과 서버 스크립트는 검증 직후 삭제했다.
+- 자동 검증: API 전체 테스트, Web lint/build, `git diff --check`를 통과했다. Web lint에는 기존 `<img>` 최적화 경고 3건만 남았다.
+
 ## 2026-07-30 B-077 관리자 주문 처리 화면 정리
 
 - 관련 항목: B-077
