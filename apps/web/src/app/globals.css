@@ -1189,6 +1189,17 @@ img.admin-product-detail-image {
   color: var(--muted);
 }
 
+.product-policy-summary {
+  display: contents;
+}
+
+.product-policy-summary a {
+  color: var(--navy);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .product-action-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3439,5 +3450,9 @@ body:has(.admin-shell) > .page-shell {
   .site-footer {
     flex-direction: column;
     padding: 20px 16px;
+  }
+
+  body:has(.mobile-purchase-bar) .site-footer {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
   }
 }

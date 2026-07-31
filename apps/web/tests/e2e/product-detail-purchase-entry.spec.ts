@@ -16,6 +16,12 @@ test("guest product detail shows purchase controls and redirects to login on sub
   await expect(page.getByLabel("수량")).toBeVisible();
   await expect(purchaseForm.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
   await expect(purchaseForm.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
+  await expect(purchasePanel.getByRole("link", {
+    name: "배송비는 상품 가격에 포함되어 있으며, 주문은 배송 그룹 단위로 처리됩니다.",
+  })).toHaveAttribute("href", "/policies/shipping");
+  await expect(purchasePanel.getByRole("link", {
+    name: "취소, 반품, 교환, 환불은 주문 상태와 공급처 발주 여부에 따라 처리됩니다.",
+  })).toHaveAttribute("href", "/policies/cancellation-refund");
   await expect(page.getByRole("link", { name: "로그인하고 계속하기" })).toHaveCount(0);
   await expect(page.locator(".product-hero-copy")).not.toContainText("로그인이 필요합니다");
   await expectNoHorizontalOverflow(page);
@@ -41,6 +47,15 @@ test("mobile purchase bar submits the product form", async ({ page }, testInfo) 
   await expect(mobileBar.locator(".mobile-purchase-price")).toHaveCount(0);
   expect((await mobileBar.boundingBox())?.height).toBeLessThanOrEqual(70);
   await expectNoHorizontalOverflow(page);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const [lastFooterLinkBox, mobileBarBox] = await Promise.all([
+    page.locator(".site-footer a").last().boundingBox(),
+    mobileBar.boundingBox(),
+  ]);
+  expect(lastFooterLinkBox).not.toBeNull();
+  expect(mobileBarBox).not.toBeNull();
+  expect(lastFooterLinkBox!.y + lastFooterLinkBox!.height).toBeLessThanOrEqual(mobileBarBox!.y);
 
   await mobileBar.getByRole("button", { name: "장바구니 담기" }).click();
   await page.waitForURL(/\/login\?/);

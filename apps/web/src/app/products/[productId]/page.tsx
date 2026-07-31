@@ -63,6 +63,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const policyPages = product.policyLinks
     .map((policy) => policyPageForType(policy.policyType))
     .filter((policy): policy is PolicyPage => policy !== null);
+  const purchasePolicyPages = POLICY_PAGES.filter(
+    (policy) => policy.slug === "shipping" || policy.slug === "cancellation-refund",
+  );
   const purchaseFormId = `product-purchase-form-${product.id}`;
 
   return (
@@ -111,14 +114,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <strong>{product.salesEnabled ? (purchasable ? "주문 가능" : "구매 불가") : "판매 준비 중"}</strong>
               <span>인증 정보</span>
               <strong>{complianceStatusLabel(product.complianceStatus)}</strong>
-              {product.productNotice ? (
-                <>
-                  <span>배송 안내</span>
-                  <strong>{product.productNotice.shippingInfo}</strong>
-                  <span>반품 안내</span>
-                  <strong>{product.productNotice.returnExchangeInfo}</strong>
-                </>
-              ) : null}
+              {purchasePolicyPages.map((policy) => (
+                <div className="product-policy-summary" key={policy.slug}>
+                  <span>{policy.slug === "shipping" ? "배송 안내" : "반품 안내"}</span>
+                  <Link href={`/policies/${policy.slug}`}>{policy.summary}</Link>
+                </div>
+              ))}
             </div>
             {purchasable ? (
               <form action={addCartItem} className="cart-add-form" id={purchaseFormId}>
