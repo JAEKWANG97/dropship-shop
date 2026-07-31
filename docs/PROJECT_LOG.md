@@ -7,6 +7,7 @@
 - 해결: 구매 패널에는 확정된 정책 요약과 상세 정책 링크만 남기고 전문은 기존 하단 정책 영역에 유지했다. 모바일 상품 상세 푸터에는 구매바와 safe area 높이를 반영한 여백을 추가했다.
 - 시각 검증: Desktop `1440x1000`, Mobile `390x844` 캡처를 `tmp/qa/b-078-final/`에 생성해 정책 정보 밀도와 푸터 간격을 확인했다. 의도된 변경이 확인된 모바일 상품 상세와 관리자 주문 상세 snapshot만 갱신했다.
 - 자동 검증: API 전체 테스트 `131 passed`, Web lint/build, Playwright 전체 suite `67 passed / 25 skipped / 0 failed`, `git diff --check`를 통과했다. lint에는 기존 `<img>` 최적화 경고 3건만 남았다.
+- 배포: 커밋 `0bd9d7e`를 GitHub Actions run `30638826270`으로 배포했다. verify, ARM64 image build/push, EC2 deploy가 성공했고 공개 health, readiness `UP`, 운영 상품 상세의 정책 요약과 판매 차단을 확인했다.
 
 ## 2026-07-31 B-026 판매 추천 후보 상품명 정제
 
