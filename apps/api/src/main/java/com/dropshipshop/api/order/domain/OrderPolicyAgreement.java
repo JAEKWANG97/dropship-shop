@@ -94,4 +94,28 @@ public class OrderPolicyAgreement {
 	public Instant getConfirmedAt() {
 		return confirmedAt;
 	}
+
+	public String getTermsVersion() {
+		return termsVersion;
+	}
+
+	public String getPrivacyVersion() {
+		return privacyVersion;
+	}
+
+	public String getOrderPolicyVersion() {
+		return orderPolicyVersion;
+	}
+
+	public String getCancellationRefundPolicyVersion() {
+		return cancellationRefundPolicyVersion;
+	}
+
+	public String getOutOfStockNoticeVersion() {
+		return outOfStockNoticeVersion;
+	}
+
+	public String getConfirmedNoticeText() {
+		return confirmedNoticeText;
+	}
 }

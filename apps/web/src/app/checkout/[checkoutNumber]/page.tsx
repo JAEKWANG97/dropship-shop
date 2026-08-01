@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
-import { getAgreementState, type AgreementState } from "@/lib/account";
 import { getCheckout, type Checkout, type CheckoutOrder } from "@/lib/checkout";
 import { formatPrice } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
@@ -21,16 +20,12 @@ type CheckoutDetailPageProps = {
 
 async function loadCheckout(checkoutNumber: string) {
   try {
-    const [checkout, agreement] = await Promise.all([
-      getCheckout(checkoutNumber),
-      getAgreementState(),
-    ]);
-    return { checkout, agreement, error: false };
+    return { checkout: await getCheckout(checkoutNumber), error: false };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       notFound();
     }
-    return { checkout: null, agreement: null, error: true };
+    return { checkout: null, error: true };
   }
 }
 
@@ -48,9 +43,9 @@ export default async function CheckoutDetailPage({
     redirect(`/login?redirectTo=${encodeURIComponent(`/checkout/${checkoutNumber}`)}`);
   }
 
-  const { checkout, agreement, error } = await loadCheckout(checkoutNumber);
+  const { checkout, error } = await loadCheckout(checkoutNumber);
 
-  if (error || !checkout || !agreement) {
+  if (error || !checkout) {
     return (
       <section className="narrow-page">
         <p className="eyebrow">주문서</p>
@@ -81,9 +76,9 @@ export default async function CheckoutDetailPage({
       ) : null}
 
       <CheckoutSummary checkout={checkout} />
-      {paymentPending ? <ShippingAddressForm checkout={checkout} /> : <CheckoutLockedNotice />}
+      <ShippingAddressSection checkout={checkout} editable={paymentPending && !policyConfirmed} />
       {paymentPending && !policyConfirmed ? (
-        <PolicyConfirmationForm agreement={agreement} checkout={checkout} />
+        <PolicyConfirmationForm checkout={checkout} />
       ) : null}
       {paymentPending && policyConfirmed ? <BankTransferDepositPanel checkout={checkout} /> : null}
     </section>
@@ -167,24 +162,52 @@ function CheckoutOrderCard({ order }: { order: CheckoutOrder }) {
   );
 }
 
-function ShippingAddressForm({ checkout }: { checkout: Checkout }) {
+function ShippingAddressSection({ checkout, editable }: { checkout: Checkout; editable: boolean }) {
+  const address = checkout.shippingAddress;
+
   return (
-    <form action={updateCheckoutShippingAddress} className="checkout-form">
-      <h2>배송지 변경</h2>
-      <input name="checkoutNumber" type="hidden" value={checkout.checkoutNumber} />
-      <label>
-        받는 사람
-        <input name="recipientName" required />
-      </label>
-      <label>
-        연락처
-        <input name="recipientPhone" required />
-      </label>
-      <AddressFields />
-      <SubmitButton className="button" pendingLabel="변경 중...">
-        배송지 변경
-      </SubmitButton>
-    </form>
+    <section className="checkout-form">
+      <h2>배송지</h2>
+      <div className="summary-list">
+        <div>
+          <span>받는 사람</span>
+          <strong>{address.recipientName}</strong>
+        </div>
+        <div>
+          <span>연락처</span>
+          <strong>{address.recipientPhone}</strong>
+        </div>
+        <div>
+          <span>주소</span>
+          <strong>
+            ({address.postalCode}) {address.address1} {address.address2 ?? ""}
+          </strong>
+        </div>
+      </div>
+      {editable ? (
+        <form action={updateCheckoutShippingAddress} className="form-stack">
+          <input name="checkoutNumber" type="hidden" value={checkout.checkoutNumber} />
+          <label>
+            받는 사람
+            <input name="recipientName" required defaultValue={address.recipientName} />
+          </label>
+          <label>
+            연락처
+            <input name="recipientPhone" required defaultValue={address.recipientPhone} />
+          </label>
+          <AddressFields
+            postalCode={address.postalCode}
+            address1={address.address1}
+            address2={address.address2 ?? undefined}
+          />
+          <SubmitButton className="button" pendingLabel="변경 중...">
+            배송지 변경
+          </SubmitButton>
+        </form>
+      ) : (
+        <CheckoutLockedNotice />
+      )}
+    </section>
   );
 }
 
@@ -192,28 +215,37 @@ function CheckoutLockedNotice() {
   return (
     <div className="notice">
       <strong>주문서 수정이 제한됩니다</strong>
-      <span>입금대기 상태가 아니므로 배송지 변경을 진행하지 않습니다.</span>
+      <span>주문 정책 확인이 완료된 배송지는 고객 문의를 통해서만 변경할 수 있습니다.</span>
     </div>
   );
 }
 
 function PolicyConfirmationForm({
   checkout,
-  agreement,
 }: {
   checkout: Checkout;
-  agreement: AgreementState;
 }) {
+  const evidence = checkout.policyEvidence;
   return (
     <form action={confirmCheckoutPolicies} className="checkout-form">
       <h2>주문 정책 확인</h2>
       <input name="checkoutNumber" type="hidden" value={checkout.checkoutNumber} />
-      <input name="termsVersion" type="hidden" value={agreement.requiredTermsVersion} />
-      <input name="privacyVersion" type="hidden" value={agreement.requiredPrivacyVersion} />
+      <input name="termsVersion" type="hidden" value={evidence.termsVersion} />
+      <input name="privacyVersion" type="hidden" value={evidence.privacyVersion} />
+      <input name="orderPolicyVersion" type="hidden" value={evidence.orderPolicyVersion} />
+      <input
+        name="cancellationRefundPolicyVersion"
+        type="hidden"
+        value={evidence.cancellationRefundPolicyVersion}
+      />
+      <input
+        name="outOfStockNoticeVersion"
+        type="hidden"
+        value={evidence.outOfStockNoticeVersion}
+      />
       <label className="checkbox-row">
         <input name="policyConfirmed" type="checkbox" required />
-        주문 상품, 입금 금액, 배송지, 배송/취소/환불 정책, 품절 시 배송 그룹 주문 금액 환불 안내를
-        확인했습니다. 현금영수증은 요청 시 발급됩니다.
+        {evidence.confirmedNoticeText}
       </label>
       <SubmitButton className="button" pendingLabel="저장 중...">
         정책 확인 저장

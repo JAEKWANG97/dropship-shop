@@ -937,6 +937,7 @@ DS-31 implementation note:
 - `PolicyDocument` linkage can be added later when managed policy version APIs are implemented.
 - Duplicate agreement for the same user, terms version, and privacy version is idempotent.
 - Checkout creation requires the current required terms/privacy agreement.
+- Current prelaunch policy versions are aligned to `prelaunch-2026-06-30`; changing the required version requires a new customer agreement.
 
 ## OrderPolicyAgreement
 
@@ -955,6 +956,12 @@ Suggested fields:
 - confirmedNoticeText
 - confirmedAt
 - createdAt
+
+B-080 implementation note:
+
+- The checkout response exposes the shared shipping-address snapshot and the server-owned policy evidence.
+- The client returns only the displayed versions; the server validates them and persists its canonical notice text.
+- Checkout policy confirmation locks direct customer address changes for the payment group and resulting orders.
 
 ## Modeling Notes
 

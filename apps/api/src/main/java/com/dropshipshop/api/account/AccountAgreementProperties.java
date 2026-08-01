@@ -10,8 +10,8 @@ class AccountAgreementProperties {
 	private final String requiredPrivacyVersion;
 
 	AccountAgreementProperties(
-		@Value("${app.policies.required-terms-version:terms-2026-06-01}") String requiredTermsVersion,
-		@Value("${app.policies.required-privacy-version:privacy-2026-06-01}") String requiredPrivacyVersion
+		@Value("${app.policies.required-terms-version:prelaunch-2026-06-30}") String requiredTermsVersion,
+		@Value("${app.policies.required-privacy-version:prelaunch-2026-06-30}") String requiredPrivacyVersion
 	) {
 		this.requiredTermsVersion = requiredTermsVersion;
 		this.requiredPrivacyVersion = requiredPrivacyVersion;

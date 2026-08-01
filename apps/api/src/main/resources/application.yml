@@ -41,8 +41,12 @@ app:
     oauth-state-cookie-name: OAUTH2_STATE
     oauth-state-ttl-seconds: 300
   policies:
-    required-terms-version: terms-2026-06-01
-    required-privacy-version: privacy-2026-06-01
+    required-terms-version: prelaunch-2026-06-30
+    required-privacy-version: prelaunch-2026-06-30
+    required-order-policy-version: prelaunch-2026-06-30
+    required-cancellation-refund-policy-version: prelaunch-2026-06-30
+    required-out-of-stock-notice-version: prelaunch-2026-06-30
+    checkout-confirmed-notice-text: "주문 상품, 입금 금액, 배송지, 배송/취소/환불 정책, 결제 후 품절 가능성과 품절 시 해당 배송 그룹 주문 금액 환불 안내를 확인했습니다."
   bank-transfer:
     bank-name: ${APP_BANK_TRANSFER_BANK_NAME:입금 계좌 준비중}
     account-number: ${APP_BANK_TRANSFER_ACCOUNT_NUMBER:입금 계좌 준비중}

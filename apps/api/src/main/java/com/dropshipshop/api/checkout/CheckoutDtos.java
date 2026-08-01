@@ -40,8 +40,7 @@ final class CheckoutDtos {
 		@NotBlank @Size(max = 50) String privacyVersion,
 		@NotBlank @Size(max = 50) String orderPolicyVersion,
 		@NotBlank @Size(max = 50) String cancellationRefundPolicyVersion,
-		@NotBlank @Size(max = 50) String outOfStockNoticeVersion,
-		@NotBlank String confirmedNoticeText
+		@NotBlank @Size(max = 50) String outOfStockNoticeVersion
 	) {
 	}
 
@@ -54,8 +53,29 @@ final class CheckoutDtos {
 		Instant expiresAt,
 		Instant policyConfirmedAt,
 		BankTransferDepositResponse bankTransferDeposit,
+		ShippingAddressResponse shippingAddress,
+		PolicyEvidenceResponse policyEvidence,
 		List<PolicyLinkResponse> policyLinks,
 		List<OrderResponse> orders
+	) {
+	}
+
+	record ShippingAddressResponse(
+		String recipientName,
+		String recipientPhone,
+		String postalCode,
+		String address1,
+		String address2
+	) {
+	}
+
+	record PolicyEvidenceResponse(
+		String termsVersion,
+		String privacyVersion,
+		String orderPolicyVersion,
+		String cancellationRefundPolicyVersion,
+		String outOfStockNoticeVersion,
+		String confirmedNoticeText
 	) {
 	}
 

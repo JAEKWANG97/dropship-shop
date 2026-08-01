@@ -49,6 +49,7 @@ import com.dropshipshop.api.notification.domain.NotificationChannel;
 import com.dropshipshop.api.notification.domain.NotificationStatus;
 import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderPolicyAgreementRepository;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -87,6 +88,9 @@ class CheckoutApiIntegrationTest {
 
 	@Autowired
 	private CustomerOrderRepository orderRepository;
+
+	@Autowired
+	private OrderPolicyAgreementRepository orderPolicyAgreementRepository;
 
 	@Autowired
 	private NotificationLogRepository notificationLogRepository;
@@ -141,6 +145,17 @@ class CheckoutApiIntegrationTest {
 			.andExpect(jsonPath("$.bankTransferDeposit.amount", is(141000)))
 			.andExpect(jsonPath("$.bankTransferDeposit.deadline").exists())
 			.andExpect(jsonPath("$.bankTransferDeposit.cashReceiptNotice").exists())
+			.andExpect(jsonPath("$.shippingAddress.recipientName", is("Receiver")))
+			.andExpect(jsonPath("$.shippingAddress.recipientPhone", is("010-1111-2222")))
+			.andExpect(jsonPath("$.shippingAddress.postalCode", is("12345")))
+			.andExpect(jsonPath("$.shippingAddress.address1", is("Seoul test road")))
+			.andExpect(jsonPath("$.shippingAddress.address2", is("101")))
+			.andExpect(jsonPath("$.policyEvidence.termsVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.policyEvidence.privacyVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.policyEvidence.orderPolicyVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.policyEvidence.cancellationRefundPolicyVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.policyEvidence.outOfStockNoticeVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.policyEvidence.confirmedNoticeText").exists())
 			.andExpect(jsonPath("$.orders", hasSize(2)))
 			.andExpect(jsonPath("$.orders[0].status", is("PAYMENT_PENDING")))
 			.andExpect(jsonPath("$.orders[0].subtotalAmount", is(80000)))
@@ -196,12 +211,11 @@ class CheckoutApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "termsVersion": "terms-2026-06-01",
-					  "privacyVersion": "privacy-2026-06-01",
-					  "orderPolicyVersion": "order-2026-06-01",
-					  "cancellationRefundPolicyVersion": "refund-2026-06-01",
-					  "outOfStockNoticeVersion": "out-of-stock-2026-06-01",
-					  "confirmedNoticeText": "I agree to the checkout policies."
+					  "termsVersion": "prelaunch-2026-06-30",
+					  "privacyVersion": "prelaunch-2026-06-30",
+					  "orderPolicyVersion": "prelaunch-2026-06-30",
+					  "cancellationRefundPolicyVersion": "prelaunch-2026-06-30",
+					  "outOfStockNoticeVersion": "prelaunch-2026-06-30"
 					}
 					"""))
 			.andExpect(status().isOk())
@@ -211,6 +225,66 @@ class CheckoutApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.policyConfirmedAt").exists());
+	}
+
+	@Test
+	void rejectsTamperedPolicyVersionsAndStoresCanonicalEvidence() throws Exception {
+		UserAccount customer = createCustomer("checkout-policy-evidence");
+		ProductOption option = createOption("Checkout Policy Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0, 1);
+		addCartItem(customer.getId(), option.getId(), 1);
+		String checkoutNumber = checkoutNumberFrom(mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isCreated())
+			.andReturn());
+
+		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(policyConfirmationRequest("tampered-version")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Checkout policy versions are not current")));
+
+		var paymentGroup = paymentGroupRepository.findByCheckoutNumberAndUser_Id(checkoutNumber, customer.getId()).orElseThrow();
+		assertThat(paymentGroup.getPolicyConfirmedAt()).isNull();
+		assertThat(orderPolicyAgreementRepository.findByPaymentGroup_Id(paymentGroup.getId())).isEmpty();
+
+		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(policyConfirmationRequest("prelaunch-2026-06-30")))
+			.andExpect(status().isOk());
+
+		var agreement = orderPolicyAgreementRepository.findByPaymentGroup_Id(paymentGroup.getId()).orElseThrow();
+		assertThat(agreement.getTermsVersion()).isEqualTo("prelaunch-2026-06-30");
+		assertThat(agreement.getPrivacyVersion()).isEqualTo("prelaunch-2026-06-30");
+		assertThat(agreement.getOrderPolicyVersion()).isEqualTo("prelaunch-2026-06-30");
+		assertThat(agreement.getCancellationRefundPolicyVersion()).isEqualTo("prelaunch-2026-06-30");
+		assertThat(agreement.getOutOfStockNoticeVersion()).isEqualTo("prelaunch-2026-06-30");
+		assertThat(agreement.getConfirmedNoticeText()).startsWith("주문 상품, 입금 금액, 배송지");
+	}
+
+	@Test
+	void rejectsPolicyConfirmationWhenCurrentAccountAgreementIsMissing() throws Exception {
+		UserAccount customer = createCustomer("checkout-policy-missing-account-agreement");
+		ProductOption option = createOption("Checkout Agreement Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0, 1);
+		addCartItem(customer.getId(), option.getId(), 1);
+		String checkoutNumber = checkoutNumberFrom(mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isCreated())
+			.andReturn());
+		userPolicyAgreementRepository.findFirstByUser_IdOrderByAgreedAtDesc(customer.getId())
+			.ifPresent(userPolicyAgreementRepository::delete);
+
+		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(policyConfirmationRequest("prelaunch-2026-06-30")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Required account agreements are missing")));
 	}
 
 	@Test
@@ -304,8 +378,8 @@ class CheckoutApiIntegrationTest {
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
-			"terms-2026-06-01",
-			"privacy-2026-06-01",
+			"prelaunch-2026-06-30",
+			"prelaunch-2026-06-30",
 			Instant.now()
 		));
 		return customer;
@@ -367,6 +441,18 @@ class CheckoutApiIntegrationTest {
 			  "address2": "101"
 			}
 			""";
+	}
+
+	private String policyConfirmationRequest(String version) {
+		return """
+			{
+			  "termsVersion": "%1$s",
+			  "privacyVersion": "%1$s",
+			  "orderPolicyVersion": "%1$s",
+			  "cancellationRefundPolicyVersion": "%1$s",
+			  "outOfStockNoticeVersion": "%1$s"
+			}
+			""".formatted(version);
 	}
 
 	private CheckoutDtos.CreateCheckoutRequest checkoutRequest() {

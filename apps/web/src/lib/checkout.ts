@@ -41,6 +41,23 @@ export type BankTransferDeposit = {
   cashReceiptNotice: string;
 };
 
+export type CheckoutShippingAddress = {
+  recipientName: string;
+  recipientPhone: string;
+  postalCode: string;
+  address1: string;
+  address2: string | null;
+};
+
+export type CheckoutPolicyEvidence = {
+  termsVersion: string;
+  privacyVersion: string;
+  orderPolicyVersion: string;
+  cancellationRefundPolicyVersion: string;
+  outOfStockNoticeVersion: string;
+  confirmedNoticeText: string;
+};
+
 export type Checkout = {
   paymentGroupId: string;
   checkoutNumber: string;
@@ -50,6 +67,8 @@ export type Checkout = {
   expiresAt: string;
   policyConfirmedAt: string | null;
   bankTransferDeposit: BankTransferDeposit;
+  shippingAddress: CheckoutShippingAddress;
+  policyEvidence: CheckoutPolicyEvidence;
   policyLinks: CheckoutPolicyLink[];
   orders: CheckoutOrder[];
 };

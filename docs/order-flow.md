@@ -198,9 +198,9 @@ Order status: PAYMENT_PENDING
 -> Customer can edit checkout address before payment
 
 Order status: SUPPLIER_ORDER_PENDING
--> If addressLockedAt is empty, customer can directly change shipping address
--> If admin started supplier order work and addressLockedAt is set, customer cannot directly change shipping address
--> Address change requires customer support/admin manual handling
+-> Customer cannot directly change the confirmed checkout address
+-> Address correction requires customer support before supplier work starts
+-> If admin started supplier order work and addressLockedAt is set, correction is no longer accepted
 
 Order status: SUPPLIER_ORDERED or later
 -> Customer cannot directly change shipping address
@@ -318,7 +318,7 @@ Admin detects wrong operational state or shipment information
 - Customer can pay once for all delivery groups in the checkout.
 - Delivery groups are based on supplier, but customer UI should use delivery group wording instead of supplier wording.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING`.
-- Customer direct shipping address change is blocked once `addressLockedAt` is set by supplier order work start.
+- Customer direct shipping address change is blocked after checkout policy confirmation. `addressLockedAt` additionally records that supplier work has started.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
 - DS-12 implements admin supplier actions: supplier work start, supplier order completed, and supplier out-of-stock.
 - Supplier work start records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId` without changing order status.

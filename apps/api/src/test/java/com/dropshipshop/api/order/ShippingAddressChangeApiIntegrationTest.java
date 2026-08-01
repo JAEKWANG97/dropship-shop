@@ -77,7 +77,9 @@ class ShippingAddressChangeApiIntegrationTest {
 	void updatesCheckoutShippingAddressBeforePolicyConfirmation() throws Exception {
 		UserAccount customer = createCustomer("shipping-change-customer-1");
 		ProductOption option = createOption("Shipping Change Product", 12000);
+		ProductOption secondOption = createOption("Second Shipping Change Product", 15000);
 		addCartItem(customer.getId(), option.getId(), 1);
+		addCartItem(customer.getId(), secondOption.getId(), 1);
 		String checkoutNumber = createCheckout(customer.getId());
 
 		mockMvc.perform(patch("/api/checkouts/{checkoutNumber}/shipping-address", checkoutNumber)
@@ -85,15 +87,23 @@ class ShippingAddressChangeApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(shippingAddressRequest("Changed Receiver", "010-9999-9999", "99999", "Changed address", "909")))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.checkoutNumber", is(checkoutNumber)));
+			.andExpect(jsonPath("$.checkoutNumber", is(checkoutNumber)))
+			.andExpect(jsonPath("$.shippingAddress.recipientName", is("Changed Receiver")))
+			.andExpect(jsonPath("$.shippingAddress.recipientPhone", is("010-9999-9999")))
+			.andExpect(jsonPath("$.shippingAddress.postalCode", is("99999")))
+			.andExpect(jsonPath("$.shippingAddress.address1", is("Changed address")))
+			.andExpect(jsonPath("$.shippingAddress.address2", is("909")));
 
 		PaymentGroup paymentGroup = paymentGroupRepository.findByCheckoutNumberAndUser_Id(checkoutNumber, customer.getId()).orElseThrow();
-		CustomerOrder order = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId()).getFirst();
-		assertThat(order.getRecipientName()).isEqualTo("Changed Receiver");
-		assertThat(order.getRecipientPhone()).isEqualTo("010-9999-9999");
-		assertThat(order.getPostalCode()).isEqualTo("99999");
-		assertThat(order.getAddress1()).isEqualTo("Changed address");
-		assertThat(order.getAddress2()).isEqualTo("909");
+		assertThat(orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId()))
+			.hasSize(2)
+			.allSatisfy(order -> {
+				assertThat(order.getRecipientName()).isEqualTo("Changed Receiver");
+				assertThat(order.getRecipientPhone()).isEqualTo("010-9999-9999");
+				assertThat(order.getPostalCode()).isEqualTo("99999");
+				assertThat(order.getAddress1()).isEqualTo("Changed address");
+				assertThat(order.getAddress2()).isEqualTo("909");
+			});
 	}
 
 	@Test
@@ -143,6 +153,17 @@ class ShippingAddressChangeApiIntegrationTest {
 			.andExpect(jsonPath("$.shippingAddress.address1", is("Order changed address")))
 			.andExpect(jsonPath("$.shippingAddress.address2", is("808")));
 
+		CustomerOrder confirmedOrder = createSupplierOrderPendingOrder(customer, "SHIP-CHANGE-ORDER-CONFIRMED", "SHIP-CHANGE-CO-CONFIRMED");
+		confirmedOrder.getPaymentGroup().confirmPolicy(Instant.now());
+		paymentGroupRepository.saveAndFlush(confirmedOrder.getPaymentGroup());
+
+		mockMvc.perform(patch("/api/orders/{orderId}/shipping-address", confirmedOrder.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(shippingAddressRequest("Confirmed", "010-6666-6666", "66666", "Confirmed address", null)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Confirmed order shipping address cannot be changed")));
+
 		CustomerOrder lockedOrder = createSupplierOrderPendingOrder(customer, "SHIP-CHANGE-ORDER-2", "SHIP-CHANGE-CO-2");
 		lockedOrder.startSupplierOrderWork(TestAuthentication.ADMIN_ID, Instant.now());
 		orderRepository.saveAndFlush(lockedOrder);
@@ -190,8 +211,8 @@ class ShippingAddressChangeApiIntegrationTest {
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
-			"terms-2026-06-01",
-			"privacy-2026-06-01",
+			"prelaunch-2026-06-30",
+			"prelaunch-2026-06-30",
 			Instant.now()
 		));
 		return customer;
@@ -244,12 +265,11 @@ class ShippingAddressChangeApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "termsVersion": "terms-2026-06-01",
-					  "privacyVersion": "privacy-2026-06-01",
-					  "orderPolicyVersion": "order-2026-06-01",
-					  "cancellationRefundPolicyVersion": "refund-2026-06-01",
-					  "outOfStockNoticeVersion": "out-of-stock-2026-06-01",
-					  "confirmedNoticeText": "I agree to the checkout policies."
+					  "termsVersion": "prelaunch-2026-06-30",
+					  "privacyVersion": "prelaunch-2026-06-30",
+					  "orderPolicyVersion": "prelaunch-2026-06-30",
+					  "cancellationRefundPolicyVersion": "prelaunch-2026-06-30",
+					  "outOfStockNoticeVersion": "prelaunch-2026-06-30"
 					}
 					"""))
 			.andExpect(status().isOk());
