@@ -56,6 +56,43 @@ test("public customer pages render without horizontal overflow", async ({ page }
   }
 });
 
+test("mobile catalog controls stay horizontal at narrow widths", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Narrow catalog layout is mobile-only.");
+
+  for (const width of [320, 390, 430]) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/products");
+
+      const filters = page.locator(".catalog-mobile-filters");
+      await filters.locator("summary").click();
+      await expect(filters).toHaveAttribute("open", "");
+
+      for (const name of ["낮은가격순", "높은가격순"]) {
+        const sortLink = page.getByRole("link", { name, exact: true });
+        const box = await sortLink.boundingBox();
+        expect(box, `${name} should have a rendered box at ${width}px`).not.toBeNull();
+        expect(box!.width).toBeGreaterThan(100);
+        expect(box!.height).toBeLessThanOrEqual(48);
+      }
+
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+});
+
+test("mobile form controls avoid iOS input zoom", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile form sizing is mobile-only.");
+
+  await page.goto("/support");
+  const fontSizes = await page.locator('input:not([type="checkbox"]):not([type="radio"]), select, textarea').evaluateAll(
+    (elements) => elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+  );
+
+  expect(fontSizes.length).toBeGreaterThan(0);
+  expect(Math.min(...fontSizes)).toBeGreaterThanOrEqual(16);
+});
+
 test("customer inquiry flows from public receipt through admin answer to protected lookup", async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Inquiry mutation runs once in the desktop project.");
   test.skip(!isLocalTarget(), "Inquiry mutation uses local dev login and disabled SES.");
@@ -353,6 +390,65 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
   });
 });
 
+test("mobile customer product layouts keep compact shopping density", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Layout measurements use local seed data; skip on deployed targets.");
+  test.skip(testInfo.project.name !== "mobile", "Layout measurements are mobile-only.");
+
+  await page.goto("/");
+  const featuredShelf = page.locator(".home-products .product-grid.featured");
+  const featuredCards = featuredShelf.locator(".product-card");
+  await expect(featuredShelf).toBeVisible();
+  expect(await featuredCards.count()).toBeGreaterThan(2);
+  expect(await featuredShelf.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  const featuredCardBox = await featuredCards.first().boundingBox();
+  const featuredImageBox = await featuredCards.first().locator(".product-card-image").boundingBox();
+  expect(featuredCardBox?.width).toBeGreaterThanOrEqual(148);
+  expect(featuredCardBox?.width).toBeLessThanOrEqual(152);
+  expect(featuredImageBox?.width).toBe(150);
+  expect(featuredImageBox?.height).toBe(150);
+
+  await page.goto("/products");
+  const catalogCard = page.locator(".catalog-results .product-card").first();
+  const catalogImage = catalogCard.locator(".product-card-image");
+  const filterSummary = page.locator(".catalog-mobile-filters summary");
+  await expect(catalogCard).toBeVisible();
+
+  const [catalogImageBox, filterBox, priceFontSize, nameFontWeight] = await Promise.all([
+    catalogImage.boundingBox(),
+    filterSummary.boundingBox(),
+    catalogCard.locator(".product-card-price").evaluate((element) => getComputedStyle(element).fontSize),
+    catalogCard.locator(".product-card-name").evaluate((element) => getComputedStyle(element).fontWeight),
+  ]);
+  expect(catalogImageBox?.width).toBe(120);
+  expect(catalogImageBox?.height).toBe(120);
+  expect(filterBox?.height).toBeGreaterThanOrEqual(44);
+  expect(priceFontSize).toBe("20px");
+  expect(nameFontWeight).toBe("500");
+  await expectNoHorizontalOverflow(page);
+});
+
+test("mobile account and orders keep compact customer hierarchy", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Layout measurements use local seed data; skip on deployed targets.");
+  test.skip(testInfo.project.name !== "mobile", "Layout measurements are mobile-only.");
+
+  await addCookie(context, await requireCustomerCookie());
+  await page.goto("/account");
+
+  const profileSummary = page.locator(".account-collapsible > summary");
+  const newAddress = page.locator(".account-new-address");
+  await expect(profileSummary).toBeVisible();
+  await expect(newAddress).not.toHaveAttribute("open", "");
+  expect((await profileSummary.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/orders");
+  const orderCard = page.locator(".order-card").first();
+  await expect(orderCard).toBeVisible();
+  expect((await orderCard.boundingBox())?.height).toBeLessThanOrEqual(150);
+  await expectNoHorizontalOverflow(page);
+});
+
 test("mobile admin product screenshot remains stable", async ({ page, context }, testInfo) => {
   test.skip(!isLocalTarget(), "Screenshot baselines use local seed data; skip on deployed targets.");
   test.skip(testInfo.project.name !== "mobile", "Screenshots are mobile-only.");
@@ -372,8 +468,22 @@ test("mobile admin order detail screenshot remains stable", async ({ page, conte
   await addCookie(context, await requireAdminCookie());
   await page.goto("/admin/orders");
   const orderLink = await firstAdminOrderLink(page);
+  const orderTable = page.locator(".admin-table.orders");
+  const orderTableSize = await orderTable.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(orderTableSize.scrollWidth).toBeLessThanOrEqual(orderTableSize.clientWidth + 1);
+  await expect(orderLink.locator(".admin-badge")).toBeVisible();
+  await expect(orderLink.locator("span").nth(2)).toBeVisible();
+  await expect(orderLink.locator("span").nth(3)).toBeVisible();
+  await orderLink.scrollIntoViewIfNeeded();
+  await expect(page).toHaveScreenshot("mobile-admin-orders.png");
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();
+  const backLink = page.getByRole("link", { name: "주문 목록으로" });
+  await expect(backLink).toBeVisible();
+  expect((await backLink.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expectNoHorizontalOverflow(page);
   const summaryValue = (label: string) => page.getByText(label, { exact: true }).locator("..").locator("strong");
   await expect(page).toHaveScreenshot("mobile-admin-order-detail.png", {

@@ -18,7 +18,9 @@ declare global {
     daum?: {
       Postcode: new (options: {
         oncomplete: (data: PostcodeData) => void;
-      }) => { open: () => void };
+        width: string;
+        height: string;
+      }) => { embed: (element: HTMLElement) => void };
     };
   }
 }
@@ -36,8 +38,10 @@ export function AddressFields({
 }: AddressFieldsProps) {
   const id = useId();
   const detailRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
   const [postcodeReady, setPostcodeReady] = useState(false);
   const [scriptError, setScriptError] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [postalCodeValue, setPostalCodeValue] = useState(postalCode);
   const [addressValue, setAddressValue] = useState(address1);
 
@@ -47,17 +51,26 @@ export function AddressFields({
       setScriptError(true);
       return;
     }
-    new Postcode({
-      oncomplete(data) {
-        setPostalCodeValue(data.zonecode);
-        setAddressValue(
-          data.userSelectedType === "R"
-            ? data.roadAddress || data.jibunAddress
-            : data.jibunAddress || data.roadAddress,
-        );
-        requestAnimationFrame(() => detailRef.current?.focus());
-      },
-    }).open();
+    setSearchOpen(true);
+    requestAnimationFrame(() => {
+      const container = searchRef.current;
+      if (!container) return;
+      container.replaceChildren();
+      new Postcode({
+        width: "100%",
+        height: "100%",
+        oncomplete(data) {
+          setPostalCodeValue(data.zonecode);
+          setAddressValue(
+            data.userSelectedType === "R"
+              ? data.roadAddress || data.jibunAddress
+              : data.jibunAddress || data.roadAddress,
+          );
+          setSearchOpen(false);
+          requestAnimationFrame(() => detailRef.current?.focus());
+        },
+      }).embed(container);
+    });
   }
 
   return (
@@ -80,9 +93,20 @@ export function AddressFields({
           />
         </label>
         <button className="button" type="button" onClick={searchAddress} disabled={!postcodeReady}>
-          주소 검색
+          {postcodeReady ? "주소 검색" : "주소 검색 준비 중"}
         </button>
       </div>
+      {searchOpen ? (
+        <div className="address-search-panel">
+          <div className="address-search-panel-header">
+            <strong>주소 검색</strong>
+            <button className="button secondary" type="button" onClick={() => setSearchOpen(false)}>
+              닫기
+            </button>
+          </div>
+          <div className="address-search-embed" ref={searchRef} />
+        </div>
+      ) : null}
       <label htmlFor={`${id}-address1`}>
         주소
         <input

@@ -65,7 +65,7 @@ export default async function OrdersPage() {
               <div className="summary-list compact">
                 <div>
                   <span>주문일</span>
-                  <strong>{new Date(order.createdAt).toLocaleString("ko-KR")}</strong>
+                  <strong>{new Date(order.createdAt).toLocaleDateString("ko-KR")}</strong>
                 </div>
                 <div>
                   <span>결제 그룹</span>

@@ -59,31 +59,45 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <strong>{profile.data.requiredInfoComplete ? "필수 정보 완료" : "필수 정보 필요"}</strong>
             <span>주문 전 이름, 연락 가능한 이메일, 배송 연락처가 필요합니다.</span>
           </div>
-          <form action={updateProfile} className="account-form account-profile-form" id="profile">
-            <h2>회원정보</h2>
-            <label>
-              이름
-              <input name="displayName" required defaultValue={profile.data.displayName} />
-            </label>
-            <label>
-              이메일
-              <input name="email" required type="email" defaultValue={profile.data.email} />
-            </label>
-            <label>
-              배송 연락처
-              <input
-                name="phoneNumber"
-                required
-                inputMode="tel"
-                placeholder="01012345678"
-                defaultValue={profile.data.phoneNumber ?? ""}
-              />
-              <span className="field-help">주문 확인과 배송 연락에 사용할 휴대폰 번호를 입력해 주세요.</span>
-            </label>
-            <SubmitButton className="button" pendingLabel="저장 중...">
-              기본 정보 저장
-            </SubmitButton>
-          </form>
+          <details
+            className="account-form account-collapsible"
+            id="profile"
+            open={!profile.data.requiredInfoComplete}
+          >
+            <summary>
+              <span>
+                <strong>회원정보</strong>
+                <small>
+                  {profile.data.displayName} · {profile.data.email}
+                </small>
+              </span>
+              <span aria-hidden="true">수정</span>
+            </summary>
+            <form action={updateProfile} className="account-profile-form account-collapsible-body">
+              <label>
+                이름
+                <input name="displayName" required defaultValue={profile.data.displayName} />
+              </label>
+              <label>
+                이메일
+                <input name="email" required type="email" defaultValue={profile.data.email} />
+              </label>
+              <label>
+                배송 연락처
+                <input
+                  name="phoneNumber"
+                  required
+                  inputMode="tel"
+                  placeholder="01012345678"
+                  defaultValue={profile.data.phoneNumber ?? ""}
+                />
+                <span className="field-help">주문 확인과 배송 연락에 사용할 휴대폰 번호를 입력해 주세요.</span>
+              </label>
+              <SubmitButton className="button" pendingLabel="저장 중...">
+                기본 정보 저장
+              </SubmitButton>
+            </form>
+          </details>
         </>
       )}
       <section className="account-form" id="addresses">
@@ -152,34 +166,36 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 ))
               )}
             </div>
-            <form action={createAddress} className="account-address-form">
-              <h3>새 배송지</h3>
-              <label>
-                받는 사람
-                <input
-                  name="recipientName"
-                  required
-                  defaultValue={profile.error ? "" : profile.data.displayName}
-                />
-              </label>
-              <label>
-                연락처
-                <input
-                  name="recipientPhone"
-                  required
-                  inputMode="tel"
-                  defaultValue={profile.error ? "" : (profile.data.phoneNumber ?? "")}
-                />
-              </label>
-              <AddressFields />
-              <label className="checkbox-label">
-                <input name="defaultAddress" type="checkbox" value="true" defaultChecked />
-                <span>기본 배송지로 사용</span>
-              </label>
-              <SubmitButton className="button" pendingLabel="저장 중...">
-                배송지 저장
-              </SubmitButton>
-            </form>
+            <details className="account-new-address">
+              <summary>새 배송지 추가</summary>
+              <form action={createAddress} className="account-address-form">
+                <label>
+                  받는 사람
+                  <input
+                    name="recipientName"
+                    required
+                    defaultValue={profile.error ? "" : profile.data.displayName}
+                  />
+                </label>
+                <label>
+                  연락처
+                  <input
+                    name="recipientPhone"
+                    required
+                    inputMode="tel"
+                    defaultValue={profile.error ? "" : (profile.data.phoneNumber ?? "")}
+                  />
+                </label>
+                <AddressFields />
+                <label className="checkbox-label">
+                  <input name="defaultAddress" type="checkbox" value="true" defaultChecked />
+                  <span>기본 배송지로 사용</span>
+                </label>
+                <SubmitButton className="button" pendingLabel="저장 중...">
+                  배송지 저장
+                </SubmitButton>
+              </form>
+            </details>
           </>
         )}
       </section>
