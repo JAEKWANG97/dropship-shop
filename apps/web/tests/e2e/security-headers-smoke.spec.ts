@@ -57,6 +57,13 @@ test("public pages render without CSP console violations", async ({ page }) => {
   ]);
 });
 
+test("CSP allows the embedded address search", async ({ request }) => {
+  const response = await request.get("/");
+  expect(response.headers()["content-security-policy"]).toContain(
+    "frame-src 'self' https://postcode.map.kakao.com",
+  );
+});
+
 test("customer pages render without CSP console violations", async ({ page, context }) => {
   const customerCookie = await requireCustomerCookie();
   await addCookie(context, customerCookie);

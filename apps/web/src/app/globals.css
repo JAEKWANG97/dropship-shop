@@ -1930,6 +1930,34 @@ textarea {
   min-height: 40px;
 }
 
+.address-search-panel {
+  grid-column: 1 / -1;
+  width: min(100%, 500px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.address-search-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.address-search-panel-header .button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.address-search-embed {
+  width: 100%;
+  height: min(470px, 70vh);
+}
+
 .address-fields .field-error {
   grid-column: 1 / -1;
   margin: 0;
