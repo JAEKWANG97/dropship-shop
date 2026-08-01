@@ -61,6 +61,7 @@ public class CheckoutService {
 	private final AccountAgreementService accountAgreementService;
 	private final AccountProfileService accountProfileService;
 	private final CustomerPolicyLinkService customerPolicyLinkService;
+	private final CheckoutPolicyProperties checkoutPolicyProperties;
 	private final BankTransferProperties bankTransferProperties;
 	private final NotificationService notificationService;
 	private final StorefrontSalesProperties salesProperties;
@@ -78,6 +79,7 @@ public class CheckoutService {
 		AccountAgreementService accountAgreementService,
 		AccountProfileService accountProfileService,
 		CustomerPolicyLinkService customerPolicyLinkService,
+		CheckoutPolicyProperties checkoutPolicyProperties,
 		BankTransferProperties bankTransferProperties,
 		NotificationService notificationService,
 		StorefrontSalesProperties salesProperties
@@ -93,6 +95,7 @@ public class CheckoutService {
 		this.accountAgreementService = accountAgreementService;
 		this.accountProfileService = accountProfileService;
 		this.customerPolicyLinkService = customerPolicyLinkService;
+		this.checkoutPolicyProperties = checkoutPolicyProperties;
 		this.bankTransferProperties = bankTransferProperties;
 		this.notificationService = notificationService;
 		this.salesProperties = salesProperties;
@@ -201,19 +204,29 @@ public class CheckoutService {
 		CheckoutDtos.PolicyConfirmationRequest request
 	) {
 		PaymentGroup paymentGroup = findPaymentGroup(userId, checkoutNumber);
+		if (paymentGroup.getStatus() != PaymentGroupStatus.PAYMENT_PENDING) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout policy can be confirmed only while payment is pending");
+		}
 		if (paymentGroup.getPolicyConfirmedAt() != null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Policy already confirmed");
 		}
+		accountAgreementService.requireCurrentAgreement(userId);
+		validatePolicyVersions(request);
+		List<CustomerOrder> orders = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId());
+		if (orders.isEmpty() || orders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAYMENT_PENDING)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout policy can be confirmed only while payment is pending");
+		}
+		shippingAddress(orders);
 		Instant confirmedAt = Instant.now(clock);
 		orderPolicyAgreementRepository.save(new OrderPolicyAgreement(
 			paymentGroup,
 			paymentGroup.getUser(),
-			request.termsVersion(),
-			request.privacyVersion(),
-			request.orderPolicyVersion(),
-			request.cancellationRefundPolicyVersion(),
-			request.outOfStockNoticeVersion(),
-			request.confirmedNoticeText(),
+			accountAgreementService.requiredTermsVersion(),
+			accountAgreementService.requiredPrivacyVersion(),
+			checkoutPolicyProperties.orderPolicyVersion(),
+			checkoutPolicyProperties.cancellationRefundPolicyVersion(),
+			checkoutPolicyProperties.outOfStockNoticeVersion(),
+			checkoutPolicyProperties.confirmedNoticeText(),
 			confirmedAt
 		));
 		paymentGroup.confirmPolicy(confirmedAt);
@@ -273,8 +286,9 @@ public class CheckoutService {
 	}
 
 	private CheckoutDtos.CheckoutResponse toCheckoutResponse(PaymentGroup paymentGroup) {
-		List<CheckoutDtos.OrderResponse> orders = orderRepository
-			.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId())
+		List<CustomerOrder> customerOrders = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId());
+		CheckoutDtos.ShippingAddressResponse shippingAddress = shippingAddress(customerOrders);
+		List<CheckoutDtos.OrderResponse> orders = customerOrders
 			.stream()
 			.map(this::toOrderResponse)
 			.toList();
@@ -295,9 +309,63 @@ public class CheckoutService {
 				paymentGroup.getExpiresAt(),
 				paymentGroup.getBankTransferCashReceiptNotice()
 			),
+			shippingAddress,
+			policyEvidence(),
 			policyLinks(),
 			orders
 		);
+	}
+
+	private CheckoutDtos.ShippingAddressResponse shippingAddress(List<CustomerOrder> orders) {
+		if (orders.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout has no orders");
+		}
+		CustomerOrder first = orders.getFirst();
+		ShippingAddressSnapshot address = new ShippingAddressSnapshot(
+			first.getRecipientName(),
+			first.getRecipientPhone(),
+			first.getPostalCode(),
+			first.getAddress1(),
+			first.getAddress2()
+		);
+		boolean inconsistent = orders.stream().skip(1).anyMatch(order -> !address.equals(new ShippingAddressSnapshot(
+			order.getRecipientName(),
+			order.getRecipientPhone(),
+			order.getPostalCode(),
+			order.getAddress1(),
+			order.getAddress2()
+		)));
+		if (inconsistent) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout shipping address is inconsistent");
+		}
+		return new CheckoutDtos.ShippingAddressResponse(
+			address.recipientName(),
+			address.recipientPhone(),
+			address.postalCode(),
+			address.address1(),
+			address.address2()
+		);
+	}
+
+	private CheckoutDtos.PolicyEvidenceResponse policyEvidence() {
+		return new CheckoutDtos.PolicyEvidenceResponse(
+			accountAgreementService.requiredTermsVersion(),
+			accountAgreementService.requiredPrivacyVersion(),
+			checkoutPolicyProperties.orderPolicyVersion(),
+			checkoutPolicyProperties.cancellationRefundPolicyVersion(),
+			checkoutPolicyProperties.outOfStockNoticeVersion(),
+			checkoutPolicyProperties.confirmedNoticeText()
+		);
+	}
+
+	private void validatePolicyVersions(CheckoutDtos.PolicyConfirmationRequest request) {
+		if (!accountAgreementService.requiredTermsVersion().equals(request.termsVersion())
+			|| !accountAgreementService.requiredPrivacyVersion().equals(request.privacyVersion())
+			|| !checkoutPolicyProperties.orderPolicyVersion().equals(request.orderPolicyVersion())
+			|| !checkoutPolicyProperties.cancellationRefundPolicyVersion().equals(request.cancellationRefundPolicyVersion())
+			|| !checkoutPolicyProperties.outOfStockNoticeVersion().equals(request.outOfStockNoticeVersion())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout policy versions are not current");
+		}
 	}
 
 	private String depositorName(CheckoutDtos.CreateCheckoutRequest request) {

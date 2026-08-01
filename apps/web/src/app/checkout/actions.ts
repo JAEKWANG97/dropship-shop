@@ -6,12 +6,6 @@ import { revalidatePath } from "next/cache";
 import { ApiError, apiSendWithCookie } from "@/lib/api";
 import type { Checkout } from "@/lib/checkout";
 
-const ORDER_POLICY_VERSION = "order-2026-06-01";
-const REFUND_POLICY_VERSION = "refund-2026-06-01";
-const OUT_OF_STOCK_NOTICE_VERSION = "out-of-stock-2026-06-01";
-const CONFIRMED_NOTICE_TEXT =
-  "주문 상품, 결제 금액, 배송지, 배송/취소/환불 정책, 결제 후 품절 가능성과 품절 시 해당 배송 그룹 주문 금액 환불 안내를 확인했습니다.";
-
 function value(formData: FormData, name: string) {
   const raw = formData.get(name);
   return typeof raw === "string" ? raw : "";
@@ -120,10 +114,12 @@ export async function confirmCheckoutPolicies(formData: FormData) {
         body: JSON.stringify({
           termsVersion: value(formData, "termsVersion"),
           privacyVersion: value(formData, "privacyVersion"),
-          orderPolicyVersion: ORDER_POLICY_VERSION,
-          cancellationRefundPolicyVersion: REFUND_POLICY_VERSION,
-          outOfStockNoticeVersion: OUT_OF_STOCK_NOTICE_VERSION,
-          confirmedNoticeText: CONFIRMED_NOTICE_TEXT,
+          orderPolicyVersion: value(formData, "orderPolicyVersion"),
+          cancellationRefundPolicyVersion: value(
+            formData,
+            "cancellationRefundPolicyVersion",
+          ),
+          outOfStockNoticeVersion: value(formData, "outOfStockNoticeVersion"),
         }),
       },
     );

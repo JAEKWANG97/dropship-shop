@@ -133,7 +133,7 @@ Notes:
 - Kakao authorization requests `profile_nickname account_email`. A verified provider email replaces only an existing internal `@oauth.local` placeholder and never overwrites a customer-edited email.
 - Successful login sets `ACCESS_TOKEN` as an HttpOnly cookie with `SameSite=Lax`; production must use `Secure`.
 - Access tokens are stateless JWTs signed by the API. Refresh tokens are deferred from MVP auth foundation.
-- Current required versions start as `terms-2026-06-01` and `privacy-2026-06-01`.
+- Current terms, privacy, shipping/order, cancellation/refund, and stock-risk versions are `prelaunch-2026-06-30` until the final launch policies are published.
 - `POST /api/me/agreements` requires both `termsAgreed=true` and `privacyAgreed=true` with current required versions.
 - Reposting the same current versions is idempotent and returns the existing agreement record.
 - Required customer info is display name, reachable contact email, and a valid delivery phone number.
@@ -154,8 +154,8 @@ POST /api/me/agreements
 {
   "termsAgreed": true,
   "privacyAgreed": true,
-  "termsVersion": "terms-2026-06-01",
-  "privacyVersion": "privacy-2026-06-01"
+  "termsVersion": "prelaunch-2026-06-30",
+  "privacyVersion": "prelaunch-2026-06-30"
 }
 
 GET /api/me/profile-completion
@@ -346,7 +346,7 @@ PATCH /api/cart/items/{cartItemId}
 | `POST` | `/api/checkouts/{checkoutNumber}/policy-confirmation` | `CUSTOMER` | Implemented | Store order policy confirmation |
 | `GET` | `/api/orders` | `CUSTOMER` | Implemented | Customer order history |
 | `GET` | `/api/orders/{orderId}` | `CUSTOMER` | Implemented | Customer order detail |
-| `PATCH` | `/api/orders/{orderId}/shipping-address` | `CUSTOMER` | Implemented | Change address before supplier work starts |
+| `PATCH` | `/api/orders/{orderId}/shipping-address` | `CUSTOMER` | Implemented | Legacy compatibility route; rejects orders whose checkout policy is confirmed |
 | `POST` | `/api/orders/{orderId}/cancel` | `CUSTOMER` | Implemented | Self-service cancel when allowed |
 
 Rules:
@@ -362,17 +362,17 @@ Rules:
 - Checkout creation pessimistically locks the customer's cart row before reading cart items to prevent duplicate submit from creating two payment groups.
 - Checkout creation empties the cart after payment group and orders are created.
 - A duplicate checkout submit after the first transaction commits returns `400 BUSINESS_RULE_VIOLATION` with `Checkout was already submitted for this cart. Please check your checkout or cart.`
-- Checkout create/read responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notice.
+- Checkout create/read responses include the current `shippingAddress`, server-owned `policyEvidence`, and `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notice.
 - Checkout create/read responses include `bankTransferDeposit` with bank name, account number, account holder, depositor name, amount, deadline, and cash receipt notice.
-- Policy confirmation is stored separately on the payment group before admin deposit confirmation.
+- Policy confirmation accepts only the versions returned in `policyEvidence`. The server validates those versions and stores its own canonical notice text before admin deposit confirmation.
 - Customer order history excludes normal `PAYMENT_PENDING`, `EXPIRED`, and failed payment attempts.
 - Customer order list and detail are scoped to the authenticated customer.
 - Customer order APIs expose stable status codes. Customer-facing display labels are owned by the frontend.
 - Customer order detail includes payment group summary, payment summary, shipping address, order items, and fulfillment/shipment/refund summaries.
 - Checkout shipping address changes are allowed only while the payment group and its orders are still `PAYMENT_PENDING`.
 - Checkout shipping address changes are rejected after checkout policy confirmation because the confirmation text includes shipping address.
-- Paid order shipping address changes are allowed only while the order is `SUPPLIER_ORDER_PENDING` and both `supplierOrderStartedAt` and `addressLockedAt` are empty.
-- Address changes are rejected after `address_locked_at` or supplier order completion.
+- Customer shipping-address changes are rejected after checkout policy confirmation. A required correction is handled through customer support before supplier work starts.
+- `address_locked_at` still records the stronger operational lock applied when supplier work starts.
 
 Implemented request bodies:
 
@@ -400,12 +400,11 @@ PATCH /api/orders/{orderId}/shipping-address
 
 POST /api/checkouts/{checkoutNumber}/policy-confirmation
 {
-  "termsVersion": "terms-2026-06-01",
-  "privacyVersion": "privacy-2026-06-01",
-  "orderPolicyVersion": "order-2026-06-01",
-  "cancellationRefundPolicyVersion": "refund-2026-06-01",
-  "outOfStockNoticeVersion": "out-of-stock-2026-06-01",
-  "confirmedNoticeText": "I agree to the checkout policies."
+  "termsVersion": "prelaunch-2026-06-30",
+  "privacyVersion": "prelaunch-2026-06-30",
+  "orderPolicyVersion": "prelaunch-2026-06-30",
+  "cancellationRefundPolicyVersion": "prelaunch-2026-06-30",
+  "outOfStockNoticeVersion": "prelaunch-2026-06-30"
 }
 ```
 

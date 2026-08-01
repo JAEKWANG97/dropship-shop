@@ -34,6 +34,9 @@ class CustomerOrderAddressService {
 	) {
 		CustomerOrder order = orderRepository.findByIdAndUser_Id(orderId, userId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		if (order.getPaymentGroup().getPolicyConfirmedAt() != null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Confirmed order shipping address cannot be changed");
+		}
 		if (order.getStatus() != OrderStatus.SUPPLIER_ORDER_PENDING
 			|| order.getSupplierOrderStartedAt() != null
 			|| order.getAddressLockedAt() != null) {

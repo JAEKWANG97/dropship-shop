@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { apiSendWithCookie, apiUrl } from "@/lib/api";
-import type { OrderDetail } from "@/lib/orders";
 
 function value(formData: FormData, name: string) {
   const raw = formData.get(name);
@@ -13,36 +12,6 @@ function value(formData: FormData, name: string) {
 
 function orderMessage(orderId: string, message: string) {
   return `/orders/${orderId}?message=${encodeURIComponent(message)}`;
-}
-
-function shippingAddress(formData: FormData) {
-  return {
-    recipientName: value(formData, "recipientName"),
-    recipientPhone: value(formData, "recipientPhone"),
-    postalCode: value(formData, "postalCode"),
-    address1: value(formData, "address1"),
-    address2: value(formData, "address2"),
-  };
-}
-
-export async function updateOrderShippingAddress(formData: FormData) {
-  const orderId = value(formData, "orderId");
-
-  try {
-    await apiSendWithCookie<OrderDetail>(
-      `/api/orders/${orderId}/shipping-address`,
-      (await cookies()).toString(),
-      {
-        method: "PATCH",
-        body: JSON.stringify(shippingAddress(formData)),
-      },
-    );
-  } catch {
-    redirect(orderMessage(orderId, "배송지를 변경하지 못했습니다."));
-  }
-
-  revalidatePath(`/orders/${orderId}`);
-  redirect(orderMessage(orderId, "배송지를 변경했습니다."));
 }
 
 export async function cancelOrder(formData: FormData) {

@@ -66,8 +66,8 @@ class AccountAgreementApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.requiredAgreed", is(false)))
-			.andExpect(jsonPath("$.requiredTermsVersion", is("terms-2026-06-01")))
-			.andExpect(jsonPath("$.requiredPrivacyVersion", is("privacy-2026-06-01")));
+			.andExpect(jsonPath("$.requiredTermsVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.requiredPrivacyVersion", is("prelaunch-2026-06-30")));
 
 		MvcResult firstResult = mockMvc.perform(post("/api/me/agreements")
 				.with(authentication(TestAuthentication.customer(customer.getId())))
@@ -75,8 +75,8 @@ class AccountAgreementApiIntegrationTest {
 				.content(requiredAgreementRequest()))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.requiredAgreed", is(true)))
-			.andExpect(jsonPath("$.termsVersion", is("terms-2026-06-01")))
-			.andExpect(jsonPath("$.privacyVersion", is("privacy-2026-06-01")))
+			.andExpect(jsonPath("$.termsVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.privacyVersion", is("prelaunch-2026-06-30")))
 			.andExpect(jsonPath("$.agreedAt").exists())
 			.andReturn();
 
@@ -93,13 +93,13 @@ class AccountAgreementApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.requiredAgreed", is(true)))
-			.andExpect(jsonPath("$.agreedTermsVersion", is("terms-2026-06-01")))
-			.andExpect(jsonPath("$.agreedPrivacyVersion", is("privacy-2026-06-01")));
+			.andExpect(jsonPath("$.agreedTermsVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.agreedPrivacyVersion", is("prelaunch-2026-06-30")));
 
 		org.assertj.core.api.Assertions.assertThat(userPolicyAgreementRepository.findByUser_IdAndTermsVersionAndPrivacyVersion(
 			customer.getId(),
-			"terms-2026-06-01",
-			"privacy-2026-06-01"
+			"prelaunch-2026-06-30",
+			"prelaunch-2026-06-30"
 		)).isPresent();
 	}
 
@@ -114,8 +114,8 @@ class AccountAgreementApiIntegrationTest {
 					{
 					  "termsAgreed": false,
 					  "privacyAgreed": true,
-					  "termsVersion": "terms-2026-06-01",
-					  "privacyVersion": "privacy-2026-06-01"
+					  "termsVersion": "prelaunch-2026-06-30",
+					  "privacyVersion": "prelaunch-2026-06-30"
 					}
 					"""))
 			.andExpect(status().isBadRequest())
@@ -129,7 +129,7 @@ class AccountAgreementApiIntegrationTest {
 					  "termsAgreed": true,
 					  "privacyAgreed": true,
 					  "termsVersion": "terms-old",
-					  "privacyVersion": "privacy-2026-06-01"
+					  "privacyVersion": "prelaunch-2026-06-30"
 					}
 					"""))
 			.andExpect(status().isBadRequest())
@@ -215,8 +215,8 @@ class AccountAgreementApiIntegrationTest {
 			{
 			  "termsAgreed": true,
 			  "privacyAgreed": true,
-			  "termsVersion": "terms-2026-06-01",
-			  "privacyVersion": "privacy-2026-06-01"
+			  "termsVersion": "prelaunch-2026-06-30",
+			  "privacyVersion": "prelaunch-2026-06-30"
 			}
 			""";
 	}

@@ -381,8 +381,8 @@ class PolicyPageApiIntegrationTest {
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
-			"terms-2026-06-01",
-			"privacy-2026-06-01",
+			"prelaunch-2026-06-30",
+			"prelaunch-2026-06-30",
 			Instant.now()
 		));
 		return customer;

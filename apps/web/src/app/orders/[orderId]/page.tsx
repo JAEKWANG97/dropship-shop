@@ -17,9 +17,8 @@ import {
   type OrderDetail,
 } from "@/lib/orders";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
-import { AddressFields } from "../../address-fields";
 import { SubmitButton } from "../../submit-button";
-import { cancelOrder, createClaim, updateOrderShippingAddress } from "../actions";
+import { cancelOrder, createClaim } from "../actions";
 import { ClaimEvidenceInput } from "../claim-evidence-input";
 
 type OrderDetailPageProps = {
@@ -89,7 +88,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
       <OrderSummaryPanel order={order} />
       <ClaimProgressPanel order={order} />
       <OrderItems order={order} />
-      <OrderShippingAddressForm order={order} />
+      <OrderShippingAddressPanel order={order} />
       <CancelOrderForm orderId={order.orderId} />
       <ClaimForm orderId={order.orderId} />
       <Link className="button" href="/orders">
@@ -279,30 +278,34 @@ function OrderItems({ order }: { order: OrderDetail }) {
   );
 }
 
-function OrderShippingAddressForm({ order }: { order: OrderDetail }) {
+function OrderShippingAddressPanel({ order }: { order: OrderDetail }) {
   const address = order.shippingAddress;
 
   return (
-    <form action={updateOrderShippingAddress} className="checkout-form">
-      <h2>배송지 변경</h2>
-      <input name="orderId" type="hidden" value={order.orderId} />
-      <label>
-        받는 사람
-        <input name="recipientName" required defaultValue={address.recipientName} />
-      </label>
-      <label>
-        연락처
-        <input name="recipientPhone" required defaultValue={address.recipientPhone} />
-      </label>
-      <AddressFields
-        postalCode={address.postalCode}
-        address1={address.address1}
-        address2={address.address2 ?? undefined}
-      />
-      <SubmitButton className="button" pendingLabel="변경 중...">
-        배송지 변경
-      </SubmitButton>
-    </form>
+    <section className="checkout-form">
+      <h2>배송지</h2>
+      <div className="summary-list">
+        <div>
+          <span>받는 사람</span>
+          <strong>{address.recipientName}</strong>
+        </div>
+        <div>
+          <span>연락처</span>
+          <strong>{address.recipientPhone}</strong>
+        </div>
+        <div>
+          <span>주소</span>
+          <strong>
+            ({address.postalCode}) {address.address1} {address.address2 ?? ""}
+          </strong>
+        </div>
+      </div>
+      <div className="notice">
+        <strong>주문 정책 확인이 완료된 배송지입니다</strong>
+        <span>변경이 필요하면 공급처 발주 전에 고객 문의를 남겨 주세요.</span>
+        <Link href="/support">고객 문의</Link>
+      </div>
+    </section>
   );
 }
 

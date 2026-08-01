@@ -85,6 +85,14 @@ public class AccountAgreementService {
 		);
 	}
 
+	public String requiredTermsVersion() {
+		return accountAgreementProperties.requiredTermsVersion();
+	}
+
+	public String requiredPrivacyVersion() {
+		return accountAgreementProperties.requiredPrivacyVersion();
+	}
+
 	private Optional<UserPolicyAgreement> latestAgreement(UUID userId) {
 		return userPolicyAgreementRepository.findFirstByUser_IdOrderByAgreedAtDesc(userId);
 	}
