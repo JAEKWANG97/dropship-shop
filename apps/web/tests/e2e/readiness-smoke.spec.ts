@@ -7,6 +7,7 @@ import {
   firstAdminOrderLink,
   isLocalTarget,
   requireAdminCookie,
+  requireCustomerCookie,
 } from "./helpers";
 
 type AdminProductPage = {
@@ -354,6 +355,65 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
       page.locator(".product-grid"),
     ],
   });
+});
+
+test("mobile customer product layouts keep compact shopping density", async ({ page }, testInfo) => {
+  test.skip(!isLocalTarget(), "Layout measurements use local seed data; skip on deployed targets.");
+  test.skip(testInfo.project.name !== "mobile", "Layout measurements are mobile-only.");
+
+  await page.goto("/");
+  const featuredShelf = page.locator(".home-products .product-grid.featured");
+  const featuredCards = featuredShelf.locator(".product-card");
+  await expect(featuredShelf).toBeVisible();
+  expect(await featuredCards.count()).toBeGreaterThan(2);
+  expect(await featuredShelf.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  const featuredCardBox = await featuredCards.first().boundingBox();
+  const featuredImageBox = await featuredCards.first().locator(".product-card-image").boundingBox();
+  expect(featuredCardBox?.width).toBeGreaterThanOrEqual(148);
+  expect(featuredCardBox?.width).toBeLessThanOrEqual(152);
+  expect(featuredImageBox?.width).toBe(150);
+  expect(featuredImageBox?.height).toBe(150);
+
+  await page.goto("/products");
+  const catalogCard = page.locator(".catalog-results .product-card").first();
+  const catalogImage = catalogCard.locator(".product-card-image");
+  const filterSummary = page.locator(".catalog-mobile-filters summary");
+  await expect(catalogCard).toBeVisible();
+
+  const [catalogImageBox, filterBox, priceFontSize, nameFontWeight] = await Promise.all([
+    catalogImage.boundingBox(),
+    filterSummary.boundingBox(),
+    catalogCard.locator(".product-card-price").evaluate((element) => getComputedStyle(element).fontSize),
+    catalogCard.locator(".product-card-name").evaluate((element) => getComputedStyle(element).fontWeight),
+  ]);
+  expect(catalogImageBox?.width).toBe(120);
+  expect(catalogImageBox?.height).toBe(120);
+  expect(filterBox?.height).toBeGreaterThanOrEqual(44);
+  expect(priceFontSize).toBe("20px");
+  expect(nameFontWeight).toBe("500");
+  await expectNoHorizontalOverflow(page);
+});
+
+test("mobile account and orders keep compact customer hierarchy", async ({ page, context }, testInfo) => {
+  test.skip(!isLocalTarget(), "Layout measurements use local seed data; skip on deployed targets.");
+  test.skip(testInfo.project.name !== "mobile", "Layout measurements are mobile-only.");
+
+  await addCookie(context, await requireCustomerCookie());
+  await page.goto("/account");
+
+  const profileSummary = page.locator(".account-collapsible > summary");
+  const newAddress = page.locator(".account-new-address");
+  await expect(profileSummary).toBeVisible();
+  await expect(newAddress).not.toHaveAttribute("open", "");
+  expect((await profileSummary.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/orders");
+  const orderCard = page.locator(".order-card").first();
+  await expect(orderCard).toBeVisible();
+  expect((await orderCard.boundingBox())?.height).toBeLessThanOrEqual(150);
+  await expectNoHorizontalOverflow(page);
 });
 
 test("mobile admin product screenshot remains stable", async ({ page, context }, testInfo) => {
