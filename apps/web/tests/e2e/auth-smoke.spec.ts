@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { addCookie, expectNoHorizontalOverflow, requireCustomerCookie } from "./helpers";
 
-test("login page renders social provider entry points", async ({ page }) => {
+test("login page renders social provider entry points", async ({ page }, testInfo) => {
   await page.goto("/login");
 
   await expect(page.getByRole("heading")).toContainText("안전용품");
@@ -9,6 +9,10 @@ test("login page renders social provider entry points", async ({ page }) => {
   await expect(page.getByRole("link", { name: "카카오로 계속하기" })).toBeVisible();
   await expect(page.getByRole("link", { name: "구글로 계속하기" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "네이버로 계속하기" })).toHaveCount(0);
+  if (testInfo.project.name === "mobile") {
+    await expect(page.locator(".site-header")).toBeHidden();
+    await expect(page.locator(".mobile-bottom-nav")).toBeHidden();
+  }
   await expectNoHorizontalOverflow(page);
 });
 

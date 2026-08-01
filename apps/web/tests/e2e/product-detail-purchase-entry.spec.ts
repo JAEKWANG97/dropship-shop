@@ -6,16 +6,30 @@ import {
   requireCustomerCookie,
 } from "./helpers";
 
-test("guest product detail shows purchase controls and redirects to login on submit", async ({ page }) => {
+test("guest product detail shows purchase controls and redirects to login on submit", async ({ page }, testInfo) => {
   const productId = await activeProductId();
   await page.goto(`/products/${productId}`);
   const purchasePanel = page.locator(".product-purchase-panel");
-  const purchaseForm = purchasePanel.locator(".cart-add-form");
+  const mobile = testInfo.project.name === "mobile";
+  const purchaseForm = page.locator(mobile ? ".mobile-purchase-form" : ".desktop-purchase-form");
+  const mobileBar = page.locator(".mobile-purchase-bar");
 
-  await expect(page.getByLabel("옵션")).toBeVisible();
-  await expect(page.getByLabel("수량")).toBeVisible();
-  await expect(purchaseForm.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
-  await expect(purchaseForm.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
+  if (mobile) {
+    await expect(page.locator(".site-header")).toBeHidden();
+    await expect(page.locator(".product-mobile-topbar")).toBeVisible();
+    await expect(page.locator(".mobile-bottom-nav")).toBeVisible();
+    await expect(mobileBar.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
+    await expect(mobileBar.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
+    await mobileBar.getByRole("button", { name: "장바구니", exact: true }).click();
+  } else {
+    await expect(purchasePanel.locator(".product-action-row")).toBeVisible();
+  }
+  await expect(purchaseForm.getByLabel("옵션")).toBeVisible();
+  await expect(purchaseForm.getByLabel("수량")).toBeVisible();
+  const cartButton = purchaseForm.getByRole("button", { name: "장바구니", exact: true });
+  const checkoutButton = purchaseForm.getByRole("button", { name: "바로구매", exact: true });
+  await expect(cartButton).toBeVisible();
+  await expect(checkoutButton).toBeVisible();
   await expect(purchasePanel.getByRole("link", {
     name: "배송비는 상품 가격에 포함되어 있으며, 주문은 배송 그룹 단위로 처리됩니다.",
   })).toHaveAttribute("href", "/policies/shipping");
@@ -26,7 +40,7 @@ test("guest product detail shows purchase controls and redirects to login on sub
   await expect(page.locator(".product-hero-copy")).not.toContainText("로그인이 필요합니다");
   await expectNoHorizontalOverflow(page);
 
-  await purchaseForm.getByRole("button", { name: "장바구니", exact: true }).click();
+  await cartButton.click();
   await page.waitForURL(/\/login\?/);
 
   const url = new URL(page.url());
@@ -41,11 +55,20 @@ test("mobile purchase bar submits the product form", async ({ page }, testInfo) 
   await page.goto(`/products/${productId}`);
 
   const mobileBar = page.locator(".mobile-purchase-bar");
+  const mobileNav = page.locator(".mobile-bottom-nav");
   await expect(mobileBar).toBeVisible();
-  await expect(mobileBar.getByRole("button", { name: "장바구니 담기" })).toBeVisible();
+  await expect(mobileNav).toBeVisible();
+  await expect(mobileBar.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
   await expect(mobileBar.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
   await expect(mobileBar.locator(".mobile-purchase-price")).toHaveCount(0);
-  expect((await mobileBar.boundingBox())?.height).toBeLessThanOrEqual(70);
+  const [initialMobileBarBox, mobileNavBox] = await Promise.all([
+    mobileBar.boundingBox(),
+    mobileNav.boundingBox(),
+  ]);
+  expect(initialMobileBarBox?.height).toBeLessThanOrEqual(70);
+  expect(mobileNavBox).not.toBeNull();
+  expect(initialMobileBarBox).not.toBeNull();
+  expect(initialMobileBarBox!.y + initialMobileBarBox!.height).toBeLessThanOrEqual(mobileNavBox!.y + 1);
   await expectNoHorizontalOverflow(page);
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -57,7 +80,12 @@ test("mobile purchase bar submits the product form", async ({ page }, testInfo) 
   expect(mobileBarBox).not.toBeNull();
   expect(lastFooterLinkBox!.y + lastFooterLinkBox!.height).toBeLessThanOrEqual(mobileBarBox!.y);
 
-  await mobileBar.getByRole("button", { name: "장바구니 담기" }).click();
+  await mobileBar.getByRole("button", { name: "장바구니", exact: true }).click();
+  const mobilePurchaseForm = page.locator(".mobile-purchase-form");
+  await expect(mobilePurchaseForm).toBeVisible();
+  await expect(mobilePurchaseForm.getByLabel("옵션")).toBeVisible();
+  await expect(mobilePurchaseForm.getByLabel("수량")).toBeVisible();
+  await mobilePurchaseForm.getByRole("button", { name: "장바구니", exact: true }).click();
   await page.waitForURL(/\/login\?/);
 
   const url = new URL(page.url());
@@ -79,7 +107,7 @@ test("product category selection follows the actual query", async ({ page }, tes
   await expect(sidebar.getByRole("link", { name: /개인보호구/ })).toHaveClass(/active/);
 });
 
-test("customer can add product detail item to cart", async ({ page, context }) => {
+test("customer can add product detail item to cart", async ({ page, context }, testInfo) => {
   const [productId, customerCookie] = await Promise.all([
     activeProductId(),
     requireCustomerCookie(),
@@ -87,7 +115,14 @@ test("customer can add product detail item to cart", async ({ page, context }) =
 
   await addCookie(context, customerCookie);
   await page.goto(`/products/${productId}`);
-  await page.locator(".cart-add-form").getByRole("button", { name: "장바구니", exact: true }).click();
+  const mobile = testInfo.project.name === "mobile";
+  if (mobile) {
+    await page.locator(".mobile-purchase-bar").getByRole("button", { name: "장바구니", exact: true }).click();
+  }
+  const cartButton = page
+    .locator(mobile ? ".mobile-purchase-form" : ".desktop-purchase-form")
+    .getByRole("button", { name: "장바구니", exact: true });
+  await cartButton.click();
 
   await page.waitForURL(/\/cart\?/);
   await expect(page.locator(".notice").first()).toContainText("장바구니에 담았습니다.");

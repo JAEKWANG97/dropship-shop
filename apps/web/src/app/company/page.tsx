@@ -42,8 +42,7 @@ export default function CompanyPage() {
         </div>
       </section>
       <section className="detail-section">
-        <h2>결제/구매안전 안내</h2>
-        <p>{BUSINESS_PROFILE.purchaseSafetyNotice}</p>
+        <h2>통신판매 안내</h2>
         <p className="legal-note">
           현재 통신판매업 신고 면제 상태입니다. 신고 의무가 발생하거나 자진 신고하면 실제 신고번호와 등록 정보를 갱신합니다.
         </p>

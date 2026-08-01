@@ -70,7 +70,6 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
       <section className="detail-section">
         <h2>운영 안내</h2>
         <p>반품 주소는 {BUSINESS_PROFILE.returnAddress} 입니다.</p>
-        <p>{BUSINESS_PROFILE.purchaseSafetyNotice}</p>
         <Link className="admin-text-link" href="/company">
           회사 정보 보기
         </Link>

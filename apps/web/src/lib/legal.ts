@@ -25,8 +25,6 @@ export const BUSINESS_PROFILE = {
   privacyOfficerEmail: "contact@coreable-saf.com",
   privacyOfficerPhone: "010-8277-7369",
   hostingProvider: "Amazon Web Services",
-  purchaseSafetyNotice:
-    "구매안전서비스 준비 후 판매를 시작합니다. 현재 주문은 받지 않습니다.",
   businessRegistryUrl: "https://www.ftc.go.kr/www/bizContents.do?key=253",
 } as const;
 
