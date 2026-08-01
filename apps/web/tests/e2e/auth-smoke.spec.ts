@@ -28,6 +28,7 @@ test("logged-in login page honors redirectTo without provider automation", async
 
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("heading", { name: "내 계정" })).toBeVisible();
+  await page.locator(".account-collapsible > summary").click();
   await expect(page.getByLabel("배송 연락처")).toBeVisible();
   await expect(page.getByRole("button", { name: "인증번호 받기" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
