@@ -9,6 +9,7 @@ const csp = [
   "img-src 'self' data: blob:",
   "font-src 'self' data: https://cdn.jsdelivr.net",
   "connect-src 'self'",
+  "frame-src 'self' https://postcode.map.kakao.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

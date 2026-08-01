@@ -40,7 +40,7 @@ test("checkout shows, updates, and locks the confirmed shipping address", async 
   await page.route(POSTCODE_SCRIPT, async (route) => {
     await route.fulfill({
       contentType: "application/javascript",
-      body: `window.daum={Postcode:function(options){this.open=function(){options.oncomplete({zonecode:"05555",roadAddress:"서울특별시 송파구 테스트로 1",jibunAddress:"",userSelectedType:"R"});};}};`,
+      body: `window.daum={Postcode:function(options){this.embed=function(){if(options.width!=="100%"||options.height!=="100%")throw new Error("Responsive postcode size is required");options.oncomplete({zonecode:"05555",roadAddress:"서울특별시 송파구 테스트로 1",jibunAddress:"",userSelectedType:"R"});};}};`,
     });
   });
   const checkout = await createPendingCheckout(customerCookie);
