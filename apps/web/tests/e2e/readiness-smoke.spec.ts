@@ -7,6 +7,7 @@ import {
   firstAdminOrderLink,
   isLocalTarget,
   requireAdminCookie,
+  requireCustomerCookie,
 } from "./helpers";
 
 type AdminProductPage = {
@@ -130,9 +131,7 @@ test("customer inquiry flows from public receipt through admin answer to protect
 });
 
 test("customer account pages render with a session cookie", async ({ page, context }) => {
-  test.skip(!process.env.E2E_CUSTOMER_COOKIE, "Set E2E_CUSTOMER_COOKIE to run customer auth smoke.");
-
-  await addCookie(context, process.env.E2E_CUSTOMER_COOKIE!);
+  await addCookie(context, await requireCustomerCookie());
   for (const route of ["/cart", "/checkout", "/account", "/orders"]) {
     await page.goto(route);
     await expect(page.locator("body")).not.toContainText("API 서버");
@@ -142,9 +141,7 @@ test("customer account pages render with a session cookie", async ({ page, conte
 });
 
 test("admin pages render with an admin session cookie", async ({ page, context }) => {
-  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin smoke.");
-
-  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
+  await addCookie(context, await requireAdminCookie());
   const productId = await activeProductId();
   const routes = [
     "/admin",

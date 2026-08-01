@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { addCartItem } from "@/app/cart/actions";
 import { ApiError } from "@/lib/api";
-import { categoryLabel } from "@/lib/categories";
 import {
   formatPrice,
   getProduct,
@@ -67,9 +66,18 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     (policy) => policy.slug === "shipping" || policy.slug === "cancellation-refund",
   );
   const purchaseFormId = `product-purchase-form-${product.id}`;
+  const mobilePurchaseFormId = `mobile-product-purchase-form-${product.id}`;
+  const mobilePurchasePopoverId = `mobile-product-purchase-popover-${product.id}`;
 
   return (
     <article className={purchasable ? "product-detail has-mobile-purchase-bar" : "product-detail"}>
+      <div className="product-mobile-topbar">
+        <Link href="/products" aria-label="상품 목록으로 돌아가기">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="m15 4-8 8 8 8" />
+          </svg>
+        </Link>
+      </div>
       <nav className="breadcrumb" aria-label="breadcrumb">
         <Link href="/">홈</Link>
         <span>/</span>
@@ -87,7 +95,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <div className="product-thumbnails">
             <ProductImage
               alt={product.name}
-              className="product-thumbnail-image"
+              className="product-thumbnail-image product-thumbnail-current"
               src={product.thumbnailImageUrl}
             />
             {galleryImages.slice(0, 5).map((image) => (
@@ -99,6 +107,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               />
             ))}
           </div>
+          <a className="product-mobile-detail-link" href="#product-description">
+            상품상세 <span aria-hidden="true">›</span>
+          </a>
         </div>
         <div className="product-hero-copy">
           <h1>{product.name}</h1>
@@ -106,12 +117,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <div className="product-purchase-panel">
             <strong className="product-price">{formatPrice(product.basePrice)}</strong>
             <div className="product-buy-info">
-              <span>카테고리</span>
-              <strong>{categoryLabel(product.categoryCode)}</strong>
-              <span>최소 주문</span>
-              <strong>옵션별 1개</strong>
-              <span>판매 상태</span>
-              <strong>{product.salesEnabled ? (purchasable ? "주문 가능" : "구매 불가") : "판매 준비 중"}</strong>
+              <span className="product-buy-info-secondary">최소 주문</span>
+              <strong className="product-buy-info-secondary">옵션별 1개</strong>
               <span>인증 정보</span>
               <strong>{complianceStatusLabel(product.complianceStatus)}</strong>
               {purchasePolicyPages.map((policy) => (
@@ -122,41 +129,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               ))}
             </div>
             {purchasable ? (
-              <form action={addCartItem} className="cart-add-form" id={purchaseFormId}>
-                <input name="productId" type="hidden" value={product.id} />
-                <label>
-                  옵션
-                  <select name="productOptionId" required>
-                    {activeOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name} {formatOptionPrice(option.additionalPrice)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  수량
-                  <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
-                </label>
-                <div className="product-action-row">
-                  <SubmitButton
-                    className="button"
-                    name="intent"
-                    pendingLabel="담는 중..."
-                    value="cart"
-                  >
-                    장바구니
-                  </SubmitButton>
-                  <SubmitButton
-                    className="button primary"
-                    name="intent"
-                    pendingLabel="이동 중..."
-                    value="checkout"
-                  >
-                    바로구매
-                  </SubmitButton>
-                </div>
-              </form>
+              <PurchaseForm
+                activeOptions={activeOptions}
+                formId={purchaseFormId}
+                productId={product.id}
+              />
             ) : (
               <div className="notice empty">
                 <strong>{product.salesEnabled ? "현재 구매할 수 없습니다" : "판매 준비 중"}</strong>
@@ -172,55 +149,58 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       </section>
 
       {purchasable ? (
-        <div className="mobile-purchase-bar" aria-label="모바일 구매 액션">
-          <SubmitButton
-            className="button mobile-purchase-secondary"
-            form={purchaseFormId}
-            name="intent"
-            pendingLabel="담는 중..."
-            value="cart"
+        <>
+          <div
+            className="mobile-purchase-popover"
+            id={mobilePurchasePopoverId}
+            popover="auto"
           >
-            장바구니 담기
-          </SubmitButton>
-          <SubmitButton
-            className="button primary mobile-purchase-primary"
-            form={purchaseFormId}
-            name="intent"
-            pendingLabel="이동 중..."
-            value="checkout"
-          >
-            바로구매
-          </SubmitButton>
-        </div>
-      ) : null}
-
-      {relatedProducts.length > 0 ? (
-        <section className="detail-section">
-          <div className="catalog-heading">
-            <h2>관련 제품</h2>
-            <Link href="/products">더보기</Link>
-          </div>
-          <div className="related-product-row">
-            {relatedProducts.map((relatedProduct) => (
-              <Link
-                className="related-product-card"
-                href={`/products/${relatedProduct.id}`}
-                key={relatedProduct.id}
+            <div className="mobile-purchase-popover-head">
+              <strong>옵션과 수량 선택</strong>
+              <button
+                aria-label="구매 옵션 닫기"
+                popoverTarget={mobilePurchasePopoverId}
+                popoverTargetAction="hide"
+                type="button"
               >
-                <ProductImage
-                  alt={relatedProduct.name}
-                  className="related-product-image"
-                  src={relatedProduct.thumbnailImageUrl}
-                />
-                <span>{relatedProduct.name}</span>
-                <strong>{formatPrice(relatedProduct.basePrice)}</strong>
-              </Link>
-            ))}
+                ×
+              </button>
+            </div>
+            <PurchaseForm
+              activeOptions={activeOptions}
+              formId={mobilePurchaseFormId}
+              mobile
+              productId={product.id}
+            />
           </div>
-        </section>
+          <div className="mobile-purchase-bar" aria-label="모바일 구매 액션">
+            <button
+              className="button mobile-purchase-secondary"
+              popoverTarget={mobilePurchasePopoverId}
+              popoverTargetAction="show"
+              type="button"
+            >
+              장바구니
+            </button>
+            <button
+              className="button primary mobile-purchase-primary"
+              popoverTarget={mobilePurchasePopoverId}
+              popoverTargetAction="show"
+              type="button"
+            >
+              바로구매
+            </button>
+          </div>
+        </>
       ) : null}
 
-      <section className="detail-section">
+      <nav className="product-section-nav" aria-label="상품 상세 섹션">
+        <a href="#product-information">상품정보</a>
+        <a href="#product-description">상품상세</a>
+        <a href="#product-shipping">배송/반품</a>
+      </nav>
+
+      <section className="detail-section" id="product-information">
         <h2>제품 사양</h2>
         <div className="option-list">
           {product.options.map((option) => (
@@ -232,33 +212,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           ))}
         </div>
       </section>
-
-      {product.images.length > 0 ? (
-        <section className="detail-section">
-          <h2>이미지</h2>
-          <div className="gallery-grid">
-            {product.images.map((image) => (
-              <ProductImage
-                alt={image.altText ?? product.name}
-                className="gallery-image"
-                key={image.id}
-                src={image.imageUrl}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {product.detailBlocks.length > 0 ? (
-        <section className="detail-section">
-          <h2>상세</h2>
-          <div className="detail-blocks">
-            {product.detailBlocks.map((block) => (
-              <DetailBlock block={block} key={block.id} product={product} />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {product.productNotice ? (
         <section className="detail-section">
@@ -284,8 +237,33 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </section>
       ) : null}
 
+      {product.detailBlocks.length > 0 || galleryImages.length > 0 ? (
+        <section className="detail-section" id="product-description">
+          <h2>상품상세</h2>
+          {product.detailBlocks.length > 0 ? (
+            <div className="detail-blocks">
+              {product.detailBlocks.map((block) => (
+                <DetailBlock block={block} key={block.id} product={product} />
+              ))}
+            </div>
+          ) : null}
+          {galleryImages.length > 0 ? (
+            <div className="gallery-grid">
+              {galleryImages.map((image) => (
+                <ProductImage
+                  alt={image.altText ?? product.name}
+                  className="gallery-image"
+                  key={image.id}
+                  src={image.imageUrl}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       {policyPages.length > 0 ? (
-        <section className="detail-section">
+        <section className="detail-section" id="product-shipping">
           <h2>배송/교환/환불 안내</h2>
           <div className="product-policy-board">
             {policyPages.map((policy) => (
@@ -313,6 +291,32 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                   상세 정책 보기
                 </Link>
               </section>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {relatedProducts.length > 0 ? (
+        <section className="detail-section">
+          <div className="catalog-heading">
+            <h2>관련 제품</h2>
+            <Link href="/products">더보기</Link>
+          </div>
+          <div className="related-product-row">
+            {relatedProducts.map((relatedProduct) => (
+              <Link
+                className="related-product-card"
+                href={`/products/${relatedProduct.id}`}
+                key={relatedProduct.id}
+              >
+                <ProductImage
+                  alt={relatedProduct.name}
+                  className="related-product-image"
+                  src={relatedProduct.thumbnailImageUrl}
+                />
+                <span>{relatedProduct.name}</span>
+                <strong>{formatPrice(relatedProduct.basePrice)}</strong>
+              </Link>
             ))}
           </div>
         </section>
@@ -356,6 +360,60 @@ function formatOptionPrice(value: number) {
     return "추가금 없음";
   }
   return `+${formatPrice(value)}`;
+}
+
+function PurchaseForm({
+  activeOptions,
+  formId,
+  mobile = false,
+  productId,
+}: {
+  activeOptions: ProductDetail["options"];
+  formId: string;
+  mobile?: boolean;
+  productId: string;
+}) {
+  return (
+    <form
+      action={addCartItem}
+      className={`cart-add-form ${mobile ? "mobile-purchase-form" : "desktop-purchase-form"}`}
+      id={formId}
+    >
+      <input name="productId" type="hidden" value={productId} />
+      <label>
+        옵션
+        <select name="productOptionId" required>
+          {activeOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name} {formatOptionPrice(option.additionalPrice)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        수량
+        <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
+      </label>
+      <div className="product-action-row">
+        <SubmitButton
+          className="button"
+          name="intent"
+          pendingLabel="담는 중..."
+          value="cart"
+        >
+          장바구니
+        </SubmitButton>
+        <SubmitButton
+          className="button primary"
+          name="intent"
+          pendingLabel="이동 중..."
+          value="checkout"
+        >
+          바로구매
+        </SubmitButton>
+      </div>
+    </form>
+  );
 }
 
 function complianceStatusLabel(status: ProductDetail["complianceStatus"]) {

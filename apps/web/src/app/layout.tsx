@@ -29,6 +29,11 @@ export default async function RootLayout({
         </div>
         <header className="site-header">
           <div className="site-header-main">
+            <Link className="mobile-catalog-entry" href="/products" aria-label="상품목록">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </Link>
             <Link href="/" className="brand" aria-label="코어블SAF home">
               <strong>
                 <span>코어블</span>
@@ -50,25 +55,88 @@ export default async function RootLayout({
               </button>
             </form>
             <nav className="site-nav" aria-label="Primary navigation">
-              <Link href="/cart">장바구니</Link>
-              <Link href="/orders">주문조회</Link>
+              <Link href="/cart" aria-label="장바구니">
+                <svg className="site-nav-icon" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M3 4h2l2.2 10.5h9.9l2-7H6.1" />
+                  <circle cx="9" cy="19" r="1.5" />
+                  <circle cx="17" cy="19" r="1.5" />
+                </svg>
+                <span>장바구니</span>
+              </Link>
+              <Link href="/orders" aria-label="주문조회">
+                <svg className="site-nav-icon" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" />
+                </svg>
+                <span>주문조회</span>
+              </Link>
               {session ? (
                 <>
-                  <Link href="/account">내 계정</Link>
+                  <Link href="/account" aria-label="내 계정">
+                    <svg className="site-nav-icon" aria-hidden="true" viewBox="0 0 24 24">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+                    </svg>
+                    <span>내 계정</span>
+                  </Link>
                   <form action="/auth/logout" method="post">
                     <button type="submit">로그아웃</button>
                   </form>
                 </>
               ) : (
                 <>
-                  <Link href="/account">내 계정</Link>
-                  <Link href="/login">로그인</Link>
+                  <Link href="/account" aria-label="내 계정">
+                    <svg className="site-nav-icon" aria-hidden="true" viewBox="0 0 24 24">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+                    </svg>
+                    <span>내 계정</span>
+                  </Link>
+                  <Link className="site-nav-login" href="/login">로그인</Link>
                 </>
               )}
             </nav>
           </div>
         </header>
         <main className="page-shell">{children}</main>
+        <nav className="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+          <Link href="/" aria-label="홈">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m3 11 9-8 9 8v10h-6v-6H9v6H3z" />
+            </svg>
+            <span>홈</span>
+          </Link>
+          <Link href="/products" aria-label="카테고리">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="6" height="6" />
+              <rect x="15" y="3" width="6" height="6" />
+              <rect x="3" y="15" width="6" height="6" />
+              <rect x="15" y="15" width="6" height="6" />
+            </svg>
+            <span>카테고리</span>
+          </Link>
+          <Link href="/products" aria-label="검색">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="m16 16 5 5" />
+            </svg>
+            <span>검색</span>
+          </Link>
+          <Link href="/account" aria-label="내 계정">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+            </svg>
+            <span>내 계정</span>
+          </Link>
+          <Link href="/cart" aria-label="장바구니">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M3 4h2l2.2 10.5h9.9l2-7H6.1" />
+              <circle cx="9" cy="19" r="1.5" />
+              <circle cx="17" cy="19" r="1.5" />
+            </svg>
+            <span>장바구니</span>
+          </Link>
+        </nav>
         <footer className="site-footer">
           <div>
             <strong>{BUSINESS_PROFILE.brandName}</strong>
@@ -84,7 +152,6 @@ export default async function RootLayout({
             <Link href="/support">고객 문의 접수</Link>
             <Link href="/company">회사 정보</Link>
             <span>반품 주소 {BUSINESS_PROFILE.returnAddress}</span>
-            <span>{BUSINESS_PROFILE.purchaseSafetyNotice}</span>
           </div>
           <div>
             <strong>거래 정책</strong>
