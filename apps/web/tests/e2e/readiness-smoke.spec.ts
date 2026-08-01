@@ -56,6 +56,43 @@ test("public customer pages render without horizontal overflow", async ({ page }
   }
 });
 
+test("mobile catalog controls stay horizontal at narrow widths", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Narrow catalog layout is mobile-only.");
+
+  for (const width of [320, 390, 430]) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/products");
+
+      const filters = page.locator(".catalog-mobile-filters");
+      await filters.locator("summary").click();
+      await expect(filters).toHaveAttribute("open", "");
+
+      for (const name of ["낮은가격순", "높은가격순"]) {
+        const sortLink = page.getByRole("link", { name, exact: true });
+        const box = await sortLink.boundingBox();
+        expect(box, `${name} should have a rendered box at ${width}px`).not.toBeNull();
+        expect(box!.width).toBeGreaterThan(100);
+        expect(box!.height).toBeLessThanOrEqual(48);
+      }
+
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+});
+
+test("mobile form controls avoid iOS input zoom", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile form sizing is mobile-only.");
+
+  await page.goto("/support");
+  const fontSizes = await page.locator('input:not([type="checkbox"]):not([type="radio"]), select, textarea').evaluateAll(
+    (elements) => elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+  );
+
+  expect(fontSizes.length).toBeGreaterThan(0);
+  expect(Math.min(...fontSizes)).toBeGreaterThanOrEqual(16);
+});
+
 test("customer inquiry flows from public receipt through admin answer to protected lookup", async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Inquiry mutation runs once in the desktop project.");
   test.skip(!isLocalTarget(), "Inquiry mutation uses local dev login and disabled SES.");
@@ -435,8 +472,22 @@ test("mobile admin order detail screenshot remains stable", async ({ page, conte
   await addCookie(context, await requireAdminCookie());
   await page.goto("/admin/orders");
   const orderLink = await firstAdminOrderLink(page);
+  const orderTable = page.locator(".admin-table.orders");
+  const orderTableSize = await orderTable.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(orderTableSize.scrollWidth).toBeLessThanOrEqual(orderTableSize.clientWidth + 1);
+  await expect(orderLink.locator(".admin-badge")).toBeVisible();
+  await expect(orderLink.locator("span").nth(2)).toBeVisible();
+  await expect(orderLink.locator("span").nth(3)).toBeVisible();
+  await orderLink.scrollIntoViewIfNeeded();
+  await expect(page).toHaveScreenshot("mobile-admin-orders.png");
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();
+  const backLink = page.getByRole("link", { name: "주문 목록으로" });
+  await expect(backLink).toBeVisible();
+  expect((await backLink.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expectNoHorizontalOverflow(page);
   const summaryValue = (label: string) => page.getByText(label, { exact: true }).locator("..").locator("strong");
   await expect(page).toHaveScreenshot("mobile-admin-order-detail.png", {
