@@ -94,7 +94,8 @@ infra      Local and deployment infrastructure
 - 작은 버그, 문구, 스타일 수정은 backlog 항목 없이 바로 처리할 수 있다.
 - 큰 기능, 정책, 결제, 주문 상태, DB 변경은 backlog에 남긴다.
 - 기본 완료 단위는 git commit이다.
-- PR은 팀 리뷰, 배포 전 검토, 큰 리스크 변경에만 사용한다.
+- 저장소 변경은 짧은 branch와 PR로 `main`에 반영하고, 같은 worktree에서 다음 backlog 작업을 시작하기 전에 현재 PR을 merge하고 `main`을 동기화한다.
+- 병렬 작업이 꼭 필요하면 별도 worktree를 사용한다.
 - Linear와 GitHub Issues는 기본으로 사용하지 않는다.
 
 커밋 메시지는 실제 변경을 설명한다.
@@ -175,8 +176,10 @@ fix: make payment confirmation idempotent
 - 정책 결정이 필요한 부분을 임의로 정하지 않았는가
 - 테스트가 성공/권한/실패/상태 케이스를 포함하는가
 - DB migration 순서, nullable, unique, foreign key, index가 정책과 맞는가
-- `cd apps/api && ./gradlew test`를 통과했는가
+- PR CI 또는 로컬에서 전체 API 테스트와 Web lint/build를 통과했는가
 - `git diff --check`를 통과했는가
+
+개발 중에는 변경 범위의 대상 테스트를 실행하고, 전체 API 테스트와 Web lint/build는 PR CI에서 한 번 실행한다. DB migration이 있을 때만 PostgreSQL smoke를 추가한다.
 
 완료 보고에는 다음을 포함한다.
 

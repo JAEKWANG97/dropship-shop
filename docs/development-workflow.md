@@ -12,7 +12,7 @@
 
 - Linear 사용 안 함
 - GitHub Issues 사용 안 함
-- PR 기본 생략
+- 저장소 변경은 짧은 branch와 PR로 `main`에 반영
 - 큰 기능, 정책, 결제, 주문 상태, DB 변경만 backlog에 기록
 - 작은 확인사항, env 설정, 수동 검증, 운영 전 체크리스트는 backlog 항목의 `Tasks:`에 기록
 - 결정 이유와 작업 맥락은 project log에 기록
@@ -51,22 +51,19 @@ frontend, backend, docs가 같은 목적이면 한 커밋에 포함할 수 있�
 
 ## Branch And PR
 
-기본은 `main`에서 작은 커밋으로 진행한다.
+`main`에서 직접 작업하지 않고 짧은 branch와 PR을 사용한다.
 
-branch 또는 PR을 쓰는 경우:
+한 worktree에서는 하나의 backlog 작업만 진행한다. `구현 -> 대상 테스트 -> commit -> PR CI -> merge -> main 동기화`가 끝나기 전에는 같은 worktree에서 다음 작업을 시작하지 않는다. 병렬 작업이 꼭 필요하면 별도 worktree를 사용한다.
 
-- 결제/주문/환불/배송 상태 전이 변경
-- DB migration이 크거나 되돌리기 어렵다
-- 배포 직전 리뷰가 필요하다
-- 팀원이 생겨 리뷰 흐름이 필요하다
+merge 후에는 깨끗한 worktree와 merge된 branch를 제거한다. 미커밋 변경이 있는 worktree는 제거하지 않는다.
 
-브랜치를 쓸 때는 짧게 쓴다.
+브랜치 이름은 `codex/` 접두사를 사용한다.
 
 ```text
-feature/bank-transfer-checkout
-feature/oauth-browser-check
-fix/kakao-oauth-profile
-docs/backlog-workflow
+codex/bank-transfer-checkout
+codex/oauth-browser-check
+codex/kakao-oauth-profile
+codex/backlog-workflow
 ```
 
 ## Commit Messages
@@ -107,7 +104,7 @@ docs: switch workflow to markdown backlog
 
 ## Verification
 
-변경 범위에 맞는 최소 검증을 한다.
+개발 중에는 변경 범위에 맞는 대상 테스트만 실행한다.
 
 API 변경:
 
@@ -130,6 +127,8 @@ npm run build
 git diff --check
 ```
 
+전체 API 테스트, Web lint/build와 whitespace 검사는 PR CI에서 한 번 실행한다. 같은 검증을 로컬과 CI에서 연속으로 중복 실행하지 않는다.
+
 운영 설정, 보안 설정, DB migration, 결제 설정, health endpoint를 바꾸면 더 넓게 확인한다.
 
 ```sh
@@ -147,6 +146,17 @@ cd apps/api
 ```
 
 모바일/관리자 화면 회귀를 확인해야 하는 변경이면 로컬 API/Web을 띄운 뒤 Playwright smoke를 실행한다. 로컬은 기존 dev-login fallback으로 고객/관리자 쿠키를 준비하고, 배포 URL은 `E2E_CUSTOMER_COOKIE`, `E2E_ADMIN_COOKIE`가 있을 때만 인증 화면을 확인한다.
+
+## Documentation Scope
+
+구현이 실제로 영향을 준 문서만 수정한다.
+
+- API 계약 변경: `docs/api-spec.md`
+- DB schema 변경: `docs/erd.md`
+- 주문 흐름 변경: `docs/order-flow.md`
+- 정책 결정 변경: 해당 `docs/policies/*`와 `docs/decision-log.md`
+- 일반 UI나 버그 수정: 필요할 때만 `docs/PROJECT_LOG.md`
+- 단순 CSS나 문구 수정: 별도 문서 변경 생략 가능
 
 `local/dev`에서 `APP_SEED_ENABLED=true`로 시작하면 카탈로그 시드 10개는 authoritative fixture로 동작한다. 정확한 시드 상품을 로컬에서 수정해도 재시작하면 정의된 가격, 상태, 인증 상태, 대표 이미지와 필수 연관 데이터가 복구된다. 수집 상품이나 사용자가 등록한 비시드 상품은 수정하지 않는다.
 
