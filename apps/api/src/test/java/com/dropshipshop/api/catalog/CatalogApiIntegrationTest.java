@@ -201,6 +201,10 @@ class CatalogApiIntegrationTest {
 					{
 					  "reason": "Initial notice setup",
 					  "productInfoNotice": "Product info notice",
+					  "noticeRows": [
+					    {"label": "품명 및 모델명", "value": "안전모 A"},
+					    {"label": "제조국 또는 원산지", "value": "대한민국"}
+					  ],
 					  "shippingInfo": "Shipping info",
 					  "asInfo": "AS info",
 					  "returnExchangeInfo": "Return exchange info"
@@ -208,7 +212,10 @@ class CatalogApiIntegrationTest {
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.productNoticeVersion", is(1)))
-			.andExpect(jsonPath("$.productNotice.productInfoNotice", is("Product info notice")));
+			.andExpect(jsonPath("$.productNotice.productInfoNotice", is("Product info notice")))
+			.andExpect(jsonPath("$.productNotice.noticeRows", hasSize(2)))
+			.andExpect(jsonPath("$.productNotice.noticeRows[0].label", is("품명 및 모델명")))
+			.andExpect(jsonPath("$.productNotice.noticeRows[0].value", is("안전모 A")));
 
 		mockMvc.perform(patch("/api/admin/products/{productId}", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -289,7 +296,26 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.options[0].sourceStockQuantity").doesNotExist())
 			.andExpect(jsonPath("$.options[0].sortOrder").doesNotExist())
 			.andExpect(jsonPath("$.images", hasSize(2)))
-			.andExpect(jsonPath("$.productNoticeVersion", is(1)));
+			.andExpect(jsonPath("$.productNoticeVersion", is(1)))
+			.andExpect(jsonPath("$.productNotice.noticeRows", hasSize(2)))
+			.andExpect(jsonPath("$.productNotice.noticeRows[1].value", is("대한민국")));
+
+		mockMvc.perform(put("/api/admin/products/{productId}/notice", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Update legacy notice fields",
+					  "productInfoNotice": "Updated product info notice",
+					  "shippingInfo": "Updated shipping info",
+					  "asInfo": "Updated AS info",
+					  "returnExchangeInfo": "Updated return exchange info"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.productNoticeVersion", is(2)))
+			.andExpect(jsonPath("$.productNotice.noticeRows", hasSize(2)))
+			.andExpect(jsonPath("$.productNotice.noticeRows[0].value", is("안전모 A")));
 
 		mockMvc.perform(patch("/api/admin/products/{productId}/options/{optionId}/status", productId, optionId)
 				.with(authentication(TestAuthentication.admin()))
@@ -356,7 +382,7 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.changes", hasSize(6)))
+			.andExpect(jsonPath("$.changes", hasSize(7)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'IMAGES')]", hasSize(1)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeValue", hasItem("ACTIVE")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].afterValue", hasItem("HIDDEN")))

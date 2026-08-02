@@ -344,19 +344,20 @@ function sourceCertificationText(product) {
   return cleanText(item?.desc || "");
 }
 
-function productInfoNoticeFor(product, complianceStatus, audit) {
-  const certificationNumbers = Array.isArray(audit?.certificationNumbers)
-    ? audit.certificationNumbers.filter(Boolean)
-    : [];
-  const certification = complianceStatus === "VERIFIED" && certificationNumbers.length
-    ? `KOSHA 인증번호 ${certificationNumbers.join(", ")}`
-    : sourceCertificationText(product) || (complianceStatus === "NOT_REQUIRED" ? "해당 없음" : "상품 상세 설명 참조");
-  return [
-    `품명 및 모델명: ${cleanText(product.title)}`,
-    `제조국 또는 원산지: ${cleanText(product.origin) || "상품 상세 설명 참조"}`,
-    `제조사: ${cleanText(product.manufacturer) || "상품 상세 설명 참조"}`,
-    `인증·허가 사항: ${certification}`,
-  ].join("\n");
+function productNoticeRowsFor(product) {
+  const rows = Array.isArray(product.productInfoDuty?.item) ? product.productInfoDuty.item : [];
+  return rows
+    .filter((entry) => entry.type !== "transaction")
+    .map((entry) => ({
+      label: String(entry.name ?? ""),
+      value: String(entry.desc ?? ""),
+    }))
+    .filter((entry) => entry.label && entry.value);
+}
+
+function productInfoNoticeFor(product) {
+  const noticeRows = productNoticeRowsFor(product);
+  return noticeRows.map((row) => `${row.label}: ${row.value}`).join("\n");
 }
 
 export function readCategoryDefinitions() {
@@ -652,6 +653,7 @@ async function reviewProduct(entry, context) {
   }
   if (detailImagePaths.length === 0) hardReasons.push("DETAIL_IMAGE_MISSING");
   if (!product.thumbnailImagePath || thumbnailSize === 0) hardReasons.push("THUMBNAIL_MISSING");
+  if (productNoticeRowsFor(product).length === 0) hardReasons.push("PRODUCT_NOTICE_MISSING");
   if (hasAny(textForKeyword, CUSTOMER_EXPOSURE_KEYWORDS).length) hardReasons.push("CUSTOMER_EXPOSURE_KEYWORD");
   if (hasAny(textForKeyword, NON_SAFETY_KEYWORDS).length) hardReasons.push("NON_SAFETY_KEYWORD");
   if (
@@ -735,7 +737,8 @@ async function reviewProduct(entry, context) {
       basePrice: calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
       options: manifestOptions,
       supplierName: product.sellerName || "외부 공급처",
-      productInfoNotice: productInfoNoticeFor(product, complianceStatus, koshaAudit),
+      productInfoNotice: productInfoNoticeFor(product),
+      noticeRows: productNoticeRowsFor(product),
       shippingInfo: shipping.known ? "고객에게 별도 배송비를 청구하지 않습니다." : "",
       asInfo: COREABLE_AS_INFO,
       returnExchangeInfo: COREABLE_RETURN_EXCHANGE_INFO,
@@ -888,12 +891,31 @@ async function main() {
     assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "KOSHA_REGISTRY_MODEL_VERIFIED"), "VERIFIED");
     assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "KOSHA_REGISTRY_VERIFIED"), "PENDING");
     assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "SOURCE_EVIDENCE_MISSING"), "PENDING");
-    assert.match(productInfoNoticeFor({
-      title: "안전용품",
-      origin: "대한민국",
-      manufacturer: "코어블",
-      productInfoDuty: { item: [{ name: "인증·허가 사항", desc: "해당 없음" }] },
-    }, "NOT_REQUIRED"), /품명 및 모델명: 안전용품/);
+    assert.equal(productInfoNoticeFor({ title: "안전용품" }), "");
+    const rawNotice = productInfoNoticeFor({
+      origin: "상세정보별도표기",
+      model: "해당없음",
+      manufacturer: "상세정보 별도표기",
+      productSize: "1",
+      productWeight: "1",
+      deliveryMethod: "택배",
+      deliveryWaiting: "2일 후 발송",
+      productInfoDuty: {
+        item: [
+          { type: "item", name: "품명 및 모델명", desc: "상세정보 별도표기" },
+          { type: "transaction", name: "청약철회 및 계약의 해제에 관한 사항", desc: "상세정보 별도표기" },
+        ],
+      },
+    });
+    assert.equal(rawNotice, "품명 및 모델명: 상세정보 별도표기");
+    assert.deepEqual(productNoticeRowsFor({
+      productInfoDuty: {
+        item: [
+          { type: "item", name: "품명 및 모델명", desc: "상세정보 별도표기" },
+          { type: "transaction", name: "청약철회", desc: "공급처 조건" },
+        ],
+      },
+    }), [{ label: "품명 및 모델명", value: "상세정보 별도표기" }]);
     console.log("Domeggook product review self-check passed");
     return;
   }

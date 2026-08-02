@@ -159,7 +159,14 @@ final class CatalogDtos {
 		@NotBlank String shippingInfo,
 		@NotBlank String asInfo,
 		@NotBlank String returnExchangeInfo,
+		@Size(max = 100) List<@Valid ProductNoticeRowItem> noticeRows,
 		@NotBlank @Size(max = 500) String reason
+	) {
+	}
+
+	record ProductNoticeRowItem(
+		@NotBlank @Size(max = 500) String label,
+		@NotBlank String value
 	) {
 	}
 
@@ -208,7 +215,8 @@ final class CatalogDtos {
 		String productInfoNotice,
 		String shippingInfo,
 		String asInfo,
-		String returnExchangeInfo
+		String returnExchangeInfo,
+		List<ProductNoticeRowItem> noticeRows
 	) {
 	}
 

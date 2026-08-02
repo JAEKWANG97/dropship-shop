@@ -187,6 +187,13 @@ function manifestOption(option) {
   };
 }
 
+function sourceNoticeRows(product) {
+  return (product.productInfoDuty?.item || [])
+    .filter((entry) => entry.type !== "transaction")
+    .map((entry) => ({ label: String(entry.name ?? ""), value: String(entry.desc ?? "") }))
+    .filter((entry) => entry.label && entry.value);
+}
+
 async function readCollectedProducts() {
   const entries = await readdir(DEFAULT_PRODUCTS_DIR, { withFileTypes: true });
   const products = [];
@@ -207,6 +214,7 @@ async function initManifest() {
   const items = products.map((product) => {
     const sourcePrice = parsePrice(product.priceText);
     const pricing = pricedOptionsFor({ sourcePrice, options: product.options }, product);
+    const noticeRows = sourceNoticeRows(product);
     return {
       itemNo: product.itemNo,
       import: false,
@@ -222,7 +230,8 @@ async function initManifest() {
       basePrice: pricing.basePrice,
       options: pricing.options.map(manifestOption),
       supplierName: product.sellerName || "도매꾹 공급처",
-      productInfoNotice: "",
+      productInfoNotice: noticeRows.map((row) => `${row.label}: ${row.value}`).join("\n"),
+      noticeRows,
       shippingInfo: "",
       asInfo: "",
       returnExchangeInfo: "",
@@ -431,11 +440,13 @@ async function importItem(args, item, product, suppliers, products, policy) {
     });
   }
 
-  if (item.productInfoNotice && !created.productNotice) {
+  if ((item.productInfoNotice || item.noticeRows?.length) && (!created.productNotice || !(created.productNotice.noticeRows || []).length)) {
+    const noticeRows = item.noticeRows || [];
     await apiFetch(args, `/api/admin/products/${created.id}/notice`, {
       method: "PUT",
       body: JSON.stringify({
-        productInfoNotice: item.productInfoNotice,
+        productInfoNotice: item.productInfoNotice || noticeRows.map((row) => `${row.label}: ${row.value}`).join("\n"),
+        noticeRows,
         shippingInfo: item.shippingInfo,
         asInfo: item.asInfo,
         returnExchangeInfo: item.returnExchangeInfo,
@@ -552,6 +563,7 @@ async function main() {
       status: "ACTIVE",
       complianceStatus: "NOT_REQUIRED",
       productInfoNotice: "상품 고시",
+      noticeRows: [{ label: "품명 및 모델명", value: "상품 고시" }],
       shippingInfo: "배송 안내",
       asInfo: "A/S 안내",
       returnExchangeInfo: "반품 안내",
