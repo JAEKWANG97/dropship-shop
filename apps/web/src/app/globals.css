@@ -881,25 +881,6 @@ p {
   line-height: 1.55;
 }
 
-.auth-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-weight: 900;
-  text-align: center;
-}
-
-.auth-tabs span {
-  padding: 12px 6px;
-  border-bottom: 3px solid transparent;
-}
-
-.auth-tabs .active {
-  border-color: var(--accent);
-  color: var(--navy);
-}
-
 .auth-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3210,11 +3191,6 @@ body:has(.admin-shell) > .page-shell {
 
   .auth-copy h1 {
     font-size: 22px;
-  }
-
-  .auth-tabs span {
-    padding: 10px 4px;
-    font-size: 13px;
   }
 
   .auth-actions {

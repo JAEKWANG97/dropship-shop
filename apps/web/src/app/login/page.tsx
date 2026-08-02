@@ -47,10 +47,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         ) : (
           <>
-            <div className="auth-tabs" aria-hidden="true">
-              <span className="active">소셜 로그인</span>
-              <span>주문·배송 조회</span>
-            </div>
             <div className="button-stack">
               <a
                 className="oauth-button kakao"

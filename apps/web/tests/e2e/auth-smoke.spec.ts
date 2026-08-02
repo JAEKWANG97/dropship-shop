@@ -6,6 +6,7 @@ test("login page renders social provider entry points", async ({ page }, testInf
 
   await expect(page.getByRole("heading")).toContainText("안전용품");
   await expect(page.getByText("소셜 로그인").first()).toBeVisible();
+  await expect(page.getByText("주문·배송 조회", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "카카오로 계속하기" })).toBeVisible();
   await expect(page.getByRole("link", { name: "구글로 계속하기" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "네이버로 계속하기" })).toHaveCount(0);
