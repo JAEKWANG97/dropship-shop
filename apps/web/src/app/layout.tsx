@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BUSINESS_PROFILE, POLICY_PAGES } from "@/lib/legal";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
+import { CategoryMenu } from "./category-menu";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,11 +30,7 @@ export default async function RootLayout({
         </div>
         <header className="site-header">
           <div className="site-header-main">
-            <Link className="mobile-catalog-entry" href="/products" aria-label="상품목록">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M4 7h16M4 12h16M4 17h16" />
-              </svg>
-            </Link>
+            <CategoryMenu />
             <Link href="/" className="brand" aria-label="코어블SAF home">
               <strong>
                 <span>코어블</span>
