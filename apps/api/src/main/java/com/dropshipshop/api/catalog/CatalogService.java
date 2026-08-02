@@ -1,6 +1,7 @@
 package com.dropshipshop.api.catalog;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -11,6 +12,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
@@ -19,6 +22,7 @@ import org.jsoup.safety.Safelist;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,6 +85,8 @@ public class CatalogService {
 	private static final BigDecimal DEFAULT_OVERHEAD_RATE = new BigDecimal("5.00");
 	private static final BigDecimal DEFAULT_SAFETY_MARGIN_RATE = new BigDecimal("5.00");
 	private static final int DEFAULT_ROUNDING_UNIT = 100;
+	private static final Pattern DOMEGGOOK_PATH_ITEM_NO = Pattern.compile("(?:^|/)(\\d+)(?:/|$)");
+	private static final Pattern DOMEGGOOK_QUERY_ITEM_NO = Pattern.compile("(?:^|&)(?:itemNo|item_no|no)=(\\d+)(?:&|$)", Pattern.CASE_INSENSITIVE);
 
 	private final SupplierRepository supplierRepository;
 	private final ProductRepository productRepository;
@@ -210,6 +216,8 @@ public class CatalogService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상품은 HIDDEN으로 등록한 뒤 판매 필수정보를 확인하세요");
 		}
 		Supplier supplier = findSupplier(request.supplierId());
+		String sourceItemNo = sourceItemNo(request.sourceUrl(), request.sourceItemNo(), null);
+		requireUniqueSourceItemNo(sourceItemNo, null);
 		Product product = new Product(
 			supplier,
 			request.name(),
@@ -219,9 +227,13 @@ public class CatalogService {
 			request.categoryCode(),
 			request.status()
 		);
-		product.updateSourceItemNo(request.sourceItemNo());
+		product.updateSourceItemNo(sourceItemNo);
 		product.updateSourceUrl(request.sourceUrl());
-		return toAdminProductResponse(productRepository.save(product));
+		try {
+			return toAdminProductResponse(productRepository.saveAndFlush(product));
+		} catch (DataIntegrityViolationException exception) {
+			throw duplicateSourceItemNo(sourceItemNo);
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -248,14 +260,74 @@ public class CatalogService {
 	) {
 		Product product = findProduct(productId);
 		Supplier supplier = findSupplier(request.supplierId());
+		String sourceItemNo = sourceItemNo(request.sourceUrl(), request.sourceItemNo(), product.getSourceItemNo());
+		requireUniqueSourceItemNo(sourceItemNo, productId);
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
 		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
-		product.updateSourceItemNo(valueOrDefault(request.sourceItemNo(), product.getSourceItemNo()));
+		product.updateSourceItemNo(sourceItemNo);
 		product.updateSourceUrl(request.sourceUrl());
 		product.updateComplianceStatus(valueOrDefault(request.complianceStatus(), product.getComplianceStatus()));
 		validateIfActive(product);
 		return toAdminProductResponse(product);
+	}
+
+	private String sourceItemNo(String sourceUrl, String requestedSourceItemNo, String fallbackSourceItemNo) {
+		String requested = normalized(requestedSourceItemNo);
+		String fallback = normalized(fallbackSourceItemNo);
+		if (sourceUrl == null || sourceUrl.isBlank()) {
+			return requested != null ? requested : fallback;
+		}
+
+		URI uri;
+		try {
+			uri = URI.create(sourceUrl);
+		} catch (IllegalArgumentException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공급처 상품 주소가 올바르지 않습니다");
+		}
+		String host = uri.getHost();
+		if (host == null || !(host.equalsIgnoreCase("domeggook.com") || host.toLowerCase(Locale.ROOT).endsWith(".domeggook.com"))) {
+			return requested != null ? requested : fallback;
+		}
+
+		String derived = firstMatch(DOMEGGOOK_PATH_ITEM_NO, uri.getPath());
+		if (derived == null) {
+			derived = firstMatch(DOMEGGOOK_QUERY_ITEM_NO, uri.getRawQuery());
+		}
+		if (derived == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "도매꾹 상품번호를 공급처 상품 주소에서 확인할 수 없습니다");
+		}
+		if (requested != null && !requested.equals(derived)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공급처 상품번호가 상품 주소와 일치하지 않습니다");
+		}
+		return derived;
+	}
+
+	private String firstMatch(Pattern pattern, String value) {
+		if (value == null) {
+			return null;
+		}
+		Matcher matcher = pattern.matcher(value);
+		return matcher.find() ? matcher.group(1) : null;
+	}
+
+	private String normalized(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private void requireUniqueSourceItemNo(String sourceItemNo, UUID excludedProductId) {
+		if (sourceItemNo == null) {
+			return;
+		}
+		productRepository.findBySourceItemNo(sourceItemNo)
+			.filter(product -> !product.getId().equals(excludedProductId))
+			.ifPresent(product -> {
+				throw duplicateSourceItemNo(sourceItemNo);
+			});
+	}
+
+	private ResponseStatusException duplicateSourceItemNo(String sourceItemNo) {
+		return new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 공급처 상품번호입니다: " + sourceItemNo);
 	}
 
 	@Transactional

@@ -178,6 +178,7 @@ Suggested fields:
 - summary
 - description
 - sourcePrice: supplier/domeggook cost, admin-only
+- sourceItemNo: optional unique supplier product number, admin-only
 - sourceUrl: optional supplier source page, admin-only
 - basePrice
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
@@ -191,7 +192,8 @@ Suggested fields:
 Modeling notes:
 
 - MVP stores one fixed `categoryCode` per product.
-- `sourcePrice` is internal cost. `sourceUrl` is an operator traceability link. Neither is exposed by public product APIs.
+- `sourcePrice` is internal cost. `sourceItemNo` is the supplier-product identity and `sourceUrl` is its operator traceability link. None are exposed by public product APIs.
+- Domeggook product creation derives `sourceItemNo` from `sourceUrl`; duplicate non-null values are rejected.
 - `sourceUrl` accepts only `http` or `https`, is limited to 2,000 characters, and is never fetched by the backend.
 - `basePrice` is the customer sale price including expected shipping cost.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
