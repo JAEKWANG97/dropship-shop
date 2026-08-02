@@ -1074,7 +1074,7 @@ img.admin-product-detail-image {
   display: -webkit-box;
   overflow: hidden;
   color: var(--navy);
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -3702,7 +3702,7 @@ body:has(.admin-shell) > .page-shell {
   }
 
   .product-hero-copy h1 {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     line-height: 1.4;
   }
@@ -3801,7 +3801,7 @@ body:has(.admin-shell) > .page-shell {
 
   .product-price {
     color: var(--accent-strong);
-    font-size: 28px;
+    font-size: 26px;
   }
 
   .product-thumbnails {
