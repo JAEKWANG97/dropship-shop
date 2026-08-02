@@ -1364,11 +1364,16 @@ img.admin-product-detail-image {
   display: contents;
 }
 
+.product-policy-summary span {
+  font-size: 12px;
+}
+
 .product-policy-summary a {
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.45;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  opacity: 0.72;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -3536,32 +3541,40 @@ body:has(.admin-shell) > .page-shell {
   }
 
   .catalog-results .product-card {
-    grid-template-columns: 120px minmax(0, 1fr);
-    grid-template-rows: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
     align-items: start;
-    gap: 12px;
-    min-height: 132px;
-    padding: 0 0 12px;
-    border-bottom: 1px solid var(--line);
+    gap: 8px;
+    min-height: 0;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .catalog-results .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 10px;
   }
 
   .catalog-results .product-card-image,
   .catalog-results .image-placeholder.product-card-image {
     grid-column: 1;
     grid-row: 1;
-    width: 120px;
+    width: 100%;
     aspect-ratio: 1;
     align-self: start;
+    border: 0;
+    border-radius: 0;
   }
 
   .catalog-results .product-card-copy {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: 1;
+    grid-row: 2;
     min-width: 0;
-    gap: 3px;
+    gap: 5px;
   }
 
   .catalog-results .product-card-name {
+    min-height: 38px;
     font-size: 14px;
     font-weight: 500;
     line-height: 19px;
@@ -3569,29 +3582,24 @@ body:has(.admin-shell) > .page-shell {
 
   .catalog-results .product-card-category,
   .catalog-results .product-card-summary {
-    font-size: 12px;
-    line-height: 18px;
+    display: none;
   }
 
   .catalog-results .product-card-price {
     color: var(--accent-strong);
-    font-size: 20px;
-    line-height: 24px;
+    font-size: 19px;
+    line-height: 23px;
   }
 
   .catalog-results .product-card-status {
     min-width: 0;
-    min-height: 22px;
-    padding: 2px 6px;
+    min-height: 20px;
+    padding: 0;
     border: 0;
-    border-radius: 4px;
-    background: #eefbf3;
-    font-size: 12px;
-    line-height: 18px;
-  }
-
-  .catalog-results .product-card-summary {
-    -webkit-line-clamp: 1;
+    border-radius: 0;
+    background: transparent;
+    font-size: 11px;
+    line-height: 20px;
   }
 
   .product-hero {
