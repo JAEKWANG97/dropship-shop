@@ -1,7 +1,11 @@
 package com.dropshipshop.api.catalog.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -53,6 +57,10 @@ public class ProductNotice {
 	@Column(name = "return_exchange_info", nullable = false, columnDefinition = "TEXT")
 	private String returnExchangeInfo;
 
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "notice_rows", columnDefinition = "jsonb")
+	private List<ProductNoticeRow> noticeRows;
+
 	@Column(name = "effective_from", nullable = false)
 	private Instant effectiveFrom;
 
@@ -73,6 +81,18 @@ public class ProductNotice {
 		String asInfo,
 		String returnExchangeInfo
 	) {
+		this(product, version, productInfoNotice, shippingInfo, asInfo, returnExchangeInfo, List.of());
+	}
+
+	public ProductNotice(
+		Product product,
+		int version,
+		String productInfoNotice,
+		String shippingInfo,
+		String asInfo,
+		String returnExchangeInfo,
+		List<ProductNoticeRow> noticeRows
+	) {
 		this.product = product;
 		this.version = version;
 		this.status = ProductNoticeStatus.ACTIVE;
@@ -80,6 +100,7 @@ public class ProductNotice {
 		this.shippingInfo = shippingInfo;
 		this.asInfo = asInfo;
 		this.returnExchangeInfo = returnExchangeInfo;
+		this.noticeRows = noticeRows == null ? List.of() : List.copyOf(noticeRows);
 		this.effectiveFrom = Instant.now();
 	}
 
@@ -121,5 +142,9 @@ public class ProductNotice {
 
 	public String getReturnExchangeInfo() {
 		return returnExchangeInfo;
+	}
+
+	public List<ProductNoticeRow> getNoticeRows() {
+		return noticeRows == null ? List.of() : List.copyOf(noticeRows);
 	}
 }

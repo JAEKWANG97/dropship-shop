@@ -35,6 +35,7 @@ import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImage;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductNotice;
+import com.dropshipshop.api.catalog.domain.ProductNoticeRow;
 import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
@@ -414,13 +415,22 @@ public class CatalogService {
 		Product product = findProduct(productId);
 		requireReason(request.reason());
 		int nextVersion = productNoticeRepository.countByProduct_Id(productId) + 1;
+		List<ProductNoticeRow> noticeRows = request.noticeRows() == null
+			? productNoticeRepository
+				.findFirstByProduct_IdAndStatusOrderByVersionDesc(productId, ProductNoticeStatus.ACTIVE)
+				.map(ProductNotice::getNoticeRows)
+				.orElseGet(List::of)
+			: request.noticeRows().stream()
+				.map(row -> new ProductNoticeRow(row.label(), row.value()))
+				.toList();
 		ProductNotice notice = new ProductNotice(
 			product,
 			nextVersion,
 			request.productInfoNotice(),
 			request.shippingInfo(),
 			request.asInfo(),
-			request.returnExchangeInfo()
+			request.returnExchangeInfo(),
+			noticeRows
 		);
 		productNoticeRepository.save(notice);
 		recordChange(product, null, adminUserId, ProductChangeType.NOTICE, null,
@@ -945,7 +955,10 @@ public class CatalogService {
 			notice.getProductInfoNotice(),
 			notice.getShippingInfo(),
 			notice.getAsInfo(),
-			notice.getReturnExchangeInfo()
+			notice.getReturnExchangeInfo(),
+			notice.getNoticeRows().stream()
+				.map(row -> new CatalogDtos.ProductNoticeRowItem(row.label(), row.value()))
+				.toList()
 		);
 	}
 }

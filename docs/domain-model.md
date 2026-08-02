@@ -264,7 +264,7 @@ Suggested fields:
 
 ## ProductNotice
 
-상품 정보 제공 고시와 상품별 배송, AS, 반품, 교환 안내 버전. 주문 상품 스냅샷에서 `productNoticeSnapshotId` 또는 동등한 버전 참조로 연결된다.
+상품 정보 제공 고시와 상품별 배송, AS, 반품, 교환 안내 버전. 주문 상품 스냅샷에서 `productNoticeSnapshotId` 또는 동등한 버전 참조로 연결된다. 고객 화면은 공급처 상품정보제공고시를 구조화한 `noticeRows`와 코어블 정책만 사용한다.
 
 Suggested fields:
 
@@ -273,12 +273,17 @@ Suggested fields:
 - version
 - status: DRAFT / ACTIVE / ARCHIVED
 - productInfoNotice
+- noticeRows: `{ label, value }[]`
 - shippingInfo
 - asInfo
 - returnExchangeInfo
 - effectiveFrom
 - createdAt
 - updatedAt
+
+Rules:
+
+- Supplier identity and trade terms may be retained in collection snapshots but are not customer-facing product notice rows.
 
 Implemented DS-40 scope:
 

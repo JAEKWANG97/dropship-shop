@@ -225,40 +225,27 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </section>
       ) : null}
 
-      <section className="detail-section" id="product-information">
-        <h2>제품 사양</h2>
-        <div className="option-list">
-          {product.options.map((option) => (
-            <div className="option-row" key={option.id}>
-              <span>{option.name}</span>
-              <span>{formatOptionPrice(option.additionalPrice)}</span>
-              <strong>{option.status === "ACTIVE" ? "선택 가능" : "선택 불가"}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {product.productNotice ? (
-        <section className="detail-section">
-          <h2>상품 고시</h2>
-          <dl className="notice-list">
-            <div>
-              <dt>상품 정보</dt>
-              <dd>{product.productNotice.productInfoNotice}</dd>
-            </div>
-            <div>
-              <dt>배송</dt>
-              <dd>{product.productNotice.shippingInfo}</dd>
-            </div>
-            <div>
-              <dt>AS</dt>
-              <dd>{product.productNotice.asInfo}</dd>
-            </div>
-            <div>
-              <dt>반품/교환</dt>
-              <dd>{product.productNotice.returnExchangeInfo}</dd>
-            </div>
-          </dl>
+        <section className="detail-section product-information-section" id="product-information">
+          <h2>상품정보제공고시</h2>
+          <details className="product-notice-details">
+            <summary>상세 정보 보기</summary>
+            <dl className="notice-list">
+              {product.productNotice.noticeRows?.length ? (
+                product.productNotice.noticeRows.map((row, index) => (
+                  <div key={`${row.label}-${index}`}>
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))
+              ) : (
+                <div>
+                  <dt>상품 정보</dt>
+                  <dd>{product.productNotice.productInfoNotice}</dd>
+                </div>
+              )}
+            </dl>
+          </details>
         </section>
       ) : null}
 
@@ -269,24 +256,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             {policyPages.map((policy) => (
               <section className="product-policy-card" key={policy.slug}>
                 <h3>{policy.title}</h3>
-                <dl className="product-policy-table">
-                  <div>
-                    <dt>요약</dt>
-                    <dd>{policy.summary}</dd>
-                  </div>
-                  {policy.sections.map((section) => (
-                    <div key={section.heading}>
-                      <dt>{section.heading}</dt>
-                      <dd>
-                        <ul>
-                          {section.paragraphs.map((paragraph) => (
-                            <li key={paragraph}>{paragraph}</li>
-                          ))}
-                        </ul>
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <p>{policy.summary}</p>
                 <Link className="policy-detail-link" href={`/policies/${policy.slug}`}>
                   상세 정책 보기
                 </Link>

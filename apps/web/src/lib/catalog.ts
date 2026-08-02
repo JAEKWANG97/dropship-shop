@@ -73,6 +73,12 @@ export type ProductNotice = {
   shippingInfo: string;
   asInfo: string;
   returnExchangeInfo: string;
+  noticeRows?: ProductNoticeRow[];
+};
+
+export type ProductNoticeRow = {
+  label: string;
+  value: string;
 };
 
 export type PolicyLink = {

@@ -239,6 +239,7 @@ Customer visibility rules:
 The response is `{ products, page, size, totalElements, totalPages, categoryCounts }`. `categoryCounts` contains active product counts for each leaf category and is used by the customer category filter.
 - Do not expose raw supplier information to customers.
 - Product detail responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notices so operational policy is not embedded only in arbitrary product HTML/images.
+- Product detail `productNotice.noticeRows` contains structured `{ label, value }` rows from the supplier product information notice. Supplier trade terms and supplier identity are not public fields.
 
 ### Admin Catalog
 
@@ -273,7 +274,7 @@ DS-6 minimum:
 - Product image upload stores files under local product image storage and returns `imageUrl` and `objectKey`.
 - Products carry one fixed `categoryCode`; category administration and multi-category assignment are future scope.
 - Product detail block API with ordered `IMAGE` and sanitized `HTML` blocks.
-- Product notice/version source for product information notice, shipping, AS, return, and exchange information.
+- Product notice/version source for structured product information notice rows and legacy shipping, AS, return, and exchange information.
 - Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
 - Admin product responses include `sourcePrice` and optional `sourceUrl`; public product responses expose neither supplier cost nor source URL.
@@ -296,6 +297,7 @@ DS-6 implementation notes:
 - DS-43 implements the admin product change history read API at `GET /api/admin/products/{productId}/changes`.
 - Product image binary upload is implemented for local product image storage and returns URL/object key metadata.
 - Product detail and notice version sources must exist before DS-8 order creation can safely snapshot order items.
+- `PUT /api/admin/products/{productId}/notice` accepts optional `noticeRows`. Omitting it preserves the current structured rows.
 
 ## Cart APIs
 

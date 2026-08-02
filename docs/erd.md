@@ -421,6 +421,7 @@ Key fields:
 - `version`
 - `status`: `DRAFT` / `ACTIVE` / `ARCHIVED`
 - `product_info_notice`
+- `notice_rows`: nullable JSONB array of `{ label, value }` product information notice rows
 - `shipping_info`
 - `as_info`
 - `return_exchange_info`
@@ -431,6 +432,7 @@ Key fields:
 Rule:
 
 - Paid orders should reference the active notice version used at checkout time.
+- `notice_rows` contains product information notice rows only; supplier identity and supplier trade terms are not public product detail fields.
 
 ## Cart
 
