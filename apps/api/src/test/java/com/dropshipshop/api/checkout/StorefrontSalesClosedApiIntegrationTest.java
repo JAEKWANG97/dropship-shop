@@ -23,7 +23,7 @@ import com.dropshipshop.api.auth.security.TestAuthentication;
 @ActiveProfiles("test")
 class StorefrontSalesClosedApiIntegrationTest {
 
-	private static final String SALES_NOTICE = "구매안전서비스 준비 후 판매를 시작합니다. 현재 주문은 받지 않습니다.";
+	private static final String SALES_NOTICE = "판매 준비 중입니다.";
 
 	@Autowired
 	private MockMvc mockMvc;

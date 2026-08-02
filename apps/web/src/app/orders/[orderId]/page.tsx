@@ -327,7 +327,7 @@ function CancelOrderForm({ orderId }: { orderId: string }) {
 
 function ClaimForm({ orderId }: { orderId: string }) {
   return (
-    <form action={createClaim} className="claim-form" encType="multipart/form-data">
+    <form action={createClaim} className="claim-form">
       <h2>클레임 접수</h2>
       <input name="orderId" type="hidden" value={orderId} />
       <label>

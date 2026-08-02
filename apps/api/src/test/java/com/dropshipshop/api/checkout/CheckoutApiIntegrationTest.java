@@ -150,11 +150,11 @@ class CheckoutApiIntegrationTest {
 			.andExpect(jsonPath("$.shippingAddress.postalCode", is("12345")))
 			.andExpect(jsonPath("$.shippingAddress.address1", is("Seoul test road")))
 			.andExpect(jsonPath("$.shippingAddress.address2", is("101")))
-			.andExpect(jsonPath("$.policyEvidence.termsVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.policyEvidence.privacyVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.policyEvidence.orderPolicyVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.policyEvidence.cancellationRefundPolicyVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.policyEvidence.outOfStockNoticeVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.policyEvidence.termsVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.policyEvidence.privacyVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.policyEvidence.orderPolicyVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.policyEvidence.cancellationRefundPolicyVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.policyEvidence.outOfStockNoticeVersion", is("2026-08-02")))
 			.andExpect(jsonPath("$.policyEvidence.confirmedNoticeText").exists())
 			.andExpect(jsonPath("$.orders", hasSize(2)))
 			.andExpect(jsonPath("$.orders[0].status", is("PAYMENT_PENDING")))
@@ -211,11 +211,11 @@ class CheckoutApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "termsVersion": "prelaunch-2026-06-30",
-					  "privacyVersion": "prelaunch-2026-06-30",
-					  "orderPolicyVersion": "prelaunch-2026-06-30",
-					  "cancellationRefundPolicyVersion": "prelaunch-2026-06-30",
-					  "outOfStockNoticeVersion": "prelaunch-2026-06-30"
+					  "termsVersion": "2026-08-02",
+					  "privacyVersion": "2026-08-02",
+					  "orderPolicyVersion": "2026-08-02",
+					  "cancellationRefundPolicyVersion": "2026-08-02",
+					  "outOfStockNoticeVersion": "2026-08-02"
 					}
 					"""))
 			.andExpect(status().isOk())
@@ -253,15 +253,15 @@ class CheckoutApiIntegrationTest {
 		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
-				.content(policyConfirmationRequest("prelaunch-2026-06-30")))
+				.content(policyConfirmationRequest("2026-08-02")))
 			.andExpect(status().isOk());
 
 		var agreement = orderPolicyAgreementRepository.findByPaymentGroup_Id(paymentGroup.getId()).orElseThrow();
-		assertThat(agreement.getTermsVersion()).isEqualTo("prelaunch-2026-06-30");
-		assertThat(agreement.getPrivacyVersion()).isEqualTo("prelaunch-2026-06-30");
-		assertThat(agreement.getOrderPolicyVersion()).isEqualTo("prelaunch-2026-06-30");
-		assertThat(agreement.getCancellationRefundPolicyVersion()).isEqualTo("prelaunch-2026-06-30");
-		assertThat(agreement.getOutOfStockNoticeVersion()).isEqualTo("prelaunch-2026-06-30");
+		assertThat(agreement.getTermsVersion()).isEqualTo("2026-08-02");
+		assertThat(agreement.getPrivacyVersion()).isEqualTo("2026-08-02");
+		assertThat(agreement.getOrderPolicyVersion()).isEqualTo("2026-08-02");
+		assertThat(agreement.getCancellationRefundPolicyVersion()).isEqualTo("2026-08-02");
+		assertThat(agreement.getOutOfStockNoticeVersion()).isEqualTo("2026-08-02");
 		assertThat(agreement.getConfirmedNoticeText()).startsWith("주문 상품, 입금 금액, 배송지");
 	}
 
@@ -282,7 +282,7 @@ class CheckoutApiIntegrationTest {
 		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
-				.content(policyConfirmationRequest("prelaunch-2026-06-30")))
+				.content(policyConfirmationRequest("2026-08-02")))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.message", is("Required account agreements are missing")));
 	}
@@ -378,8 +378,8 @@ class CheckoutApiIntegrationTest {
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
-			"prelaunch-2026-06-30",
-			"prelaunch-2026-06-30",
+			"2026-08-02",
+			"2026-08-02",
 			Instant.now()
 		));
 		return customer;

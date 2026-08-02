@@ -143,11 +143,11 @@ function RequiredAgreementForm({
       <input name="privacyVersion" type="hidden" value={privacyVersion} />
       <label className="checkbox-row">
         <input name="termsAgreed" type="checkbox" required />
-        이용약관 {termsVersion}에 동의합니다.
+        이용약관에 동의합니다.
       </label>
       <label className="checkbox-row">
         <input name="privacyAgreed" type="checkbox" required />
-        개인정보처리방침 {privacyVersion}에 동의합니다.
+        개인정보처리방침에 동의합니다.
       </label>
       <SubmitButton className="button" pendingLabel="저장 중...">
         필수 약관 동의 저장
@@ -180,7 +180,7 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
         </div>
         <div>
           <span>구매 조건</span>
-          <strong>세금계산서 가능 · 최소주문 상품별 확인</strong>
+          <strong>최소 주문 수량은 상품별로 확인</strong>
         </div>
         <div>
           <span>최종 결제금액</span>

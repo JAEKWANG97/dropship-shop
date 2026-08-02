@@ -189,7 +189,7 @@ function CartContents({ cart }: { cart: Cart }) {
         </div>
         <div>
           <span>구매 조건</span>
-          <strong>세금계산서 가능 · 최소주문 상품별 확인</strong>
+          <strong>최소 주문 수량은 상품별로 확인</strong>
         </div>
         <div>
           <span>주문 가능</span>

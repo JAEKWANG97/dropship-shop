@@ -140,7 +140,7 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 				product,
 				ProductDetailBlockType.HTML,
 				null,
-				"<h2>" + seed.name() + "</h2><p>" + seed.summary() + "</p><ul><li>배송비 포함 가격</li><li>세금계산서 발행 가능</li><li>최소주문 수량은 옵션별로 확인</li></ul>",
+				"<h2>" + seed.name() + "</h2><p>" + seed.summary() + "</p><ul><li>배송비 포함 가격</li><li>최소주문 수량은 옵션별로 확인</li></ul>",
 				1,
 				null
 			));

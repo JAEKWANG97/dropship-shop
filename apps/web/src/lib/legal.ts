@@ -32,8 +32,8 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "terms",
     title: "이용약관",
-    version: "prelaunch-2026-06-30",
-    effectiveDate: "2026-06-30",
+    version: "2026-08-02",
+    effectiveDate: "2026-08-02",
     summary: "본 약관은 코어블SAF 쇼핑몰 이용과 상품 주문, 결제, 배송, 취소 및 클레임 처리의 기본 조건을 정합니다.",
     sections: [
       {
@@ -65,8 +65,8 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "privacy",
     title: "개인정보처리방침",
-    version: "prelaunch-2026-06-30",
-    effectiveDate: "2026-06-30",
+    version: "2026-08-02",
+    effectiveDate: "2026-08-02",
     summary: "본 방침은 회원 식별, 주문, 배송, 결제, 환불, 클레임 처리를 위해 필요한 개인정보 처리 기준을 설명합니다.",
     sections: [
       {
@@ -98,8 +98,8 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "shipping",
     title: "배송 정책",
-    version: "prelaunch-2026-06-30",
-    effectiveDate: "2026-06-30",
+    version: "2026-08-02",
+    effectiveDate: "2026-08-02",
     summary: "배송비는 상품 가격에 포함되어 있으며, 주문은 배송 그룹 단위로 처리됩니다.",
     sections: [
       {
@@ -121,8 +121,8 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "cancellation-refund",
     title: "취소/환불 정책",
-    version: "prelaunch-2026-06-30",
-    effectiveDate: "2026-06-30",
+    version: "2026-08-02",
+    effectiveDate: "2026-08-02",
     summary: "취소, 반품, 교환, 환불은 주문 상태와 공급처 발주 여부에 따라 처리됩니다.",
     sections: [
       {
@@ -152,8 +152,8 @@ export const POLICY_PAGES: PolicyPage[] = [
   {
     slug: "stock-risk",
     title: "결제 후 품절 안내",
-    version: "prelaunch-2026-06-30",
-    effectiveDate: "2026-06-30",
+    version: "2026-08-02",
+    effectiveDate: "2026-08-02",
     summary: "공급처 출고형 상품은 결제 후 공급처 확인 과정에서 품절이 확인될 수 있습니다.",
     sections: [
       {

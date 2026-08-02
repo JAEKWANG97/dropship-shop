@@ -14,9 +14,7 @@ export default function PolicyIndexPage() {
           <Link className="legal-card" href={`/policies/${policy.slug}`} key={policy.slug}>
             <strong>{policy.title}</strong>
             <span>{policy.summary}</span>
-            <small>
-              {policy.version} · 시행일 {policy.effectiveDate}
-            </small>
+            <small>시행일 {policy.effectiveDate}</small>
           </Link>
         ))}
       </div>

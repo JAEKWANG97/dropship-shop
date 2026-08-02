@@ -211,8 +211,8 @@ class ShippingAddressChangeApiIntegrationTest {
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
-			"prelaunch-2026-06-30",
-			"prelaunch-2026-06-30",
+			"2026-08-02",
+			"2026-08-02",
 			Instant.now()
 		));
 		return customer;
@@ -265,11 +265,11 @@ class ShippingAddressChangeApiIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "termsVersion": "prelaunch-2026-06-30",
-					  "privacyVersion": "prelaunch-2026-06-30",
-					  "orderPolicyVersion": "prelaunch-2026-06-30",
-					  "cancellationRefundPolicyVersion": "prelaunch-2026-06-30",
-					  "outOfStockNoticeVersion": "prelaunch-2026-06-30"
+					  "termsVersion": "2026-08-02",
+					  "privacyVersion": "2026-08-02",
+					  "orderPolicyVersion": "2026-08-02",
+					  "cancellationRefundPolicyVersion": "2026-08-02",
+					  "outOfStockNoticeVersion": "2026-08-02"
 					}
 					"""))
 			.andExpect(status().isOk());

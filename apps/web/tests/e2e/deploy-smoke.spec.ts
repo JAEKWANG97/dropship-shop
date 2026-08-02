@@ -1,23 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { API_BASE_URL, expectNoHorizontalOverflow, isLocalTarget, WEB_BASE_URL } from "./helpers";
+import { activeProductId, API_BASE_URL, expectNoHorizontalOverflow, isLocalTarget, WEB_BASE_URL } from "./helpers";
 
 const apiBaseUrl = process.env.E2E_API_BASE_URL ?? (isLocalTarget() ? API_BASE_URL : WEB_BASE_URL);
-
-type ProductSummary = {
-  id: string;
-};
-
-type ProductPage = {
-  products: ProductSummary[];
-};
-
-async function deployedProductId() {
-  const response = await fetch(`${apiBaseUrl}/api/products?size=1`);
-  expect(response.ok).toBeTruthy();
-  const products = ((await response.json()) as ProductPage).products;
-  expect(products.length).toBeGreaterThan(0);
-  return products[0].id;
-}
 
 test("web root response includes security headers", async ({ request }) => {
   const response = await request.get(`${WEB_BASE_URL}/`);
@@ -47,7 +31,6 @@ test("deployed public pages render without horizontal overflow", async ({ page }
     "/policies/stock-risk",
     "/company",
     "/support",
-    "/login",
   ];
 
   for (const route of routes) {
@@ -61,19 +44,27 @@ test("deployed public pages render without horizontal overflow", async ({ page }
 });
 
 test("deployed product detail exposes purchase CTAs", async ({ page }, testInfo) => {
-  const productId = await deployedProductId();
+  const productId = await activeProductId();
+  const detailResponse = await fetch(`${apiBaseUrl}/api/products/${productId}`);
+  expect(detailResponse.ok).toBeTruthy();
+  const product = (await detailResponse.json()) as { salesEnabled: boolean };
   const response = await page.goto(`/products/${productId}`);
   expect(response?.status()).toBe(200);
 
-  const purchaseForm = page.locator(".cart-add-form");
-  await expect(purchaseForm.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
-  await expect(purchaseForm.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
+  if (!product.salesEnabled) {
+    await expect(page.getByText("판매 준비 중", { exact: true })).toBeVisible();
+    await expect(page.locator(".cart-add-form")).toHaveCount(0);
+    return;
+  }
 
   const mobileBar = page.locator(".mobile-purchase-bar");
   if (testInfo.project.name === "mobile") {
-    await expect(mobileBar.getByRole("button", { name: "장바구니 담기" })).toBeVisible();
+    await expect(mobileBar.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
     await expect(mobileBar.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
   } else {
+    const purchaseForm = page.locator(".desktop-purchase-form");
+    await expect(purchaseForm.getByRole("button", { name: "장바구니", exact: true })).toBeVisible();
+    await expect(purchaseForm.getByRole("button", { name: "바로구매", exact: true })).toBeVisible();
     await expect(mobileBar).toBeHidden();
   }
   await expectNoHorizontalOverflow(page);

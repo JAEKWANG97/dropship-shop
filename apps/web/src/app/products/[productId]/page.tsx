@@ -195,10 +195,35 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       ) : null}
 
       <nav className="product-section-nav" aria-label="상품 상세 섹션">
-        <a href="#product-information">상품정보</a>
         <a href="#product-description">상품상세</a>
+        <a href="#product-information">상품정보</a>
         <a href="#product-shipping">배송/반품</a>
       </nav>
+
+      {product.detailBlocks.length > 0 || galleryImages.length > 0 ? (
+        <section className="detail-section" id="product-description">
+          <h2>상품상세</h2>
+          {product.detailBlocks.length > 0 ? (
+            <div className="detail-blocks">
+              {product.detailBlocks.map((block) => (
+                <DetailBlock block={block} key={block.id} product={product} />
+              ))}
+            </div>
+          ) : null}
+          {galleryImages.length > 0 ? (
+            <div className="gallery-grid">
+              {galleryImages.map((image) => (
+                <ProductImage
+                  alt={image.altText ?? product.name}
+                  className="gallery-image"
+                  key={image.id}
+                  src={image.imageUrl}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="detail-section" id="product-information">
         <h2>제품 사양</h2>
@@ -234,31 +259,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               <dd>{product.productNotice.returnExchangeInfo}</dd>
             </div>
           </dl>
-        </section>
-      ) : null}
-
-      {product.detailBlocks.length > 0 || galleryImages.length > 0 ? (
-        <section className="detail-section" id="product-description">
-          <h2>상품상세</h2>
-          {product.detailBlocks.length > 0 ? (
-            <div className="detail-blocks">
-              {product.detailBlocks.map((block) => (
-                <DetailBlock block={block} key={block.id} product={product} />
-              ))}
-            </div>
-          ) : null}
-          {galleryImages.length > 0 ? (
-            <div className="gallery-grid">
-              {galleryImages.map((image) => (
-                <ProductImage
-                  alt={image.altText ?? product.name}
-                  className="gallery-image"
-                  key={image.id}
-                  src={image.imageUrl}
-                />
-              ))}
-            </div>
-          ) : null}
         </section>
       ) : null}
 

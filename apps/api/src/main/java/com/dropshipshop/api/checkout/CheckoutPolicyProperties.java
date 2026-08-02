@@ -12,9 +12,9 @@ class CheckoutPolicyProperties {
 	private final String confirmedNoticeText;
 
 	CheckoutPolicyProperties(
-		@Value("${app.policies.required-order-policy-version:prelaunch-2026-06-30}") String orderPolicyVersion,
-		@Value("${app.policies.required-cancellation-refund-policy-version:prelaunch-2026-06-30}") String cancellationRefundPolicyVersion,
-		@Value("${app.policies.required-out-of-stock-notice-version:prelaunch-2026-06-30}") String outOfStockNoticeVersion,
+		@Value("${app.policies.required-order-policy-version:2026-08-02}") String orderPolicyVersion,
+		@Value("${app.policies.required-cancellation-refund-policy-version:2026-08-02}") String cancellationRefundPolicyVersion,
+		@Value("${app.policies.required-out-of-stock-notice-version:2026-08-02}") String outOfStockNoticeVersion,
 		@Value("${app.policies.checkout-confirmed-notice-text}") String confirmedNoticeText
 	) {
 		this.orderPolicyVersion = orderPolicyVersion;

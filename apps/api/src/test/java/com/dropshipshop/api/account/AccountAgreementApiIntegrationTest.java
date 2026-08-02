@@ -66,8 +66,8 @@ class AccountAgreementApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.requiredAgreed", is(false)))
-			.andExpect(jsonPath("$.requiredTermsVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.requiredPrivacyVersion", is("prelaunch-2026-06-30")));
+			.andExpect(jsonPath("$.requiredTermsVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.requiredPrivacyVersion", is("2026-08-02")));
 
 		MvcResult firstResult = mockMvc.perform(post("/api/me/agreements")
 				.with(authentication(TestAuthentication.customer(customer.getId())))
@@ -75,8 +75,8 @@ class AccountAgreementApiIntegrationTest {
 				.content(requiredAgreementRequest()))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.requiredAgreed", is(true)))
-			.andExpect(jsonPath("$.termsVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.privacyVersion", is("prelaunch-2026-06-30")))
+			.andExpect(jsonPath("$.termsVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.privacyVersion", is("2026-08-02")))
 			.andExpect(jsonPath("$.agreedAt").exists())
 			.andReturn();
 
@@ -93,13 +93,13 @@ class AccountAgreementApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.requiredAgreed", is(true)))
-			.andExpect(jsonPath("$.agreedTermsVersion", is("prelaunch-2026-06-30")))
-			.andExpect(jsonPath("$.agreedPrivacyVersion", is("prelaunch-2026-06-30")));
+			.andExpect(jsonPath("$.agreedTermsVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.agreedPrivacyVersion", is("2026-08-02")));
 
 		org.assertj.core.api.Assertions.assertThat(userPolicyAgreementRepository.findByUser_IdAndTermsVersionAndPrivacyVersion(
 			customer.getId(),
-			"prelaunch-2026-06-30",
-			"prelaunch-2026-06-30"
+			"2026-08-02",
+			"2026-08-02"
 		)).isPresent();
 	}
 
@@ -114,8 +114,8 @@ class AccountAgreementApiIntegrationTest {
 					{
 					  "termsAgreed": false,
 					  "privacyAgreed": true,
-					  "termsVersion": "prelaunch-2026-06-30",
-					  "privacyVersion": "prelaunch-2026-06-30"
+					  "termsVersion": "2026-08-02",
+					  "privacyVersion": "2026-08-02"
 					}
 					"""))
 			.andExpect(status().isBadRequest())
@@ -129,7 +129,7 @@ class AccountAgreementApiIntegrationTest {
 					  "termsAgreed": true,
 					  "privacyAgreed": true,
 					  "termsVersion": "terms-old",
-					  "privacyVersion": "prelaunch-2026-06-30"
+					  "privacyVersion": "2026-08-02"
 					}
 					"""))
 			.andExpect(status().isBadRequest())
@@ -215,8 +215,8 @@ class AccountAgreementApiIntegrationTest {
 			{
 			  "termsAgreed": true,
 			  "privacyAgreed": true,
-			  "termsVersion": "prelaunch-2026-06-30",
-			  "privacyVersion": "prelaunch-2026-06-30"
+			  "termsVersion": "2026-08-02",
+			  "privacyVersion": "2026-08-02"
 			}
 			""";
 	}

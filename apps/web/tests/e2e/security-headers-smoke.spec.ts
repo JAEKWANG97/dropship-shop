@@ -91,6 +91,7 @@ test("admin pages render without CSP console violations", async ({ page, context
     `/admin/products/${productId}`,
     "/admin/products/new",
     "/admin/pricing",
+    "/admin/referrals",
     "/admin/orders",
     `/admin/orders?orderId=${order.orderId}`,
     "/admin/inquiries",

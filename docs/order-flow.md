@@ -21,7 +21,7 @@ Customer selects product option
 -> Non-Domeggook order stays on the existing manual supplier-order path
 -> Fulfillment status: ORDERED
 -> Order status: SUPPLIER_ORDERED
--> Admin enters carrier and tracking number
+-> Domeggook sync supplies carrier and tracking number, or admin enters them for a manual order
 -> Shipment status: SHIPPED
 -> Order status: SHIPPED
 -> System syncs carrier tracking status
@@ -365,11 +365,11 @@ Admin detects wrong operational state or shipment information
 
 ## Risk Points
 
-### Duplicate Payment Callback
+### Duplicate Deposit Confirmation Or Supplier Response
 
-PG callbacks or client confirmations can arrive multiple times. Payment approval must be idempotent.
+Admin deposit confirmation, supplier-order retries, and delayed external responses can be submitted more than once. Deposit approval and supplier purchase must remain idempotent.
 
-Payment and refund events must be recorded with idempotency keys and provider identifiers so duplicate confirmations or retries do not create multiple state transitions.
+Payment, supplier purchase, and refund events must retain identifiers and evidence so duplicate confirmations or retries do not create multiple payments, supplier orders, refunds, or state transitions.
 
 ### Client-Side Price Tampering
 

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   activeProductId,
   addCookie,
+  expectImagesLoaded,
   expectNoHorizontalOverflow,
   firstAdminOrderLink,
   isLocalTarget,
@@ -16,6 +17,7 @@ test("desktop home screenshot remains stable", async ({ page }, testInfo) => {
 
   await page.goto("/");
 
+  await expectImagesLoaded(page);
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("desktop-home.png", { fullPage: true });
 });
@@ -27,6 +29,7 @@ test("desktop product detail screenshot remains stable", async ({ page }, testIn
   const productId = await activeProductId();
   await page.goto(`/products/${productId}`);
 
+  await expectImagesLoaded(page);
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("desktop-product-detail.png", { fullPage: true });
 });
@@ -83,6 +86,7 @@ test("mobile home screenshot remains stable", async ({ page }, testInfo) => {
 
   await page.goto("/");
 
+  await expectImagesLoaded(page);
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("mobile-home.png", { fullPage: true });
 });
@@ -94,6 +98,7 @@ test("mobile product detail screenshot remains stable", async ({ page }, testInf
   const productId = await activeProductId();
   await page.goto(`/products/${productId}`);
 
+  await expectImagesLoaded(page);
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("mobile-product-detail.png", { fullPage: true });
 });

@@ -25,7 +25,7 @@ app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
   sales:
     enabled: ${APP_SALES_ENABLED:false}
-    closed-notice: ${APP_SALES_CLOSED_NOTICE:구매안전서비스 준비 후 판매를 시작합니다. 현재 주문은 받지 않습니다.}
+    closed-notice: ${APP_SALES_CLOSED_NOTICE:판매 준비 중입니다.}
   inquiry:
     lookup-secret: ${APP_INQUIRY_LOOKUP_SECRET:local-inquiry-lookup-secret-change-me-123456}
     consent-policy-version: support-inquiry-privacy-2026-07-13
@@ -41,11 +41,11 @@ app:
     oauth-state-cookie-name: OAUTH2_STATE
     oauth-state-ttl-seconds: 300
   policies:
-    required-terms-version: prelaunch-2026-06-30
-    required-privacy-version: prelaunch-2026-06-30
-    required-order-policy-version: prelaunch-2026-06-30
-    required-cancellation-refund-policy-version: prelaunch-2026-06-30
-    required-out-of-stock-notice-version: prelaunch-2026-06-30
+    required-terms-version: "2026-08-02"
+    required-privacy-version: "2026-08-02"
+    required-order-policy-version: "2026-08-02"
+    required-cancellation-refund-policy-version: "2026-08-02"
+    required-out-of-stock-notice-version: "2026-08-02"
     checkout-confirmed-notice-text: "주문 상품, 입금 금액, 배송지, 배송/취소/환불 정책, 결제 후 품절 가능성과 품절 시 해당 배송 그룹 주문 금액 환불 안내를 확인했습니다."
   bank-transfer:
     bank-name: ${APP_BANK_TRANSFER_BANK_NAME:입금 계좌 준비중}

@@ -3,6 +3,7 @@ import {
   API_BASE_URL,
   activeProductId,
   addCookie,
+  expectImagesLoaded,
   expectNoHorizontalOverflow,
   firstAdminOrderLink,
   isLocalTarget,
@@ -186,6 +187,7 @@ test("admin pages render with an admin session cookie", async ({ page, context }
     `/admin/products/${productId}`,
     "/admin/products/new",
     "/admin/pricing",
+    "/admin/referrals",
     "/admin/orders",
     "/admin/inquiries",
   ];
@@ -376,6 +378,7 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
   test.skip(testInfo.project.name !== "mobile", "Screenshots are mobile-only.");
 
   await page.goto("/");
+  await expectImagesLoaded(page);
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("mobile-home.png");
 

@@ -19,9 +19,7 @@ export default async function PolicyPage({ params }: PolicyPageProps) {
         <p className="eyebrow">정책</p>
         <h1>{policy.title}</h1>
         <p>{policy.summary}</p>
-        <span>
-          버전 {policy.version} · 시행일 {policy.effectiveDate}
-        </span>
+        <span>시행일 {policy.effectiveDate}</span>
       </div>
       <div className="legal-notice">
         정책 내용이 변경되면 시행일과 함께 이 페이지에서 안내합니다.

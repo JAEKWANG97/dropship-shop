@@ -79,6 +79,19 @@ export async function addCookie(context: BrowserContext, cookieHeader: string) {
   ]);
 }
 
+export async function expectImagesLoaded(page: Page) {
+  await expect
+    .poll(() =>
+      page.locator("img").evaluateAll((images) =>
+        images.every((image) => {
+          const htmlImage = image as HTMLImageElement;
+          return htmlImage.complete && htmlImage.naturalWidth > 0;
+        }),
+      ),
+    )
+    .toBe(true);
+}
+
 export function accessTokenValue(cookieHeader: string) {
   return cookieHeader
     .split(";")

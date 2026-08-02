@@ -1,5 +1,7 @@
 # UX/UI Review
 
+> Historical UX snapshot. This report records the 2026-06-29 screen state and is not the current UI specification. Use the running application, Playwright snapshots, `docs/BACKLOG.md`, and recent `docs/PROJECT_LOG.md` entries for current status.
+
 Date: 2026-06-29 KST
 Role: Senior UX/UI reviewer
 Scope: customer storefront, login/account entry, checkout entry, admin shell

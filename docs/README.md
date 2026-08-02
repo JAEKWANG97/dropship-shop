@@ -14,8 +14,19 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - 현재 작업 큐: [Backlog](BACKLOG.md)
 - 완료 작업 보관: [Completed Backlog](BACKLOG_DONE.md)
 - 구현 설계 초안: [Domain Model](domain-model.md), [MVP ERD](erd.md), [MVP API Specification](api-spec.md), [Order Flow](order-flow.md), [Architecture](architecture.md), [Production Readiness](production-readiness.md)
+- 배포 전 기능 검증: [Test Checklist](TEST_CHECKLIST.md), [Test Log](TEST_LOG.md)
 
 정책 파일에서는 `Confirmed Policy`가 현재 구현 기준이다. `Initial Direction`은 논의 초기에 잡은 방향이므로, 충돌이 있으면 `Confirmed Policy`와 `Decision Log`를 우선한다.
+
+`PROJECT_LOG`, `BACKLOG_DONE`, 과거 `Decision Log` 항목은 당시 작업 이력이다. 현재 정책과 충돌할 수 있으며, 최신 `Decision Log`의 대체 결정과 `Confirmed Policy`를 우선한다. 과거 기록은 현재 요구사항처럼 해석하지 않는다.
+
+## Current Operating Baseline
+
+- 고객 결제는 계좌입금과 관리자 입금확인만 사용한다. Toss Payments를 포함한 PG 실행 경로는 제거됐다.
+- 판매가는 공급처 상품가에 active 가격 정책을 적용하며, 현재 기본값은 25%와 100원 단위 반올림이다. 공급처 배송비는 판매가 계산에 더하지 않는다.
+- 도매꾹 source snapshot 주문은 입금확인 후 Private API 자동 발주 대상이며, 그 외 주문은 수동 발주한다.
+- 운영 판매는 구매안전서비스와 최종 정책 버전이 준비될 때까지 `APP_SALES_ENABLED=false`로 차단한다.
+- 공개 정책의 `prelaunch-*` 버전, 세금계산서 안내, 상품별 고시·인증 검수는 출시 전 미완료 항목이다.
 
 ## Recommended Reading Order
 

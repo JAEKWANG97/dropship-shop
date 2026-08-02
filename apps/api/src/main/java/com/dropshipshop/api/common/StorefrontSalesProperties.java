@@ -13,7 +13,7 @@ public class StorefrontSalesProperties {
 
 	public StorefrontSalesProperties(
 		@Value("${app.sales.enabled:false}") boolean enabled,
-		@Value("${app.sales.closed-notice:구매안전서비스 준비 후 판매를 시작합니다. 현재 주문은 받지 않습니다.}") String closedNotice
+		@Value("${app.sales.closed-notice:판매 준비 중입니다.}") String closedNotice
 	) {
 		this.enabled = enabled;
 		this.closedNotice = closedNotice;

@@ -235,8 +235,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <SubmitButton pendingLabel="로그아웃 중...">로그아웃</SubmitButton>
         </form>
       </div>
-      <details className="account-secondary-section danger">
-        <summary>회원 탈퇴</summary>
+      <details className="account-secondary-section">
+        <summary>계정 관리</summary>
         <form action={requestAccountDeletion} className="account-secondary-body">
           <div className="notice danger">
             <strong>탈퇴 전 확인</strong>

@@ -6,6 +6,8 @@ test("policy detail page renders by slug", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "배송 정책" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "배송비와 배송 그룹" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("prelaunch");
+  await expect(page.getByText("시행일 2026-08-02")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 

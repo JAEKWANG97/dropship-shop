@@ -113,8 +113,8 @@ class ApiErrorResponseIntegrationTest {
 		userAccountRepository.save(customer);
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
-			"prelaunch-2026-06-30",
-			"prelaunch-2026-06-30",
+			"2026-08-02",
+			"2026-08-02",
 			Instant.now()
 		));
 

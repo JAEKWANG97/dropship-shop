@@ -1,14 +1,18 @@
 # Architecture
 
-## Initial Architecture
+## Current Architecture
 
 ```text
 Browser
-  -> Frontend
-  -> Spring Boot API
-  -> PostgreSQL
-  -> Object Storage
-  -> Payment Gateway
+  -> Cloudflare
+  -> nginx on EC2
+     -> Next.js web container
+     -> Spring Boot API container
+        -> PostgreSQL container on EBS
+        -> EBS-backed product uploads
+        -> Domeggook Private API
+        -> AWS SES
+  -> Backup job copies database and uploads to S3
 ```
 
 ## Repository Structure
@@ -31,7 +35,7 @@ Rationale:
 
 - The project is developed by a single developer.
 - Frontend, backend, docs, and infra decisions are tightly coupled during MVP development.
-- One Linear issue can map to one PR even when the change touches both frontend and backend.
+- One backlog item normally maps to one commit; larger reviewable changes may use one PR.
 - Splitting repositories can be revisited if release cadence, team ownership, or security boundaries require it later.
 
 ## Backend
@@ -115,9 +119,10 @@ First admin screens:
 
 ## External Services
 
-### Payment Gateway
+### Customer Payment
 
 Use direct bank transfer with manual admin deposit confirmation for the current customer checkout path.
+No PG runtime or PG secret is used. Historical PG enum values and migrations remain only for existing-data compatibility.
 
 ### Object Storage
 
@@ -135,21 +140,17 @@ Runtime storage rules:
 
 ### Supplier
 
-MVP supplier operation is manual.
-
-Later expansion:
-
-- Supplier CSV import
-- Supplier API integration
-- Automated purchase order export
-- Supplier stock polling
+- Domeggook source snapshot orders use the approved Private API after customer deposit confirmation and pay with prefunded e-money.
+- The API revalidates item, option, source price, shipping, and e-money immediately before purchase.
+- Orders without a supported source snapshot stay on the manual supplier-order path.
+- Real-time stock guarantees and additional supplier integrations are deferred.
 
 ## Security Notes
 
 - Admin APIs require admin role.
 - Customer APIs must scope data by authenticated user.
-- Do not log payment secrets, personal identifiers, or raw PG payloads without filtering.
-- Keep PG secret keys only on the server.
+- Do not log bank-transfer evidence, supplier credentials, e-money balances, recipient personal information, or raw external API payloads without filtering.
+- Keep OAuth, Domeggook, database, email, and backup credentials only in runtime secrets or IAM roles.
 - Use HTTPS in production.
 
 ## Deployment Notes

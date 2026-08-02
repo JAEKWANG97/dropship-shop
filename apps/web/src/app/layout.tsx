@@ -20,14 +20,13 @@ export default async function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <div className="site-utility">
-          <nav aria-label="Utility navigation">
-            <Link href="/products">상품 목록</Link>
-            <Link href="/support">고객 문의</Link>
-            <Link href="/company">회사 정보</Link>
-            {admin ? <Link className="admin-entry" href="/admin">운영관리</Link> : null}
-          </nav>
-        </div>
+        {admin ? (
+          <div className="site-utility">
+            <nav aria-label="관리자 메뉴">
+              <Link className="admin-entry" href="/admin">운영관리</Link>
+            </nav>
+          </div>
+        ) : null}
         <header className="site-header">
           <div className="site-header-main">
             <CategoryMenu />
@@ -135,29 +134,30 @@ export default async function RootLayout({
           </Link>
         </nav>
         <footer className="site-footer">
-          <div>
-            <strong>{BUSINESS_PROFILE.brandName}</strong>
-            <span>건설 안전용품 쇼핑몰</span>
-            <span>상호 {BUSINESS_PROFILE.companyName}</span>
-            <span>대표 {BUSINESS_PROFILE.representativeName}</span>
-            <span>사업자등록번호 {BUSINESS_PROFILE.businessRegistrationNumber}</span>
-            <span>통신판매업 신고번호 {BUSINESS_PROFILE.mailOrderSalesRegistrationNumber}</span>
-            <span>주소 {BUSINESS_PROFILE.businessAddress}</span>
-          </div>
-          <div>
-            <strong>고객 지원</strong>
-            <Link href="/support">고객 문의 접수</Link>
+          <nav className="footer-nav" aria-label="푸터 메뉴">
             <Link href="/company">회사 정보</Link>
-            <span>반품 주소 {BUSINESS_PROFILE.returnAddress}</span>
-          </div>
-          <div>
-            <strong>거래 정책</strong>
-            <div className="footer-links">
-              {POLICY_PAGES.map((policy) => (
-                <Link href={`/policies/${policy.slug}`} key={policy.slug}>
-                  {policy.title}
-                </Link>
-              ))}
+            <Link href="/support">고객 문의</Link>
+            {POLICY_PAGES.map((policy) => (
+              <Link href={`/policies/${policy.slug}`} key={policy.slug}>
+                {policy.title}
+              </Link>
+            ))}
+          </nav>
+          <div className="footer-main">
+            <strong className="footer-brand">{BUSINESS_PROFILE.brandName}</strong>
+            <div className="footer-business">
+              <span>상호 {BUSINESS_PROFILE.companyName} · 대표 {BUSINESS_PROFILE.representativeName}</span>
+              <span>사업자등록번호 {BUSINESS_PROFILE.businessRegistrationNumber}</span>
+              <span>주소 {BUSINESS_PROFILE.businessAddress}</span>
+              <span>반품 주소 {BUSINESS_PROFILE.returnAddress}</span>
+            </div>
+            <div className="footer-support">
+              <strong>고객 지원</strong>
+              <span>{BUSINESS_PROFILE.customerCenterHours}</span>
+              <a href={`mailto:${BUSINESS_PROFILE.customerCenterEmail}`}>
+                {BUSINESS_PROFILE.customerCenterEmail}
+              </a>
+              <Link href="/support">문의 접수 &gt;</Link>
             </div>
           </div>
         </footer>

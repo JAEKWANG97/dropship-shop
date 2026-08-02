@@ -1,5 +1,7 @@
 # Roadmap
 
+Status snapshot: Phases 0-4 are implemented. Phase 5 is in progress and its remaining launch blockers are tracked in `docs/BACKLOG.md`. This file describes delivery order, not the current work queue.
+
 ## Phase 0: Product And Domain Design
 
 - Confirm product model
@@ -49,6 +51,8 @@ Exit criteria:
 
 - Build order queue
 - Build order detail
+- Add Domeggook Private API purchase and reconciliation for supported source snapshots
+- Keep manual supplier ordering as the fallback
 - Add supplier order completed action
 - Add out-of-stock action
 - Add tracking number input
@@ -92,5 +96,5 @@ Exit criteria:
 - Review
 - Basic search improvements
 - Dashboard metrics
-- Automated supplier API integration
+- Additional supplier API integrations
 - Customer notifications

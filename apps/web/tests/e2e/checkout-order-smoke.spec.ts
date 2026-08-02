@@ -137,8 +137,8 @@ async function createPendingCheckout(customerCookie: string): Promise<CheckoutFi
     body: JSON.stringify({
       termsAgreed: true,
       privacyAgreed: true,
-      termsVersion: "prelaunch-2026-06-30",
-      privacyVersion: "prelaunch-2026-06-30",
+      termsVersion: "2026-08-02",
+      privacyVersion: "2026-08-02",
     }),
   });
   const cart = (await apiRequest("/api/cart", customerCookie)) as Cart;

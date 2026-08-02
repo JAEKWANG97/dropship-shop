@@ -1,5 +1,23 @@
 # Decision Log
 
+## Current Overrides
+
+- 고객 결제의 현재 기준은 `2026-07-17: Direct Bank Transfer Only, No Toss Payments`와 `2026-07-18: Remove Unused Toss Payments Execution Paths`다. 이전 Toss/PG 항목은 역사 기록이다.
+- 상품 가격의 현재 기준은 `2026-07-28: Supplier Shipping Is Excluded From Product Markup`이다. 공급처 배송비는 수집 가능성 검증에는 사용하지만 판매가 계산에는 더하지 않는다.
+- 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
+- 완료 로그와 과거 결정이 위 항목과 충돌하면 이 절과 각 정책 문서의 `Confirmed Policy`를 우선한다.
+
+## 2026-08-02: Customer Policies Use The Live Version And Show Only The Effective Date
+
+Decision:
+
+이용약관, 개인정보처리방침, 배송 정책, 취소/환불 정책, 결제 후 품절 안내의 운영 버전과 시행일을 `2026-08-02`로 확정한다. 서버는 이 버전을 회원 및 주문 동의 증적으로 저장하고 검증하며, 고객 화면에는 내부 버전 문자열 대신 시행일만 표시한다.
+
+Consequences:
+
+- 기존 `prelaunch-2026-06-30` 동의는 현재 필수 버전이 아니므로 고객에게 다시 동의를 받는다.
+- 정책 버전이 변경되면 서버 필수 버전, 공개 정책 시행일, API 문서와 회귀 테스트를 함께 갱신한다.
+
 ## 2026-07-27: Collected Products Activate Only After Automated Evidence Completion
 
 Decision:
@@ -140,7 +158,7 @@ Customers are not charged a separate shipping fee, so supplier shipping must be 
 Consequences:
 
 - Collection and review classify conditional supplier shipping as `EXCLUDE`, not `REVIEW`.
-- Fixed supplier shipping remains part of `effectiveSourcePrice`; customer-visible shipping remains zero.
+- Historical behavior added fixed supplier shipping to `effectiveSourcePrice`. The current pricing decision excludes it from `sourcePrice` and sale-price calculation; customer-visible shipping remains zero.
 - Supporting conditional shipping later requires an explicit quantity-based pricing or shipping-cost model.
 
 ## 2026-07-14: Product Activation Requires Explicit Sale Readiness

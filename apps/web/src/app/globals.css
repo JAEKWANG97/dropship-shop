@@ -69,10 +69,14 @@ textarea {
 
 .site-header {
   position: sticky;
-  top: 34px;
+  top: 0;
   z-index: 10;
   border-bottom: 1px solid var(--line);
   background: #ffffff;
+}
+
+.site-utility + .site-header {
+  top: 34px;
 }
 
 .site-header-main {
@@ -354,19 +358,31 @@ textarea {
 }
 
 .site-footer {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1.2fr;
-  gap: 24px;
-  padding: 32px max(32px, calc((100vw - 1280px) / 2));
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   background: var(--surface);
 }
 
-.site-footer > div {
+.footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 14px max(32px, calc((100vw - 1280px) / 2));
+  border-bottom: 1px solid var(--line);
+}
+
+.footer-main {
   display: grid;
-  gap: 6px;
+  grid-template-columns: 0.7fr 1.5fr 1fr;
+  gap: 28px;
+  padding: 28px max(32px, calc((100vw - 1280px) / 2));
+}
+
+.footer-business,
+.footer-support {
+  display: grid;
+  gap: 5px;
   align-content: start;
 }
 
@@ -374,19 +390,13 @@ textarea {
   color: var(--navy);
 }
 
+.footer-brand {
+  font-size: 18px;
+}
+
 .site-footer a {
   color: var(--navy);
-  font-weight: 800;
-}
-
-.footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-}
-
-.footer-links a {
-  width: fit-content;
+  font-weight: 700;
 }
 
 .home-page {
@@ -1374,8 +1384,6 @@ img.admin-product-detail-image {
   font-weight: 700;
   line-height: 1.4;
   opacity: 0.72;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .product-action-row {
@@ -3262,8 +3270,9 @@ body:has(.admin-shell) > .page-shell {
     grid-column: 1 / -1;
   }
 
-  .site-footer {
+  .footer-main {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .catalog-layout,
@@ -4256,8 +4265,16 @@ body:has(.admin-shell) > .page-shell {
   }
 
   .site-footer {
-    flex-direction: column;
-    padding: 20px 16px calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .footer-nav {
+    gap: 8px 14px;
+    padding: 12px 16px;
+  }
+
+  .footer-main {
+    padding: 20px 16px;
   }
 
   body:has(.mobile-purchase-bar) .site-footer {

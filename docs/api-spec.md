@@ -133,7 +133,7 @@ Notes:
 - Kakao authorization requests `profile_nickname account_email`. A verified provider email replaces only an existing internal `@oauth.local` placeholder and never overwrites a customer-edited email.
 - Successful login sets `ACCESS_TOKEN` as an HttpOnly cookie with `SameSite=Lax`; production must use `Secure`.
 - Access tokens are stateless JWTs signed by the API. Refresh tokens are deferred from MVP auth foundation.
-- Current terms, privacy, shipping/order, cancellation/refund, and stock-risk versions are `prelaunch-2026-06-30` until the final launch policies are published.
+- Current terms, privacy, shipping/order, cancellation/refund, and stock-risk versions are `2026-08-02`.
 - `POST /api/me/agreements` requires both `termsAgreed=true` and `privacyAgreed=true` with current required versions.
 - Reposting the same current versions is idempotent and returns the existing agreement record.
 - Required customer info is display name, reachable contact email, and a valid delivery phone number.
@@ -154,8 +154,8 @@ POST /api/me/agreements
 {
   "termsAgreed": true,
   "privacyAgreed": true,
-  "termsVersion": "prelaunch-2026-06-30",
-  "privacyVersion": "prelaunch-2026-06-30"
+  "termsVersion": "2026-08-02",
+  "privacyVersion": "2026-08-02"
 }
 
 GET /api/me/profile-completion
@@ -400,11 +400,11 @@ PATCH /api/orders/{orderId}/shipping-address
 
 POST /api/checkouts/{checkoutNumber}/policy-confirmation
 {
-  "termsVersion": "prelaunch-2026-06-30",
-  "privacyVersion": "prelaunch-2026-06-30",
-  "orderPolicyVersion": "prelaunch-2026-06-30",
-  "cancellationRefundPolicyVersion": "prelaunch-2026-06-30",
-  "outOfStockNoticeVersion": "prelaunch-2026-06-30"
+  "termsVersion": "2026-08-02",
+  "privacyVersion": "2026-08-02",
+  "orderPolicyVersion": "2026-08-02",
+  "cancellationRefundPolicyVersion": "2026-08-02",
+  "outOfStockNoticeVersion": "2026-08-02"
 }
 ```
 
@@ -533,7 +533,7 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/policies` | Public | Implemented | List customer-facing MVP policy pages |
+| `GET` | `/api/policies` | Public | Implemented | List customer-facing policy pages |
 | `GET` | `/api/policies/{slug}` | Public | Implemented | Customer-facing policy page by slug |
 | `GET` | `/api/policies/{type}/current` | Public | Implemented | Active managed policy document by type |
 | `GET` | `/api/policies/{type}/versions/{version}` | Public | Implemented | Specific policy version |
@@ -555,7 +555,7 @@ Rules:
 
 Rules:
 
-- Implemented MVP slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
+- Implemented policy slugs are `shipping`, `cancellation-refund`, and `stock-risk`.
 - Implemented policy pages are backed by active `policy_documents` rows.
 - Business profile and privacy processing item APIs are backed by DB tables; admin management remains planned.
 - Managed policy documents support draft creation, draft update, activation, current public lookup, and version public lookup in DS-41.
