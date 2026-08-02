@@ -68,6 +68,12 @@ function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
   return Math.round(rawPrice / roundingUnit) * roundingUnit;
 }
 
+function calculateSalePrice(sourcePrice, minimumResalePrice, policy = DEFAULT_PRICING_POLICY) {
+  const roundingUnit = Number(policy.roundingUnit || 100);
+  const minimum = Math.ceil(Number(minimumResalePrice || 0) / roundingUnit) * roundingUnit;
+  return Math.max(calculateBasePrice(sourcePrice, policy), minimum);
+}
+
 function findExistingBySourceItemNo(products, itemNo) {
   const sourceItemNo = String(itemNo);
   return products.find((candidate) => String(candidate.sourceItemNo || "") === sourceItemNo) || null;
@@ -148,10 +154,11 @@ function sourceOptionsFor(item, product) {
 
 function pricedOptionsFor(item, product, policy = DEFAULT_PRICING_POLICY) {
   const sourcePrice = Number(item.sourcePrice || parsePrice(product.priceText));
+  const minimumResalePrice = Number(item.minimumResalePrice ?? product.minimumResalePrice ?? 0) || null;
   const sourceOptions = sourceOptionsFor(item, product);
   const pricedOptions = sourceOptions.map((option) => {
     const sourceOptionPrice = sourcePrice + Number(option.sourceAdditionalPrice || 0);
-    const calculatedSalePrice = calculateBasePrice(sourceOptionPrice, policy);
+    const calculatedSalePrice = calculateSalePrice(sourceOptionPrice, minimumResalePrice, policy);
     return {
       ...option,
       sourceOptionPrice,
@@ -164,6 +171,7 @@ function pricedOptionsFor(item, product, policy = DEFAULT_PRICING_POLICY) {
   const basePrice = salePrices.length === 0 ? 0 : Math.min(...salePrices);
   return {
     sourcePrice,
+    minimumResalePrice,
     basePrice,
     options: pricedOptions.map((option) => ({
       sourceOptionCode: option.sourceOptionCode,
@@ -199,6 +207,15 @@ function sourceNoticeRows(product) {
     .filter((entry) => entry.label && entry.value);
 }
 
+function noticeMatches(current, item) {
+  if (!current) return false;
+  return current.productInfoNotice === item.productInfoNotice
+    && current.shippingInfo === item.shippingInfo
+    && current.asInfo === item.asInfo
+    && current.returnExchangeInfo === item.returnExchangeInfo
+    && JSON.stringify(current.noticeRows || []) === JSON.stringify(item.noticeRows || []);
+}
+
 async function readCollectedProducts() {
   const entries = await readdir(DEFAULT_PRODUCTS_DIR, { withFileTypes: true });
   const products = [];
@@ -218,7 +235,11 @@ async function initManifest() {
   const products = await readCollectedProducts();
   const items = products.map((product) => {
     const sourcePrice = parsePrice(product.priceText);
-    const pricing = pricedOptionsFor({ sourcePrice, options: product.options }, product);
+    const pricing = pricedOptionsFor({
+      sourcePrice,
+      minimumResalePrice: product.minimumResalePrice,
+      options: product.options,
+    }, product);
     const noticeRows = sourceNoticeRows(product);
     return {
       itemNo: product.itemNo,
@@ -232,6 +253,7 @@ async function initManifest() {
       sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
       sourceItemNo: String(product.itemNo),
       sourcePrice,
+      minimumResalePrice: pricing.minimumResalePrice,
       basePrice: pricing.basePrice,
       options: pricing.options.map(manifestOption),
       supplierName: product.sellerName || "도매꾹 공급처",
@@ -354,7 +376,20 @@ function manifestIssue(item, pricing) {
 }
 
 async function importItem(args, item, product, suppliers, products, policy) {
-  if (!item.import) return { itemNo: item.itemNo, status: "SKIPPED", reason: "manifest import=false" };
+  if (!item.import) {
+    const existing = findExistingBySourceItemNo(products, item.itemNo);
+    if (!existing || existing.status === "HIDDEN") {
+      return { itemNo: item.itemNo, status: "SKIPPED", reason: "manifest import=false" };
+    }
+    await apiFetch(args, `/api/admin/products/${existing.id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "HIDDEN",
+        reason: `자동 검수 제외: ${(item.reasonCodes || []).join(",") || "IMPORT_DISABLED"}`,
+      }),
+    });
+    return { itemNo: item.itemNo, status: "HIDDEN", productId: existing.id, reason: item.reasonCodes || [] };
+  }
   const pricing = pricedOptionsFor(item, product, policy);
   item.sourcePrice = pricing.sourcePrice;
   item.basePrice = pricing.basePrice;
@@ -363,15 +398,8 @@ async function importItem(args, item, product, suppliers, products, policy) {
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
   const sourceUrl = item.sourceUrl || product.sourceUrl || null;
   const existingByItemNo = findExistingBySourceItemNo(products, item.itemNo);
-  if (existingByItemNo) {
-    return {
-      itemNo: item.itemNo,
-      productId: existingByItemNo.id,
-      status: "SKIPPED",
-      reason: "sourceItemNo already imported",
-    };
-  }
-  const existing = products.find((candidate) => !candidate.sourceItemNo && sourceUrl && candidate.sourceUrl === sourceUrl);
+  const existing = existingByItemNo
+    || products.find((candidate) => !candidate.sourceItemNo && sourceUrl && candidate.sourceUrl === sourceUrl);
 
   const supplier = existing
     ? suppliers.find((candidate) => candidate.id === existing.supplierId)
@@ -392,8 +420,8 @@ async function importItem(args, item, product, suppliers, products, policy) {
           status: "HIDDEN",
         }),
       });
-  if (existing && sourceUrl && !existing.sourceUrl) {
-    created = await apiFetch(args, `/api/admin/products/${created.id}`, {
+  if (existing) {
+    await apiFetch(args, `/api/admin/products/${created.id}`, {
       method: "PATCH",
       body: JSON.stringify({
         supplierId: created.supplierId,
@@ -404,18 +432,24 @@ async function importItem(args, item, product, suppliers, products, policy) {
         sourceUrl,
         basePrice: pricing.basePrice,
         categoryCode: item.categoryCode,
-        complianceStatus: created.complianceStatus,
-        reason: "기존 수집 상품 원본 연결",
+        complianceStatus: item.complianceStatus || created.complianceStatus,
+        reason: "공급처 원문 상품 정보 갱신",
       }),
     });
-    existing.sourceUrl = sourceUrl;
+    created = await apiFetch(args, `/api/admin/products/${created.id}`);
   }
-  const existingOptionKeys = new Set((created.options || []).map((option) => option.sourceOptionCode || option.name));
+  const existingOptions = new Map((created.options || []).map((option) => [option.sourceOptionCode || option.name, option]));
+  const sourceOptionKeys = new Set();
 
   for (const option of pricing.options) {
-    if (existingOptionKeys.has(option.sourceOptionCode || option.name)) continue;
-    await apiFetch(args, `/api/admin/products/${created.id}/options`, {
-      method: "POST",
+    const key = option.sourceOptionCode || option.name;
+    const existingOption = existingOptions.get(key);
+    sourceOptionKeys.add(key);
+    const optionPath = existingOption
+      ? `/api/admin/products/${created.id}/options/${existingOption.id}`
+      : `/api/admin/products/${created.id}/options`;
+    await apiFetch(args, optionPath, {
+      method: existingOption ? "PATCH" : "POST",
       body: JSON.stringify({
         name: option.name,
         additionalPrice: option.additionalPrice,
@@ -424,8 +458,24 @@ async function importItem(args, item, product, suppliers, products, policy) {
         sourceAdditionalPrice: option.sourceAdditionalPrice,
         sourceStockQuantity: option.sourceStockQuantity,
         sortOrder: option.sortOrder,
+        ...(existingOption ? { reason: "공급처 옵션 정보 갱신" } : {}),
       }),
     });
+    if (existingOption && existingOption.status !== option.status) {
+      await apiFetch(args, `${optionPath}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: option.status, reason: "공급처 옵션 상태 갱신" }),
+      });
+    }
+  }
+
+  for (const [key, option] of existingOptions) {
+    if (!sourceOptionKeys.has(key) && option.status !== "STOPPED") {
+      await apiFetch(args, `/api/admin/products/${created.id}/options/${option.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "STOPPED", reason: "공급처에서 제거된 옵션 판매 중지" }),
+      });
+    }
   }
 
   if (!created.thumbnailImageUrl) {
@@ -456,9 +506,7 @@ async function importItem(args, item, product, suppliers, products, policy) {
     });
   }
 
-  const shouldCreateNotice = !created.productNotice && (item.productInfoNotice || item.noticeRows?.length);
-  const shouldBackfillNoticeRows = item.noticeRows?.length && !(created.productNotice?.noticeRows || []).length;
-  if (shouldCreateNotice || shouldBackfillNoticeRows) {
+  if ((item.productInfoNotice || item.noticeRows?.length) && !noticeMatches(created.productNotice, item)) {
     const noticeRows = item.noticeRows || [];
     await apiFetch(args, `/api/admin/products/${created.id}/notice`, {
       method: "PUT",
@@ -473,7 +521,7 @@ async function importItem(args, item, product, suppliers, products, policy) {
     });
   }
 
-  if (item.complianceStatus && item.complianceStatus !== "PENDING") {
+  if (!existing && item.complianceStatus && item.complianceStatus !== "PENDING") {
     await apiFetch(args, `/api/admin/products/${created.id}`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -508,6 +556,7 @@ async function importItem(args, item, product, suppliers, products, policy) {
     productId: created.id,
     supplierId: supplier.id,
     sourcePrice: pricing.sourcePrice,
+    minimumResalePrice: pricing.minimumResalePrice,
     basePrice: pricing.basePrice,
     optionCount: pricing.options.length,
     complianceStatus: item.complianceStatus || "PENDING",
@@ -520,17 +569,33 @@ async function runManifest(args) {
   const results = [];
   if (!args.apply) {
     const policy = await pricingPolicy(args);
+    let existingProducts = [];
+    if (await cookieHeader(args)) {
+      try {
+        existingProducts = await allAdminProducts(args);
+      } catch {
+        // dry-run 가격 검증은 인증 만료로 관리자 비교를 못 해도 계속한다.
+      }
+    }
     for (const item of manifest.items || []) {
       try {
         const product = JSON.parse(await readFile(item.productFile, "utf8"));
         const pricing = pricedOptionsFor(item, product, policy);
         const issue = manifestIssue(item, pricing);
+        const existing = findExistingBySourceItemNo(existingProducts, item.itemNo);
         results.push({
           itemNo: item.itemNo,
-          status: item.import ? (issue ? "FAILED" : "DRY_RUN") : "SKIPPED",
+          status: item.import
+            ? (issue ? "FAILED" : existing ? "DRY_RUN_UPDATE" : "DRY_RUN_CREATE")
+            : existing && existing.status !== "HIDDEN" ? "DRY_RUN_HIDE" : "SKIPPED",
           reason: item.import ? issue : "manifest import=false",
+          productId: existing?.id || null,
+          currentName: existing?.name || null,
+          nextName: item.name,
           sourcePrice: pricing.sourcePrice,
-          currentBasePrice: Number(item.basePrice || 0),
+          minimumResalePrice: pricing.minimumResalePrice,
+          currentSourcePrice: existing?.sourcePrice ?? null,
+          currentBasePrice: existing?.basePrice ?? null,
           calculatedBasePrice: pricing.basePrice,
           optionCount: pricing.options.length,
           minOptionSalePrice: pricing.basePrice,
@@ -543,7 +608,9 @@ async function runManifest(args) {
       }
     }
     await writeFile(DEFAULT_RESULT, `${JSON.stringify(results, null, 2)}\n`);
-    console.log(`dry-run 완료: ${results.length}개. 실제 적재는 --apply 필요`);
+    console.log(
+      `dry-run 완료: 기존 갱신 ${results.filter((result) => result.status === "DRY_RUN_UPDATE").length}개, 신규 ${results.filter((result) => result.status === "DRY_RUN_CREATE").length}개`,
+    );
     return;
   }
 
@@ -597,6 +664,8 @@ async function main() {
     assert.equal(imageFormat(Buffer.from("GIF89a")), null);
     assert.equal(findExistingBySourceItemNo([{ id: "product-1", sourceItemNo: "64470251" }], 64470251)?.id, "product-1");
     assert.equal(findExistingBySourceItemNo([{ id: "product-1", sourceItemNo: "64470251" }], 64470252), null);
+    assert.equal(pricedOptionsFor({ sourcePrice: 990, minimumResalePrice: 1900 }, { options: [] }).basePrice, 1900);
+    assert.equal(pricedOptionsFor({ sourcePrice: 900, minimumResalePrice: 1130 }, { options: [] }).basePrice, 1200);
     console.log("Domeggook product import self-check passed");
     return;
   }

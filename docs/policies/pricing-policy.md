@@ -7,6 +7,7 @@ Status: Confirmed
 - `sourcePrice` is supplier cost and is visible only to admins.
 - `basePrice` is the customer-facing sale price.
 - Default sale price is `sourcePrice * 1.25`, rounded to the nearest active rounding unit.
+- If the supplier provides `price.resale.minimum`, round that minimum up to the active rounding unit and do not set a lower customer-facing sale price.
 - Supplier shipping fees are not added to `sourcePrice` or `basePrice`.
 - Customers are not charged a separate shipping fee; supplier shipping is treated as an operating cost.
 - The default 25% markup is commission 5%, tax/fee buffer 10%, overhead 5%, and safety margin 5%.

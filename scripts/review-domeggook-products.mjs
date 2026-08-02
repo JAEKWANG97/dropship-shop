@@ -154,6 +154,16 @@ export const NON_SAFETY_KEYWORDS = [
   "캠핑",
   "반려동물",
   "애견",
+  "강아지",
+  "고양이",
+  "어린이",
+  "육아",
+  "교구",
+  "만들기 키트",
+  "화장실",
+  "골무",
+  "원예",
+  "알약통",
   "도어벨",
   "홈캠",
   "주방",
@@ -298,6 +308,12 @@ function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
   const roundingUnit = Number(policy.roundingUnit || 100);
   const rawPrice = Number(sourcePrice || 0) * (1 + totalMarkupRate(policy) / 100);
   return Math.round(rawPrice / roundingUnit) * roundingUnit;
+}
+
+function calculateSalePrice(sourcePrice, minimumResalePrice, policy = DEFAULT_PRICING_POLICY) {
+  const roundingUnit = Number(policy.roundingUnit || 100);
+  const minimum = Math.ceil(Number(minimumResalePrice || 0) / roundingUnit) * roundingUnit;
+  return Math.max(calculateBasePrice(sourcePrice, policy), minimum);
 }
 
 function hasAny(text, keywords) {
@@ -600,10 +616,10 @@ export function stopCustomOptions(options) {
   ));
 }
 
-function manifestOptionsFor(sourcePrice, basePrice, options, policy) {
+function manifestOptionsFor(sourcePrice, minimumResalePrice, basePrice, options, policy) {
   return options.map((option) => {
     const sourceOptionPrice = sourcePrice + Number(option.sourceAdditionalPrice || 0);
-    const calculatedSalePrice = calculateBasePrice(sourceOptionPrice, policy);
+    const calculatedSalePrice = calculateSalePrice(sourceOptionPrice, minimumResalePrice, policy);
     return {
       sourceOptionCode: option.sourceOptionCode,
       name: option.name,
@@ -625,6 +641,7 @@ async function reviewProduct(entry, context) {
   const customOptionCount = saleOptions.filter((option, index) => option.status !== options[index].status).length;
   const activeOptions = saleOptions.filter((option) => option.status === "ACTIVE");
   const sourcePrice = parsePrice(product.priceText);
+  const minimumResalePrice = Number(product.minimumResalePrice || 0) || null;
   const minOrderQuantity = parseQuantity(product.minOrderQuantityText);
   const detailImagePaths = Array.isArray(product.detailImagePaths) ? product.detailImagePaths : [];
   const category = resolveReviewCategory(product, context.categories);
@@ -647,6 +664,7 @@ async function reviewProduct(entry, context) {
 
   if (!sourcePrice) hardReasons.push("PRICE_MISSING");
   if (product.sourceStatus === "NOT_FOUND") hardReasons.push("SOURCE_ITEM_UNAVAILABLE");
+  if (product.businessSinglePurchase !== true) hardReasons.push("BUSINESS_SINGLE_PURCHASE_NOT_AVAILABLE");
   if (!String(product.imageUsage || "").includes("허용")) hardReasons.push("IMAGE_USAGE_NOT_ALLOWED");
   if (activeOptions.length === 0) {
     hardReasons.push(customOptionCount === options.length ? "CUSTOM_OPTIONS_ONLY" : "NO_ACTIVE_OPTIONS");
@@ -662,7 +680,6 @@ async function reviewProduct(entry, context) {
   ) {
     hardReasons.push("NON_COMPLETE_PRODUCT");
   }
-  if (context.existingProductNames.has(title)) hardReasons.push("DUPLICATE_NAME");
   if (koshaGate.hardReason) hardReasons.push(koshaGate.hardReason);
 
   if (category.confidence !== "HIGH") reviewReasons.push("CATEGORY_LOW_CONFIDENCE");
@@ -672,14 +689,17 @@ async function reviewProduct(entry, context) {
   if (!String(product.origin || "").trim() || !String(product.manufacturer || "").trim()) reviewReasons.push("ORIGIN_OR_MANUFACTURER_MISSING");
   if (hasAny(textForKeyword, REVIEW_KEYWORDS).length) reviewReasons.push("DOMAIN_OR_CUSTOM_PRODUCT_SUSPECT");
 
-  const calculatedBasePrice = sourcePrice ? calculateBasePrice(sourcePrice, context.policy) : null;
+  const calculatedBasePrice = sourcePrice
+    ? calculateSalePrice(sourcePrice, minimumResalePrice, context.policy)
+    : null;
   const reasonCodes = [...new Set([...hardReasons, ...reviewReasons])];
   const decision = reasonCodes.length ? "EXCLUDE" : "IMPORT";
   const complianceStatus = complianceStatusFor(product, category.code, koshaGate.status);
   const status = decision === "IMPORT" && complianceStatus !== "REJECTED" ? "ACTIVE" : "HIDDEN";
   const manifestOptions = manifestOptionsFor(
     sourcePrice,
-    calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
+    minimumResalePrice,
+    calculatedBasePrice || calculateSalePrice(sourcePrice, minimumResalePrice, context.policy),
     saleOptions,
     context.policy,
   );
@@ -698,6 +718,7 @@ async function reviewProduct(entry, context) {
     sourceCategoryCode: product.sourceCategoryCode || "",
     sourceCategoryPath: product.sourceCategoryPath || "",
     sourcePrice,
+    minimumResalePrice,
     shippingFee: shipping.fee,
     shippingFeeKnown: shipping.known,
     shippingFeeConditional: shipping.conditional,
@@ -734,7 +755,8 @@ async function reviewProduct(entry, context) {
       summary: summaryFor(product),
       sourceUrl: product.sourceUrl || `https://mobile.domeggook.com/${product.itemNo}`,
       sourcePrice,
-      basePrice: calculatedBasePrice || calculateBasePrice(sourcePrice, context.policy),
+      minimumResalePrice,
+      basePrice: calculatedBasePrice || calculateSalePrice(sourcePrice, minimumResalePrice, context.policy),
       options: manifestOptions,
       supplierName: product.sellerName || "외부 공급처",
       productInfoNotice: productInfoNoticeFor(product),
@@ -787,27 +809,6 @@ async function loadPricingPolicy(args) {
   }
 }
 
-async function loadExistingProductNames(args) {
-  try {
-    if (!(await cookieHeader(args))) return new Set();
-    const names = new Set();
-    let page = 0;
-    let totalPages = 1;
-    do {
-      const response = await apiFetch(args, `/api/admin/products?page=${page}&size=100`);
-      const products = Array.isArray(response) ? response : response.products || [];
-      for (const product of products) {
-        if (product.name) names.add(product.name);
-      }
-      totalPages = Array.isArray(response) ? 1 : Number(response.totalPages || 0);
-      page += 1;
-    } while (page < totalPages);
-    return names;
-  } catch {
-    return new Set();
-  }
-}
-
 async function loadKoshaAudit(file) {
   try {
     const audit = JSON.parse(await readFile(file, "utf8"));
@@ -828,6 +829,7 @@ function reviewCsv(items) {
     "categoryResolution",
     "sourceCategoryPath",
     "sourcePrice",
+    "minimumResalePrice",
     "shippingFee",
     "calculatedBasePrice",
     "minOrderQuantity",
@@ -867,6 +869,8 @@ async function main() {
   if (args.help) return usage();
   if (args.selfCheck) {
     assert.equal(calculateBasePrice(3700), 4600);
+    assert.equal(calculateSalePrice(990, 1900), 1900);
+    assert.equal(calculateSalePrice(900, 1130), 1200);
     assert.equal(koshaCollectionGate("TRAFFIC_CONE").status, "NOT_APPLICABLE");
     assert.equal(koshaCollectionGate("PPE_SAFETY_HELMET").hardReason, "");
     assert.equal(koshaCollectionGate("WORK_PLATFORM", {
@@ -928,16 +932,14 @@ async function main() {
   let entries = await readCollectedProducts(args.productsDir);
   if (args.limit) entries = entries.slice(0, args.limit);
 
-  const [policy, existingProductNames, koshaAudit] = await Promise.all([
+  const [policy, koshaAudit] = await Promise.all([
     loadPricingPolicy(args),
-    loadExistingProductNames(args),
     loadKoshaAudit(args.koshaAudit),
   ]);
   const context = {
     categories,
     fetchShipping: args.fetchShipping,
     policy,
-    existingProductNames,
     koshaAudit,
   };
 

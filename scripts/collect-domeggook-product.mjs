@@ -22,10 +22,10 @@ const COVERAGE_OUT_DIR = "tmp/domeggook-category-coverage";
 const OPEN_API_COVERAGE_OUT_DIR = "tmp/domeggook-open-api-coverage";
 const OPTION_BACKFILL_REPORT = "tmp/domeggook-option-backfill-report.json";
 const SELLER_SCORE_BACKFILL_REPORT = "tmp/domeggook-seller-score-backfill-report.json";
-const OPEN_API_COLLECTOR_VERSION = 6;
+const OPEN_API_REFRESH_REPORT = "tmp/domeggook-open-api-refresh-report.json";
+const OPEN_API_COLLECTOR_VERSION = 9;
 const OPEN_API_DAILY_LIMIT = 5000;
-const OPEN_API_SALES_UNIT_SORT = "qd";
-const OPEN_API_MAX_SELLER_RANK = 2;
+const OPEN_API_RANKING_SORT = "rd";
 
 function usage() {
   console.log(`Usage:
@@ -37,7 +37,8 @@ function usage() {
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10
   node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
-  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --sales-count 60 --fresh
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --ranking-count 60 --fresh
+  node scripts/collect-domeggook-product.mjs --open-api-refresh
   node scripts/collect-domeggook-product.mjs --self-check
 
 Output:
@@ -59,10 +60,18 @@ function parseArgs(argv) {
       openApiCoverage: true,
       category: stringArg(argv, "--category"),
       targetPerCategory: numberArg(argv, "--target-per-category", 10),
-      salesCount: numberArg(argv, "--sales-count", 60),
+      rankingCount: numberArg(argv, "--ranking-count", numberArg(argv, "--sales-count", 60)),
       maxCategories: numberArg(argv, "--max-categories", 0),
       delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
       fresh: argv.includes("--fresh"),
+    };
+  }
+
+  if (argv.includes("--open-api-refresh")) {
+    return {
+      openApiRefresh: true,
+      limit: numberArg(argv, "--limit", 0),
+      delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
     };
   }
 
@@ -342,12 +351,19 @@ async function writeOutputs(product, dir) {
     "itemNo",
     "title",
     "priceText",
+    "minimumResalePrice",
     "minOrderQuantityText",
+    "businessSinglePurchase",
     "sellerName",
     "sellerReviewCount",
     "sellerSatisfaction",
     "origin",
+    "model",
     "manufacturer",
+    "productSize",
+    "productWeight",
+    "deliveryMethod",
+    "deliveryWaiting",
     "imageUsage",
     "optionCount",
     "options",
@@ -841,19 +857,20 @@ function arrayValue(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-async function openApiList(apiKey, keyword, sort, size) {
-  const result = await openApiRequest(apiKey, {
+function openApiListParams(keyword, size) {
+  return {
     ver: "4.1",
     mode: "getItemList",
     kw: keyword,
-    so: sort,
+    so: OPEN_API_RANKING_SORT,
     sz: size,
     pg: 1,
     mxq: 1,
-    sgd: true,
-    fdl: true,
-    dfos: false,
-  });
+  };
+}
+
+async function openApiList(apiKey, keyword, size) {
+  const result = await openApiRequest(apiKey, openApiListParams(keyword, size));
   return {
     total: Number(result.header?.numberOfItems || 0),
     items: arrayValue(result.list?.item),
@@ -875,12 +892,6 @@ function openApiSellerScore(detail) {
     sellerReviewCount: numberOrNull(detail.seller?.score?.cnt) ?? 0,
     sellerSatisfaction: numberOrNull(String(detail.seller?.score?.avg || "").replace("%", "")),
   };
-}
-
-function sellerMeetsPolicy(sellerScore) {
-  return sellerScore.sellerGood
-    && sellerScore.sellerRank > 0
-    && sellerScore.sellerRank <= OPEN_API_MAX_SELLER_RANK;
 }
 
 async function backfillSellerScore(args) {
@@ -1064,6 +1075,8 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
   const title = cleanText(detail.basis?.title || candidate.title);
   const sourcePrice = numberOrNull(detail.price?.supply ?? candidate.price);
   const minOrderQuantity = numberOrNull(detail.qty?.supplyUnit ?? candidate.unitQty ?? detail.qty?.domeMoq);
+  const minimumResalePrice = numberOrNull(detail.price?.resale?.minimum ?? detail.price?.resale?.minumum);
+  const businessSinglePurchase = booleanValue(detail.channel?.supply) && minOrderQuantity === 1;
   const detailImageUrls = openApiDetailImageUrls(detail);
   const options = parseOpenApiOptions(detail.selectOpt);
   const shipping = openApiShipping(detail);
@@ -1073,12 +1086,11 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
 
   if (detail.basis?.status !== "판매중") hardReasons.push("NOT_ON_SALE");
   if (!sourcePrice || sourcePrice <= 0) hardReasons.push("PRICE_MISSING");
-  if (minOrderQuantity !== 1) hardReasons.push("MIN_ORDER_QUANTITY_NOT_ONE");
+  if (!businessSinglePurchase) hardReasons.push("BUSINESS_SINGLE_PURCHASE_NOT_AVAILABLE");
   if (!booleanValue(detail.desc?.license?.usable)) hardReasons.push("IMAGE_USAGE_NOT_ALLOWED");
   if (detailImageUrls.length === 0) hardReasons.push("DETAIL_IMAGE_MISSING");
   if (!options.some((option) => option.status === "ACTIVE")) hardReasons.push("NO_ACTIVE_OPTIONS");
   if (booleanValue(detail.deli?.fromOversea)) hardReasons.push("OVERSEAS_DIRECT");
-  if (!sellerMeetsPolicy(sellerScore)) hardReasons.push("SELLER_POLICY_NOT_MET");
   if (!shipping.known) reviewReasons.push("SHIPPING_FEE_MISSING");
   if (shipping.conditional) hardReasons.push("SHIPPING_FEE_CONDITIONAL");
   if (!String(detail.detail?.country || "").trim() || !String(detail.detail?.manufacturer || "").trim()) {
@@ -1097,16 +1109,23 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
 
   return {
     product: {
+      collectorVersion: OPEN_API_COLLECTOR_VERSION,
       sourceUrl: `https://mobile.domeggook.com/${itemNo}`,
       itemNo,
       title,
       priceText: String(sourcePrice || ""),
+      minimumResalePrice,
       minOrderQuantityText: `${minOrderQuantity || 0}개`,
       sellerName: cleanText(detail.seller?.nick || detail.seller?.id || detail.seller?.company?.name),
       ...sellerScore,
       sellerScoreUpdatedAt: new Date().toISOString(),
-      origin: cleanText(detail.detail?.country),
-      manufacturer: cleanText(detail.detail?.manufacturer),
+      origin: detail.detail?.country ?? "",
+      model: detail.detail?.model ?? "",
+      manufacturer: detail.detail?.manufacturer ?? "",
+      productSize: detail.detail?.size ?? "",
+      productWeight: detail.detail?.weight ?? "",
+      deliveryMethod: detail.deli?.method ?? "",
+      deliveryWaiting: detail.deli?.wating ?? "",
       imageUsage: "허용 (Open API)",
       thumbnailImageUrl: detail.thumb?.original || detail.thumb?.large || candidate.thumb || "",
       detailImageUrls,
@@ -1118,9 +1137,8 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
       collectionCategoryLabel: category.label,
       collectionKeyword: keyword,
       collectionSorts: sorts,
-      fastDelivery: true,
       lowestPriceVerified: booleanValue(candidate.lwp),
-      businessSinglePurchase: minOrderQuantity === 1,
+      businessSinglePurchase,
       collectionDecision: "IMPORT_CANDIDATE",
       collectionReviewReasons: [],
       sourceStatus: detail.basis?.status || "",
@@ -1129,6 +1147,11 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
       collectionCategoryScore: categoryScore,
       safetyCert: arrayValue(detail.detail?.safetyCert),
       productInfoDuty: detail.detail?.infoDuty || null,
+      sourceDeliveryInfo: detail.deli || null,
+      sourceSellerInfo: detail.seller || null,
+      sourceReturnInfo: detail.return || null,
+      sourceDeliveryReturnContents: detail.desc?.contents?.deli ?? null,
+      sourceTermsInfo: detail.dialog?.msg ?? null,
       collectedAt: new Date().toISOString(),
     },
     hardReasons,
@@ -1214,26 +1237,23 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
 
   async function runKeyword(keyword, supplemental) {
     const candidates = new Map();
-    const result = await openApiList(apiKey, keyword, OPEN_API_SALES_UNIT_SORT, args.salesCount);
+    const result = await openApiList(apiKey, keyword, args.rankingCount);
     report.queries.push({
       keyword,
-      sort: OPEN_API_SALES_UNIT_SORT,
+      sort: OPEN_API_RANKING_SORT,
       filters: {
-        fastDelivery: true,
-        goodSeller: true,
+        market: "supply",
         maxMinimumOrderQuantity: 1,
-        maxSellerRank: OPEN_API_MAX_SELLER_RANK,
       },
-      requested: args.salesCount,
+      requested: args.rankingCount,
       returned: result.items.length,
       total: result.total,
       supplemental,
     });
-    mergeListCandidates(candidates, result.items, keyword, OPEN_API_SALES_UNIT_SORT);
+    mergeListCandidates(candidates, result.items, keyword, OPEN_API_RANKING_SORT);
     await sleep(args.delayMs);
 
-    const orderedCandidates = [...candidates.values()]
-      .sort((left, right) => Number(left.price || 0) - Number(right.price || 0));
+    const orderedCandidates = [...candidates.values()];
     for (const candidate of orderedCandidates) {
       if (acceptedCount() >= args.targetPerCategory) break;
       const itemNo = String(candidate.no);
@@ -1356,7 +1376,7 @@ async function openApiCoverage(args) {
     generatedAt: new Date().toISOString(),
     categoryCount: reports.length,
     targetPerCategory: args.targetPerCategory,
-    salesCount: args.salesCount,
+    rankingCount: args.rankingCount,
     coveredCategories: reports.filter((report) => !report.shortfall).length,
     shortfallCategories: reports.filter((report) => report.shortfall).map((report) => ({
       categoryCode: report.categoryCode,
@@ -1373,9 +1393,62 @@ async function openApiCoverage(args) {
   console.log(`${OPEN_API_COVERAGE_OUT_DIR}/summary.json 저장 완료`);
 }
 
+async function refreshOpenApiProducts(args) {
+  const apiKey = await readOpenApiKey();
+  const categories = await readCategories();
+  const categoryByCode = new Map(categories.map((category) => [category.code, category]));
+  const scoringCategories = readCategoryDefinitions();
+  const entries = (await readdir(DEFAULT_OUT_DIR, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const stale = [];
+  for (const entry of entries) {
+    const product = await readExistingProduct(entry.name);
+    const current = Object.hasOwn(product || {}, "businessSinglePurchase")
+      && Object.hasOwn(product, "minimumResalePrice")
+      && product.sourceDeliveryInfo;
+    if (!current) stale.push(entry);
+  }
+  const selected = args.limit ? stale.slice(0, args.limit) : stale;
+  const report = { generatedAt: new Date().toISOString(), refreshed: [], failed: [] };
+
+  for (const entry of selected) {
+    try {
+      const existing = await readExistingProduct(entry.name);
+      const category = categoryByCode.get(existing?.collectionCategoryCode);
+      if (!existing || !category) throw new Error("COLLECTION_CATEGORY_MISSING");
+      const detail = await openApiDetail(apiKey, existing.itemNo);
+      const parsed = openApiProduct(
+        detail,
+        existing,
+        category,
+        existing.collectionKeyword || cleanKeyword(category.label),
+        [OPEN_API_RANKING_SORT],
+        scoringCategories,
+      );
+      await saveOpenApiProduct(parsed.product);
+      if (parsed.hardReasons.length) throw new Error(parsed.hardReasons.join(","));
+      report.refreshed.push({ itemNo: existing.itemNo, title: parsed.product.title });
+      console.log(`refresh: ${existing.itemNo} ${parsed.product.title}`);
+    } catch (error) {
+      report.failed.push({ itemNo: entry.name, reason: error.message });
+    }
+    await writeFile(OPEN_API_REFRESH_REPORT, `${JSON.stringify(report, null, 2)}\n`);
+    await sleep(args.delayMs);
+  }
+
+  console.log(`refresh 완료: 성공 ${report.refreshed.length}개, 실패 ${report.failed.length}개`);
+}
+
 function selfCheck() {
-  if (OPEN_API_SALES_UNIT_SORT !== "qd") {
-    throw new Error("Open API 정렬 기준은 많은판매단위순이어야 합니다");
+  const listParams = openApiListParams("안전모", 60);
+  if (
+    listParams.so !== "rd"
+    || listParams.mxq !== 1
+    || Object.hasOwn(listParams, "sgd")
+    || Object.hasOwn(listParams, "fdl")
+  ) {
+    throw new Error("Open API 후보 기준은 도매꾹랭킹순과 낱개구매여야 합니다");
   }
   if (listCandidateIssue({
     no: "1",
@@ -1412,12 +1485,41 @@ function selfCheck() {
   ) {
     throw new Error("Open API 판매자 후기 파서 self-check 실패");
   }
-  if (!sellerMeetsPolicy(sellerScore) || sellerMeetsPolicy({ sellerRank: 3, sellerGood: true })) {
-    throw new Error("Open API 판매자 정책 self-check 실패");
-  }
   const images = openApiDetailImageUrls({ desc: { contents: { item: '<img src="//example.com/a.jpg"><img data-src="/b.png">' } } });
   if (images.length !== 2 || !images[0].startsWith("https://")) {
     throw new Error("Open API 상세 이미지 파서 self-check 실패");
+  }
+  const rawInfo = openApiProduct({
+    basis: { no: "1", title: "안전모", status: "판매중" },
+    price: { supply: "1000", resale: { minimum: "1300" } },
+    channel: { supply: "true" },
+    qty: { supplyUnit: "1" },
+    detail: {
+      country: "상세정보별도표기",
+      model: "해당없음",
+      manufacturer: "상세정보 별도표기",
+      size: "0x0x0",
+      weight: "0g",
+      infoDuty: { item: [{ type: "item", name: "품명 및 모델명", desc: "상세정보 별도표기" }] },
+    },
+    deli: { method: "택배", wating: "2일 후 발송", supply: { pay: "무료배송", type: "고정배송비" } },
+    desc: { license: { usable: "true" }, contents: { item: '<img src="https://example.com/a.jpg">' } },
+    selectOpt: null,
+  }, {}, { code: "PPE_SAFETY_HELMET", label: "안전모" }, "안전모", ["rd"], [{
+    code: "PPE_SAFETY_HELMET",
+    label: "안전모",
+    keywords: ["안전모"],
+  }]).product;
+  if (
+    rawInfo.collectorVersion !== OPEN_API_COLLECTOR_VERSION
+    || rawInfo.model !== "해당없음"
+    || rawInfo.minimumResalePrice !== 1300
+    || !rawInfo.businessSinglePurchase
+    || rawInfo.productSize !== "0x0x0"
+    || rawInfo.productWeight !== "0g"
+    || rawInfo.productInfoDuty.item[0].desc !== "상세정보 별도표기"
+  ) {
+    throw new Error("Open API 상품정보 원문 보존 self-check 실패");
   }
   const helmetIssue = listCandidateIssue({
     no: "1",
@@ -1498,7 +1600,7 @@ function selfCheck() {
     deli: { fromOversea: "false" },
     market: { supply: "true" },
   }, { code: "WARNING_SIGN", label: "경고표지" });
-  if (genericWarningSign !== "CATEGORY_MISMATCH") throw new Error("일반 안내판 self-check 실패");
+  if (genericWarningSign !== "NON_SAFETY_KEYWORD") throw new Error("일반 안내판 self-check 실패");
   const surfaceRoughness = listCandidateIssue({
     no: "9",
     title: "윤곽 게이지 표면조도측정기 내경측정기",
@@ -1561,6 +1663,10 @@ async function main() {
   }
   if (args.openApiCoverage) {
     await openApiCoverage(args);
+    return;
+  }
+  if (args.openApiRefresh) {
+    await refreshOpenApiProducts(args);
     return;
   }
 
