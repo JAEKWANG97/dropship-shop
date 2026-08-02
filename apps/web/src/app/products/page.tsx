@@ -69,7 +69,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     <section className="catalog-page">
       <div className="catalog-heading">
         <div className="section-heading">
-          <p className="eyebrow">상품목록</p>
+          <p className="eyebrow">상품 목록</p>
           <h1>안전장비 상품 목록</h1>
           <p>건설현장과 산업현장에 필요한 안전장비를 바로 구매하세요.</p>
         </div>
@@ -85,7 +85,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       {!error && products.length === 0 ? (
         <div className="notice empty">
-          <strong>판매중인 상품이 없습니다</strong>
+          <strong>판매 중인 상품이 없습니다</strong>
           <span>검색 조건을 바꾸거나 관리자에서 상품을 등록해 주세요.</span>
         </div>
       ) : null}
@@ -119,8 +119,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   />
                 </div>
               </details>
-              <Link href={withSort(params, "price-asc")}>낮은가격순</Link>
-              <Link href={withSort(params, "price-desc")}>높은가격순</Link>
+              <Link href={withSort(params, "price-asc")}>낮은 가격순</Link>
+              <Link href={withSort(params, "price-desc")}>높은 가격순</Link>
             </div>
           </div>
 

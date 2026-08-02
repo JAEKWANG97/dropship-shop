@@ -117,7 +117,7 @@ function CartContents({ cart }: { cart: Cart }) {
       <div>
         <div className="cart-list">
           <div className="cart-list-head">
-            <span>전체선택 ({cart.items.length})</span>
+            <span>전체 선택 ({cart.items.length})</span>
             <span>상품 정보</span>
             <span>수량</span>
             <span>금액</span>
@@ -178,7 +178,7 @@ function CartContents({ cart }: { cart: Cart }) {
       </div>
 
       <aside className="cart-summary">
-        <h2>주문요약</h2>
+        <h2>주문 요약</h2>
         <div>
           <span>상품 금액 ({cart.items.length}개)</span>
           <strong>{formatPrice(cart.subtotalAmount)}</strong>

@@ -68,7 +68,7 @@ test("mobile catalog controls stay horizontal at narrow widths", async ({ page }
       await filters.locator("summary").click();
       await expect(filters).toHaveAttribute("open", "");
 
-      for (const name of ["낮은가격순", "높은가격순"]) {
+      for (const name of ["낮은 가격순", "높은 가격순"]) {
         const sortLink = page.getByRole("link", { name, exact: true });
         const box = await sortLink.boundingBox();
         expect(box, `${name} should have a rendered box at ${width}px`).not.toBeNull();

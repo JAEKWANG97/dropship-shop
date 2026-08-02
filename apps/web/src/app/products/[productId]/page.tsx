@@ -81,7 +81,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <nav className="breadcrumb" aria-label="breadcrumb">
         <Link href="/">홈</Link>
         <span>/</span>
-        <Link href="/products">상품목록</Link>
+        <Link href="/products">상품 목록</Link>
         <span>/</span>
         <strong>{product.name}</strong>
       </nav>

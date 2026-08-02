@@ -12,7 +12,7 @@ test("policy detail page renders by slug", async ({ page }) => {
 test("product list empty state is distinct from API failure", async ({ page }) => {
   await page.goto("/products?q=e2e-no-matching-product-keyword");
 
-  await expect(page.getByText("판매중인 상품이 없습니다")).toBeVisible();
+  await expect(page.getByText("판매 중인 상품이 없습니다")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("상품을 불러오지 못했습니다");
   await expectNoHorizontalOverflow(page);
 });

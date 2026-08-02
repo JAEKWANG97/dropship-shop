@@ -22,9 +22,9 @@ export default async function RootLayout({
       <body>
         <div className="site-utility">
           <nav aria-label="Utility navigation">
-            <Link href="/products">상품목록</Link>
-            <Link href="/support">고객문의</Link>
-            <Link href="/company">회사정보</Link>
+            <Link href="/products">상품 목록</Link>
+            <Link href="/support">고객 문의</Link>
+            <Link href="/company">회사 정보</Link>
             {admin ? <Link className="admin-entry" href="/admin">운영관리</Link> : null}
           </nav>
         </div>
@@ -60,11 +60,11 @@ export default async function RootLayout({
                 </svg>
                 <span>장바구니</span>
               </Link>
-              <Link href="/orders" aria-label="주문조회">
+              <Link href="/orders" aria-label="주문 조회">
                 <svg className="site-nav-icon" aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" />
                 </svg>
-                <span>주문조회</span>
+                <span>주문 조회</span>
               </Link>
               {session ? (
                 <>

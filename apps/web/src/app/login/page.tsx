@@ -31,7 +31,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="auth-copy">
           <span className="auth-context">소셜 로그인</span>
           <h1>현장에 필요한 안전용품을 바로 주문하세요</h1>
-          <p>비밀번호 없이 소셜 계정으로 로그인하고 장바구니, 주문조회, 배송 정보를 이어서 확인할 수 있습니다.</p>
+          <p>비밀번호 없이 소셜 계정으로 로그인하고 장바구니, 주문 조회, 배송 정보를 이어서 확인할 수 있습니다.</p>
         </div>
         {session ? (
           <div className="auth-signed-in">
