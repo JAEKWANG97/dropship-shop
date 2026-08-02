@@ -58,13 +58,25 @@ node scripts/audit-sale-catalog.mjs --cookie-file tmp/admin-cookie.txt
 ```
 
 - 결과: `tmp/sale-catalog-audit.json`, `tmp/sale-catalog-audit.csv`
-- 자동 차단: 판매 준비 조건 미충족, 중복 상품명, 60자 초과 또는 키워드 과다 상품명, placeholder, 모델명·제조사·원산지·배송·반품 정보 누락
+- 자동 차단: 판매 준비 조건 미충족, 공급처 상품번호 누락·중복, 모델명·제조사·원산지·배송·반품 항목 누락
+- 상품명은 길이, 키워드 수, 다른 상품과의 이름 중복을 이유로 차단하거나 정제하지 않는다. 중복 상품은 공급처 상품번호로 판정한다.
+- `상세정보 별도표기`, `해당없음`, `1 / 1`, `0x0x0 / 0g` 등 상품 페이지에 표시된 값은 공급처 표시값으로 취급하고 판단하거나 치환하지 않는다.
 - 경고만 기록: 인증 `PENDING`. 기존 정책대로 판매 자체를 차단하지 않으며 상품 상세에는 `상품 정보 확인 필요`로 표시한다.
 - 감사 도구는 상품 정보를 추측하거나 자동 생성하지 않는다.
 
 ## Domeggook Collection
 
 도매꾹 상품은 자동 수집·선별하며 상품별 수동 `REVIEW` 큐를 만들지 않는다.
+
+상품 페이지에서 확인되는 상품 정보를 원문 그대로 수집·등록한다.
+
+- 수집·등록: 상품명, 공급가, 옵션, 재고, 최소수량, 대표·상세 이미지, 상세설명, 원산지, 모델명, 제조사, 부피·무게, 인증정보, 상품정보제공고시, 배송 방법·예정일·배송비
+- 수집본 보존: 거래조건, 공급사 사업자 정보, 공급처 반품·교환 정보와 원문 배송·약관 데이터
+- 제외: 도매꾹 화면 구성·브랜드 문구, 후기·문의, 개인정보, 로그인 계정별 정보, 광고·추적 데이터
+- 공급처가 이미지 사용을 허용한 상품만 이미지와 상세설명을 사용한다.
+- 공급처 원문과 별도로 고객 계약에 적용되는 코어러블 A/S·반품·교환 정책을 표시한다.
+- 공급가는 원문 그대로 `sourcePrice`에 저장하고 고객 판매가 `basePrice`는 코어러블 가격 정책으로 계산한다.
+- 공급처 카테고리는 원문으로 보존하되 고객 상품 카테고리는 코어러블 카테고리로 매핑한다.
 
 ```bash
 node scripts/collect-domeggook-product.mjs https://mobile.domeggook.com/8667274
@@ -74,6 +86,7 @@ node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
 node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
 node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
 node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10
+node --env-file=.env scripts/collect-domeggook-product.mjs --open-api-refresh
 node scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
 node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
 node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs
@@ -82,11 +95,11 @@ node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs
 - 결과는 `tmp/domeggook-products/{상품번호}/`에 저장된다.
 - 공공데이터포털 키는 `.env`의 `DATA_GO_KR_SERVICE_KEY_DECODED`, `DATA_GO_KR_SERVICE_KEY_ENCODED`에 저장한다. 감사 도구는 디코딩 키를 먼저 사용하고 인증 실패 시 인코딩 키로 한 번 재시도한다.
 - 공식 Open API 수집은 로컬 `.env`의 `DOMEGGOOK_OPEN_API_KEY`를 사용하며 key를 산출물이나 git에 남기지 않는다.
-- `--open-api-coverage`는 카테고리별 많은판매단위순(`qd`) 60개만 조회하고 상품번호 중복을 제거한다. 목표 개수가 부족한 카테고리만 동의어로 추가 조회한다.
-- `qd`는 누적 구매량이나 후기순이 아니라 도매 상품의 판매단위 기준 정렬이다.
-- 목록 조회는 빠른배송(`fdl`), 우수판매자(`sgd`), 최소구매수량 최대 1개(`mxq=1`)를 필수로 한다.
-- 상세 조회에서 판매자 등급 1~2등급과 도매매 낱개구매 가능 여부를 다시 확인한다.
-- `최저가확인(lwp)`은 검색어에 따라 결과가 0건이 될 수 있어 필수 조건으로 쓰지 않는다. 많은판매단위순 상위 후보 안에서 공급가가 낮은 상품부터 검수한다.
+- `--open-api-coverage`는 카테고리별 도매꾹랭킹순(`rd`) 60개를 조회하고 상품번호 중복을 제거한다. 목표 개수가 부족한 카테고리만 동의어로 추가 조회한다.
+- 목록 조회 조건은 도매꾹랭킹순(`rd`)과 도매매 낱개구매(`mxq=1`)만 사용한다.
+- 상세 조회에서 `channel.supply=true`, `price.supply`, `qty.supplyUnit=1`을 확인해 사업자 낱개구매 가능 여부를 검증한다.
+- 상세 조회에서 판매 상태, 배송비, 이미지, 옵션, 카테고리와 인증 정보를 검증한다.
+- 상품정보, 상품정보제공고시, 거래조건, 공급사와 반품 정보는 Open API 원문을 수집본에 보존한다. 고객 공개 상품에는 상품정보제공고시 행만 등록한다.
 - 기본 검색에서 유효 후보가 목표 수량보다 적을 때만 해당 카테고리 동의어를 추가 조회한다.
 - 분당 호출 제한을 피하기 위해 호출 간격을 최소 1초로 강제하고 일일 자체 한도는 5,000회로 제한한다.
 - 호출 횟수는 `tmp/domeggook-api-usage-YYYY-MM-DD.json`에 기록한다. `429` 응답이면 재시도하지 않고 실행을 중단한다.
@@ -137,12 +150,13 @@ node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manif
 - `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 반올림한 값이다.
 - `tmp/domeggook-import-manifest.filtered.json`의 `sourcePrice`는 공급처 상품가만 사용한다. 공급처 배송비는 판매가 계산에 더하지 않는다.
 - 옵션이 있는 상품은 옵션별 원본 공급가(`sourcePrice + sourceAdditionalPrice`)에 가격 정책을 적용하고, 가장 낮은 옵션 판매가를 상품 `basePrice`로 둔다. 각 옵션의 `additionalPrice`는 `옵션 판매가 - basePrice`로 계산한다.
+- 공급처 `price.resale.minimum`이 있으면 100원 단위로 올림한 금액과 계산 판매가 중 큰 값을 사용한다.
 - `sourceOptionCode`, `sourceAdditionalPrice`, `sourceStockQuantity`, `sortOrder`는 관리자 검수용 메타데이터이며 고객 화면에는 노출하지 않는다.
 - 숫자 가격이 없는 상품은 자동 제외한다.
-- filtered manifest는 수집 상품의 상품명·원산지·제조사·인증 문구로 상품 고시를 만들고 코어블SAF의 배송, A/S, 반품/교환 안내를 채운다.
+- filtered manifest는 공급처 상품 페이지의 상품정보제공고시 행을 새로 조합하거나 치환하지 않고 그대로 등록한다. 거래조건과 공급사 정보는 수집본에만 보존하고, 고객에게는 코어블SAF 배송·반품 정책을 별도로 표시한다.
 - 공식 등록 모델 일치는 `VERIFIED`, 명시적 인증 비대상 근거나 관리되는 단순 비인증 품목은 `NOT_REQUIRED`, 나머지는 `PENDING`으로 기록한다.
 - importer는 생성 요청에 항상 `HIDDEN`을 사용한다. 옵션·대표 이미지·상세 이미지·상품 고시 저장이 모두 성공한 뒤 manifest 목표 상태가 `ACTIVE`인 상품만 상태 API로 공개한다.
-- 같은 `sourceUrl` 상품이 이미 있으면 부분 실패 지점부터 이어서 처리한다. 상세 이미지 블록은 backend 허용 한도인 앞 50개까지 저장한다.
+- 같은 `sourceItemNo` 상품이 이미 있으면 새 상품을 만들지 않고 원문 상품명·가격·옵션·고시를 갱신한다. 공급처에서 사라진 옵션은 `STOPPED`로 바꾼다. 상세 이미지 블록은 backend 허용 한도인 앞 50개까지 저장한다.
 - 인증 상태가 명시적으로 `REJECTED`인 상품만 자동 공개하지 않는다.
 - import 결과는 `tmp/domeggook-import-result.json`에 저장된다.
 - 대량 적재 전에는 filtered manifest를 10개 정도로 제한한 임시 manifest를 만들어 먼저 `--apply` 한다.
