@@ -43,7 +43,7 @@ public class Product {
 	@Column(name = "source_url", length = 2000)
 	private String sourceUrl;
 
-	@Column(name = "source_item_no", length = 50)
+	@Column(name = "source_item_no", length = 50, unique = true)
 	private String sourceItemNo;
 
 	@Enumerated(EnumType.STRING)

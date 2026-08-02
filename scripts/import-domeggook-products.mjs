@@ -68,6 +68,11 @@ function calculateBasePrice(sourcePrice, policy = DEFAULT_PRICING_POLICY) {
   return Math.round(rawPrice / roundingUnit) * roundingUnit;
 }
 
+function findExistingBySourceItemNo(products, itemNo) {
+  const sourceItemNo = String(itemNo);
+  return products.find((candidate) => String(candidate.sourceItemNo || "") === sourceItemNo) || null;
+}
+
 function publicSummaryPart(part) {
   const value = String(part || "").trim();
   if (!value) return "";
@@ -342,6 +347,9 @@ function manifestIssue(item, pricing) {
   if (item.status === "ACTIVE" && ![item.productInfoNotice, item.shippingInfo, item.asInfo, item.returnExchangeInfo].every(Boolean)) {
     return "ACTIVE import requires complete product notice";
   }
+  if (item.status === "ACTIVE" && !(item.noticeRows || []).length) {
+    return "ACTIVE import requires structured product notice rows";
+  }
   return "";
 }
 
@@ -354,8 +362,16 @@ async function importItem(args, item, product, suppliers, products, policy) {
   const issue = manifestIssue(item, pricing);
   if (issue) return { itemNo: item.itemNo, status: "FAILED", reason: issue };
   const sourceUrl = item.sourceUrl || product.sourceUrl || null;
-  const existing = products.find((candidate) => sourceUrl && candidate.sourceUrl === sourceUrl)
-    || products.find((candidate) => !candidate.sourceUrl && candidate.name === item.name);
+  const existingByItemNo = findExistingBySourceItemNo(products, item.itemNo);
+  if (existingByItemNo) {
+    return {
+      itemNo: item.itemNo,
+      productId: existingByItemNo.id,
+      status: "SKIPPED",
+      reason: "sourceItemNo already imported",
+    };
+  }
+  const existing = products.find((candidate) => !candidate.sourceItemNo && sourceUrl && candidate.sourceUrl === sourceUrl);
 
   const supplier = existing
     ? suppliers.find((candidate) => candidate.id === existing.supplierId)
@@ -440,7 +456,9 @@ async function importItem(args, item, product, suppliers, products, policy) {
     });
   }
 
-  if ((item.productInfoNotice || item.noticeRows?.length) && (!created.productNotice || !(created.productNotice.noticeRows || []).length)) {
+  const shouldCreateNotice = !created.productNotice && (item.productInfoNotice || item.noticeRows?.length);
+  const shouldBackfillNoticeRows = item.noticeRows?.length && !(created.productNotice?.noticeRows || []).length;
+  if (shouldCreateNotice || shouldBackfillNoticeRows) {
     const noticeRows = item.noticeRows || [];
     await apiFetch(args, `/api/admin/products/${created.id}/notice`, {
       method: "PUT",
@@ -572,10 +590,13 @@ async function main() {
     assert.equal(manifestIssue({ ...active, complianceStatus: "PENDING" }, pricing), "");
     assert.match(manifestIssue({ ...active, complianceStatus: "REJECTED" }, pricing), /compliance/);
     assert.match(manifestIssue({ ...active, asInfo: "" }, pricing), /product notice/);
+    assert.match(manifestIssue({ ...active, noticeRows: [] }, pricing), /structured product notice/);
     assert.equal(imageFormat(Buffer.from([0xff, 0xd8, 0xff])).extension, "jpg");
     assert.equal(imageFormat(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])).extension, "png");
     assert.equal(imageFormat(Buffer.from("RIFF0000WEBP")).extension, "webp");
     assert.equal(imageFormat(Buffer.from("GIF89a")), null);
+    assert.equal(findExistingBySourceItemNo([{ id: "product-1", sourceItemNo: "64470251" }], 64470251)?.id, "product-1");
+    assert.equal(findExistingBySourceItemNo([{ id: "product-1", sourceItemNo: "64470251" }], 64470252), null);
     console.log("Domeggook product import self-check passed");
     return;
   }

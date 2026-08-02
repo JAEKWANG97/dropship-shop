@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -22,6 +23,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import javax.imageio.ImageIO;
 
@@ -573,6 +578,72 @@ class CatalogApiIntegrationTest {
 	}
 
 	@Test
+	void derivesSourceItemNoAndRejectsDuplicateSupplierProduct() throws Exception {
+		UUID supplierId = createSupplier();
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(productRequest(supplierId, "First supplier product", "64470251", null)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.sourceItemNo", is("64470251")));
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(productRequest(supplierId, "Duplicate supplier product", "64470251", null)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.message", containsString("64470251")));
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(productRequest(supplierId, "First supplier product", "64470252", null)))
+			.andExpect(status().isCreated());
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(productRequest(supplierId, "Mismatched supplier product", "64470253", "99999999")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("일치하지 않습니다")));
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(productRequest(supplierId, "Missing supplier item number", "items", null)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("확인할 수 없습니다")));
+	}
+
+	@Test
+	void allowsOnlyOneConcurrentCreationForSameSourceItemNo() throws Exception {
+		UUID supplierId = createSupplier();
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch start = new CountDownLatch(1);
+
+		try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+			List<Future<Integer>> requests = List.of("Concurrent A", "Concurrent B").stream()
+				.map(name -> executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return mockMvc.perform(post("/api/admin/products")
+							.with(authentication(TestAuthentication.admin()))
+							.contentType(MediaType.APPLICATION_JSON)
+							.content(productRequest(supplierId, name, "64470254", null)))
+						.andReturn()
+						.getResponse()
+						.getStatus();
+				}))
+				.toList();
+			ready.await();
+			start.countDown();
+			List<Integer> statuses = requests.stream().map(this::futureResult).sorted().toList();
+			assertEquals(List.of(201, 409), statuses);
+		}
+	}
+
+	@Test
 	void sanitizesProductDetailHtmlWithSafelist() throws Exception {
 		UUID productId = createProduct(createSupplier());
 
@@ -678,7 +749,7 @@ class CatalogApiIntegrationTest {
 	}
 
 	private UUID createProduct(UUID supplierId) throws Exception {
-		return createProduct(supplierId, "Product A", "Summary", "PPE_SAFETY_HELMET", "HIDDEN");
+		return createProduct(supplierId, "Product A", "Summary", "PPE_SAFETY_HELMET", "HIDDEN", "8667274");
 	}
 
 	private void prepareProductForSale(UUID productId, UUID supplierId) throws Exception {
@@ -738,6 +809,17 @@ class CatalogApiIntegrationTest {
 		String categoryCode,
 		String status
 	) throws Exception {
+		return createProduct(supplierId, name, summary, categoryCode, status, Integer.toUnsignedString(name.hashCode()));
+	}
+
+	private UUID createProduct(
+		UUID supplierId,
+		String name,
+		String summary,
+		String categoryCode,
+		String status,
+		String sourceItemNo
+	) throws Exception {
 		MvcResult result = mockMvc.perform(post("/api/admin/products")
 				.with(authentication(TestAuthentication.admin()))
 				.contentType(MediaType.APPLICATION_JSON)
@@ -747,12 +829,12 @@ class CatalogApiIntegrationTest {
 					  "name": "%s",
 					  "summary": "%s",
 					  "sourcePrice": 31200,
-					  "sourceUrl": "https://mobile.domeggook.com/8667274",
+					  "sourceUrl": "https://mobile.domeggook.com/%s",
 					  "basePrice": 39000,
 					  "categoryCode": "%s",
 					  "status": "%s"
 					}
-					""".formatted(supplierId, name, summary, categoryCode, status)))
+					""".formatted(supplierId, name, summary, sourceItemNo, categoryCode, status)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.sourcePrice", is(31200)))
 			.andExpect(jsonPath("$.basePrice", is(39000)))
@@ -760,6 +842,30 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.status", is(status)))
 			.andReturn();
 		return idFrom(result);
+	}
+
+	private String productRequest(UUID supplierId, String name, String pathItemNo, String sourceItemNo) {
+		String sourceItemNoJson = sourceItemNo == null ? "" : ",\n  \"sourceItemNo\": \"" + sourceItemNo + "\"";
+		return """
+			{
+			  "supplierId": "%s",
+			  "name": "%s",
+			  "summary": "Supplier product",
+			  "sourcePrice": 1000,
+			  "sourceUrl": "https://mobile.domeggook.com/%s",
+			  "basePrice": 1300,
+			  "categoryCode": "PPE_SAFETY_HELMET",
+			  "status": "HIDDEN"%s
+			}
+			""".formatted(supplierId, name, pathItemNo, sourceItemNoJson);
+	}
+
+	private int futureResult(Future<Integer> future) {
+		try {
+			return future.get();
+		} catch (Exception exception) {
+			throw new IllegalStateException(exception);
+		}
 	}
 
 	private UUID idFrom(MvcResult result) throws Exception {

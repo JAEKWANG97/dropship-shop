@@ -22,6 +22,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
 	Optional<Product> findBySupplier_IdAndName(UUID supplierId, String name);
 
+	Optional<Product> findBySourceItemNo(String sourceItemNo);
+
 	@Query(
 		value = """
 			select product from Product product
