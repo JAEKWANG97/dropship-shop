@@ -284,7 +284,7 @@ DS-6 minimum:
 - Admin product detail includes `supplierId` and `supplierName`; public product detail omits supplier information.
 - Admin product list accepts optional `q`, `status`, `category`, `supplierId`, `readiness=READY|BLOCKED`, `page`, and `size`. `page` is zero-based, `size` defaults to 20 and is limited to 1-100.
 - Admin product list returns `{ products, page, size, totalElements, totalPages }` ordered by `createdAt DESC, id DESC`.
-- Products must be created as non-active. `ACTIVE` requires a positive sale price, thumbnail, active option, active product notice, and `NOT_REQUIRED` or `VERIFIED` compliance review.
+- Products must be created as non-active. `ACTIVE` requires a positive sale price, thumbnail, active option, active product notice, and a compliance status other than `REJECTED`.
 - Sale readiness is derived from current product data and is not persisted as a separate review-status column. Individual activation remains protected by the same service validation used for readiness display.
 - Price, image, option, and compliance updates cannot leave an `ACTIVE` product without those requirements.
 - Active pricing policy stores the default margin rates used to calculate customer sale prices from supplier cost.

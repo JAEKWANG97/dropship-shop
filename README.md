@@ -75,7 +75,6 @@
 - [Domain Model](docs/domain-model.md)
 - [Architecture](docs/architecture.md)
 - [Production Readiness](docs/production-readiness.md)
-- [Roadmap](docs/roadmap.md)
 - [Backlog](docs/BACKLOG.md)
 - [Development Workflow](docs/development-workflow.md)
 - [Decision Log](docs/decision-log.md)

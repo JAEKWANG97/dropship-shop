@@ -195,10 +195,10 @@ Modeling notes:
 - `sourcePrice` is internal cost. `sourceItemNo` is the supplier-product identity and `sourceUrl` is its operator traceability link. None are exposed by public product APIs.
 - Domeggook product creation derives `sourceItemNo` from `sourceUrl`; duplicate non-null values are rejected.
 - `sourceUrl` accepts only `http` or `https`, is limited to 2,000 characters, and is never fetched by the backend.
-- `basePrice` is the customer sale price including expected shipping cost.
+- `basePrice` is the customer sale price. Supplier shipping fees are operating costs and are not added to its calculation.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
-- `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status `NOT_REQUIRED` or `VERIFIED`.
+- `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status other than `REJECTED`.
 - `saleReady` and `saleBlockers` are derived admin views over those conditions rather than persisted product state. Detail-content presence is shown as a recommendation and does not block activation.
 
 ## ProductImage
@@ -1081,11 +1081,11 @@ B-080 implementation note:
 - 고객 계좌환불과 도매꾹 주문취소/e-money 반환은 서로 다른 상태와 증적으로 관리한다.
 - 공급처 발주 후 2영업일 이상 출고 예정이 불명확하면 고객 지연 안내 대상으로 관리한다.
 - 배송 후 반품/교환은 클레임 접수와 관리자 수동 심사로 시작한다.
-- 택배사와 송장번호 입력 후 배송 상태는 자동 조회/동기화한다.
+- 도매꾹 자동 발주 주문은 구매 주문 조회에서 택배사, 송장번호와 배송 상태를 동기화하고, 그 외 주문은 관리자가 직접 입력한다.
 - `PREPARING_SHIPMENT`은 MVP 주문 상태에서 제거하고 공급처 발주 완료 후 송장 입력 전 구간은 `SUPPLIER_ORDERED`로 표현한다.
-- 자동 배송조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
+- 공급처 주문 조회 실패에 대비해 배송 상태 수동 보정과 상태 변경 이력이 필요하다.
 - MVP 배송은 주문 1개당 배송 1개로 시작하고 부분 출고/분할 배송은 제외한다.
-- 자동 배송조회는 관리자 수동 보정 상태를 임의로 덮어쓰거나 뒤로 되돌리지 않는다.
+- 공급처 주문 동기화는 관리자 수동 보정 상태를 임의로 덮어쓰거나 뒤로 되돌리지 않는다.
 - MVP에서는 고객에게 별도 배송비를 청구하지 않으며 `shippingFee`는 `0`으로 시작한다.
 - MVP에서 한 주문은 하나의 배송 그룹만 포함한다.
 - 배송 그룹은 공급처 기준으로 나누지만 고객 화면에는 공급처 대신 배송 그룹으로 표시한다.

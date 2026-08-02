@@ -37,6 +37,8 @@ infra      Local and deployment infrastructure
 - 설계 기준: `docs/domain-model.md`, `docs/erd.md`, `docs/api-spec.md`, `docs/order-flow.md`, `docs/architecture.md`
 - 실행 단위: `docs/BACKLOG.md`, `docs/PROJECT_LOG.md`, `docs/development-workflow.md`
 
+문서를 처음부터 모두 읽지 않는다. 현재 작업의 backlog ID와 관련 용어로 필요한 문서만 검색한다. `docs/PROJECT_LOG.md`, `docs/BACKLOG_DONE.md`, `docs/decision-log.md`의 과거 항목은 이력 확인이 필요할 때만 `rg`로 조회한다.
+
 ## Instruction Model
 
 `AGENTS.md`는 살아있는 작업 규칙이다.
