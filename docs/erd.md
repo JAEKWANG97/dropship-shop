@@ -346,7 +346,7 @@ Rules:
 - Existing order item price snapshots are not changed when product source or sale prices change.
 - One product has one `category_code`; category admin and multi-category mapping are future scope.
 - Customer-visible sale requires product `ACTIVE` and option `ACTIVE`.
-- Product activation additionally requires positive `base_price`, one canonical thumbnail, one active option, an active product notice, and compliance status `NOT_REQUIRED` or `VERIFIED`.
+- Product activation additionally requires positive `base_price`, one canonical thumbnail, one active option, an active product notice, and compliance status other than `REJECTED`.
 - Sale readiness is calculated from those current values and is not stored as a separate column.
 - Canonical thumbnail data lives in `product_images` where `type = THUMBNAIL`.
 - If `thumbnail_image_url` is kept on `products`, it is a cache updated from canonical thumbnail image metadata.
@@ -1016,6 +1016,6 @@ Implemented catalog must not add:
 ## Open Modeling Notes
 
 - `User` and `SocialAccount` are conceptually separate, but currently collapsed into `users`.
-- `user_addresses` is required by requirements but not yet present in `docs/domain-model.md`.
+- `user_addresses` is implemented and represented by `UserAddress` in `docs/domain-model.md`.
 - Delivery group can be derived from supplier at first; one active delivery group per supplier is the MVP baseline.
 - Image binary storage is outside PostgreSQL; database tables store URLs or object storage keys.

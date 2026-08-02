@@ -28,22 +28,16 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - 운영 판매는 구매안전서비스와 최종 정책 버전이 준비될 때까지 `APP_SALES_ENABLED=false`로 차단한다.
 - 공개 정책의 `prelaunch-*` 버전, 세금계산서 안내, 상품별 고시·인증 검수는 출시 전 미완료 항목이다.
 
-## Recommended Reading Order
+## Task-Based Reading
 
-1. [Product Brief](product-brief.md)
-2. [Glossary](glossary.md)
-3. [Requirements](requirements.md)
-4. [Policy Documents](policies/README.md)
-5. [Order Flow](order-flow.md)
-6. [Domain Model](domain-model.md)
-7. [MVP ERD](erd.md)
-8. [MVP API Specification](api-spec.md)
-9. [Architecture](architecture.md)
-10. [Production Readiness](production-readiness.md)
-11. [Roadmap](roadmap.md)
-12. [Backlog](BACKLOG.md)
-13. [Development Workflow](development-workflow.md)
-14. [Decision Log](decision-log.md)
+모든 문서를 순서대로 읽지 않는다. 먼저 [Backlog](BACKLOG.md)에서 현재 작업을 확인하고 변경 범위에 해당하는 문서만 읽는다.
+
+- 제품 범위: [Product Brief](product-brief.md), [Requirements](requirements.md)
+- 정책: 관련 [Policy Documents](policies/README.md), 필요한 결정만 [Decision Log](decision-log.md)에서 검색
+- API/DB: [API Specification](api-spec.md), [ERD](erd.md)
+- 주문 상태: [Order Flow](order-flow.md)
+- 배포/복구: [Architecture](architecture.md), [Production Readiness](production-readiness.md), [Backup And Restore](backup-restore.md)
+- 과거 작업: `B-###`로 [Completed Backlog](BACKLOG_DONE.md)와 `PROJECT_LOG.md`를 검색
 
 ## Current Policy Hardening
 
