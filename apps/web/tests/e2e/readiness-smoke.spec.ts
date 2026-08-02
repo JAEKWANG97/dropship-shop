@@ -179,7 +179,15 @@ test("customer account pages render with a session cookie", async ({ page, conte
 });
 
 test("admin pages render with an admin session cookie", async ({ page, context }) => {
+  await page.goto("/");
+  await expect(page.locator(".site-utility")).toHaveCount(0);
+
   await addCookie(context, await requireAdminCookie());
+  await page.goto("/");
+  const utility = page.locator(".site-utility");
+  await expect(utility.getByRole("link")).toHaveCount(1);
+  await expect(utility.getByRole("link", { name: "운영관리" })).toHaveAttribute("href", "/admin");
+
   const productId = await activeProductId();
   const routes = [
     "/admin",
