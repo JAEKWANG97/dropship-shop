@@ -360,14 +360,12 @@ public class DomeggookPurchaseService {
 	}
 
 	private PurchaseContext readContext(UUID orderId) {
-		Fulfillment fulfillment = fulfillmentForOrder(orderId);
-		return context(fulfillment);
+		return transactionTemplate.execute(status -> context(fulfillmentForOrder(orderId)));
 	}
 
 	private PurchaseContext readContextByFulfillment(UUID fulfillmentId) {
-		Fulfillment fulfillment = fulfillmentRepository.findById(fulfillmentId)
-			.orElseThrow(() -> new IllegalStateException("Fulfillment not found"));
-		return context(fulfillment);
+		return transactionTemplate.execute(status -> context(fulfillmentRepository.findById(fulfillmentId)
+			.orElseThrow(() -> new IllegalStateException("Fulfillment not found"))));
 	}
 
 	private Fulfillment fulfillmentForOrder(UUID orderId) {
