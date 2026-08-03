@@ -110,10 +110,12 @@ class DomeggookPurchaseClient {
 	}
 
 	OrderView orderView(String orderNumber) {
-		JsonNode item = domeggook(privateGet("4.1", "getOrderView", form(
+		JsonNode items = domeggook(privateGet("4.1", "getOrderView", form(
 			"for", "buy",
 			"no", orderNumber
 		))).path("items");
+		JsonNode item = array(items).stream().findFirst()
+			.orElseThrow(() -> new DomeggookApiException("ORDER_NOT_FOUND", "Domeggook order response has no item", false));
 		return new OrderView(
 			orderNumber,
 			text(item.path("status")),

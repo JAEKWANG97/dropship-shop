@@ -188,7 +188,9 @@ public class DomeggookPurchaseService {
 	public void sync(UUID fulfillmentId) {
 		if (!properties.enabled()) return;
 		PurchaseContext context = readContextByFulfillment(fulfillmentId);
-		if (context.purchaseStatus() != SupplierPurchaseStatus.ORDERED || context.supplierOrderNumbers().isEmpty()) return;
+		if ((context.purchaseStatus() != SupplierPurchaseStatus.ORDERED
+			&& context.purchaseStatus() != SupplierPurchaseStatus.CANCEL_REQUESTED)
+			|| context.supplierOrderNumbers().isEmpty()) return;
 		List<DomeggookPurchaseClient.OrderView> views = context.supplierOrderNumbers().stream().map(client::orderView).toList();
 		Set<String> tracking = new HashSet<>();
 		for (DomeggookPurchaseClient.OrderView view : views) {
@@ -196,7 +198,14 @@ public class DomeggookPurchaseService {
 		}
 		transactionTemplate.executeWithoutResult(status -> {
 			Fulfillment fulfillment = fulfillmentRepository.findByIdForUpdate(context.fulfillmentId()).orElseThrow();
-			fulfillment.markPurchaseSynced(Instant.now());
+			Instant now = Instant.now();
+			fulfillment.markPurchaseSynced(now);
+			if (context.purchaseStatus() == SupplierPurchaseStatus.CANCEL_REQUESTED
+				&& views.stream().allMatch(view -> view.status().contains("구매취소"))) {
+				fulfillment.updateActualSourceAmount(views.stream().mapToLong(DomeggookPurchaseClient.OrderView::paidAmount).sum());
+				fulfillment.markSupplierCancelled("complete", now);
+				return;
+			}
 			if (tracking.size() != 1) return;
 			String[] carrierTracking = tracking.iterator().next().split("\\|", 2);
 			CustomerOrder order = fulfillment.getOrder();
@@ -236,6 +245,11 @@ public class DomeggookPurchaseService {
 
 	List<UUID> orderedFulfillmentIds() {
 		return fulfillmentRepository.findTop20ByPurchaseStatusOrderByCreatedAtAsc(SupplierPurchaseStatus.ORDERED)
+			.stream().map(Fulfillment::getId).toList();
+	}
+
+	List<UUID> cancelRequestedFulfillmentIds() {
+		return fulfillmentRepository.findTop20ByPurchaseStatusOrderByCreatedAtAsc(SupplierPurchaseStatus.CANCEL_REQUESTED)
 			.stream().map(Fulfillment::getId).toList();
 	}
 
