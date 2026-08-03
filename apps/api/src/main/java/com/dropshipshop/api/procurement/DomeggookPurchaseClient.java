@@ -50,11 +50,24 @@ class DomeggookPurchaseClient {
 		boolean onSale = "판매중".equals(text(detail.path("basis").path("status")));
 		long basePrice = number(detail.path("price").path("supply"));
 		OptionQuote option = option(detail.path("selectOpt"), optionCode);
+		JsonNode quantity = detail.path("qty");
+		long orderUnit = number(quantity.path("supplyUnit"));
+		long maximumOrderQuantity = number(quantity.path("supplyLoq"));
+		long stockQuantity = number(quantity.path("inventory"));
 		JsonNode shipping = detail.path("deli").path("supply");
 		String shippingText = "%s %s".formatted(text(shipping.path("pay")), text(shipping.path("type")));
 		boolean conditionalShipping = shippingText.matches(".*(수량|차등|비례|착불|구매자선택).*");
 		long shippingFee = number(shipping.path("fee"));
-		return new ProductQuote(onSale, option.available(), basePrice + option.additionalPrice(), shippingFee, conditionalShipping);
+		return new ProductQuote(
+			onSale,
+			option.available(),
+			basePrice + option.additionalPrice(),
+			shippingFee,
+			conditionalShipping,
+			orderUnit,
+			maximumOrderQuantity,
+			stockQuantity
+		);
 	}
 
 	long emoneyBalance() {
@@ -364,7 +377,25 @@ class DomeggookPurchaseClient {
 		JsonNode execute(String session);
 	}
 
-	record ProductQuote(boolean onSale, boolean optionAvailable, long sourceUnitPrice, long shippingFee, boolean conditionalShipping) {
+	record ProductQuote(
+		boolean onSale,
+		boolean optionAvailable,
+		long sourceUnitPrice,
+		long shippingFee,
+		boolean conditionalShipping,
+		long orderUnit,
+		long maximumOrderQuantity,
+		long stockQuantity
+	) {
+		boolean acceptsOrderQuantity(int quantity) {
+			return orderUnit > 0
+				&& quantity % orderUnit == 0
+				&& (maximumOrderQuantity <= 0 || quantity <= maximumOrderQuantity);
+		}
+
+		boolean hasStock(int quantity) {
+			return stockQuantity >= quantity;
+		}
 	}
 
 	record OrderLine(String itemNo, String optionCode, int quantity) {
