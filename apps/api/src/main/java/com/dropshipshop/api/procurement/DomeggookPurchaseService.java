@@ -341,6 +341,12 @@ public class DomeggookPurchaseService {
 			DomeggookPurchaseClient.ProductQuote quote = client.quote(line.itemNo(), line.optionCode());
 			if (!quote.onSale()) throw new DomeggookApiException("ITEM_NOT_ON_SALE", "Supplier item is not on sale", false);
 			if (!quote.optionAvailable()) throw new DomeggookApiException("OPTION_UNAVAILABLE", "Supplier option is unavailable", false);
+			if (!quote.acceptsOrderQuantity(line.quantity())) {
+				throw new DomeggookApiException("INVALID_ORDER_QUANTITY", "Supplier order quantity is invalid", false);
+			}
+			if (!quote.hasStock(line.quantity())) {
+				throw new DomeggookApiException("STOCK_INSUFFICIENT", "Supplier stock is insufficient", false);
+			}
 			if (quote.conditionalShipping()) {
 				throw new DomeggookApiException("SHIPPING_CONDITIONAL", "Conditional supplier shipping is not supported", false);
 			}
