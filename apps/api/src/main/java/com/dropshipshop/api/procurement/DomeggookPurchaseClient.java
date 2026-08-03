@@ -79,6 +79,8 @@ class DomeggookPurchaseClient {
 		MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 		form.add("receipt", "0");
 		form.add("market", "supply");
+		form.add("notify", "false");
+		form.add("alliance", "CoreableSAF");
 		form.add("deliinfo", deliveryInfo(request));
 		for (OrderLine line : request.lines()) {
 			form.add("item[%s]".formatted(line.itemNo()), orderLine(line, request.orderNumber()));
@@ -220,6 +222,8 @@ class DomeggookPurchaseClient {
 			"aid", properties.apiKey(),
 			"id", properties.userId(),
 			"sId", session,
+			"ie", "utf-8",
+			"oe", "utf-8",
 			"om", "json"
 		);
 	}
@@ -256,7 +260,8 @@ class DomeggookPurchaseClient {
 	private JsonNode parse(String body, boolean authenticated) {
 		try {
 			JsonNode root = objectMapper.readTree(body);
-			JsonNode error = root.path("domeggook").path("error");
+			JsonNode error = root.path("errors");
+			if (error.isMissingNode() || error.isNull()) error = root.path("domeggook").path("error");
 			if (!error.isMissingNode() && !error.isNull()) {
 				String code = firstText(error, "dcode", "code");
 				if (authenticated && code.toLowerCase().contains("login")) code = "AUTH_FAILED";
@@ -282,6 +287,8 @@ class DomeggookPurchaseClient {
 	private DomeggookApiException apiError(JsonNode root, boolean outcomeUnknown) {
 		String code = firstText(root.path("error"), "dcode", "code", "result");
 		String message = firstText(root.path("error"), "dmessage", "message", "msg");
+		if (code.isBlank()) code = firstText(root, "dcode", "code", "result");
+		if (message.isBlank()) message = firstText(root, "dmessage", "message", "msg");
 		return new DomeggookApiException(
 			code.isBlank() ? "API_ERROR" : code,
 			message.isBlank() ? "Domeggook API request failed" : message,
@@ -314,10 +321,19 @@ class DomeggookPurchaseClient {
 			clean(request.postalCode()),
 			clean(request.address1()),
 			clean(request.address2()),
-			clean(request.recipientPhone()),
+			deliveryPhone(request.recipientPhone()),
 			"",
 			"코어블SAF"
 		);
+	}
+
+	private String deliveryPhone(String value) {
+		String digits = value == null ? "" : value.replaceAll("[^0-9]", "");
+		if (!digits.matches("01[016789][0-9]{7,8}")) {
+			throw new DomeggookApiException("ORDER_CONSUMER_MOBILE_ERROR", "Recipient phone number is invalid", false);
+		}
+		int middleEnd = digits.length() - 4;
+		return digits.substring(0, 3) + "-" + digits.substring(3, middleEnd) + "-" + digits.substring(middleEnd);
 	}
 
 	private String orderLine(OrderLine line, String orderNumber) {

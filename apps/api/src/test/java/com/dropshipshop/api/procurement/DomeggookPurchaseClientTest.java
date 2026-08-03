@@ -4,7 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -55,5 +60,56 @@ class DomeggookPurchaseClientTest {
 		assertThat(quote.acceptsOrderQuantity(1)).isTrue();
 		assertThat(quote.acceptsOrderQuantity(11)).isFalse();
 		assertThat(quote.hasStock(197036)).isFalse();
+	}
+
+	@Test
+	void sendsOrderUsingDomeggookEncodingAndPhoneFormat() throws IOException {
+		AtomicReference<Map<String, String>> orderForm = new AtomicReference<>();
+		server = HttpServer.create(new InetSocketAddress(0), 0);
+		server.createContext("/", exchange -> {
+			String input = "POST".equals(exchange.getRequestMethod())
+				? new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)
+				: exchange.getRequestURI().getRawQuery();
+			Map<String, String> form = Arrays.stream(input.split("&"))
+				.map(value -> value.split("=", 2))
+				.collect(Collectors.toMap(
+					value -> URLDecoder.decode(value[0], StandardCharsets.UTF_8),
+					value -> value.length == 1 ? "" : URLDecoder.decode(value[1], StandardCharsets.UTF_8)
+				));
+			String mode = form.get("mode");
+			String response;
+			if ("setLogin".equals(mode)) {
+				response = "{\"domeggook\":{\"sId\":\"session\"}}";
+			} else if ("setOrder".equals(mode)) {
+				orderForm.set(form);
+				response = "{\"domeggook\":{\"result\":\"SUCCESS\",\"order\":{\"orderNo\":\"12345\"}}}";
+			} else {
+				response = "{\"domeggook\":{\"items\":{\"status\":\"결제완료\",\"orderAmtPay\":\"3450\"}}}";
+			}
+			byte[] body = response.getBytes(StandardCharsets.UTF_8);
+			exchange.getResponseHeaders().add("Content-Type", "application/json");
+			exchange.sendResponseHeaders(200, body.length);
+			exchange.getResponseBody().write(body);
+			exchange.close();
+		});
+		server.start();
+
+		String endpoint = "http://localhost:" + server.getAddress().getPort();
+		DomeggookPurchaseClient client = new DomeggookPurchaseClient(
+			new DomeggookProperties(true, false, "key", "user", "password", "127.0.0.1", endpoint),
+			new ObjectMapper(),
+			RestClient.builder().baseUrl(endpoint).build()
+		);
+
+		DomeggookPurchaseClient.OrderResult result = client.placeOrder(new DomeggookPurchaseClient.OrderRequest(
+			"OD-TEST", "홍길동", "01012345678", "12345", "서울시", "상세주소", "test@example.com",
+			java.util.List.of(new DomeggookPurchaseClient.OrderLine("63511465", "01", 1))
+		));
+
+		assertThat(result.actualAmount()).isEqualTo(3450);
+		assertThat(orderForm.get()).containsEntry("ie", "utf-8").containsEntry("oe", "utf-8")
+			.containsEntry("notify", "false").containsEntry("alliance", "CoreableSAF")
+			.containsEntry("item[63511465]", "supply||P||01|1||OD-TEST||OD-TEST");
+		assertThat(orderForm.get().get("deliinfo")).contains("|010-1234-5678||코어블SAF");
 	}
 }
