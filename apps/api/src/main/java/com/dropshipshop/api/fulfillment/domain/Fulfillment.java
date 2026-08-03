@@ -179,6 +179,10 @@ public class Fulfillment {
 		this.expectedSourceAmount = expectedSourceAmount;
 	}
 
+	public void updateActualSourceAmount(long actualSourceAmount) {
+		this.actualSourceAmount = actualSourceAmount;
+	}
+
 	public void markPurchaseOrdered(
 		String supplierOrderNumber,
 		long actualSourceAmount,

@@ -34,7 +34,10 @@ class DomeggookPurchaseScheduler {
 	@Scheduled(fixedDelayString = "${app.domeggook.sync-interval-ms:600000}")
 	void syncOrderedPurchases() {
 		if (!properties.enabled()) return;
-		service.orderedFulfillmentIds().forEach(id -> {
+		java.util.stream.Stream.concat(
+			service.orderedFulfillmentIds().stream(),
+			service.cancelRequestedFulfillmentIds().stream()
+		).forEach(id -> {
 			try {
 				service.sync(id);
 			} catch (RuntimeException exception) {
