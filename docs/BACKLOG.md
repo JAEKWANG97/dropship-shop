@@ -84,18 +84,19 @@ Status: In Progress
 
 Notes:
 - 80/443은 Cloudflare 공개 IPv4 대역으로 제한했고 DB/API 포트는 외부에 노출하지 않는다.
-- SSH 22는 현재 전체 IPv4에 공개되어 있고 EC2 instance role은 연결되지 않았다.
-- 남은 핵심은 SSH 제한, root/장기 access key 제거, EC2 정적 자격증명 축소, OS와 웹 의존성 보안 패치다.
+- SSH 22 인바운드는 제거했고 GitHub Actions 배포도 OIDC 단기 자격증명과 SSM으로 전환했다.
+- 남은 핵심은 root/장기 access key 제거다.
 
 Tasks:
 - [x] 80/443 인바운드를 Cloudflare IP 대역으로 제한하고 직접 origin 접속 차단을 확인한다.
 - [x] 미사용 보안그룹을 삭제한다.
 - [ ] root 액세스 키의 마지막 사용을 확인하고 삭제한다.
 - [ ] `cli-user`의 장기 `AdministratorAccess` 키를 로테이션하고 사람/배포 권한을 필요한 범위로 줄인다.
-- [ ] EC2에 S3 백업 전용 instance role을 연결하고 `/root/.aws`의 정적 백업 키를 제거한다.
-- [ ] EC2 `unattended-upgrades` 활성 여부를 확인한다.
-- [ ] SSH 22를 현재 관리자 IP로 즉시 제한하고, 이후 SSM Session Manager 전환 여부를 B-052와 함께 결정한다.
-- [ ] Next.js/PostCSS moderate advisory가 해소되는 패치 버전으로 갱신하고 `npm audit`를 다시 확인한다.
+- [x] EC2에 S3 백업 전용 instance role을 연결하고 `/root/.aws`의 정적 백업 키를 제거한다.
+- [x] EC2 `unattended-upgrades`가 enabled/active인지 확인한다.
+- [x] SSH 22 인바운드를 제거하고 SSM 명령 실행을 검증한다.
+- [x] GitHub Actions 배포를 main 전용 OIDC 역할과 대상 EC2 전용 SSM 권한으로 전환한다.
+- [x] Next.js/PostCSS/sharp high advisory를 해소하고 `npm audit` 0건을 확인한다.
 
 ### B-065 관리자 주문 목록 서버 페이징과 필터
 

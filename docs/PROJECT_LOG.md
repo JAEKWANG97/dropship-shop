@@ -988,3 +988,10 @@
 - 구현: 상품 카드·상세에서 MOQ와 개당/최소/선택수량 총액을 표시하고, HTML `min`/`step`과 인라인 오류로 잘못된 수량의 장바구니·바로구매를 막았다. 장바구니 합산·수정과 Checkout 직전에도 같은 서버 검증을 적용했다.
 - 보호: 공급처 MOQ 변경으로 저장 수량이 무효가 되어도 자동 보정하지 않고 현재 수량·조건·사유를 보여주며 Checkout을 차단한다. 주문 snapshot과 공급처 발주 직전 최신 수량 검증은 유지한다.
 - 검증: API 전체 테스트와 Web lint/build를 통과했다. MOQ 전용 Playwright는 Desktop 1440px·Mobile 390px에서 `6 passed`, 기존 상품 상세 구매 회귀는 `6 passed / 2 skipped`였고 상품 카드·상세·장바구니·Checkout 캡처 8장을 확인했다.
+
+## 2026-08-05 (GitHub Actions SSM 배포 전환)
+
+- 관련 항목: B-059
+- 문제·고민: SSH 22 인바운드를 제거한 뒤 기존 SCP/SSH 배포 job이 타임아웃되어 새 이미지는 생성돼도 EC2에 반영되지 않았다.
+- 해결방안: GitHub OIDC provider와 `main` 전용 IAM role을 만들고, 대상 EC2 한 대의 `AWS-RunShellScript` 실행·결과 조회만 허용했다. workflow는 commit SHA의 compose/nginx를 내려받고 GHCR 이미지를 pull한 뒤 readiness까지 SSM에서 확인한다.
+- 결정: SSH 22는 다시 열지 않고 GitHub Secrets의 장기 EC2 SSH 키도 더 이상 배포에 사용하지 않는다.
