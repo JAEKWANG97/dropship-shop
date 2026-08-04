@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
   packages: write
 
 concurrency:
@@ -108,57 +109,65 @@ jobs:
     needs: build-and-push
     steps:
       - uses: actions/checkout@v4
-      - name: Copy deployment files
-        uses: appleboy/scp-action@v0.1.7
+      - uses: aws-actions/configure-aws-credentials@v6.1.1
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          source: "infra/aws/ec2/compose.prod.yml,infra/aws/ec2/nginx.conf"
-          target: "/tmp/coreable-deploy"
-      - name: Deploy on EC2
-        uses: appleboy/ssh-action@v1.2.0
+          aws-region: ap-northeast-2
+          role-to-assume: arn:aws:iam::445567114845:role/coreable-github-deploy
+      - name: Deploy on EC2 through SSM
         env:
           API_IMAGE: ${{ needs.build-and-push.outputs.api-image }}
           WEB_IMAGE: ${{ needs.build-and-push.outputs.web-image }}
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          envs: API_IMAGE,WEB_IMAGE,GHCR_USERNAME,GHCR_TOKEN
-          script: |
-            set -euo pipefail
-            sudo mkdir -p /opt/coreable
-            sudo cp /tmp/coreable-deploy/infra/aws/ec2/compose.prod.yml /opt/coreable/compose.prod.yml
-            sudo cp /tmp/coreable-deploy/infra/aws/ec2/nginx.conf /opt/coreable/nginx.conf
-            sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.pem
-            sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.key
-            sudo test -f /opt/coreable/.env
-            for required_key in APP_BANK_TRANSFER_BANK_NAME APP_BANK_TRANSFER_ACCOUNT_NUMBER APP_BANK_TRANSFER_ACCOUNT_HOLDER; do
-              if ! sudo grep -Eq "^${required_key}=.+" /opt/coreable/.env; then
-                echo "::error::${required_key} must be configured in /opt/coreable/.env"
-                exit 1
-              fi
-            done
-            echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
-            sudo sed -i "s|^API_IMAGE=.*|API_IMAGE=${API_IMAGE}|" /opt/coreable/.env
-            sudo sed -i "s|^WEB_IMAGE=.*|WEB_IMAGE=${WEB_IMAGE}|" /opt/coreable/.env
-            cd /opt/coreable
-            sudo docker compose --env-file .env -f compose.prod.yml pull
-            sudo docker compose --env-file .env -f compose.prod.yml up -d
-            sudo docker compose --env-file .env -f compose.prod.yml ps
-            healthy=0
-            for i in $(seq 1 40); do
-              if curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null; then
-                healthy=1
-                break
-              fi
-              sleep 3
-            done
-            if [ "${healthy}" != "1" ]; then
-              sudo docker compose --env-file .env -f compose.prod.yml logs --tail=200 api
-              exit 1
-            fi
-            sudo docker image prune -af --filter "until=168h"
+        run: |
+          set -euo pipefail
+          commands=$(jq -n \
+            --arg api_image "${API_IMAGE}" \
+            --arg web_image "${WEB_IMAGE}" \
+            --arg ghcr_username "${GHCR_USERNAME}" \
+            --arg ghcr_token "${GHCR_TOKEN}" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            '{commands: [
+              "set -eu",
+              "sudo mkdir -p /opt/coreable",
+              ("sudo curl -fsSL " + ("https://raw.githubusercontent.com/" + $repository + "/" + $sha + "/infra/aws/ec2/compose.prod.yml" | @sh) + " -o /opt/coreable/compose.prod.yml"),
+              ("sudo curl -fsSL " + ("https://raw.githubusercontent.com/" + $repository + "/" + $sha + "/infra/aws/ec2/nginx.conf" | @sh) + " -o /opt/coreable/nginx.conf"),
+              "sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.pem",
+              "sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.key",
+              "sudo test -f /opt/coreable/.env",
+              "for required_key in APP_BANK_TRANSFER_BANK_NAME APP_BANK_TRANSFER_ACCOUNT_NUMBER APP_BANK_TRANSFER_ACCOUNT_HOLDER; do sudo grep -Eq \"^${required_key}=.+\" /opt/coreable/.env || exit 1; done",
+              ("printf %s " + ($ghcr_token | @sh) + " | sudo docker login ghcr.io -u " + ($ghcr_username | @sh) + " --password-stdin"),
+              ("sudo sed -i " + ("s|^API_IMAGE=.*|API_IMAGE=" + $api_image + "|" | @sh) + " /opt/coreable/.env"),
+              ("sudo sed -i " + ("s|^WEB_IMAGE=.*|WEB_IMAGE=" + $web_image + "|" | @sh) + " /opt/coreable/.env"),
+              "cd /opt/coreable",
+              "sudo docker compose --env-file .env -f compose.prod.yml pull",
+              "sudo docker logout ghcr.io >/dev/null 2>&1 || true",
+              "sudo docker compose --env-file .env -f compose.prod.yml up -d",
+              "sudo docker compose --env-file .env -f compose.prod.yml ps",
+              "healthy=0; for i in $(seq 1 40); do if curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null; then healthy=1; break; fi; sleep 3; done; if [ \"${healthy}\" != 1 ]; then sudo docker compose --env-file .env -f compose.prod.yml logs --tail=200 api; exit 1; fi",
+              "sudo docker image prune -af --filter until=168h"
+            ]}')
+          command_id=$(aws ssm send-command \
+            --instance-ids i-0c795cb4b0f0b4177 \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy ${GITHUB_SHA}" \
+            --parameters "${commands}" \
+            --query Command.CommandId \
+            --output text)
+          for _ in $(seq 1 90); do
+            command_status=$(aws ssm get-command-invocation \
+              --command-id "${command_id}" \
+              --instance-id i-0c795cb4b0f0b4177 \
+              --query Status \
+              --output text 2>/dev/null || true)
+            case "${command_status}" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 2
+          done
+          aws ssm get-command-invocation \
+            --command-id "${command_id}" \
+            --instance-id i-0c795cb4b0f0b4177 \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+          test "${command_status}" = Success
