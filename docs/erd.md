@@ -329,6 +329,9 @@ Relationships:
 - `summary`
 - `source_price`: supplier cost, admin-only
 - `source_item_no`: nullable unique supplier product number used by automated ordering, admin-only
+- `source_available`: nullable last confirmed supplier sale availability, admin-only
+- `source_synced_at`: nullable last source sync attempt time, admin-only
+- `source_sync_error`: nullable last source sync failure, admin-only
 - `source_url`: nullable supplier source URL, admin-only, maximum 2,000 characters
 - `base_price`
 - `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`

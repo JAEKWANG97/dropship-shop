@@ -1,6 +1,7 @@
 package com.dropshipshop.api.procurement;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -33,9 +34,11 @@ class DomeggookPurchaseClientTest {
 		server = HttpServer.create(new InetSocketAddress(0), 0);
 		server.createContext("/", exchange -> {
 			byte[] body = """
-				{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":450},
+				{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":450,"resale":{"minimum":600}},
 				"qty":{"inventory":"197035","domeMoq":"12","supplyUnit":1,"supplyLoq":10},
-				"selectOpt":"","deli":{"supply":{"type":"고정배송비","fee":"3000"}}}}
+				"selectOpt":{"data":{"01":{"name":"대형","sup":"1","hid":"0","supPrice":"50","qty":"2"},
+				"02":{"name":"소형","sup":"1","hid":"0","supPrice":"0","qty":"0"}}},
+				"deli":{"supply":{"type":"고정배송비","fee":"3000"}}}}
 				""".getBytes(StandardCharsets.UTF_8);
 			exchange.getResponseHeaders().add("Content-Type", "application/json");
 			exchange.sendResponseHeaders(200, body.length);
@@ -45,7 +48,9 @@ class DomeggookPurchaseClientTest {
 		server.start();
 
 		String endpoint = "http://localhost:" + server.getAddress().getPort();
-		DomeggookProperties properties = new DomeggookProperties(true, false, "key", "user", "password", "127.0.0.1", endpoint);
+		DomeggookProperties properties = new DomeggookProperties(
+			true, false, false, true, 20, "key", "user", "password", "127.0.0.1", endpoint
+		);
 		DomeggookPurchaseClient client = new DomeggookPurchaseClient(
 			properties,
 			new ObjectMapper(),
@@ -57,9 +62,16 @@ class DomeggookPurchaseClientTest {
 		assertThat(quote.orderUnit()).isEqualTo(1);
 		assertThat(quote.maximumOrderQuantity()).isEqualTo(10);
 		assertThat(quote.stockQuantity()).isEqualTo(197035);
+		assertThat(quote.sourceUnitPrice()).isEqualTo(500);
+		assertThat(quote.optionAvailable()).isTrue();
 		assertThat(quote.acceptsOrderQuantity(1)).isTrue();
 		assertThat(quote.acceptsOrderQuantity(11)).isFalse();
 		assertThat(quote.hasStock(197036)).isFalse();
+
+		DomeggookPurchaseClient.CatalogSnapshot snapshot = client.catalogSnapshot("63511465");
+		assertThat(snapshot.minimumResalePrice()).isEqualTo(600);
+		assertThat(snapshot.options()).extracting("sourceOptionCode", "available")
+			.containsExactly(tuple("01", true), tuple("02", false));
 	}
 
 	@Test
@@ -102,7 +114,7 @@ class DomeggookPurchaseClientTest {
 
 		String endpoint = "http://localhost:" + server.getAddress().getPort();
 		DomeggookPurchaseClient client = new DomeggookPurchaseClient(
-			new DomeggookProperties(true, false, "key", "user", "password", "127.0.0.1", endpoint),
+			new DomeggookProperties(true, false, false, true, 20, "key", "user", "password", "127.0.0.1", endpoint),
 			new ObjectMapper(),
 			RestClient.builder().baseUrl(endpoint).build()
 		);

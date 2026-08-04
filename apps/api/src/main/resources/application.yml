@@ -56,6 +56,10 @@ app:
   domeggook:
     enabled: ${DOMEGGOOK_PURCHASE_ENABLED:false}
     auto-order-enabled: ${DOMEGGOOK_AUTO_ORDER_ENABLED:false}
+    catalog-sync-enabled: ${DOMEGGOOK_CATALOG_SYNC_ENABLED:false}
+    catalog-sync-dry-run: ${DOMEGGOOK_CATALOG_SYNC_DRY_RUN:true}
+    catalog-sync-batch-size: ${DOMEGGOOK_CATALOG_SYNC_BATCH_SIZE:20}
+    catalog-sync-interval-ms: ${DOMEGGOOK_CATALOG_SYNC_INTERVAL_MS:3600000}
     api-key: ${DOMEGGOOK_OPEN_API_KEY:}
     user-id: ${DOMEGGOOK_PURCHASE_USER_ID:}
     password: ${DOMEGGOOK_PURCHASE_USER_PASSWORD:}

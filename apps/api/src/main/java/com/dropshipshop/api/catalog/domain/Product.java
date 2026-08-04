@@ -46,6 +46,15 @@ public class Product {
 	@Column(name = "source_item_no", length = 50, unique = true)
 	private String sourceItemNo;
 
+	@Column(name = "source_available")
+	private Boolean sourceAvailable;
+
+	@Column(name = "source_synced_at")
+	private Instant sourceSyncedAt;
+
+	@Column(name = "source_sync_error", columnDefinition = "TEXT")
+	private String sourceSyncError;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "category_code", nullable = false, length = 80)
 	private ProductCategory categoryCode;
@@ -143,6 +152,22 @@ public class Product {
 		this.sourceItemNo = sourceItemNo;
 	}
 
+	public void updateSourcePricing(long sourcePrice, long basePrice) {
+		this.sourcePrice = sourcePrice;
+		this.basePrice = basePrice;
+	}
+
+	public void markSourceSynced(boolean available, Instant syncedAt) {
+		this.sourceAvailable = available;
+		this.sourceSyncedAt = syncedAt;
+		this.sourceSyncError = null;
+	}
+
+	public void markSourceSyncFailed(String error, Instant syncedAt) {
+		this.sourceSyncedAt = syncedAt;
+		this.sourceSyncError = error;
+	}
+
 	public void updateThumbnailImageUrl(String thumbnailImageUrl) {
 		this.thumbnailImageUrl = thumbnailImageUrl;
 	}
@@ -181,6 +206,18 @@ public class Product {
 
 	public String getSourceItemNo() {
 		return sourceItemNo;
+	}
+
+	public Boolean getSourceAvailable() {
+		return sourceAvailable;
+	}
+
+	public Instant getSourceSyncedAt() {
+		return sourceSyncedAt;
+	}
+
+	public String getSourceSyncError() {
+		return sourceSyncError;
 	}
 
 	public ProductCategory getCategoryCode() {
