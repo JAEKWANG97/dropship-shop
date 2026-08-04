@@ -18,7 +18,7 @@ test("MOQ card and purchase panel show quantity rules with inline validation", a
   const productId = await moqProductId();
   await mkdir(screenshotDir, { recursive: true });
 
-  await page.goto("/products");
+  await page.goto(`/products?q=${encodeURIComponent(MOQ_PRODUCT_NAME)}`);
   const card = page.locator(`a.product-card[href="/products/${productId}"]`);
   await expect(card).toContainText(MOQ_PRODUCT_NAME);
   await expect(card).toContainText("최소 6개");

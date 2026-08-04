@@ -1009,6 +1009,7 @@
 - 검수·dry-run: `IMPORT 363 / EXCLUDE 4`, 카테고리 최종 30개 충족 4개와 미달 PASS 77개다. 운영 dry-run은 `UPDATE 178 / CREATE 185 / HIDE 0 / SKIP 4 / 실패 0`이었다.
 - 운영 반영: 관리자 API importer 결과 `UPDATED 178 / IMPORTED 185 / SKIPPED 4 / 실패 0`. 반영 후 `ACTIVE 658 / SOLD_OUT 6 / HIDDEN 132`, 옵션 1,361개, 상품번호 중복 0건, 전체 상품 MOQ 1은 796개다.
 - 검증: 신규 공개 상품 상세에서 `minimumOrderQuantity=1`, `orderQuantityStep=1`, 옵션 2개를 확인했고 공개 상품 API는 658개다. 임시 관리자 토큰과 로컬 비밀 파일을 삭제하고 JWT 서명값을 회전한 뒤 내부·공개 readiness `UP`을 확인했다.
+- 후속 검증: 공급처 MOQ가 DB 저장 범위 99를 넘어도 기존 유효 MOQ를 보존한 채 상품을 `HIDDEN` 처리하도록 동기화 경계를 보완했다. MOQ 10 허용과 조건부 배송비 제외 fixture도 collector self-check에 추가했다.
 
 ## 2026-08-05 (웹 의존성 high 취약점 재패치)
 
