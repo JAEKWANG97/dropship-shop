@@ -277,6 +277,8 @@ DS-6 minimum:
 - Product notice/version source for structured product information notice rows and legacy shipping, AS, return, and exchange information.
 - Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
+- Product create/update accepts optional `minimumOrderQuantity` and `orderQuantityStep` values from 1 to 99. Create defaults omitted values to `1`; update preserves the current values.
+- Admin and public product responses expose both quantity-rule fields.
 - Admin product responses include `sourcePrice`, optional `sourceItemNo`, `sourceUrl`, `sourceAvailable`, `sourceSyncedAt`, and `sourceSyncError`; public product responses expose none of them.
 - Source-backed `ACTIVE` products are refreshed in bounded batches. A supplier-side outage keeps the existing price and options and records `sourceSyncError`; confirmed unavailability changes the product to `SOLD_OUT`. Only products previously auto-marked unavailable are automatically restored to `ACTIVE`.
 - `sourceUrl` is limited to 2,000 characters and accepts only `http` or `https`. Domeggook URLs must contain a product number, which the server stores as the unique `sourceItemNo`. Duplicate creation returns `409 Conflict`.
@@ -636,6 +638,8 @@ Customer visibility:
   "summary": "Short customer-facing summary",
   "sourcePrice": 31200,
   "basePrice": 39000,
+  "minimumOrderQuantity": 6,
+  "orderQuantityStep": 6,
   "categoryCode": "PPE_SAFETY_HELMET",
   "status": "ACTIVE"
 }
@@ -738,6 +742,8 @@ Rule:
   "name": "Product name",
   "summary": "Short customer-facing summary",
   "basePrice": 39000,
+  "minimumOrderQuantity": 6,
+  "orderQuantityStep": 6,
   "categoryCode": "PPE_SAFETY_HELMET",
   "status": "ACTIVE",
   "detailVersion": 3,

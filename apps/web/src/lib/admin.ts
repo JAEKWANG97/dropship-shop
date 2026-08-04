@@ -18,6 +18,8 @@ export type AdminProduct = {
   sourceSyncedAt: string | null;
   sourceSyncError: string | null;
   basePrice: number;
+  minimumOrderQuantity: number;
+  orderQuantityStep: number;
   categoryCode: ProductCategoryCode;
   status: AdminProductStatus;
   complianceStatus: ProductComplianceStatus;

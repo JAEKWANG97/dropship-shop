@@ -13,6 +13,8 @@ export type ProductSummary = {
   name: string;
   summary: string;
   basePrice: number;
+  minimumOrderQuantity: number;
+  orderQuantityStep: number;
   categoryCode: ProductCategoryCode;
   status: ProductStatus;
   thumbnailImageUrl: string | null;

@@ -227,6 +227,10 @@ public class CatalogService {
 			request.categoryCode(),
 			request.status()
 		);
+		product.updateOrderQuantityRules(
+			valueOrDefault(request.minimumOrderQuantity(), 1),
+			valueOrDefault(request.orderQuantityStep(), 1)
+		);
 		product.updateSourceItemNo(sourceItemNo);
 		product.updateSourceUrl(request.sourceUrl());
 		try {
@@ -265,6 +269,10 @@ public class CatalogService {
 		requireReason(request.reason());
 		recordProductBaseChanges(product, supplier, request, adminUserId);
 		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
+		product.updateOrderQuantityRules(
+			valueOrDefault(request.minimumOrderQuantity(), product.getMinimumOrderQuantity()),
+			valueOrDefault(request.orderQuantityStep(), product.getOrderQuantityStep())
+		);
 		product.updateSourceItemNo(sourceItemNo);
 		product.updateSourceUrl(request.sourceUrl());
 		product.updateComplianceStatus(valueOrDefault(request.complianceStatus(), product.getComplianceStatus()));
@@ -611,6 +619,14 @@ public class CatalogService {
 			recordChange(product, null, adminUserId, ProductChangeType.COMPLIANCE_STATUS,
 				product.getComplianceStatus().name(), request.complianceStatus().name(), request.reason());
 		}
+		int minimumOrderQuantity = valueOrDefault(request.minimumOrderQuantity(), product.getMinimumOrderQuantity());
+		int orderQuantityStep = valueOrDefault(request.orderQuantityStep(), product.getOrderQuantityStep());
+		if (product.getMinimumOrderQuantity() != minimumOrderQuantity || product.getOrderQuantityStep() != orderQuantityStep) {
+			recordChange(product, null, adminUserId, ProductChangeType.ORDER_QUANTITY,
+				product.getMinimumOrderQuantity() + "/" + product.getOrderQuantityStep(),
+				minimumOrderQuantity + "/" + orderQuantityStep,
+				request.reason());
+		}
 	}
 
 	private void validateIfActive(Product product) {
@@ -861,6 +877,8 @@ public class CatalogService {
 			product.getSourceSyncedAt(),
 			product.getSourceSyncError(),
 			product.getBasePrice(),
+			product.getMinimumOrderQuantity(),
+			product.getOrderQuantityStep(),
 			product.getCategoryCode(),
 			product.getStatus(),
 			product.getComplianceStatus(),
@@ -881,6 +899,8 @@ public class CatalogService {
 			product.getName(),
 			product.getSummary(),
 			product.getBasePrice(),
+			product.getMinimumOrderQuantity(),
+			product.getOrderQuantityStep(),
 			product.getCategoryCode(),
 			product.getStatus(),
 			product.getThumbnailImageUrl()
@@ -928,6 +948,8 @@ public class CatalogService {
 			includeSourcePrice ? product.getSourceSyncedAt() : null,
 			includeSourcePrice ? product.getSourceSyncError() : null,
 			product.getBasePrice(),
+			product.getMinimumOrderQuantity(),
+			product.getOrderQuantityStep(),
 			product.getCategoryCode(),
 			product.getStatus(),
 			salesProperties.enabled(),
