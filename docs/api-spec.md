@@ -155,7 +155,7 @@ POST /api/me/agreements
   "termsAgreed": true,
   "privacyAgreed": true,
   "termsVersion": "2026-08-02",
-  "privacyVersion": "2026-08-02"
+  "privacyVersion": "2026-08-04"
 }
 
 GET /api/me/profile-completion
@@ -403,7 +403,7 @@ PATCH /api/orders/{orderId}/shipping-address
 POST /api/checkouts/{checkoutNumber}/policy-confirmation
 {
   "termsVersion": "2026-08-02",
-  "privacyVersion": "2026-08-02",
+  "privacyVersion": "2026-08-04",
   "orderPolicyVersion": "2026-08-02",
   "cancellationRefundPolicyVersion": "2026-08-02",
   "outOfStockNoticeVersion": "2026-08-02"

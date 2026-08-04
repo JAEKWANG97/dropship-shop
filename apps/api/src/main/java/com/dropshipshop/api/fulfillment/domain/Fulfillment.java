@@ -209,6 +209,12 @@ public class Fulfillment {
 
 	public void markPurchaseSynced(Instant syncedAt) {
 		this.purchaseSyncedAt = syncedAt;
+		this.lastPurchaseError = null;
+	}
+
+	public void recordPurchaseSyncFailure(String error, Instant syncedAt) {
+		this.lastPurchaseError = error;
+		this.purchaseSyncedAt = syncedAt;
 	}
 
 	public void markSupplierCancelRequested(String status, Instant syncedAt) {

@@ -63,7 +63,7 @@ class DomeggookPurchaseClientTest {
 	}
 
 	@Test
-	void sendsOrderUsingDomeggookEncodingAndPhoneFormat() throws IOException {
+	void handlesPrivateApiOrderLifecycleFixtures() throws IOException {
 		AtomicReference<Map<String, String>> orderForm = new AtomicReference<>();
 		server = HttpServer.create(new InetSocketAddress(0), 0);
 		server.createContext("/", exchange -> {
@@ -80,11 +80,17 @@ class DomeggookPurchaseClientTest {
 			String response;
 			if ("setLogin".equals(mode)) {
 				response = "{\"domeggook\":{\"sId\":\"session\"}}";
+			} else if ("getMyAsset".equals(mode)) {
+				response = "{\"domeggook\":{\"data\":{\"currEmoney\":{\"total\":\"10000\"}}}}";
 			} else if ("setOrder".equals(mode)) {
 				orderForm.set(form);
 				response = "{\"domeggook\":{\"result\":\"SUCCESS\",\"order\":{\"orderNo\":\"12345\"}}}";
+			} else if ("getOrderList".equals(mode)) {
+				response = "{\"domeggook\":{\"items\":[{\"orderNo\":\"OR12345\",\"itemNo\":\"63511465\",\"status\":\"배송중\"}]}}";
+			} else if ("setOrdDeny".equals(mode)) {
+				response = "{\"domeggook\":{\"result\":\"complete\"}}";
 			} else {
-				response = "{\"domeggook\":{\"items\":[{\"status\":\"결제완료\",\"orderAmtPay\":\"3450\"}]}}";
+				response = "{\"domeggook\":{\"items\":[{\"orderNo\":\"OR12345\",\"status\":\"배송중\",\"orderAmtPay\":\"3450\",\"orderMemo\":\"OD-TEST\",\"item\":{\"no\":\"63511465\"},\"delivery\":{\"companyName\":\"테스트택배\",\"code\":\"TRACK-1\"}}]}}";
 			}
 			byte[] body = response.getBytes(StandardCharsets.UTF_8);
 			exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -111,5 +117,13 @@ class DomeggookPurchaseClientTest {
 			.containsEntry("notify", "false").containsEntry("alliance", "CoreableSAF")
 			.containsEntry("item[63511465]", "supply||P||01|1||OD-TEST||OD-TEST");
 		assertThat(orderForm.get().get("deliinfo")).contains("|010-1234-5678||코어블SAF");
+		assertThat(client.emoneyBalance()).isEqualTo(10000);
+		assertThat(client.recentOrders()).containsExactly(
+			new DomeggookPurchaseClient.PurchaseListItem("12345", "63511465", "배송중")
+		);
+		assertThat(client.orderView("12345")).isEqualTo(new DomeggookPurchaseClient.OrderView(
+			"12345", "배송중", 3450, "테스트택배", "TRACK-1", "OD-TEST", "63511465"
+		));
+		assertThat(client.cancel("12345", "테스트 취소")).isEqualTo("complete");
 	}
 }

@@ -11,7 +11,7 @@ class AccountAgreementProperties {
 
 	AccountAgreementProperties(
 		@Value("${app.policies.required-terms-version:2026-08-02}") String requiredTermsVersion,
-		@Value("${app.policies.required-privacy-version:2026-08-02}") String requiredPrivacyVersion
+		@Value("${app.policies.required-privacy-version:2026-08-04}") String requiredPrivacyVersion
 	) {
 		this.requiredTermsVersion = requiredTermsVersion;
 		this.requiredPrivacyVersion = requiredPrivacyVersion;

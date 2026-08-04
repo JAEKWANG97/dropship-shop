@@ -7,6 +7,18 @@
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
 - 완료 로그와 과거 결정이 위 항목과 충돌하면 이 절과 각 정책 문서의 `Confirmed Policy`를 우선한다.
 
+## 2026-08-04: Disclose Domeggook Supplier Delivery Data Sharing
+
+Decision:
+
+When a Domeggook-backed order is placed, disclose that recipient name, email, phone number, postal code, and address are provided to the product supplier and its carrier for ordering, delivery, cancellation, and delivery support. Retain the data only until the purpose is fulfilled unless law requires longer retention. Set the required privacy policy version to `2026-08-04` and require renewed customer agreement.
+
+Consequences:
+
+- The storefront privacy policy and server-required privacy agreement version move together.
+- Domeggook UI, account credentials, supplier prices, and unrelated customer data are not shared.
+- Terms and order policy versions remain `2026-08-02`.
+
 ## 2026-08-02: Customer Policies Use The Live Version And Show Only The Effective Date
 
 Decision:

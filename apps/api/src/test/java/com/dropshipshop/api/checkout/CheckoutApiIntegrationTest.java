@@ -151,7 +151,7 @@ class CheckoutApiIntegrationTest {
 			.andExpect(jsonPath("$.shippingAddress.address1", is("Seoul test road")))
 			.andExpect(jsonPath("$.shippingAddress.address2", is("101")))
 			.andExpect(jsonPath("$.policyEvidence.termsVersion", is("2026-08-02")))
-			.andExpect(jsonPath("$.policyEvidence.privacyVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.policyEvidence.privacyVersion", is("2026-08-04")))
 			.andExpect(jsonPath("$.policyEvidence.orderPolicyVersion", is("2026-08-02")))
 			.andExpect(jsonPath("$.policyEvidence.cancellationRefundPolicyVersion", is("2026-08-02")))
 			.andExpect(jsonPath("$.policyEvidence.outOfStockNoticeVersion", is("2026-08-02")))
@@ -212,7 +212,7 @@ class CheckoutApiIntegrationTest {
 				.content("""
 					{
 					  "termsVersion": "2026-08-02",
-					  "privacyVersion": "2026-08-02",
+					  "privacyVersion": "2026-08-04",
 					  "orderPolicyVersion": "2026-08-02",
 					  "cancellationRefundPolicyVersion": "2026-08-02",
 					  "outOfStockNoticeVersion": "2026-08-02"
@@ -242,7 +242,7 @@ class CheckoutApiIntegrationTest {
 		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
-				.content(policyConfirmationRequest("tampered-version")))
+				.content(policyConfirmationRequest("tampered-version", "tampered-version")))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.message", is("Checkout policy versions are not current")));
 
@@ -253,12 +253,12 @@ class CheckoutApiIntegrationTest {
 		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
-				.content(policyConfirmationRequest("2026-08-02")))
+				.content(policyConfirmationRequest("2026-08-02", "2026-08-04")))
 			.andExpect(status().isOk());
 
 		var agreement = orderPolicyAgreementRepository.findByPaymentGroup_Id(paymentGroup.getId()).orElseThrow();
 		assertThat(agreement.getTermsVersion()).isEqualTo("2026-08-02");
-		assertThat(agreement.getPrivacyVersion()).isEqualTo("2026-08-02");
+		assertThat(agreement.getPrivacyVersion()).isEqualTo("2026-08-04");
 		assertThat(agreement.getOrderPolicyVersion()).isEqualTo("2026-08-02");
 		assertThat(agreement.getCancellationRefundPolicyVersion()).isEqualTo("2026-08-02");
 		assertThat(agreement.getOutOfStockNoticeVersion()).isEqualTo("2026-08-02");
@@ -282,7 +282,7 @@ class CheckoutApiIntegrationTest {
 		mockMvc.perform(post("/api/checkouts/{checkoutNumber}/policy-confirmation", checkoutNumber)
 				.with(authentication(TestAuthentication.customer(customer.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
-				.content(policyConfirmationRequest("2026-08-02")))
+				.content(policyConfirmationRequest("2026-08-02", "2026-08-04")))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.message", is("Required account agreements are missing")));
 	}
@@ -379,7 +379,7 @@ class CheckoutApiIntegrationTest {
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
 			"2026-08-02",
-			"2026-08-02",
+			"2026-08-04",
 			Instant.now()
 		));
 		return customer;
@@ -443,16 +443,16 @@ class CheckoutApiIntegrationTest {
 			""";
 	}
 
-	private String policyConfirmationRequest(String version) {
+	private String policyConfirmationRequest(String version, String privacyVersion) {
 		return """
 			{
-			  "termsVersion": "%1$s",
-			  "privacyVersion": "%1$s",
-			  "orderPolicyVersion": "%1$s",
-			  "cancellationRefundPolicyVersion": "%1$s",
-			  "outOfStockNoticeVersion": "%1$s"
+			  "termsVersion": "%s",
+			  "privacyVersion": "%s",
+			  "orderPolicyVersion": "%s",
+			  "cancellationRefundPolicyVersion": "%s",
+			  "outOfStockNoticeVersion": "%s"
 			}
-			""".formatted(version);
+			""".formatted(version, privacyVersion, version, version, version);
 	}
 
 	private CheckoutDtos.CreateCheckoutRequest checkoutRequest() {

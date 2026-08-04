@@ -67,7 +67,7 @@ class AccountAgreementApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.requiredAgreed", is(false)))
 			.andExpect(jsonPath("$.requiredTermsVersion", is("2026-08-02")))
-			.andExpect(jsonPath("$.requiredPrivacyVersion", is("2026-08-02")));
+			.andExpect(jsonPath("$.requiredPrivacyVersion", is("2026-08-04")));
 
 		MvcResult firstResult = mockMvc.perform(post("/api/me/agreements")
 				.with(authentication(TestAuthentication.customer(customer.getId())))
@@ -76,7 +76,7 @@ class AccountAgreementApiIntegrationTest {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.requiredAgreed", is(true)))
 			.andExpect(jsonPath("$.termsVersion", is("2026-08-02")))
-			.andExpect(jsonPath("$.privacyVersion", is("2026-08-02")))
+			.andExpect(jsonPath("$.privacyVersion", is("2026-08-04")))
 			.andExpect(jsonPath("$.agreedAt").exists())
 			.andReturn();
 
@@ -94,12 +94,12 @@ class AccountAgreementApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.requiredAgreed", is(true)))
 			.andExpect(jsonPath("$.agreedTermsVersion", is("2026-08-02")))
-			.andExpect(jsonPath("$.agreedPrivacyVersion", is("2026-08-02")));
+			.andExpect(jsonPath("$.agreedPrivacyVersion", is("2026-08-04")));
 
 		org.assertj.core.api.Assertions.assertThat(userPolicyAgreementRepository.findByUser_IdAndTermsVersionAndPrivacyVersion(
 			customer.getId(),
 			"2026-08-02",
-			"2026-08-02"
+			"2026-08-04"
 		)).isPresent();
 	}
 
@@ -115,7 +115,7 @@ class AccountAgreementApiIntegrationTest {
 					  "termsAgreed": false,
 					  "privacyAgreed": true,
 					  "termsVersion": "2026-08-02",
-					  "privacyVersion": "2026-08-02"
+					  "privacyVersion": "2026-08-04"
 					}
 					"""))
 			.andExpect(status().isBadRequest())
@@ -129,7 +129,7 @@ class AccountAgreementApiIntegrationTest {
 					  "termsAgreed": true,
 					  "privacyAgreed": true,
 					  "termsVersion": "terms-old",
-					  "privacyVersion": "2026-08-02"
+					  "privacyVersion": "2026-08-04"
 					}
 					"""))
 			.andExpect(status().isBadRequest())
@@ -216,7 +216,7 @@ class AccountAgreementApiIntegrationTest {
 			  "termsAgreed": true,
 			  "privacyAgreed": true,
 			  "termsVersion": "2026-08-02",
-			  "privacyVersion": "2026-08-02"
+			  "privacyVersion": "2026-08-04"
 			}
 			""";
 	}
