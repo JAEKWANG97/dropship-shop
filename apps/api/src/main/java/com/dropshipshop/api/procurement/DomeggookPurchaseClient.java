@@ -90,10 +90,16 @@ class DomeggookPurchaseClient {
 		JsonNode resale = detail.path("price").path("resale");
 		long minimumResalePrice = number(resale.path("minimum"));
 		if (minimumResalePrice <= 0) minimumResalePrice = number(resale.path("minumum"));
+		long supplyUnit = number(detail.path("qty").path("supplyUnit"));
+		if (supplyUnit < 1 || supplyUnit > 99) {
+			throw new DomeggookApiException("MOQ_INVALID", "Domeggook product has an invalid supply unit", false);
+		}
 		return new CatalogSnapshot(
 			onSale,
 			basePrice,
 			minimumResalePrice,
+			(int) supplyUnit,
+			(int) supplyUnit,
 			options(
 				detail.path("selectOpt"),
 				detail.path("qty").path("inventory").isMissingNode() ? null : number(detail.path("qty").path("inventory")),
@@ -473,6 +479,7 @@ class DomeggookPurchaseClient {
 	) {
 		boolean acceptsOrderQuantity(int quantity) {
 			return orderUnit > 0
+				&& quantity >= orderUnit
 				&& quantity % orderUnit == 0
 				&& (maximumOrderQuantity <= 0 || quantity <= maximumOrderQuantity);
 		}
@@ -486,6 +493,8 @@ class DomeggookPurchaseClient {
 		boolean onSale,
 		long sourcePrice,
 		long minimumResalePrice,
+		int minimumOrderQuantity,
+		int orderQuantityStep,
 		List<SourceOption> options
 	) {
 		boolean available() {

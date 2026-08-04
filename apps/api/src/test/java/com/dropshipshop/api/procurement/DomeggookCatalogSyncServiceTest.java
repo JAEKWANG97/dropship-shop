@@ -64,11 +64,11 @@ class DomeggookCatalogSyncServiceTest {
 	@Test
 	void appliesPriceAndSourceAvailabilityIdempotently() {
 		DomeggookPurchaseClient.CatalogSnapshot unavailable = new DomeggookPurchaseClient.CatalogSnapshot(
-			false, 1200, 2000,
+			false, 1200, 2000, 1, 1,
 			List.of(new DomeggookPurchaseClient.SourceOption("00", "기본", 100, 0L, false, 0))
 		);
 		DomeggookPurchaseClient.CatalogSnapshot recovered = new DomeggookPurchaseClient.CatalogSnapshot(
-			true, 1200, 2000,
+			true, 1200, 2000, 1, 1,
 			List.of(new DomeggookPurchaseClient.SourceOption("00", "기본", 100, 5L, true, 0))
 		);
 		when(client.catalogSnapshot("12345")).thenReturn(unavailable, recovered, recovered);
@@ -87,6 +87,28 @@ class DomeggookCatalogSyncServiceTest {
 	}
 
 	@Test
+	void updatesOrderQuantityRulesAndHidesMoqOverTen() {
+		when(client.catalogSnapshot("12345")).thenReturn(new DomeggookPurchaseClient.CatalogSnapshot(
+			true, 1000, 0, 6, 6,
+			List.of(new DomeggookPurchaseClient.SourceOption("00", "기본", 0, 10L, true, 0))
+		));
+
+		service.sync(productId, true);
+
+		assertThat(product.getMinimumOrderQuantity()).isEqualTo(6);
+		assertThat(product.getOrderQuantityStep()).isEqualTo(6);
+
+		when(client.catalogSnapshot("12345")).thenReturn(new DomeggookPurchaseClient.CatalogSnapshot(
+			true, 1000, 0, 11, 11,
+			List.of(new DomeggookPurchaseClient.SourceOption("00", "기본", 0, 10L, true, 0))
+		));
+		service.sync(productId, true);
+
+		assertThat(product.getMinimumOrderQuantity()).isEqualTo(11);
+		assertThat(product.getStatus()).isEqualTo(ProductStatus.HIDDEN);
+	}
+
+	@Test
 	void leavesExistingDataAndRecordsTheFailure() {
 		when(client.catalogSnapshot("12345")).thenThrow(new DomeggookApiException("429", "rate limited", false));
 
@@ -94,6 +116,7 @@ class DomeggookCatalogSyncServiceTest {
 			.isInstanceOf(DomeggookApiException.class);
 
 		assertThat(product.getBasePrice()).isEqualTo(1250);
+		assertThat(product.getMinimumOrderQuantity()).isEqualTo(1);
 		assertThat(product.getSourceSyncError()).contains("rate limited");
 	}
 }

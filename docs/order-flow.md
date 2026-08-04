@@ -18,7 +18,7 @@ Customer selects product option
 -> Payment status: APPROVED
 -> All delivery-group orders in the payment group move to SUPPLIER_ORDER_PENDING
 -> Domeggook source snapshot order is queued for automated purchase
--> Supplier item, option, source price, shipping, and e-money are revalidated
+-> Supplier item, option, source price, current MOQ/order step, shipping, and e-money are revalidated
 -> System places the supplier order with prefunded e-money
 -> Non-Domeggook order stays on the existing manual supplier-order path
 -> Fulfillment status: ORDERED

@@ -86,7 +86,7 @@ node scripts/collect-domeggook-product.mjs --backfill-options --limit 5
 node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
 node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
 node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
-node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10
+node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 30
 node --env-file=.env scripts/collect-domeggook-product.mjs --open-api-refresh
 node scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
 node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
@@ -96,21 +96,21 @@ node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs
 - 결과는 `tmp/domeggook-products/{상품번호}/`에 저장된다.
 - 공공데이터포털 키는 `.env`의 `DATA_GO_KR_SERVICE_KEY_DECODED`, `DATA_GO_KR_SERVICE_KEY_ENCODED`에 저장한다. 감사 도구는 디코딩 키를 먼저 사용하고 인증 실패 시 인코딩 키로 한 번 재시도한다.
 - 공식 Open API 수집은 로컬 `.env`의 `DOMEGGOOK_OPEN_API_KEY`를 사용하며 key를 산출물이나 git에 남기지 않는다.
-- `--open-api-coverage`는 카테고리별 도매꾹랭킹순(`rd`) 60개를 조회하고 상품번호 중복을 제거한다. 목표 개수가 부족한 카테고리만 동의어로 추가 조회한다.
-- 목록 조회 조건은 도매꾹랭킹순(`rd`)과 도매매 낱개구매(`mxq=1`)만 사용한다.
-- 상세 조회에서 `channel.supply=true`, `price.supply`, `qty.supplyUnit=1`을 확인해 사업자 낱개구매 가능 여부를 검증한다.
+- `--open-api-coverage`는 카테고리별 도매꾹랭킹순(`rd`) 60개를 한 번 조회하고 상품번호 중복을 제거한다. 목표 30개 미달도 확보된 상품만 사용하고 PASS 처리한다.
+- 목록 조회 조건은 도매꾹랭킹순(`rd`)과 도매매 최대 주문단위 `mxq=10`을 사용한다. 부족분을 위한 동의어 검색, 조건 완화와 반복 수집은 하지 않는다.
+- 상세 조회에서 `channel.supply=true`, 개당 공급가 `price.supply`, 도매매 주문단위 `qty.supplyUnit`을 확인한다. `supplyUnit`을 고객 최소수량과 주문단위로 저장하며 1~10만 판매 후보로 허용한다.
+- `qty.domeMoq`는 도매꾹 채널 최소수량이므로 도매매 고객 제약으로 사용하지 않는다. `qty.supplyLoq`는 공급처 최대수량 원문으로 구분해 보존한다.
 - 상세 조회에서 판매 상태, 배송비, 이미지, 옵션, 카테고리와 인증 정보를 검증한다.
 - 상품정보, 상품정보제공고시, 거래조건, 공급사와 반품 정보는 Open API 원문을 수집본에 보존한다. 고객 공개 상품에는 상품정보제공고시 행만 등록한다.
-- 기본 검색에서 유효 후보가 목표 수량보다 적을 때만 해당 카테고리 동의어를 추가 조회한다.
 - 분당 호출 제한을 피하기 위해 호출 간격을 최소 1초로 강제하고 일일 자체 한도는 5,000회로 제한한다.
 - 호출 횟수는 `tmp/domeggook-api-usage-YYYY-MM-DD.json`에 기록한다. `429` 응답이면 재시도하지 않고 실행을 중단한다.
 - 기존 수집본은 `--backfill-seller-score`로 이미지를 다시 받지 않고 최근 180일 판매자 후기 수와 만족도만 보강한다. 완료 상품은 재실행 시 건너뛴다.
 - 판매자 후기 수와 만족도는 판매자 단위 참고 metadata로만 저장하며 자동 수집·공개 제외 기준으로 사용하지 않는다.
-- 중단 후 같은 명령을 다시 실행하면 완료된 카테고리 보고서를 재사용한다. 필터 변경 후 전체 재수집이 필요할 때만 `--fresh`를 사용한다.
+- 진행 보고서는 상품마다 갱신한다. 중단 후 같은 명령을 다시 실행하면 완료 상품번호와 완료 카테고리를 건너뛰고 미완료 카테고리부터 이어간다. 필터 변경 후 전체 재수집이 필요할 때만 `--fresh`를 사용한다.
 - Open API coverage 결과는 `tmp/domeggook-open-api-coverage/`에 저장된다.
 - `이미지사용` 값이 `허용`인 상품만 대표 이미지와 상세 이미지를 다운로드한다.
 - 이미지 파일 크기와 해상도는 자동 수집 제외 기준으로 사용하지 않는다. 이미지가 없거나 다운로드되지 않은 상품만 제외한다.
-- 최소구매수량이 1개인 상품만 수집한다.
+- 최소구매수량 1~10 상품을 수집한다. 10 초과 상품은 `MIN_ORDER_QUANTITY_GT_10` 사유로 제외한다.
 - 고객이 별도 부품을 조립하거나 추가 구매하지 않아도 사용할 수 있는 완제품만 수집한다. 교체용·리필·호환품·부속품·내피·턱끈·패드 같은 단품 부속은 자동 제외한다.
 - 무료배송 또는 금액이 확정된 고정 선결제 배송 상품만 수집한다.
 - 수량별 비례·차등 배송비, 착불, 선불·착불 선택 상품은 고객 무료배송 가격을 확정할 수 없으므로 자동 제외한다.
@@ -143,11 +143,11 @@ node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manif
 node scripts/import-domeggook-products.mjs --manifest tmp/domeggook-import-manifest.filtered.json --cookie-file tmp/admin-cookie.txt --apply
 ```
 
-- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`, `options`를 먼저 확인한다.
+- `tmp/domeggook-import-manifest.json`에서 `import`, `categoryCode`, `summary`, `sourcePrice`, `basePrice`, `minimumOrderQuantity`, `orderQuantityStep`, `options`를 먼저 확인한다.
 - 생성된 manifest는 기본적으로 `import: false`, `status: "HIDDEN"`이다.
 - 자동 선별 결과는 `IMPORT`, `EXCLUDE`로만 나뉜다.
 - `IMPORT` 대상만 `tmp/domeggook-import-manifest.filtered.json`에서 `import: true`가 된다.
-- `EXCLUDE` 상품은 가격 없음, 이미지 사용 미허용, 활성 옵션 없음, 상세 이미지 없음, 카테고리 불명확, 원산지·제조사 누락, 명백한 비안전용품, 고객 노출 금지 키워드, 최소구매수량 2개 이상, 조건부·수량별·착불 배송 상품이다.
+- `EXCLUDE` 상품은 가격 없음, 이미지 사용 미허용, 활성 옵션 없음, 상세 이미지 없음, 카테고리 불명확, 원산지·제조사 누락, 명백한 비안전용품, 고객 노출 금지 키워드, 최소구매수량 10개 초과, 조건부·수량별·착불 배송 상품이다.
 - `basePrice`는 기본 가격 정책 기준으로 `sourcePrice`를 25% 증액하고 100원 단위로 반올림한 값이다.
 - `tmp/domeggook-import-manifest.filtered.json`의 `sourcePrice`는 공급처 상품가만 사용한다. 공급처 배송비는 판매가 계산에 더하지 않는다.
 - 옵션이 있는 상품은 옵션별 원본 공급가(`sourcePrice + sourceAdditionalPrice`)에 가격 정책을 적용하고, 가장 낮은 옵션 판매가를 상품 `basePrice`로 둔다. 각 옵션의 `additionalPrice`는 `옵션 판매가 - basePrice`로 계산한다.

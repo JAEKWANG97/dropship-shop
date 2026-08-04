@@ -995,3 +995,17 @@
 - 문제·고민: SSH 22 인바운드를 제거한 뒤 기존 SCP/SSH 배포 job이 타임아웃되어 새 이미지는 생성돼도 EC2에 반영되지 않았다.
 - 해결방안: GitHub OIDC provider와 `main` 전용 IAM role을 만들고, 대상 EC2 한 대의 `AWS-RunShellScript` 실행·결과 조회만 허용했다. workflow는 commit SHA의 compose/nginx를 내려받고 GHCR 이미지를 pull한 뒤 readiness까지 SSM에서 확인한다.
 - 결정: SSH 22는 다시 열지 않고 GitHub Secrets의 장기 EC2 SSH 키도 더 이상 배포에 사용하지 않는다.
+
+## 2026-08-05 (공급처 MOQ 수집·검수·정기 동기화)
+
+- 관련 항목: B-090
+- 필드 확인: 공식 상세 API와 실제 응답에서 도매매 `qty.supplyUnit`은 주문단위, `price.supply`는 개당 공급가임을 확인했다. 도매꾹 `qty.domeMoq`와 공급처 최대수량 `qty.supplyLoq`는 고객 MOQ와 구분해 원문으로만 보존한다.
+- 구현: 목록 조건을 `mxq=10`으로 넓히고 MOQ 1~10을 허용했다. 카테고리당 목표를 30개로 올리되 동의어 보충 없이 미달을 PASS 처리하며, 상품별 checkpoint와 호출 원장으로 중단 후 이어받는다.
+- 검수·적재: review/manifest/dry-run 결과에 MOQ 구간, 최소수량, 주문단위, 카테고리 목표·실제·부족 수량을 포함했다. importer는 공급처 상품번호로 신규·기존 MOQ를 멱등 반영하고 제외된 기존 상품은 `HIDDEN` 처리한다.
+- 동기화: B-086이 MOQ와 주문단위 변경을 상품 이력과 함께 반영한다. 10개 초과로 바뀐 ACTIVE 상품은 숨기고, API 실패 시 기존 MOQ를 유지한다.
+- 백업: 전체 수집 전에 `s3://coreable-backups-prod/db/coreable-db-20260805-014900.dump`를 생성하고 상품 이미지 2,590개를 `s3://coreable-backups-prod/uploads/products/`에 동기화했다.
+- 수집 결과: 81개 카테고리를 카테고리당 한 번 조회해 후보 367개를 저장했다. 목표 30개 충족 카테고리는 5개, 미달 PASS는 76개였으며 상품번호 중복은 0건이다. Open API 장부는 사전 검증 10회를 포함해 `750 / 5,000회`다.
+- MOQ 결과: 실제 수집본은 `MOQ 1 = 367 / MOQ 2~10 = 0 / MOQ 10 초과 = 0`이었다. `mxq=10`은 정상 동작했지만 이번 정확한 카테고리 검색의 랭킹 후보에서는 도매매 주문단위가 2 이상인 상품이 나오지 않아 운영 검증값을 임의로 만들지 않았다.
+- 검수·dry-run: `IMPORT 363 / EXCLUDE 4`, 카테고리 최종 30개 충족 4개와 미달 PASS 77개다. 운영 dry-run은 `UPDATE 178 / CREATE 185 / HIDE 0 / SKIP 4 / 실패 0`이었다.
+- 운영 반영: 관리자 API importer 결과 `UPDATED 178 / IMPORTED 185 / SKIPPED 4 / 실패 0`. 반영 후 `ACTIVE 658 / SOLD_OUT 6 / HIDDEN 132`, 옵션 1,361개, 상품번호 중복 0건, 전체 상품 MOQ 1은 796개다.
+- 검증: 신규 공개 상품 상세에서 `minimumOrderQuantity=1`, `orderQuantityStep=1`, 옵션 2개를 확인했고 공개 상품 API는 658개다. 임시 관리자 토큰과 로컬 비밀 파일을 삭제하고 JWT 서명값을 회전한 뒤 내부·공개 readiness `UP`을 확인했다.

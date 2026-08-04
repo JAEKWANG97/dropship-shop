@@ -203,7 +203,7 @@ Modeling notes:
 - `basePrice` is the customer sale price. Supplier shipping fees are operating costs and are not added to its calculation.
 - Customer quantity must be at least `minimumOrderQuantity` and be divisible by `orderQuantityStep`.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
-- Scheduled sync updates current product and option prices only; existing order price snapshots never change. Manual `HIDDEN` and `STOPPED` states are not overridden.
+- Scheduled sync updates current product price, MOQ, order step and options; existing order snapshots never change. Manual `HIDDEN` and `STOPPED` states are not overridden.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
 - `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status other than `REJECTED`.
 - `saleReady` and `saleBlockers` are derived admin views over those conditions rather than persisted product state. Detail-content presence is shown as a recommendation and does not block activation.

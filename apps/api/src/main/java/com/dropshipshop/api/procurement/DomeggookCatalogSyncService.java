@@ -88,15 +88,31 @@ class DomeggookCatalogSyncService {
 			.orElseGet(() -> salePrice(snapshot.sourcePrice(), snapshot.minimumResalePrice(), policy));
 
 		updateProductPrice(product, snapshot.sourcePrice(), basePrice);
+		updateOrderQuantityRules(product, snapshot.minimumOrderQuantity(), snapshot.orderQuantityStep());
 		updateOptions(product, pricedOptions, basePrice);
 
 		boolean previouslyUnavailable = Boolean.FALSE.equals(product.getSourceAvailable());
-		if (!snapshot.available() && product.getStatus() == ProductStatus.ACTIVE) {
+		if (snapshot.minimumOrderQuantity() > 10 && product.getStatus() == ProductStatus.ACTIVE) {
+			updateProductStatus(product, ProductStatus.HIDDEN);
+		} else if (!snapshot.available() && product.getStatus() == ProductStatus.ACTIVE) {
 			updateProductStatus(product, ProductStatus.SOLD_OUT);
 		} else if (snapshot.available() && product.getStatus() == ProductStatus.SOLD_OUT && previouslyUnavailable) {
 			updateProductStatus(product, ProductStatus.ACTIVE);
 		}
 		product.markSourceSynced(snapshot.available(), Instant.now());
+	}
+
+	private void updateOrderQuantityRules(Product product, int minimumOrderQuantity, int orderQuantityStep) {
+		if (
+			product.getMinimumOrderQuantity() == minimumOrderQuantity
+			&& product.getOrderQuantityStep() == orderQuantityStep
+		) return;
+		String before = "%d/%d".formatted(product.getMinimumOrderQuantity(), product.getOrderQuantityStep());
+		product.updateOrderQuantityRules(minimumOrderQuantity, orderQuantityStep);
+		historyRepository.save(history(
+			product, null, ProductChangeType.ORDER_QUANTITY, before,
+			"%d/%d".formatted(minimumOrderQuantity, orderQuantityStep)
+		));
 	}
 
 	private void updateProductPrice(Product product, long sourcePrice, long basePrice) {

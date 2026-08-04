@@ -255,6 +255,8 @@ async function initManifest() {
       sourcePrice,
       minimumResalePrice: pricing.minimumResalePrice,
       basePrice: pricing.basePrice,
+      minimumOrderQuantity: Number(product.minimumOrderQuantity || 1),
+      orderQuantityStep: Number(product.orderQuantityStep || product.minimumOrderQuantity || 1),
       options: pricing.options.map(manifestOption),
       supplierName: product.sellerName || "도매꾹 공급처",
       productInfoNotice: noticeRows.map((row) => `${row.label}: ${row.value}`).join("\n"),
@@ -360,6 +362,12 @@ function manifestIssue(item, pricing) {
   if (!item.summary) return "summary is required";
   if (!Number.isFinite(Number(pricing.sourcePrice)) || Number(pricing.sourcePrice) <= 0) return "sourcePrice must be a positive number";
   if (!Number.isFinite(Number(pricing.basePrice)) || Number(pricing.basePrice) <= 0) return "basePrice must be a positive number";
+  if (!Number.isInteger(Number(item.minimumOrderQuantity)) || Number(item.minimumOrderQuantity) < 1 || Number(item.minimumOrderQuantity) > 10) {
+    return "minimumOrderQuantity must be an integer from 1 to 10";
+  }
+  if (!Number.isInteger(Number(item.orderQuantityStep)) || Number(item.orderQuantityStep) < 1 || Number(item.orderQuantityStep) > 99) {
+    return "orderQuantityStep must be an integer from 1 to 99";
+  }
   if (!pricing.options.length) return "options are required";
   const invalidOption = pricing.options.find((option) => !option.name || !Number.isFinite(option.calculatedSalePrice) || option.calculatedSalePrice <= 0);
   if (invalidOption) return `invalid option price: ${invalidOption.name || invalidOption.sourceOptionCode}`;
@@ -416,6 +424,8 @@ async function importItem(args, item, product, suppliers, products, policy) {
           sourceItemNo: String(item.itemNo),
           sourceUrl,
           basePrice: pricing.basePrice,
+          minimumOrderQuantity: Number(item.minimumOrderQuantity),
+          orderQuantityStep: Number(item.orderQuantityStep),
           categoryCode: item.categoryCode,
           status: "HIDDEN",
         }),
@@ -431,6 +441,8 @@ async function importItem(args, item, product, suppliers, products, policy) {
         sourceItemNo: String(item.itemNo),
         sourceUrl,
         basePrice: pricing.basePrice,
+        minimumOrderQuantity: Number(item.minimumOrderQuantity),
+        orderQuantityStep: Number(item.orderQuantityStep),
         categoryCode: item.categoryCode,
         complianceStatus: item.complianceStatus || created.complianceStatus,
         reason: "공급처 원문 상품 정보 갱신",
@@ -558,6 +570,8 @@ async function importItem(args, item, product, suppliers, products, policy) {
     sourcePrice: pricing.sourcePrice,
     minimumResalePrice: pricing.minimumResalePrice,
     basePrice: pricing.basePrice,
+    minimumOrderQuantity: Number(item.minimumOrderQuantity),
+    orderQuantityStep: Number(item.orderQuantityStep),
     optionCount: pricing.options.length,
     complianceStatus: item.complianceStatus || "PENDING",
     productStatus: item.status || "HIDDEN",
@@ -597,6 +611,8 @@ async function runManifest(args) {
           currentSourcePrice: existing?.sourcePrice ?? null,
           currentBasePrice: existing?.basePrice ?? null,
           calculatedBasePrice: pricing.basePrice,
+          minimumOrderQuantity: Number(item.minimumOrderQuantity || 0),
+          orderQuantityStep: Number(item.orderQuantityStep || 0),
           optionCount: pricing.options.length,
           minOptionSalePrice: pricing.basePrice,
           maxOptionSalePrice: Math.max(...pricing.options.map((option) => option.calculatedSalePrice)),
@@ -647,6 +663,8 @@ async function main() {
       summary: "라바콘",
       status: "ACTIVE",
       complianceStatus: "NOT_REQUIRED",
+      minimumOrderQuantity: 6,
+      orderQuantityStep: 6,
       productInfoNotice: "상품 고시",
       noticeRows: [{ label: "품명 및 모델명", value: "상품 고시" }],
       shippingInfo: "배송 안내",
@@ -658,6 +676,7 @@ async function main() {
     assert.match(manifestIssue({ ...active, complianceStatus: "REJECTED" }, pricing), /compliance/);
     assert.match(manifestIssue({ ...active, asInfo: "" }, pricing), /product notice/);
     assert.match(manifestIssue({ ...active, noticeRows: [] }, pricing), /structured product notice/);
+    assert.match(manifestIssue({ ...active, minimumOrderQuantity: 11 }, pricing), /minimumOrderQuantity/);
     assert.equal(imageFormat(Buffer.from([0xff, 0xd8, 0xff])).extension, "jpg");
     assert.equal(imageFormat(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])).extension, "png");
     assert.equal(imageFormat(Buffer.from("RIFF0000WEBP")).extension, "webp");
