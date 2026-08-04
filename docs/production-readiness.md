@@ -55,6 +55,10 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
 | `DOMEGGOOK_PURCHASE_ENABLED` | Private API 읽기·동기화 활성화. 실주문 검증 전 기본값 `false` |
 | `DOMEGGOOK_AUTO_ORDER_ENABLED` | 입금확인 주문의 `setOrder` 자동 실행. e-money 충전과 실주문·취소 검증 후에만 `true` |
+| `DOMEGGOOK_CATALOG_SYNC_ENABLED` | ACTIVE 상품의 공급가·옵션·재고 조회 스케줄 활성화 |
+| `DOMEGGOOK_CATALOG_SYNC_DRY_RUN` | `true`면 공급처 조회와 로그만 수행하고 DB를 변경하지 않음 |
+| `DOMEGGOOK_CATALOG_SYNC_BATCH_SIZE` | 한 시간 실행당 상품 수. 기본 20, 최대 100 |
+| `DOMEGGOOK_CATALOG_SYNC_INTERVAL_MS` | 상품 동기화 주기. 기본 3,600,000ms |
 | `DOMEGGOOK_OPEN_API_KEY` | 승인된 Domeggook API key |
 | `DOMEGGOOK_PURCHASE_USER_ID` | 일반 Domeggook 구매 계정 ID |
 | `DOMEGGOOK_PURCHASE_USER_PASSWORD` | 일반 Domeggook 구매 계정 비밀번호. 서버에서만 사용 |
@@ -63,6 +67,8 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 현재 고객 결제 경로는 계좌입금이며, PG 결제 key는 사용하지 않는다. `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
 
 `DOMEGGOOK_PURCHASE_ENABLED=true`, `DOMEGGOOK_AUTO_ORDER_ENABLED=false`로 먼저 로그인·상품 검증·자산 조회와 관리자 상태 화면을 확인한다. 최저가 실제 상품의 주문 생성·조회·취소와 e-money 반환까지 확인하기 전에는 자동 주문을 켜지 않는다.
+
+상품 동기화는 `DOMEGGOOK_CATALOG_SYNC_ENABLED=true`, `DOMEGGOOK_CATALOG_SYNC_DRY_RUN=true`로 먼저 실행한다. 관리자 상품 상세와 로그에서 가격·옵션 수·판매 상태를 확인한 뒤 dry-run을 `false`로 전환한다. 기본 설정은 상품당 호출 간격 1초, 시간당 20개로 하루 최대 약 480회다.
 
 ## Health And Readiness
 

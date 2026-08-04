@@ -277,7 +277,8 @@ DS-6 minimum:
 - Product notice/version source for structured product information notice rows and legacy shipping, AS, return, and exchange information.
 - Product change history writes for product, option, image, detail, notice, and supplier changes.
 - Product and option status handling without stock quantity.
-- Admin product responses include `sourcePrice`, optional `sourceItemNo`, and optional `sourceUrl`; public product responses expose none of them.
+- Admin product responses include `sourcePrice`, optional `sourceItemNo`, `sourceUrl`, `sourceAvailable`, `sourceSyncedAt`, and `sourceSyncError`; public product responses expose none of them.
+- Source-backed `ACTIVE` products are refreshed in bounded batches. A supplier-side outage keeps the existing price and options and records `sourceSyncError`; confirmed unavailability changes the product to `SOLD_OUT`. Only products previously auto-marked unavailable are automatically restored to `ACTIVE`.
 - `sourceUrl` is limited to 2,000 characters and accepts only `http` or `https`. Domeggook URLs must contain a product number, which the server stores as the unique `sourceItemNo`. Duplicate creation returns `409 Conflict`.
 - Admin product responses include `complianceStatus`; public product responses do not expose internal compliance review state.
 - Admin product list/detail responses include derived `saleReady`, stable `saleBlockers`, `optionCount`, `hasThumbnail`, `hasProductNotice`, and `hasDetailContent`. `saleBlockers` uses `BASE_PRICE`, `THUMBNAIL`, `ACTIVE_OPTION`, `PRODUCT_NOTICE`, and `COMPLIANCE` codes.

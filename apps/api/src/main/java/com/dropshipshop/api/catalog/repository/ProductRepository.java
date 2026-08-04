@@ -24,6 +24,17 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
 	Optional<Product> findBySourceItemNo(String sourceItemNo);
 
+	@Query("""
+		select product from Product product
+		where product.sourceItemNo is not null
+		and (
+			product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+			or (product.status = com.dropshipshop.api.catalog.domain.ProductStatus.SOLD_OUT and product.sourceAvailable = false)
+		)
+		order by case when product.sourceSyncedAt is null then 0 else 1 end, product.sourceSyncedAt, product.id
+		""")
+	List<Product> findSourceSyncTargets(Pageable pageable);
+
 	@Query(
 		value = """
 			select product from Product product

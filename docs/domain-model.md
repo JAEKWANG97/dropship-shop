@@ -180,6 +180,9 @@ Suggested fields:
 - sourcePrice: supplier/domeggook cost, admin-only
 - sourceItemNo: optional unique supplier product number, admin-only
 - sourceUrl: optional supplier source page, admin-only
+- sourceAvailable: optional supplier sale availability from the last successful sync, admin-only
+- sourceSyncedAt: optional last sync attempt time, admin-only
+- sourceSyncError: optional last sync failure, admin-only
 - basePrice
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
@@ -194,9 +197,10 @@ Modeling notes:
 - MVP stores one fixed `categoryCode` per product.
 - `sourcePrice` is internal cost. `sourceItemNo` is the supplier-product identity and `sourceUrl` is its operator traceability link. None are exposed by public product APIs.
 - Domeggook product creation derives `sourceItemNo` from `sourceUrl`; duplicate non-null values are rejected.
-- `sourceUrl` accepts only `http` or `https`, is limited to 2,000 characters, and is never fetched by the backend.
+- `sourceUrl` accepts only `http` or `https` and is limited to 2,000 characters. Scheduled source sync uses `sourceItemNo` with the approved Open API rather than fetching this page URL.
 - `basePrice` is the customer sale price. Supplier shipping fees are operating costs and are not added to its calculation.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
+- Scheduled sync updates current product and option prices only; existing order price snapshots never change. Manual `HIDDEN` and `STOPPED` states are not overridden.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
 - `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status other than `REJECTED`.
 - `saleReady` and `saleBlockers` are derived admin views over those conditions rather than persisted product state. Detail-content presence is shown as a recommendation and does not block activation.

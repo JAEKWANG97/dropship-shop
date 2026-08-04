@@ -134,6 +134,11 @@ export default async function AdminProductsPage({ searchParams }: AdminProductsP
                   {product.sourceUrl ? (
                     <a href={product.sourceUrl} rel="noopener noreferrer" target="_blank">원본 보기</a>
                   ) : <span>원본 없음</span>}
+                  {product.sourceSyncError ? (
+                    <span title={product.sourceSyncError}>공급처 동기화 실패</span>
+                  ) : product.sourceSyncedAt ? (
+                    <span>공급처 확인 완료</span>
+                  ) : null}
                 </div>
                 <div className="admin-product-price">
                   <strong>{formatPrice(product.basePrice)}</strong>

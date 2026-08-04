@@ -4,6 +4,7 @@ import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -37,19 +38,12 @@ class DomeggookPurchaseClient {
 	}
 
 	ProductQuote quote(String itemNo, String optionCode) {
-		properties.requireConfigured();
-		JsonNode root = get(form(
-			"ver", "4.6",
-			"mode", "getItemView",
-			"aid", properties.apiKey(),
-			"no", itemNo,
-			"market", "supply",
-			"om", "json"
-		), false);
-		JsonNode detail = domeggook(root);
-		boolean onSale = "판매중".equals(text(detail.path("basis").path("status")));
-		long basePrice = number(detail.path("price").path("supply"));
-		OptionQuote option = option(detail.path("selectOpt"), optionCode);
+		JsonNode detail = itemDetail(itemNo);
+		CatalogSnapshot snapshot = catalogSnapshot(detail);
+		SourceOption option = snapshot.options().stream()
+			.filter(value -> value.sourceOptionCode().equals(normalizeOptionCode(optionCode)))
+			.findFirst()
+			.orElse(new SourceOption(normalizeOptionCode(optionCode), "", 0, 0L, false, 0));
 		JsonNode quantity = detail.path("qty");
 		long orderUnit = number(quantity.path("supplyUnit"));
 		long maximumOrderQuantity = number(quantity.path("supplyLoq"));
@@ -59,14 +53,52 @@ class DomeggookPurchaseClient {
 		boolean conditionalShipping = shippingText.matches(".*(수량|차등|비례|착불|구매자선택).*");
 		long shippingFee = number(shipping.path("fee"));
 		return new ProductQuote(
-			onSale,
+			snapshot.onSale(),
 			option.available(),
-			basePrice + option.additionalPrice(),
+			snapshot.sourcePrice() + option.sourceAdditionalPrice(),
 			shippingFee,
 			conditionalShipping,
 			orderUnit,
 			maximumOrderQuantity,
 			stockQuantity
+		);
+	}
+
+	CatalogSnapshot catalogSnapshot(String itemNo) {
+		return catalogSnapshot(itemDetail(itemNo));
+	}
+
+	private JsonNode itemDetail(String itemNo) {
+		properties.requireConfigured();
+		JsonNode root = get(form(
+			"ver", "4.6",
+			"mode", "getItemView",
+			"aid", properties.apiKey(),
+			"no", itemNo,
+			"market", "supply",
+			"om", "json"
+		), false);
+		return domeggook(root);
+	}
+
+	private CatalogSnapshot catalogSnapshot(JsonNode detail) {
+		boolean onSale = "판매중".equals(text(detail.path("basis").path("status")));
+		long basePrice = number(detail.path("price").path("supply"));
+		if (basePrice <= 0) {
+			throw new DomeggookApiException("PRICE_MISSING", "Domeggook product has no supply price", false);
+		}
+		JsonNode resale = detail.path("price").path("resale");
+		long minimumResalePrice = number(resale.path("minimum"));
+		if (minimumResalePrice <= 0) minimumResalePrice = number(resale.path("minumum"));
+		return new CatalogSnapshot(
+			onSale,
+			basePrice,
+			minimumResalePrice,
+			options(
+				detail.path("selectOpt"),
+				detail.path("qty").path("inventory").isMissingNode() ? null : number(detail.path("qty").path("inventory")),
+				onSale
+			)
 		);
 	}
 
@@ -302,22 +334,48 @@ class DomeggookPurchaseClient {
 		);
 	}
 
-	private OptionQuote option(JsonNode selectOpt, String optionCode) {
-		if (selectOpt.isMissingNode() || selectOpt.isNull() || text(selectOpt).isBlank()) {
-			return new OptionQuote(optionCode == null || optionCode.isBlank() || "00".equals(optionCode), 0);
+	private List<SourceOption> options(JsonNode selectOpt, Long defaultStock, boolean onSale) {
+		if (selectOpt.isMissingNode() || selectOpt.isNull() || (selectOpt.isTextual() && text(selectOpt).isBlank())) {
+			return List.of(new SourceOption("00", "기본", 0, defaultStock, onSale && (defaultStock == null || defaultStock > 0), 0));
 		}
 		try {
 			JsonNode parsed = selectOpt.isTextual() ? objectMapper.readTree(selectOpt.asText()) : selectOpt;
-			JsonNode value = parsed.path("data").path(optionCode == null ? "" : optionCode);
-			long stock = number(value.path("qty"));
-			boolean available = !value.isMissingNode()
-				&& !"0".equals(text(value.path("sup")))
-				&& !"2".equals(text(value.path("hid")))
-				&& (value.path("qty").isMissingNode() || stock > 0);
-			return new OptionQuote(available, number(value.path("supPrice")));
+			List<SourceOption> result = new ArrayList<>();
+			int sortOrder = 0;
+			for (Map.Entry<String, JsonNode> entry : parsed.path("data").properties()) {
+				JsonNode value = entry.getValue();
+				Long stock = value.path("qty").isMissingNode() ? null : number(value.path("qty"));
+				String supply = text(value.path("sup"));
+				String hidden = text(value.path("hid"));
+				boolean enabled = supply.isBlank()
+					? !"0".equals(text(value.path("dom")))
+					: !"0".equals(supply);
+				boolean available = onSale
+					&& enabled
+					&& (hidden.isBlank() || "0".equals(hidden))
+					&& (stock == null || stock > 0);
+				String name = firstText(value, "name", "title");
+				long additionalPrice = number(value.path("supPrice"));
+				if (value.path("supPrice").isMissingNode()) additionalPrice = number(value.path("domPrice"));
+				result.add(new SourceOption(
+					entry.getKey(),
+					name.isBlank() ? entry.getKey() : name,
+					additionalPrice,
+					stock,
+					available,
+					sortOrder++
+				));
+			}
+			return result.isEmpty()
+				? List.of(new SourceOption("00", "기본", 0, defaultStock, onSale && (defaultStock == null || defaultStock > 0), 0))
+				: List.copyOf(result);
 		} catch (Exception exception) {
 			throw new DomeggookApiException("OPTION_PARSE_FAILED", "Domeggook option response could not be parsed", false);
 		}
+	}
+
+	private String normalizeOptionCode(String optionCode) {
+		return optionCode == null || optionCode.isBlank() ? "00" : optionCode;
 	}
 
 	private String deliveryInfo(OrderRequest request) {
@@ -424,6 +482,27 @@ class DomeggookPurchaseClient {
 		}
 	}
 
+	record CatalogSnapshot(
+		boolean onSale,
+		long sourcePrice,
+		long minimumResalePrice,
+		List<SourceOption> options
+	) {
+		boolean available() {
+			return onSale && options.stream().anyMatch(SourceOption::available);
+		}
+	}
+
+	record SourceOption(
+		String sourceOptionCode,
+		String name,
+		long sourceAdditionalPrice,
+		Long sourceStockQuantity,
+		boolean available,
+		int sortOrder
+	) {
+	}
+
 	record OrderLine(String itemNo, String optionCode, int quantity) {
 	}
 
@@ -456,6 +535,4 @@ class DomeggookPurchaseClient {
 	record PurchaseListItem(String orderNumber, String itemNo, String status) {
 	}
 
-	private record OptionQuote(boolean available, long additionalPrice) {
-	}
 }

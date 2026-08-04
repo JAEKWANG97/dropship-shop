@@ -376,6 +376,20 @@ function ProductSummaryPanel({ product }: { product: ProductDetail }) {
               </dd>
             </div>
             <div>
+              <dt>공급처 상태</dt>
+              <dd>{product.sourceAvailable === true ? "판매 가능" : product.sourceAvailable === false ? "품절 또는 판매 중지" : "확인 전"}</dd>
+            </div>
+            <div>
+              <dt>마지막 동기화</dt>
+              <dd>{product.sourceSyncedAt ? formatDateTime(product.sourceSyncedAt) : "아직 실행되지 않음"}</dd>
+            </div>
+            {product.sourceSyncError ? (
+              <div>
+                <dt>동기화 오류</dt>
+                <dd>{product.sourceSyncError}</dd>
+              </div>
+            ) : null}
+            <div>
               <dt>인증 검수</dt>
               <dd>{complianceStatusLabel(product.complianceStatus ?? "PENDING")}</dd>
             </div>

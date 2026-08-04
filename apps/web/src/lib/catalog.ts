@@ -95,6 +95,9 @@ export type ProductDetail = ProductSummary & {
   sourcePrice?: number;
   sourceItemNo?: string | null;
   sourceUrl?: string | null;
+  sourceAvailable?: boolean | null;
+  sourceSyncedAt?: string | null;
+  sourceSyncError?: string | null;
   complianceStatus?: ProductComplianceStatus;
   saleReady?: boolean;
   saleBlockers?: SaleBlocker[];

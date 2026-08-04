@@ -14,6 +14,9 @@ export type AdminProduct = {
   sourcePrice: number;
   sourceItemNo: string | null;
   sourceUrl: string | null;
+  sourceAvailable: boolean | null;
+  sourceSyncedAt: string | null;
+  sourceSyncError: string | null;
   basePrice: number;
   categoryCode: ProductCategoryCode;
   status: AdminProductStatus;
