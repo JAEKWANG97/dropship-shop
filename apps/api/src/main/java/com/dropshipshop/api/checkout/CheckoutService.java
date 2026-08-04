@@ -250,6 +250,12 @@ public class CheckoutService {
 			if (product.getStatus() != ProductStatus.ACTIVE || option.getStatus() != ProductOptionStatus.ACTIVE) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item");
 			}
+			if (!product.acceptsOrderQuantity(item.getQuantity())) {
+				throw new ResponseStatusException(
+					HttpStatus.BAD_REQUEST,
+					"장바구니 상품 수량이 현재 최소 주문 조건과 맞지 않습니다. 장바구니에서 수량을 변경해 주세요."
+				);
+			}
 		}
 	}
 

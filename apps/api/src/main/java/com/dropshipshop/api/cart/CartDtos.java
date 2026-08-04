@@ -44,6 +44,8 @@ final class CartDtos {
 		String productName,
 		String optionName,
 		int quantity,
+		int minimumOrderQuantity,
+		int orderQuantityStep,
 		long unitPrice,
 		long lineAmount,
 		ProductStatus productStatus,

@@ -75,6 +75,9 @@ export async function createCheckout(formData: FormData) {
     if (error instanceof ApiError && error.status === 409) {
       redirect(checkoutMessage(error.responseMessage));
     }
+    if (error instanceof ApiError && error.responseMessage.includes("최소 주문 조건")) {
+      redirect(checkoutMessage(error.responseMessage));
+    }
     redirect(checkoutMessage("주문서를 생성하지 못했습니다. 장바구니와 약관 동의를 확인해 주세요."));
   }
 

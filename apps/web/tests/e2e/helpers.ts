@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 export const API_BASE_URL = process.env.E2E_API_BASE_URL ?? "http://localhost:8080";
 export const WEB_BASE_URL = process.env.E2E_WEB_BASE_URL ?? "http://localhost:3000";
 const PRIMARY_PRODUCT_NAME = "K2 안전모 K2-THINK 1";
+export const MOQ_PRODUCT_NAME = "반사 형광조끼 SV-1001";
 
 const REQUIRE_ADMIN_SEED_ORDERS_VALUE =
   process.env.E2E_REQUIRE_ADMIN_SEED_ORDERS ??
@@ -19,6 +20,8 @@ export function isLocalTarget() {
 export type ProductSummary = {
   id: string;
   name: string;
+  minimumOrderQuantity: number;
+  orderQuantityStep: number;
 };
 
 type ProductPage = {
@@ -60,6 +63,19 @@ export async function activeProductId() {
   const product = primaryProduct ?? fallbackProducts[0];
   expect(product, "At least one active product is required").toBeTruthy();
   return product.id;
+}
+
+export async function moqProductId() {
+  const response = await fetch(
+    `${API_BASE_URL}/api/products?q=${encodeURIComponent(MOQ_PRODUCT_NAME)}&size=10`,
+  );
+  expect(response.ok).toBeTruthy();
+  const products = ((await response.json()) as ProductPage).products;
+  const product = products.find((item) => item.name === MOQ_PRODUCT_NAME);
+  expect(product, `MOQ product '${MOQ_PRODUCT_NAME}' is required`).toBeTruthy();
+  expect(product!.minimumOrderQuantity).toBe(6);
+  expect(product!.orderQuantityStep).toBe(6);
+  return product!.id;
 }
 
 export async function addCookie(context: BrowserContext, cookieHeader: string) {

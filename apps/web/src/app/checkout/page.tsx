@@ -167,9 +167,10 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
       </div>
       <div className="summary-list">
         {cart.items.map((item) => (
-          <div key={item.id}>
+          <div className="checkout-product-summary" key={item.id}>
+            <span>{item.productName} / {item.optionName}</span>
             <span>
-              {item.productName} / {item.optionName} x {item.quantity}
+              개당 {formatPrice(item.unitPrice)} · 수량 {item.quantity}개 · 최소 {item.minimumOrderQuantity}개 / {item.orderQuantityStep}개 단위
             </span>
             <strong>{formatPrice(item.lineAmount)}</strong>
           </div>
@@ -194,6 +195,7 @@ function CheckoutCartSummary({ cart }: { cart: Cart }) {
             <span key={`${issue.cartItemId}-${issue.code}`}>{issue.message}</span>
           ))}
           {!cart.salesEnabled ? <span>{cart.salesNotice}</span> : null}
+          <Link className="button" href="/cart">장바구니로 돌아가기</Link>
         </div>
       ) : null}
     </aside>

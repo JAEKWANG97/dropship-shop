@@ -1809,6 +1809,53 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.purchase-quantity-summary {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+}
+
+.purchase-quantity-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.purchase-quantity-summary dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.purchase-quantity-summary dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.quantity-help,
+.quantity-error {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quantity-help {
+  color: var(--muted);
+}
+
+.quantity-error {
+  color: var(--danger);
+}
+
+.mobile-purchase-total {
+  display: none;
+}
+
 .cart-add-form label,
 .checkout-form label,
 .claim-form label {
@@ -2077,6 +2124,21 @@ textarea {
   display: grid;
   grid-template-columns: minmax(72px, 96px) auto;
   gap: 8px;
+}
+
+.quantity-form .quantity-error {
+  max-width: 260px;
+}
+
+.checkout-product-summary > span:nth-child(2) {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.checkout-product-summary strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .danger-text {
@@ -3716,12 +3778,28 @@ body:has(.admin-shell) > .page-shell {
     left: 0;
     z-index: 80;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
     padding: 10px 12px;
     border-top: 1px solid var(--line);
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 -8px 22px rgba(6, 27, 73, 0.12);
+  }
+
+  .mobile-purchase-total {
+    display: grid;
+    align-content: center;
+    min-width: 76px;
+  }
+
+  .mobile-purchase-total span {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .mobile-purchase-total strong {
+    color: var(--accent-strong);
+    font-size: 14px;
   }
 
   .mobile-purchase-bar .button {
@@ -3776,6 +3854,10 @@ body:has(.admin-shell) > .page-shell {
     display: grid;
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .mobile-purchase-form .purchase-quantity-summary {
+    grid-template-columns: 1fr;
   }
 
   .mobile-purchase-form .product-action-row {

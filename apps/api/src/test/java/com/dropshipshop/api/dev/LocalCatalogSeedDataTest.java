@@ -143,6 +143,12 @@ class LocalCatalogSeedDataTest {
 		assertThat(productImageRepository.existsByProduct_IdAndType(primaryProduct.getId(), ProductImageType.THUMBNAIL)).isTrue();
 		assertThat(productNoticeRepository.existsByProduct_IdAndStatus(primaryProduct.getId(), ProductNoticeStatus.ACTIVE)).isTrue();
 		assertThat(Files.exists(thumbnail)).isTrue();
+		Product moqProduct = restoredSeeds.stream()
+			.filter(product -> product.getName().equals(LocalCatalogSeedData.MOQ_PRODUCT_NAME))
+			.findFirst()
+			.orElseThrow();
+		assertThat(moqProduct.getMinimumOrderQuantity()).isEqualTo(6);
+		assertThat(moqProduct.getOrderQuantityStep()).isEqualTo(6);
 
 		Product untouched = productRepository.findById(externalProduct.getId()).orElseThrow();
 		assertThat(untouched.getStatus()).isEqualTo(ProductStatus.HIDDEN);

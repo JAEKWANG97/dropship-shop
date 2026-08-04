@@ -168,6 +168,10 @@ public class Product {
 		this.orderQuantityStep = orderQuantityStep;
 	}
 
+	public boolean acceptsOrderQuantity(int quantity) {
+		return quantity >= minimumOrderQuantity && quantity % orderQuantityStep == 0;
+	}
+
 	public void markSourceSynced(boolean available, Instant syncedAt) {
 		this.sourceAvailable = available;
 		this.sourceSyncedAt = syncedAt;

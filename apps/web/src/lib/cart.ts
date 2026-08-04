@@ -9,6 +9,8 @@ export type CartItem = {
   productName: string;
   optionName: string;
   quantity: number;
+  minimumOrderQuantity: number;
+  orderQuantityStep: number;
   unitPrice: number;
   lineAmount: number;
   productStatus: ProductStatus;
@@ -19,7 +21,7 @@ export type CartItem = {
 };
 
 export type CartIssue = {
-  cartItemId: string;
+  cartItemId: string | null;
   code: string;
   message: string;
 };
