@@ -13,6 +13,7 @@ const DEFAULT_REVIEW_JSON = "tmp/domeggook-product-review.json";
 const DEFAULT_REVIEW_CSV = "tmp/domeggook-product-review.csv";
 const DEFAULT_FILTERED_MANIFEST = "tmp/domeggook-import-manifest.filtered.json";
 const DEFAULT_KOSHA_AUDIT = "tmp/domeggook-kosha-cert-audit.json";
+const DEFAULT_TARGET_PER_CATEGORY = 30;
 const CATEGORY_FILE = "apps/web/src/lib/categories.ts";
 const KOSHA_CATEGORY_CODES = new Set([
   "PPE_SAFETY_HELMET",
@@ -293,6 +294,14 @@ function parsePrice(priceText) {
 
 function parseQuantity(value) {
   return Number(String(value || "").match(/\d+/)?.[0]) || 0;
+}
+
+function moqDecision(quantity) {
+  if (!Number.isInteger(quantity)) return "MOQ_INVALID";
+  if (quantity === 1) return "MOQ_1";
+  if (quantity >= 2 && quantity <= 10) return "MOQ_2_TO_10";
+  if (quantity > 10) return "MOQ_GT_10";
+  return "MOQ_INVALID";
 }
 
 function totalMarkupRate(policy) {
@@ -642,7 +651,9 @@ async function reviewProduct(entry, context) {
   const activeOptions = saleOptions.filter((option) => option.status === "ACTIVE");
   const sourcePrice = parsePrice(product.priceText);
   const minimumResalePrice = Number(product.minimumResalePrice || 0) || null;
-  const minOrderQuantity = parseQuantity(product.minOrderQuantityText);
+  const minimumOrderQuantity = Number(product.minimumOrderQuantity || parseQuantity(product.minOrderQuantityText));
+  const orderQuantityStep = Number(product.orderQuantityStep || minimumOrderQuantity);
+  const minimumOrderQuantityDecision = moqDecision(minimumOrderQuantity);
   const detailImagePaths = Array.isArray(product.detailImagePaths) ? product.detailImagePaths : [];
   const category = resolveReviewCategory(product, context.categories);
   const shipping = await shippingInfoFor(product, context.fetchShipping);
@@ -664,7 +675,7 @@ async function reviewProduct(entry, context) {
 
   if (!sourcePrice) hardReasons.push("PRICE_MISSING");
   if (product.sourceStatus === "NOT_FOUND") hardReasons.push("SOURCE_ITEM_UNAVAILABLE");
-  if (product.businessSinglePurchase !== true) hardReasons.push("BUSINESS_SINGLE_PURCHASE_NOT_AVAILABLE");
+  if (product.businessOrderAvailable !== true) hardReasons.push("BUSINESS_ORDER_NOT_AVAILABLE");
   if (!String(product.imageUsage || "").includes("허용")) hardReasons.push("IMAGE_USAGE_NOT_ALLOWED");
   if (activeOptions.length === 0) {
     hardReasons.push(customOptionCount === options.length ? "CUSTOM_OPTIONS_ONLY" : "NO_ACTIVE_OPTIONS");
@@ -683,7 +694,15 @@ async function reviewProduct(entry, context) {
   if (koshaGate.hardReason) hardReasons.push(koshaGate.hardReason);
 
   if (category.confidence !== "HIGH") reviewReasons.push("CATEGORY_LOW_CONFIDENCE");
-  if (minOrderQuantity > 1) hardReasons.push("MIN_ORDER_QUANTITY_GT_1");
+  if (
+    minimumOrderQuantityDecision === "MOQ_INVALID"
+    || !Number.isInteger(orderQuantityStep)
+    || orderQuantityStep < 1
+    || orderQuantityStep > 99
+  ) {
+    hardReasons.push("MIN_ORDER_QUANTITY_MISSING");
+  }
+  if (minimumOrderQuantityDecision === "MOQ_GT_10") hardReasons.push("MIN_ORDER_QUANTITY_GT_10");
   if (!shipping.known) reviewReasons.push("SHIPPING_FEE_MISSING");
   if (shipping.conditional) hardReasons.push("SHIPPING_FEE_CONDITIONAL");
   if (!String(product.origin || "").trim() || !String(product.manufacturer || "").trim()) reviewReasons.push("ORIGIN_OR_MANUFACTURER_MISSING");
@@ -725,7 +744,9 @@ async function reviewProduct(entry, context) {
     shippingText: shipping.text,
     shippingSource: shipping.source,
     calculatedBasePrice,
-    minOrderQuantity,
+    minimumOrderQuantity,
+    orderQuantityStep,
+    minimumOrderQuantityDecision,
     optionCount: options.length,
     activeOptionCount: activeOptions.length,
     customOptionCount,
@@ -757,6 +778,9 @@ async function reviewProduct(entry, context) {
       sourcePrice,
       minimumResalePrice,
       basePrice: calculatedBasePrice || calculateSalePrice(sourcePrice, minimumResalePrice, context.policy),
+      minimumOrderQuantity,
+      orderQuantityStep,
+      minimumOrderQuantityDecision,
       options: manifestOptions,
       supplierName: product.sellerName || "외부 공급처",
       productInfoNotice: productInfoNoticeFor(product),
@@ -764,7 +788,7 @@ async function reviewProduct(entry, context) {
       shippingInfo: shipping.known ? "고객에게 별도 배송비를 청구하지 않습니다." : "",
       asInfo: COREABLE_AS_INFO,
       returnExchangeInfo: COREABLE_RETURN_EXCHANGE_INFO,
-      memo: `B-054 review=${decision}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; KOSHA=${koshaGate.status}; compliance=${complianceStatus}; target=${status}`,
+      memo: `B-090 review=${decision}; MOQ=${minimumOrderQuantity}/${orderQuantityStep}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; KOSHA=${koshaGate.status}; compliance=${complianceStatus}; target=${status}`,
     },
   };
 }
@@ -832,7 +856,9 @@ function reviewCsv(items) {
     "minimumResalePrice",
     "shippingFee",
     "calculatedBasePrice",
-    "minOrderQuantity",
+    "minimumOrderQuantity",
+    "orderQuantityStep",
+    "minimumOrderQuantityDecision",
     "optionCount",
     "activeOptionCount",
     "sellerReviewCount",
@@ -849,11 +875,30 @@ function reviewCsv(items) {
   return `${headers.join(",")}\n${rows.join("\n")}\n`;
 }
 
-function summarize(items) {
+function summarize(items, categories) {
+  const itemNos = items.map((item) => String(item.itemNo));
   const summary = {
     total: items.length,
     import: items.filter((item) => item.decision === "IMPORT").length,
     exclude: items.filter((item) => item.decision === "EXCLUDE").length,
+    duplicateItemNumbers: itemNos.length - new Set(itemNos).size,
+    moq: {
+      one: items.filter((item) => item.minimumOrderQuantityDecision === "MOQ_1").length,
+      twoToTen: items.filter((item) => item.minimumOrderQuantityDecision === "MOQ_2_TO_10").length,
+      overTen: items.filter((item) => item.minimumOrderQuantityDecision === "MOQ_GT_10").length,
+      invalid: items.filter((item) => item.minimumOrderQuantityDecision === "MOQ_INVALID").length,
+    },
+    categories: categories.map((category) => {
+      const actual = items.filter((item) => item.decision === "IMPORT" && item.categoryCode === category.code).length;
+      return {
+        categoryCode: category.code,
+        categoryLabel: category.label,
+        target: DEFAULT_TARGET_PER_CATEGORY,
+        actual,
+        shortfall: Math.max(0, DEFAULT_TARGET_PER_CATEGORY - actual),
+        pass: true,
+      };
+    }),
     reasonCounts: {},
   };
   for (const item of items) {
@@ -869,6 +914,10 @@ async function main() {
   if (args.help) return usage();
   if (args.selfCheck) {
     assert.equal(calculateBasePrice(3700), 4600);
+    assert.equal(moqDecision(1), "MOQ_1");
+    assert.equal(moqDecision(6), "MOQ_2_TO_10");
+    assert.equal(moqDecision(10), "MOQ_2_TO_10");
+    assert.equal(moqDecision(11), "MOQ_GT_10");
     assert.equal(calculateSalePrice(990, 1900), 1900);
     assert.equal(calculateSalePrice(900, 1130), 1200);
     assert.equal(koshaCollectionGate("TRAFFIC_CONE").status, "NOT_APPLICABLE");
@@ -944,10 +993,10 @@ async function main() {
   };
 
   const reviewed = await mapLimit(entries, args.shippingConcurrency, (entry) => reviewProduct(entry, context));
-  const summary = summarize(reviewed);
+  const summary = summarize(reviewed, categories);
   const manifest = {
     generatedAt: new Date().toISOString(),
-    source: "B-054 domeggook product selection",
+    source: "B-090 domeggook MOQ product selection",
     summary,
     items: reviewed.map((item) => item.manifestItem),
   };

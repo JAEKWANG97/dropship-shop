@@ -30,12 +30,12 @@ class DomeggookPurchaseClientTest {
 	}
 
 	@Test
-	void readsSupplyOrderUnitAndStockFromProductQuote() throws IOException {
+	void readsSupplyMoqOrderUnitMaximumAndStockFromProductQuote() throws IOException {
 		server = HttpServer.create(new InetSocketAddress(0), 0);
 		server.createContext("/", exchange -> {
 			byte[] body = """
 				{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":450,"resale":{"minimum":600}},
-				"qty":{"inventory":"197035","domeMoq":"12","supplyUnit":1,"supplyLoq":10},
+				"qty":{"inventory":"197035","domeMoq":"12","supplyUnit":6,"supplyLoq":60},
 				"selectOpt":{"data":{"01":{"name":"대형","sup":"1","hid":"0","supPrice":"50","qty":"2"},
 				"02":{"name":"소형","sup":"1","hid":"0","supPrice":"0","qty":"0"}}},
 				"deli":{"supply":{"type":"고정배송비","fee":"3000"}}}}
@@ -59,17 +59,21 @@ class DomeggookPurchaseClientTest {
 
 		DomeggookPurchaseClient.ProductQuote quote = client.quote("63511465", "01");
 
-		assertThat(quote.orderUnit()).isEqualTo(1);
-		assertThat(quote.maximumOrderQuantity()).isEqualTo(10);
+		assertThat(quote.orderUnit()).isEqualTo(6);
+		assertThat(quote.maximumOrderQuantity()).isEqualTo(60);
 		assertThat(quote.stockQuantity()).isEqualTo(197035);
 		assertThat(quote.sourceUnitPrice()).isEqualTo(500);
 		assertThat(quote.optionAvailable()).isTrue();
-		assertThat(quote.acceptsOrderQuantity(1)).isTrue();
-		assertThat(quote.acceptsOrderQuantity(11)).isFalse();
+		assertThat(quote.acceptsOrderQuantity(6)).isTrue();
+		assertThat(quote.acceptsOrderQuantity(12)).isTrue();
+		assertThat(quote.acceptsOrderQuantity(5)).isFalse();
+		assertThat(quote.acceptsOrderQuantity(66)).isFalse();
 		assertThat(quote.hasStock(197036)).isFalse();
 
 		DomeggookPurchaseClient.CatalogSnapshot snapshot = client.catalogSnapshot("63511465");
 		assertThat(snapshot.minimumResalePrice()).isEqualTo(600);
+		assertThat(snapshot.minimumOrderQuantity()).isEqualTo(6);
+		assertThat(snapshot.orderQuantityStep()).isEqualTo(6);
 		assertThat(snapshot.options()).extracting("sourceOptionCode", "available")
 			.containsExactly(tuple("01", true), tuple("02", false));
 	}

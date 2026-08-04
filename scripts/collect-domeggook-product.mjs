@@ -23,7 +23,7 @@ const OPEN_API_COVERAGE_OUT_DIR = "tmp/domeggook-open-api-coverage";
 const OPTION_BACKFILL_REPORT = "tmp/domeggook-option-backfill-report.json";
 const SELLER_SCORE_BACKFILL_REPORT = "tmp/domeggook-seller-score-backfill-report.json";
 const OPEN_API_REFRESH_REPORT = "tmp/domeggook-open-api-refresh-report.json";
-const OPEN_API_COLLECTOR_VERSION = 9;
+const OPEN_API_COLLECTOR_VERSION = 10;
 const OPEN_API_DAILY_LIMIT = 5000;
 const OPEN_API_RANKING_SORT = "rd";
 
@@ -35,7 +35,7 @@ function usage() {
   node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
-  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 30
   node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --ranking-count 60 --fresh
   node scripts/collect-domeggook-product.mjs --open-api-refresh
@@ -59,7 +59,7 @@ function parseArgs(argv) {
     return {
       openApiCoverage: true,
       category: stringArg(argv, "--category"),
-      targetPerCategory: numberArg(argv, "--target-per-category", 10),
+      targetPerCategory: numberArg(argv, "--target-per-category", 30),
       rankingCount: numberArg(argv, "--ranking-count", numberArg(argv, "--sales-count", 60)),
       maxCategories: numberArg(argv, "--max-categories", 0),
       delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
@@ -353,7 +353,9 @@ async function writeOutputs(product, dir) {
     "priceText",
     "minimumResalePrice",
     "minOrderQuantityText",
-    "businessSinglePurchase",
+    "minimumOrderQuantity",
+    "orderQuantityStep",
+    "businessOrderAvailable",
     "sellerName",
     "sellerReviewCount",
     "sellerSatisfaction",
@@ -781,15 +783,6 @@ const OPEN_API_REQUIRED_CONTEXT_KEYWORDS = {
   IOT_TEMPERATURE_HUMIDITY_METER: ["IoT", "와이파이", "WiFi", "원격", "클라우드", "스마트센서"],
 };
 
-const OPEN_API_SUPPLEMENTAL_KEYWORD_EXCLUDES = {
-  PPE_SAFETY_HELMET: ["헬멧"],
-  PPE_SAFETY_SHOES: ["작업화", "작업 신발"],
-  PPE_SAFETY_BELT: ["보조벨트"],
-  PPE_SAFETY_GLASSES: ["고글"],
-  WORK_PLATFORM: ["사다리"],
-  SMART_WATCH: ["스마트워치"],
-};
-
 async function readOpenApiKey() {
   if (process.env.DOMEGGOOK_OPEN_API_KEY) return process.env.DOMEGGOOK_OPEN_API_KEY;
   if (!existsSync(".env")) throw new Error("DOMEGGOOK_OPEN_API_KEY가 필요합니다.");
@@ -865,7 +858,7 @@ function openApiListParams(keyword, size) {
     so: OPEN_API_RANKING_SORT,
     sz: size,
     pg: 1,
-    mxq: 1,
+    mxq: 10,
   };
 }
 
@@ -978,7 +971,9 @@ function listCandidateIssue(item, category) {
   ];
   if (!item.no) return "ITEM_NO_MISSING";
   if (numberOrNull(item.price) <= 0) return "PRICE_MISSING";
-  if (numberOrNull(item.unitQty) !== 1) return "MIN_ORDER_QUANTITY_NOT_ONE";
+  const minimumOrderQuantity = numberOrNull(item.unitQty);
+  if (!minimumOrderQuantity || minimumOrderQuantity < 1) return "MIN_ORDER_QUANTITY_MISSING";
+  if (minimumOrderQuantity > 10) return "MIN_ORDER_QUANTITY_GT_10";
   if (booleanValue(item.adultOnly)) return "ADULT_ONLY";
   if (booleanValue(item.deli?.fromOversea)) return "OVERSEAS_DIRECT";
   if (item.market?.supply !== undefined && !booleanValue(item.market.supply)) return "SUPPLY_MARKET_INACTIVE";
@@ -1074,9 +1069,12 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
   const itemNo = String(detail.basis?.no || candidate.no || "");
   const title = cleanText(detail.basis?.title || candidate.title);
   const sourcePrice = numberOrNull(detail.price?.supply ?? candidate.price);
-  const minOrderQuantity = numberOrNull(detail.qty?.supplyUnit ?? candidate.unitQty ?? detail.qty?.domeMoq);
+  const minimumOrderQuantity = numberOrNull(detail.qty?.supplyUnit ?? candidate.unitQty);
+  const orderQuantityStep = minimumOrderQuantity;
+  const sourceWholesaleMinimumOrderQuantity = numberOrNull(detail.qty?.domeMoq);
+  const sourceMaximumOrderQuantity = numberOrNull(detail.qty?.supplyLoq);
   const minimumResalePrice = numberOrNull(detail.price?.resale?.minimum ?? detail.price?.resale?.minumum);
-  const businessSinglePurchase = booleanValue(detail.channel?.supply) && minOrderQuantity === 1;
+  const businessOrderAvailable = booleanValue(detail.channel?.supply);
   const detailImageUrls = openApiDetailImageUrls(detail);
   const options = parseOpenApiOptions(detail.selectOpt);
   const shipping = openApiShipping(detail);
@@ -1086,7 +1084,9 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
 
   if (detail.basis?.status !== "판매중") hardReasons.push("NOT_ON_SALE");
   if (!sourcePrice || sourcePrice <= 0) hardReasons.push("PRICE_MISSING");
-  if (!businessSinglePurchase) hardReasons.push("BUSINESS_SINGLE_PURCHASE_NOT_AVAILABLE");
+  if (!businessOrderAvailable) hardReasons.push("BUSINESS_ORDER_NOT_AVAILABLE");
+  if (!minimumOrderQuantity || minimumOrderQuantity < 1) hardReasons.push("MIN_ORDER_QUANTITY_MISSING");
+  if (minimumOrderQuantity > 10) hardReasons.push("MIN_ORDER_QUANTITY_GT_10");
   if (!booleanValue(detail.desc?.license?.usable)) hardReasons.push("IMAGE_USAGE_NOT_ALLOWED");
   if (detailImageUrls.length === 0) hardReasons.push("DETAIL_IMAGE_MISSING");
   if (!options.some((option) => option.status === "ACTIVE")) hardReasons.push("NO_ACTIVE_OPTIONS");
@@ -1115,7 +1115,11 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
       title,
       priceText: String(sourcePrice || ""),
       minimumResalePrice,
-      minOrderQuantityText: `${minOrderQuantity || 0}개`,
+      minOrderQuantityText: `${minimumOrderQuantity || 0}개`,
+      minimumOrderQuantity,
+      orderQuantityStep,
+      sourceWholesaleMinimumOrderQuantity,
+      sourceMaximumOrderQuantity,
       sellerName: cleanText(detail.seller?.nick || detail.seller?.id || detail.seller?.company?.name),
       ...sellerScore,
       sellerScoreUpdatedAt: new Date().toISOString(),
@@ -1138,7 +1142,7 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
       collectionKeyword: keyword,
       collectionSorts: sorts,
       lowestPriceVerified: booleanValue(candidate.lwp),
-      businessSinglePurchase,
+      businessOrderAvailable,
       collectionDecision: "IMPORT_CANDIDATE",
       collectionReviewReasons: [],
       sourceStatus: detail.basis?.status || "",
@@ -1189,7 +1193,9 @@ async function loadOpenApiOwners() {
     try {
       const product = JSON.parse(await readFile(path.join(DEFAULT_OUT_DIR, entry.name, "product.json"), "utf8"));
       if (
-        product.collectionCategoryCode
+        product.collectorVersion === OPEN_API_COLLECTOR_VERSION
+        && Object.hasOwn(product, "minimumOrderQuantity")
+        && product.collectionCategoryCode
         && !product.collectionReviewReasons?.includes("CATEGORY_AMBIGUOUS")
       ) {
         owners.set(String(product.itemNo), product.collectionCategoryCode);
@@ -1214,8 +1220,16 @@ function mergeListCandidates(target, items, keyword, sort) {
   }
 }
 
-async function collectOpenApiCategory(apiKey, category, args, owners, scoringCategories) {
-  const report = {
+function processedItemNos(report) {
+  return new Set([
+    ...report.valid.map((item) => String(item.itemNo)),
+    ...report.excluded.map((item) => String(item.itemNo)),
+    ...report.duplicates.map((item) => String(item.itemNo)),
+  ]);
+}
+
+async function collectOpenApiCategory(apiKey, category, args, owners, scoringCategories, reportPath, previous) {
+  const report = previous || {
     collectorVersion: OPEN_API_COLLECTOR_VERSION,
     generatedAt: new Date().toISOString(),
     categoryCode: category.code,
@@ -1226,16 +1240,14 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
     excluded: [],
     duplicates: [],
     shortfall: false,
+    completed: false,
   };
-  const seen = new Set();
+  const seen = processedItemNos(report);
   const primaryKeyword = cleanKeyword(category.label);
-  const supplementalKeywords = (CATEGORY_KEYWORD_OVERRIDES[category.code] || [])
-    .map(cleanKeyword)
-    .filter((keyword) => keyword && normalizedText(keyword) !== normalizedText(primaryKeyword))
-    .filter((keyword) => !(OPEN_API_SUPPLEMENTAL_KEYWORD_EXCLUDES[category.code] || []).includes(keyword));
   const acceptedCount = () => report.valid.length;
+  const checkpoint = async () => writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
-  async function runKeyword(keyword, supplemental) {
+  async function runKeyword(keyword) {
     const candidates = new Map();
     const result = await openApiList(apiKey, keyword, args.rankingCount);
     report.queries.push({
@@ -1243,13 +1255,14 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
       sort: OPEN_API_RANKING_SORT,
       filters: {
         market: "supply",
-        maxMinimumOrderQuantity: 1,
+        maxMinimumOrderQuantity: 10,
       },
       requested: args.rankingCount,
       returned: result.items.length,
       total: result.total,
-      supplemental,
+      supplemental: false,
     });
+    await checkpoint();
     mergeListCandidates(candidates, result.items, keyword, OPEN_API_RANKING_SORT);
     await sleep(args.delayMs);
 
@@ -1263,11 +1276,13 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
       const owner = owners.get(itemNo);
       if (owner && owner !== category.code) {
         report.duplicates.push({ itemNo, owner });
+        await checkpoint();
         continue;
       }
       const listIssue = listCandidateIssue(candidate, category);
       if (listIssue) {
         report.excluded.push({ itemNo, title: candidate.title, reasons: [listIssue], stage: "list" });
+        await checkpoint();
         continue;
       }
 
@@ -1275,6 +1290,9 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
         const existing = await readExistingProduct(itemNo);
         if (
           !args.fresh
+          && existing?.collectorVersion === OPEN_API_COLLECTOR_VERSION
+          && Object.hasOwn(existing, "minimumOrderQuantity")
+          && Object.hasOwn(existing, "orderQuantityStep")
           && existing?.collectionCategoryCode === category.code
           && existsSync(existing.thumbnailImagePath || "")
           && existing.detailImagePaths?.some((filePath) => existsSync(filePath))
@@ -1287,6 +1305,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
           const entry = { itemNo, title: existing.title, reasons: existing.collectionReviewReasons || [], reused: true };
           if (existing.collectionDecision === "IMPORT_CANDIDATE") report.valid.push(entry);
           else report.excluded.push({ ...entry, stage: "existing" });
+          await checkpoint();
           continue;
         }
 
@@ -1301,6 +1320,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
         );
         if (parsed.hardReasons.length) {
           report.excluded.push({ itemNo, title: candidate.title, reasons: parsed.hardReasons, stage: "detail" });
+          await checkpoint();
           continue;
         }
 
@@ -1313,21 +1333,25 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
           sourceCategoryPath: parsed.product.sourceCategoryPath,
         };
         report.valid.push(entry);
+        await checkpoint();
         console.log(`${category.code}: ${parsed.product.collectionDecision} ${itemNo} ${parsed.product.title}`);
       } catch (error) {
+        if (/일일 한도|호출 제한\(429\)/.test(String(error.message))) throw error;
         report.excluded.push({ itemNo, title: candidate.title, reasons: [error.message], stage: "collect" });
+        await checkpoint();
       }
       await sleep(args.delayMs);
     }
   }
 
-  await runKeyword(primaryKeyword, false);
-  for (const keyword of supplementalKeywords) {
-    if (acceptedCount() >= args.targetPerCategory) break;
-    await runKeyword(keyword, true);
-  }
+  await runKeyword(primaryKeyword);
   report.candidateCount = acceptedCount();
+  report.actual = acceptedCount();
   report.shortfall = report.candidateCount < args.targetPerCategory;
+  report.shortfallCount = Math.max(0, args.targetPerCategory - report.candidateCount);
+  report.pass = true;
+  report.completed = true;
+  await checkpoint();
   return report;
 }
 
@@ -1354,14 +1378,21 @@ async function openApiCoverage(args) {
       const reusable =
         previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
         && previous.target === args.targetPerCategory
-        && previous.queries?.length > 0;
+        && previous.completed === true;
       if (reusable) {
         report = previous;
         console.log(`${category.code}: 기존 완료 보고서 재사용`);
+      } else if (
+        previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
+        && previous.target === args.targetPerCategory
+      ) {
+        report = await collectOpenApiCategory(
+          apiKey, category, args, owners, scoringCategories, reportPath, previous,
+        );
       }
     }
     if (!report) {
-      report = await collectOpenApiCategory(apiKey, category, args, owners, scoringCategories);
+      report = await collectOpenApiCategory(apiKey, category, args, owners, scoringCategories, reportPath);
     }
     reports.push(report);
     await writeFile(
@@ -1382,6 +1413,8 @@ async function openApiCoverage(args) {
       categoryCode: report.categoryCode,
       categoryLabel: report.categoryLabel,
       valid: report.valid.length,
+      shortfall: report.shortfallCount,
+      pass: report.pass,
     })),
     validProducts: reports.reduce((sum, report) => sum + report.valid.length, 0),
     excludedCandidates: reports.reduce((sum, report) => sum + report.excluded.length, 0),
@@ -1404,7 +1437,9 @@ async function refreshOpenApiProducts(args) {
   const stale = [];
   for (const entry of entries) {
     const product = await readExistingProduct(entry.name);
-    const current = Object.hasOwn(product || {}, "businessSinglePurchase")
+    const current = Object.hasOwn(product || {}, "businessOrderAvailable")
+      && Object.hasOwn(product, "minimumOrderQuantity")
+      && Object.hasOwn(product, "orderQuantityStep")
       && Object.hasOwn(product, "minimumResalePrice")
       && product.sourceDeliveryInfo;
     if (!current) stale.push(entry);
@@ -1444,11 +1479,11 @@ function selfCheck() {
   const listParams = openApiListParams("안전모", 60);
   if (
     listParams.so !== "rd"
-    || listParams.mxq !== 1
+    || listParams.mxq !== 10
     || Object.hasOwn(listParams, "sgd")
     || Object.hasOwn(listParams, "fdl")
   ) {
-    throw new Error("Open API 후보 기준은 도매꾹랭킹순과 낱개구매여야 합니다");
+    throw new Error("Open API 후보 기준은 도매꾹랭킹순과 MOQ 10 이하여야 합니다");
   }
   if (listCandidateIssue({
     no: "1",
@@ -1514,13 +1549,41 @@ function selfCheck() {
     rawInfo.collectorVersion !== OPEN_API_COLLECTOR_VERSION
     || rawInfo.model !== "해당없음"
     || rawInfo.minimumResalePrice !== 1300
-    || !rawInfo.businessSinglePurchase
+    || !rawInfo.businessOrderAvailable
+    || rawInfo.minimumOrderQuantity !== 1
+    || rawInfo.orderQuantityStep !== 1
     || rawInfo.productSize !== "0x0x0"
     || rawInfo.productWeight !== "0g"
     || rawInfo.productInfoDuty.item[0].desc !== "상세정보 별도표기"
   ) {
     throw new Error("Open API 상품정보 원문 보존 self-check 실패");
   }
+  const selfCheckCategories = readCategoryDefinitions();
+  const helmetCategory = selfCheckCategories.find((category) => category.code === "PPE_SAFETY_HELMET");
+  const moqSix = openApiProduct({
+    basis: { no: "6", title: "안전모", status: "판매중" },
+    price: { supply: "1000" },
+    channel: { supply: "true" },
+    qty: { supplyUnit: "6", domeMoq: "12", supplyLoq: "60" },
+    detail: { country: "대한민국", manufacturer: "제조사" },
+    deli: { supply: { pay: "무료배송", type: "고정배송비" } },
+    desc: { license: { usable: "true" }, contents: { item: '<img src="https://example.com/a.jpg">' } },
+  }, {}, helmetCategory, "안전모", ["rd"], selfCheckCategories);
+  if (
+    moqSix.hardReasons.length
+    || moqSix.product.minimumOrderQuantity !== 6
+    || moqSix.product.orderQuantityStep !== 6
+    || moqSix.product.sourceWholesaleMinimumOrderQuantity !== 12
+    || moqSix.product.sourceMaximumOrderQuantity !== 60
+  ) throw new Error("Open API MOQ 6 파서 self-check 실패");
+  const moqEleven = listCandidateIssue({ no: "11", title: "안전모", price: "1000", unitQty: "11" }, {
+    code: "PPE_SAFETY_HELMET", label: "안전모",
+  });
+  if (moqEleven !== "MIN_ORDER_QUANTITY_GT_10") throw new Error("MOQ 10 초과 제외 self-check 실패");
+  const resumed = processedItemNos({
+    valid: [{ itemNo: "1" }], excluded: [{ itemNo: "2" }], duplicates: [{ itemNo: "3" }],
+  });
+  if (!["1", "2", "3"].every((itemNo) => resumed.has(itemNo))) throw new Error("수집 재개 self-check 실패");
   const helmetIssue = listCandidateIssue({
     no: "1",
     title: "안전모 이름표 식별표 24개입",
