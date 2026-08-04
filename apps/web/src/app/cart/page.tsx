@@ -122,7 +122,12 @@ function CartContents({ cart }: { cart: Cart }) {
             <span>수량</span>
             <span>금액</span>
           </div>
-          {cart.items.map((item) => (
+          {cart.items.map((item) => {
+            const quantityIssue = cart.issues.find(
+              (issue) => issue.cartItemId === item.id && issue.code === "INVALID_ORDER_QUANTITY",
+            );
+            const quantityErrorId = `cart-item-${item.id}-quantity-error`;
+            return (
             <article className="cart-item" key={item.id}>
               <input aria-label={`${item.productName} 선택`} defaultChecked type="checkbox" />
               <ProductImage
@@ -134,7 +139,10 @@ function CartContents({ cart }: { cart: Cart }) {
                 <Link href={`/products/${item.productId}`}>{item.productName}</Link>
                 <span>{item.optionName}</span>
                 <span>단가 {formatPrice(item.unitPrice)}</span>
-                {!item.sellable ? (
+                <span>
+                  최소 {item.minimumOrderQuantity}개 · {item.orderQuantityStep}개 단위
+                </span>
+                {!item.sellable && !quantityIssue ? (
                   <strong className="danger-text">
                     {item.unavailableReason ?? "현재 주문할 수 없습니다."}
                   </strong>
@@ -144,16 +152,24 @@ function CartContents({ cart }: { cart: Cart }) {
                 <form action={updateCartItem} className="quantity-form">
                   <input name="cartItemId" type="hidden" value={item.id} />
                   <input
+                    aria-describedby={quantityIssue ? quantityErrorId : undefined}
+                    aria-invalid={Boolean(quantityIssue)}
                     aria-label={`${item.productName} quantity`}
                     max="99"
-                    min="1"
+                    min={item.minimumOrderQuantity}
                     name="quantity"
+                    step={item.orderQuantityStep}
                     type="number"
                     defaultValue={item.quantity}
                   />
                   <SubmitButton className="button" pendingLabel="변경 중...">
                     변경
                   </SubmitButton>
+                  {quantityIssue ? (
+                    <strong className="quantity-error" id={quantityErrorId} aria-live="polite">
+                      {quantityIssue.message}
+                    </strong>
+                  ) : null}
                 </form>
                 <form action={removeCartItem}>
                   <input name="cartItemId" type="hidden" value={item.id} />
@@ -164,7 +180,8 @@ function CartContents({ cart }: { cart: Cart }) {
                 <strong>{formatPrice(item.lineAmount)}</strong>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
 
         {itemIssues.length > 0 ? (

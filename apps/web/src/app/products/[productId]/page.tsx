@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { addCartItem } from "@/app/cart/actions";
 import { ApiError } from "@/lib/api";
 import {
   formatPrice,
@@ -10,8 +9,8 @@ import {
   type ProductSummary,
 } from "@/lib/catalog";
 import { POLICY_PAGES, policyHref, type PolicyPage } from "@/lib/legal";
-import { SubmitButton } from "@/app/submit-button";
 import { ProductImage } from "../product-image";
+import { PurchaseForm } from "./purchase-form";
 
 type ProductPageProps = {
   params: Promise<{ productId: string }>;
@@ -68,6 +67,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const purchaseFormId = `product-purchase-form-${product.id}`;
   const mobilePurchaseFormId = `mobile-product-purchase-form-${product.id}`;
   const mobilePurchasePopoverId = `mobile-product-purchase-popover-${product.id}`;
+  const initialUnitPrice = product.basePrice + (activeOptions[0]?.additionalPrice ?? 0);
+  const initialMinimumTotal = initialUnitPrice * product.minimumOrderQuantity;
 
   return (
     <article className={purchasable ? "product-detail has-mobile-purchase-bar" : "product-detail"}>
@@ -115,10 +116,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <h1>{product.name}</h1>
           <p>{product.summary}</p>
           <div className="product-purchase-panel">
-            <strong className="product-price">{formatPrice(product.basePrice)}</strong>
+            <strong className="product-price">{formatPrice(product.basePrice)} / 개</strong>
             <div className="product-buy-info">
-              <span className="product-buy-info-secondary">최소 주문</span>
-              <strong className="product-buy-info-secondary">옵션별 1개</strong>
+              <span className="product-buy-info-secondary">주문 조건</span>
+              <strong className="product-buy-info-secondary">
+                최소 {product.minimumOrderQuantity}개 · {product.orderQuantityStep}개 단위
+              </strong>
               <span>인증 정보</span>
               <strong>{complianceStatusLabel(product.complianceStatus)}</strong>
               {purchasePolicyPages.map((policy) => (
@@ -130,8 +133,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </div>
             {purchasable ? (
               <PurchaseForm
-                activeOptions={activeOptions}
+                basePrice={product.basePrice}
                 formId={purchaseFormId}
+                minimumOrderQuantity={product.minimumOrderQuantity}
+                options={activeOptions}
+                orderQuantityStep={product.orderQuantityStep}
                 productId={product.id}
               />
             ) : (
@@ -167,13 +173,20 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               </button>
             </div>
             <PurchaseForm
-              activeOptions={activeOptions}
+              basePrice={product.basePrice}
               formId={mobilePurchaseFormId}
+              minimumOrderQuantity={product.minimumOrderQuantity}
               mobile
+              options={activeOptions}
+              orderQuantityStep={product.orderQuantityStep}
               productId={product.id}
             />
           </div>
           <div className="mobile-purchase-bar" aria-label="모바일 구매 액션">
+            <div className="mobile-purchase-total">
+              <span>최소 주문</span>
+              <strong>{formatPrice(initialMinimumTotal)}</strong>
+            </div>
             <button
               className="button mobile-purchase-secondary"
               popoverTarget={mobilePurchasePopoverId}
@@ -286,6 +299,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                 />
                 <span>{relatedProduct.name}</span>
                 <strong>{formatPrice(relatedProduct.basePrice)}</strong>
+                {relatedProduct.minimumOrderQuantity > 1 ? (
+                  <span className="product-card-status">최소 {relatedProduct.minimumOrderQuantity}개</span>
+                ) : null}
               </Link>
             ))}
           </div>
@@ -322,67 +338,6 @@ function DetailBlock({
       className="detail-image"
       src={block.imageUrl}
     />
-  );
-}
-
-function formatOptionPrice(value: number) {
-  if (value === 0) {
-    return "추가금 없음";
-  }
-  return `+${formatPrice(value)}`;
-}
-
-function PurchaseForm({
-  activeOptions,
-  formId,
-  mobile = false,
-  productId,
-}: {
-  activeOptions: ProductDetail["options"];
-  formId: string;
-  mobile?: boolean;
-  productId: string;
-}) {
-  return (
-    <form
-      action={addCartItem}
-      className={`cart-add-form ${mobile ? "mobile-purchase-form" : "desktop-purchase-form"}`}
-      id={formId}
-    >
-      <input name="productId" type="hidden" value={productId} />
-      <label>
-        옵션
-        <select name="productOptionId" required>
-          {activeOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} {formatOptionPrice(option.additionalPrice)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        수량
-        <input max="99" min="1" name="quantity" type="number" defaultValue="1" />
-      </label>
-      <div className="product-action-row">
-        <SubmitButton
-          className="button"
-          name="intent"
-          pendingLabel="담는 중..."
-          value="cart"
-        >
-          장바구니
-        </SubmitButton>
-        <SubmitButton
-          className="button primary"
-          name="intent"
-          pendingLabel="이동 중..."
-          value="checkout"
-        >
-          바로구매
-        </SubmitButton>
-      </div>
-    </form>
   );
 }
 

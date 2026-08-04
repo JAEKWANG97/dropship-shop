@@ -67,6 +67,7 @@ public class CartService {
 		if (nextQuantity > MAX_QUANTITY) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart item quantity cannot exceed 99");
 		}
+		requireOrderQuantity(product, nextQuantity);
 		item.updateQuantity(nextQuantity);
 		cartItemRepository.save(item);
 		return toCartResponse(cart);
@@ -75,6 +76,7 @@ public class CartService {
 	@Transactional
 	public CartDtos.CartResponse updateItem(UUID userId, UUID cartItemId, CartDtos.UpdateCartItemRequest request) {
 		CartItem item = findUserCartItem(userId, cartItemId);
+		requireOrderQuantity(item.getProduct(), request.quantity());
 		item.updateQuantity(request.quantity());
 		return toCartResponse(item.getCart());
 	}
@@ -156,9 +158,13 @@ public class CartService {
 			));
 		}
 		for (CartItem item : items) {
-			String reason = unavailableReason(item.getProduct(), item.getProductOption());
+			String reason = unavailableReason(item);
 			if (reason != null) {
-				issues.add(new CartDtos.CartValidationIssueResponse(item.getId(), "UNSELLABLE_ITEM", reason));
+				String code = item.getProduct().getStatus() == ProductStatus.ACTIVE
+					&& item.getProductOption().getStatus() == ProductOptionStatus.ACTIVE
+					? "INVALID_ORDER_QUANTITY"
+					: "UNSELLABLE_ITEM";
+				issues.add(new CartDtos.CartValidationIssueResponse(item.getId(), code, reason));
 			}
 		}
 		return issues;
@@ -168,7 +174,7 @@ public class CartService {
 		Product product = item.getProduct();
 		ProductOption option = item.getProductOption();
 		long unitPrice = product.getBasePrice() + option.getAdditionalPrice();
-		String unavailableReason = unavailableReason(product, option);
+		String unavailableReason = unavailableReason(item);
 		return new CartDtos.CartItemResponse(
 			item.getId(),
 			product.getId(),
@@ -176,6 +182,8 @@ public class CartService {
 			product.getName(),
 			option.getName(),
 			item.getQuantity(),
+			product.getMinimumOrderQuantity(),
+			product.getOrderQuantityStep(),
 			unitPrice,
 			unitPrice * item.getQuantity(),
 			product.getStatus(),
@@ -186,12 +194,33 @@ public class CartService {
 		);
 	}
 
-	private String unavailableReason(Product product, ProductOption option) {
+	private String unavailableReason(CartItem item) {
+		Product product = item.getProduct();
+		ProductOption option = item.getProductOption();
 		if (product.getStatus() != ProductStatus.ACTIVE) {
 			return "판매가 중지된 상품입니다. 삭제 후 주문해 주세요.";
 		}
 		if (option.getStatus() != ProductOptionStatus.ACTIVE) {
 			return "현재 선택한 옵션은 판매가 중지되었습니다. 삭제 후 다른 옵션을 선택해 주세요.";
+		}
+		return orderQuantityReason(product, item.getQuantity());
+	}
+
+	private void requireOrderQuantity(Product product, int quantity) {
+		String reason = orderQuantityReason(product, quantity);
+		if (reason != null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, reason);
+		}
+	}
+
+	private String orderQuantityReason(Product product, int quantity) {
+		if (quantity < product.getMinimumOrderQuantity()) {
+			return "현재 수량은 %d개입니다. 최소 %d개부터 주문할 수 있습니다."
+				.formatted(quantity, product.getMinimumOrderQuantity());
+		}
+		if (!product.acceptsOrderQuantity(quantity)) {
+			return "현재 수량은 %d개입니다. %d개 단위로 주문할 수 있습니다."
+				.formatted(quantity, product.getOrderQuantityStep());
 		}
 		return null;
 	}

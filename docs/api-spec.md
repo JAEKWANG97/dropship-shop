@@ -317,10 +317,11 @@ Rules:
 - Cart belongs to authenticated customer.
 - Guest cart is excluded from MVP.
 - One customer has one current cart.
-- Adding the same product option increases the existing cart item quantity.
-- Cart item quantity is 1 through 99.
+- Adding the same product option increases the existing cart item quantity and validates the combined result.
+- Cart item quantity is at most 99 and must be at least the current product `minimumOrderQuantity` and divisible by `orderQuantityStep`.
 - Product option can be added only when product status is `ACTIVE` and option status is `ACTIVE`.
-- If product or option status changes after being added, the cart item remains but `checkoutAvailable` becomes false.
+- If product/option status or MOQ changes after being added, the cart item and quantity remain unchanged but `checkoutAvailable` becomes false.
+- Cart item responses include current `minimumOrderQuantity`, `orderQuantityStep`, and a reason when the saved quantity is no longer valid.
 - Cart response shows current product/option price. Final price is snapshotted by order creation, not cart.
 - Cart items can span multiple delivery groups.
 - Checkout splits cart into delivery-group orders.
@@ -360,6 +361,8 @@ Rules:
 - `PAYMENT_PENDING` means bank-transfer deposit waiting in the current MVP flow.
 - Bank-transfer deposit deadline defaults to 24 hours.
 - Checkout creation requires current account terms/privacy agreement and completed required customer info.
+- Checkout creation revalidates every cart item against the current product MOQ immediately before snapshot creation.
+- An invalid saved quantity leaves the cart unchanged and returns the customer to the cart correction flow.
 - DS-8 creates checkouts from cart only; direct-buy checkout is deferred.
 - Checkout request includes shipping address fields directly.
 - Server calculates all totals and ignores client-submitted totals.

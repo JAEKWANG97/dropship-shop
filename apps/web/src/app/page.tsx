@@ -98,6 +98,9 @@ export default async function Home() {
                 <div className="product-card-copy">
                   <span className="product-card-name">{product.name}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
+                  {product.minimumOrderQuantity > 1 ? (
+                    <span className="product-card-status">최소 {product.minimumOrderQuantity}개</span>
+                  ) : null}
                 </div>
                 <span className="product-card-cta">상세 보기</span>
               </Link>

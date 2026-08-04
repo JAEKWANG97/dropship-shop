@@ -6,7 +6,9 @@ Current payment path: direct bank transfer with manual admin deposit confirmatio
 
 ```text
 Customer selects product option
+-> Product quantity must meet the current minimum, order-unit multiple, and maximum 99 rules
 -> Cart items are grouped by delivery group
+-> Checkout revalidates every saved quantity without automatically changing it
 -> Customer creates payment group
 -> System creates one PAYMENT_PENDING order per delivery group
 -> Customer confirms order notice checkbox
@@ -32,6 +34,8 @@ Customer selects product option
 DS-8 backend implementation notes:
 
 - Checkout creation is cart-based.
+- Cart add, combined add, quantity update, and checkout creation enforce the current product MOQ and order unit.
+- If MOQ changes after an item was saved, the cart keeps the customer's quantity, explains the mismatch, and blocks checkout until the customer edits or removes it.
 - The server creates one payment group and one `PAYMENT_PENDING` order per supplier-backed delivery group.
 - The checkout request includes the shipping address directly.
 - Order items snapshot product name, summary, option name, price, product detail version, and product notice version.

@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { apiSendWithCookie } from "@/lib/api";
+import { ApiError, apiSendWithCookie } from "@/lib/api";
 import type { Cart, CartValidation } from "@/lib/cart";
 import { getCurrentUser } from "@/lib/session";
 
@@ -40,7 +40,10 @@ export async function addCartItem(formData: FormData) {
       method: "POST",
       body: JSON.stringify({ productOptionId, quantity }),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && error.responseMessage) {
+      redirect(messagePath(error.responseMessage));
+    }
     redirect(messagePath("장바구니에 담지 못했습니다. 로그인과 상품 상태를 확인해 주세요."));
   }
 
@@ -64,7 +67,10 @@ export async function updateCartItem(formData: FormData) {
         body: JSON.stringify({ quantity }),
       },
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && error.responseMessage) {
+      redirect(messagePath(error.responseMessage));
+    }
     redirect(messagePath("수량을 변경하지 못했습니다."));
   }
 

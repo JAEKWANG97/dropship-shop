@@ -51,6 +51,7 @@ import com.dropshipshop.api.catalog.repository.SupplierRepository;
 public class LocalCatalogSeedData implements ApplicationRunner {
 
 	static final String PRIMARY_PRODUCT_NAME = "K2 안전모 K2-THINK 1";
+	static final String MOQ_PRODUCT_NAME = "반사 형광조끼 SV-1001";
 	private static final List<SeedSupplier> SEED_SUPPLIERS = List.of(
 		new SeedSupplier("세이프허브 산업안전", "홍길동", "02-1234-5678", "safety@safehubpro.co.kr"),
 		new SeedSupplier("케이투 현장장비", "김현장", "02-2345-6789", "k2@safehubpro.co.kr"),
@@ -127,6 +128,8 @@ public class LocalCatalogSeedData implements ApplicationRunner {
 			)));
 		product.updateBase(supplier, seed.name(), seed.summary(), seed.basePrice(), seed.basePrice(), seed.categoryCode());
 		product.updateStatus(seed.status());
+		int orderQuantity = seed.name().equals(MOQ_PRODUCT_NAME) ? 6 : 1;
+		product.updateOrderQuantityRules(orderQuantity, orderQuantity);
 		product.updateComplianceStatus(ProductComplianceStatus.NOT_REQUIRED);
 		product.updateThumbnailImageUrl(imageUrl);
 

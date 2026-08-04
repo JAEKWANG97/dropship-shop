@@ -366,6 +366,40 @@ class CheckoutApiIntegrationTest {
 			.andExpect(status().isNotFound());
 	}
 
+	@Test
+	void revalidatesCurrentOrderQuantityRulesBeforeCheckout() throws Exception {
+		UserAccount customer = createCustomer("checkout-moq-customer");
+		ProductOption option = createOption(
+			"Checkout MOQ Product",
+			ProductStatus.ACTIVE,
+			ProductOptionStatus.ACTIVE,
+			10000,
+			0,
+			1
+		);
+		option.getProduct().updateOrderQuantityRules(6, 6);
+		productRepository.saveAndFlush(option.getProduct());
+		addCartItem(customer.getId(), option.getId(), 6);
+
+		option.getProduct().updateOrderQuantityRules(8, 8);
+		productRepository.saveAndFlush(option.getProduct());
+
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is(
+				"장바구니 상품 수량이 현재 최소 주문 조건과 맞지 않습니다. 장바구니에서 수량을 변경해 주세요."
+			)));
+
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].quantity", is(6)))
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)));
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		UserAccount customer = userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,

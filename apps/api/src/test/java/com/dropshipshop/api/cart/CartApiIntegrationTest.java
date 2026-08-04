@@ -251,6 +251,63 @@ class CartApiIntegrationTest {
 			.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	void enforcesMinimumAndStepForAddCombinedQuantityUpdateAndSavedCart() throws Exception {
+		UserAccount customer = createCustomer("cart-moq-customer");
+		ProductOption option = createOption("MOQ Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 6, 6);
+
+		addItem(customer.getId(), option.getId(), 1)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("현재 수량은 1개입니다. 최소 6개부터 주문할 수 있습니다.")));
+
+		addItem(customer.getId(), option.getId(), 7)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("현재 수량은 7개입니다. 6개 단위로 주문할 수 있습니다.")));
+
+		addItem(customer.getId(), option.getId(), 6)
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.items[0].quantity", is(6)))
+			.andExpect(jsonPath("$.items[0].minimumOrderQuantity", is(6)))
+			.andExpect(jsonPath("$.items[0].orderQuantityStep", is(6)))
+			.andExpect(jsonPath("$.checkoutAvailable", is(true)));
+
+		addItem(customer.getId(), option.getId(), 6)
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.items[0].quantity", is(12)));
+
+		addItem(customer.getId(), option.getId(), 1)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("현재 수량은 13개입니다. 6개 단위로 주문할 수 있습니다.")));
+
+		UUID cartItemId = currentCartItemId(customer.getId());
+		mockMvc.perform(patch("/api/cart/items/{cartItemId}", cartItemId)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "quantity": 18
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].quantity", is(18)));
+
+		option.getProduct().updateOrderQuantityRules(8, 8);
+		productRepository.saveAndFlush(option.getProduct());
+
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
+			.andExpect(jsonPath("$.items[0].quantity", is(18)))
+			.andExpect(jsonPath("$.items[0].minimumOrderQuantity", is(8)))
+			.andExpect(jsonPath("$.items[0].orderQuantityStep", is(8)))
+			.andExpect(jsonPath("$.items[0].sellable", is(false)))
+			.andExpect(jsonPath("$.items[0].unavailableReason", is(
+				"현재 수량은 18개입니다. 8개 단위로 주문할 수 있습니다."
+			)))
+			.andExpect(jsonPath("$.issues[0].code", is("INVALID_ORDER_QUANTITY")));
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		return userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,
@@ -262,6 +319,16 @@ class CartApiIntegrationTest {
 	}
 
 	private ProductOption createOption(String productName, ProductStatus productStatus, ProductOptionStatus optionStatus) {
+		return createOption(productName, productStatus, optionStatus, 1, 1);
+	}
+
+	private ProductOption createOption(
+		String productName,
+		ProductStatus productStatus,
+		ProductOptionStatus optionStatus,
+		int minimumOrderQuantity,
+		int orderQuantityStep
+	) {
 		Supplier supplier = supplierRepository.save(new Supplier(
 			productName + " Supplier",
 			"Manager",
@@ -269,14 +336,29 @@ class CartApiIntegrationTest {
 			productName + "@supplier.example",
 			null
 		));
-		Product product = productRepository.save(new Product(
+		Product product = new Product(
 			supplier,
 			productName,
 			productName + " Summary",
 			39000,
 			productStatus
-		));
+		);
+		product.updateOrderQuantityRules(minimumOrderQuantity, orderQuantityStep);
+		productRepository.save(product);
 		return productOptionRepository.saveAndFlush(new ProductOption(product, "Default", 1000, optionStatus));
+	}
+
+	private org.springframework.test.web.servlet.ResultActions addItem(UUID userId, UUID productOptionId, int quantity)
+		throws Exception {
+		return mockMvc.perform(post("/api/cart/items")
+			.with(authentication(TestAuthentication.customer(userId)))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+				{
+				  "productOptionId": "%s",
+				  "quantity": %d
+				}
+				""".formatted(productOptionId, quantity)));
 	}
 
 	private UUID currentCartItemId(UUID userId) throws Exception {

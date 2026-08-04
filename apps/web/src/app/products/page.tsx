@@ -136,7 +136,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <span className="product-card-name">{product.name}</span>
                   <span className="product-card-category">{categoryLabel(product.categoryCode)}</span>
                   <strong className="product-card-price">{formatPrice(product.basePrice)}</strong>
-                  <span className="product-card-status">배송비 포함</span>
+                  <span className="product-card-meta">
+                    <span>배송비 포함</span>
+                    {product.minimumOrderQuantity > 1 ? (
+                      <span>최소 {product.minimumOrderQuantity}개</span>
+                    ) : null}
+                  </span>
                   <span className="product-card-summary">{product.summary}</span>
                 </div>
                 <span className="product-card-cta">상세 보기</span>
