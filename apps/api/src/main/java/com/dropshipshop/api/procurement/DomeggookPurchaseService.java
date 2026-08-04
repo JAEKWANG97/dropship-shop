@@ -129,32 +129,52 @@ public class DomeggookPurchaseService {
 	}
 
 	public void reconcile(UUID orderId) {
+		PurchaseContext context = readContext(orderId);
+		if (context.purchaseStatus() != SupplierPurchaseStatus.RECONCILIATION_REQUIRED
+			&& context.purchaseStatus() != SupplierPurchaseStatus.PROCESSING) {
+			throw new IllegalStateException("Only uncertain supplier purchases can be reconciled");
+		}
+		UUID attemptId = beginAttempt(context, "RECONCILE", context.expectedAmount());
 		try {
-			PurchaseContext context = readContext(orderId);
-			if (context.purchaseStatus() != SupplierPurchaseStatus.RECONCILIATION_REQUIRED
-				&& context.purchaseStatus() != SupplierPurchaseStatus.PROCESSING) {
-				throw new IllegalStateException("Only uncertain supplier purchases can be reconciled");
-			}
-			List<DomeggookPurchaseClient.PurchaseListItem> matches = client.recentOrders().stream()
-				.filter(item -> context.recipientName().equals(item.recipientName()))
-				.filter(item -> context.lines().stream().anyMatch(line -> line.itemNo().equals(item.itemNo())))
-				.toList();
 			Set<String> requiredItems = new HashSet<>();
 			context.lines().forEach(line -> requiredItems.add(line.itemNo()));
+			List<DomeggookPurchaseClient.OrderView> matches = client.recentOrders().stream()
+				.filter(item -> requiredItems.contains(item.itemNo()))
+				.map(DomeggookPurchaseClient.PurchaseListItem::orderNumber)
+				.distinct()
+				.map(client::orderView)
+				.filter(view -> context.orderNumber().equals(view.orderMemo()))
+				.toList();
+			if (matches.isEmpty()) {
+				completeReconciliationWithoutOrder(context, attemptId);
+				return;
+			}
 			Set<String> matchedItems = new HashSet<>();
-			matches.forEach(item -> matchedItems.add(item.itemNo()));
+			matches.forEach(view -> matchedItems.add(view.itemNo()));
 			if (!matchedItems.equals(requiredItems) || matches.size() != requiredItems.size()) {
-				throw new IllegalStateException("Domeggook order reconciliation is ambiguous; verify it manually");
+				throw new DomeggookApiException(
+					"RECONCILIATION_AMBIGUOUS",
+					"Domeggook order reconciliation is ambiguous; verify it manually",
+					true
+				);
 			}
-			List<String> orderNumbers = matches.stream().map(DomeggookPurchaseClient.PurchaseListItem::orderNumber).toList();
-			long actualAmount = orderNumbers.stream().map(client::orderView).mapToLong(DomeggookPurchaseClient.OrderView::paidAmount).sum();
-			if (actualAmount <= 0 || actualAmount > context.expectedAmount()) {
-				throw new IllegalStateException("Domeggook reconciled amount is outside the validated maximum");
+			List<String> orderNumbers = matches.stream().map(DomeggookPurchaseClient.OrderView::orderNumber).toList();
+			long actualAmount = matches.stream().mapToLong(DomeggookPurchaseClient.OrderView::paidAmount).sum();
+			if (actualAmount != context.expectedAmount()) {
+				throw new DomeggookApiException(
+					"RECONCILIATION_AMOUNT_MISMATCH",
+					"Domeggook reconciled amount differs from the validated amount",
+					true
+				);
 			}
-			UUID attemptId = beginAttempt(context, "RECONCILE", context.expectedAmount());
 			completeOrder(context, attemptId, new DomeggookPurchaseClient.OrderResult(orderNumbers, actualAmount));
 		} catch (DomeggookApiException exception) {
+			fail(context.fulfillmentId(), attemptId, new DomeggookApiException(exception.code(), exception.getMessage(), true));
 			throw new IllegalStateException(exception.getMessage(), exception);
+		} catch (RuntimeException exception) {
+			fail(context.fulfillmentId(), attemptId,
+				new DomeggookApiException("RECONCILIATION_FAILED", "Domeggook reconciliation failed", true));
+			throw exception;
 		}
 	}
 
@@ -206,7 +226,11 @@ public class DomeggookPurchaseService {
 				fulfillment.markSupplierCancelled("complete", now);
 				return;
 			}
-			if (tracking.size() != 1) return;
+			if (tracking.size() > 1) {
+				fulfillment.recordPurchaseSyncFailure("Multiple supplier tracking numbers require manual shipment handling", now);
+				return;
+			}
+			if (tracking.isEmpty()) return;
 			String[] carrierTracking = tracking.iterator().next().split("\\|", 2);
 			CustomerOrder order = fulfillment.getOrder();
 			Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
@@ -225,6 +249,12 @@ public class DomeggookPurchaseService {
 					"Domeggook tracking synchronized"
 				));
 				notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.SHIPMENT_STARTED);
+			} else if (!shipment.getCarrier().equals(carrierTracking[0])
+				|| !shipment.getTrackingNumber().equals(carrierTracking[1])) {
+				fulfillment.recordPurchaseSyncFailure("Supplier tracking differs from the recorded shipment", now);
+				return;
+			} else {
+				shipment.markTrackingSynced(now);
 			}
 			boolean delivered = views.stream().allMatch(view -> view.status().contains("배송완료"));
 			if (delivered && shipment.markDeliveredByTracking(Instant.now())) {
@@ -316,6 +346,19 @@ public class DomeggookPurchaseService {
 				"Domeggook order completed",
 				"Domeggook order " + orderNumbers
 			));
+		});
+	}
+
+	private void completeReconciliationWithoutOrder(PurchaseContext context, UUID attemptId) {
+		transactionTemplate.executeWithoutResult(status -> {
+			Fulfillment fulfillment = fulfillmentRepository.findByIdForUpdate(context.fulfillmentId()).orElseThrow();
+			Instant now = Instant.now();
+			fulfillment.markPurchaseFailed("No matching supplier order was found; retry is allowed");
+			attemptRepository.findById(attemptId).orElseThrow().fail(
+				"ORDER_NOT_FOUND_AFTER_RECONCILIATION",
+				"No supplier order matched the Coreable order number",
+				now
+			);
 		});
 	}
 

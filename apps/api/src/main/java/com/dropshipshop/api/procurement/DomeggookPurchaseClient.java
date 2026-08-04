@@ -116,12 +116,17 @@ class DomeggookPurchaseClient {
 		))).path("items");
 		JsonNode item = array(items).stream().findFirst()
 			.orElseThrow(() -> new DomeggookApiException("ORDER_NOT_FOUND", "Domeggook order response has no item", false));
+		JsonNode delivery = item.path("delivery");
+		JsonNode product = item.path("item");
+		String responseOrderNumber = firstText(item, "orderNo", "no");
 		return new OrderView(
-			orderNumber,
+			normalizeOrderNumber(responseOrderNumber.isBlank() ? orderNumber : responseOrderNumber),
 			text(item.path("status")),
 			number(item.path("orderAmtPay")),
-			firstText(item, "deliCompany", "deliveryCompany", "carrier"),
-			firstText(item, "invoiceNo", "trackingNo", "deliveryNo")
+			firstText(delivery, "companyName", "company"),
+			firstText(delivery, "code", "invoiceNo", "trackingNo"),
+			text(item.path("orderMemo")),
+			firstText(product, "no", "itemNo")
 		);
 	}
 
@@ -150,9 +155,8 @@ class DomeggookPurchaseClient {
 		List<PurchaseListItem> result = new ArrayList<>();
 		for (JsonNode item : array(items)) {
 			result.add(new PurchaseListItem(
-				firstText(item, "orderNo", "no"),
+				normalizeOrderNumber(firstText(item, "orderNo", "no")),
 				firstText(item, "itemNo"),
-				firstText(item, "getName", "receiverName"),
 				firstText(item, "status")
 			));
 		}
@@ -347,6 +351,10 @@ class DomeggookPurchaseClient {
 		return value == null ? "" : value.replace("|", " ").replaceAll("[\\r\\n]+", " ").trim();
 	}
 
+	private String normalizeOrderNumber(String value) {
+		return value != null && value.startsWith("OR") ? value.substring(2) : value;
+	}
+
 	private long number(JsonNode node) {
 		String value = text(node).replace(",", "").replaceAll("[^0-9-]", "");
 		return value.isBlank() || "-".equals(value) ? 0 : Long.parseLong(value);
@@ -434,10 +442,18 @@ class DomeggookPurchaseClient {
 	record OrderResult(List<String> orderNumbers, long actualAmount) {
 	}
 
-	record OrderView(String orderNumber, String status, long paidAmount, String carrier, String trackingNumber) {
+	record OrderView(
+		String orderNumber,
+		String status,
+		long paidAmount,
+		String carrier,
+		String trackingNumber,
+		String orderMemo,
+		String itemNo
+	) {
 	}
 
-	record PurchaseListItem(String orderNumber, String itemNo, String recipientName, String status) {
+	record PurchaseListItem(String orderNumber, String itemNo, String status) {
 	}
 
 	private record OptionQuote(boolean available, long additionalPrice) {

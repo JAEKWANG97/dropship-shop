@@ -212,7 +212,7 @@ class ShippingAddressChangeApiIntegrationTest {
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
 			"2026-08-02",
-			"2026-08-02",
+			"2026-08-04",
 			Instant.now()
 		));
 		return customer;
@@ -266,7 +266,7 @@ class ShippingAddressChangeApiIntegrationTest {
 				.content("""
 					{
 					  "termsVersion": "2026-08-02",
-					  "privacyVersion": "2026-08-02",
+					  "privacyVersion": "2026-08-04",
 					  "orderPolicyVersion": "2026-08-02",
 					  "cancellationRefundPolicyVersion": "2026-08-02",
 					  "outOfStockNoticeVersion": "2026-08-02"

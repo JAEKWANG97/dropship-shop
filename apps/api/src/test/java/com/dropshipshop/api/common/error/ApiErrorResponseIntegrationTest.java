@@ -114,7 +114,7 @@ class ApiErrorResponseIntegrationTest {
 		userPolicyAgreementRepository.save(new UserPolicyAgreement(
 			customer,
 			"2026-08-02",
-			"2026-08-02",
+			"2026-08-04",
 			Instant.now()
 		));
 

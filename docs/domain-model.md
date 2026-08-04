@@ -944,7 +944,7 @@ DS-31 implementation note:
 - `PolicyDocument` linkage can be added later when managed policy version APIs are implemented.
 - Duplicate agreement for the same user, terms version, and privacy version is idempotent.
 - Checkout creation requires the current required terms/privacy agreement.
-- Current policy versions are aligned to `2026-08-02`; changing the required version requires a new customer agreement.
+- Terms and order policy versions are `2026-08-02`; the privacy policy version is `2026-08-04`. Changing a required version requires a new customer agreement.
 
 ## OrderPolicyAgreement
 

@@ -42,7 +42,7 @@ app:
     oauth-state-ttl-seconds: 300
   policies:
     required-terms-version: "2026-08-02"
-    required-privacy-version: "2026-08-02"
+    required-privacy-version: "2026-08-04"
     required-order-policy-version: "2026-08-02"
     required-cancellation-refund-policy-version: "2026-08-02"
     required-out-of-stock-notice-version: "2026-08-02"
