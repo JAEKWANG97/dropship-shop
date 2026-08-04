@@ -108,6 +108,8 @@ export async function updateAdminProductPrices(formData: FormData) {
         sourcePrice,
         sourceUrl: text(formData, "sourceUrl") || null,
         basePrice,
+        minimumOrderQuantity: numberValue(formData, "minimumOrderQuantity"),
+        orderQuantityStep: numberValue(formData, "orderQuantityStep"),
         categoryCode: text(formData, "categoryCode") as ProductCategoryCode,
         complianceStatus: text(formData, "complianceStatus") as ProductComplianceStatus,
         reason: text(formData, "reason"),

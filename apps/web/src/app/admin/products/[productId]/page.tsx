@@ -368,6 +368,14 @@ function ProductSummaryPanel({ product }: { product: ProductDetail }) {
               <dd>{formatPrice(product.basePrice)}</dd>
             </div>
             <div>
+              <dt>최소 주문</dt>
+              <dd>{product.minimumOrderQuantity}개</dd>
+            </div>
+            <div>
+              <dt>주문 증가단위</dt>
+              <dd>{product.orderQuantityStep}개</dd>
+            </div>
+            <div>
               <dt>공급처 원본</dt>
               <dd>
                 {product.sourceUrl ? (
@@ -441,6 +449,14 @@ function ProductPricingPanel({
         <label>
           판매가
           <input name="basePrice" required min="0" type="number" defaultValue={product.basePrice} />
+        </label>
+        <label>
+          최소 주문수량
+          <input name="minimumOrderQuantity" required min="1" max="99" type="number" defaultValue={product.minimumOrderQuantity} />
+        </label>
+        <label>
+          주문 증가단위
+          <input name="orderQuantityStep" required min="1" max="99" type="number" defaultValue={product.orderQuantityStep} />
         </label>
         <label>
           인증 검수

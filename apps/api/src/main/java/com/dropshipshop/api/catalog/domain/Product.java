@@ -55,6 +55,12 @@ public class Product {
 	@Column(name = "source_sync_error", columnDefinition = "TEXT")
 	private String sourceSyncError;
 
+	@Column(name = "minimum_order_quantity", nullable = false)
+	private int minimumOrderQuantity = 1;
+
+	@Column(name = "order_quantity_step", nullable = false)
+	private int orderQuantityStep = 1;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "category_code", nullable = false, length = 80)
 	private ProductCategory categoryCode;
@@ -157,6 +163,11 @@ public class Product {
 		this.basePrice = basePrice;
 	}
 
+	public void updateOrderQuantityRules(int minimumOrderQuantity, int orderQuantityStep) {
+		this.minimumOrderQuantity = minimumOrderQuantity;
+		this.orderQuantityStep = orderQuantityStep;
+	}
+
 	public void markSourceSynced(boolean available, Instant syncedAt) {
 		this.sourceAvailable = available;
 		this.sourceSyncedAt = syncedAt;
@@ -218,6 +229,14 @@ public class Product {
 
 	public String getSourceSyncError() {
 		return sourceSyncError;
+	}
+
+	public int getMinimumOrderQuantity() {
+		return minimumOrderQuantity;
+	}
+
+	public int getOrderQuantityStep() {
+		return orderQuantityStep;
 	}
 
 	public ProductCategory getCategoryCode() {

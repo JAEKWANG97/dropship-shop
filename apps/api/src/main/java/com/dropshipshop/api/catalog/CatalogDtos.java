@@ -20,6 +20,7 @@ import com.dropshipshop.api.catalog.domain.SupplierStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -60,6 +61,8 @@ final class CatalogDtos {
 		@Size(max = 50) @Pattern(regexp = "\\d+", message = "sourceItemNo must contain digits only") String sourceItemNo,
 		@Size(max = 2000) @Pattern(regexp = "(?i)^https?://\\S+$", message = "sourceUrl must use http or https") String sourceUrl,
 		@Min(0) long basePrice,
+		@Min(1) @Max(99) Integer minimumOrderQuantity,
+		@Min(1) @Max(99) Integer orderQuantityStep,
 		@NotNull ProductCategory categoryCode,
 		@NotNull ProductStatus status
 	) {
@@ -73,6 +76,8 @@ final class CatalogDtos {
 		@Size(max = 50) @Pattern(regexp = "\\d+", message = "sourceItemNo must contain digits only") String sourceItemNo,
 		@Size(max = 2000) @Pattern(regexp = "(?i)^https?://\\S+$", message = "sourceUrl must use http or https") String sourceUrl,
 		@Min(0) long basePrice,
+		@Min(1) @Max(99) Integer minimumOrderQuantity,
+		@Min(1) @Max(99) Integer orderQuantityStep,
 		@NotNull ProductCategory categoryCode,
 		ProductComplianceStatus complianceStatus,
 		@NotBlank @Size(max = 500) String reason
@@ -233,6 +238,8 @@ final class CatalogDtos {
 		Instant sourceSyncedAt,
 		String sourceSyncError,
 		long basePrice,
+		int minimumOrderQuantity,
+		int orderQuantityStep,
 		ProductCategory categoryCode,
 		ProductStatus status,
 		ProductComplianceStatus complianceStatus,
@@ -261,6 +268,8 @@ final class CatalogDtos {
 		String name,
 		String summary,
 		long basePrice,
+		int minimumOrderQuantity,
+		int orderQuantityStep,
 		ProductCategory categoryCode,
 		ProductStatus status,
 		String thumbnailImageUrl
@@ -290,6 +299,8 @@ final class CatalogDtos {
 		@JsonInclude(JsonInclude.Include.NON_NULL) Instant sourceSyncedAt,
 		@JsonInclude(JsonInclude.Include.NON_NULL) String sourceSyncError,
 		long basePrice,
+		int minimumOrderQuantity,
+		int orderQuantityStep,
 		ProductCategory categoryCode,
 		ProductStatus status,
 		boolean salesEnabled,

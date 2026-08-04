@@ -184,6 +184,8 @@ Suggested fields:
 - sourceSyncedAt: optional last sync attempt time, admin-only
 - sourceSyncError: optional last sync failure, admin-only
 - basePrice
+- minimumOrderQuantity: minimum purchasable quantity, 1-99, defaults to 1
+- orderQuantityStep: allowed quantity increment, 1-99, defaults to 1
 - categoryCode: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - status: ACTIVE / SOLD_OUT / HIDDEN / STOPPED
 - complianceStatus: PENDING / NOT_REQUIRED / VERIFIED / REJECTED
@@ -199,6 +201,7 @@ Modeling notes:
 - Domeggook product creation derives `sourceItemNo` from `sourceUrl`; duplicate non-null values are rejected.
 - `sourceUrl` accepts only `http` or `https` and is limited to 2,000 characters. Scheduled source sync uses `sourceItemNo` with the approved Open API rather than fetching this page URL.
 - `basePrice` is the customer sale price. Supplier shipping fees are operating costs and are not added to its calculation.
+- Customer quantity must be at least `minimumOrderQuantity` and be divisible by `orderQuantityStep`.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
 - Scheduled sync updates current product and option prices only; existing order price snapshots never change. Manual `HIDDEN` and `STOPPED` states are not overridden.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
@@ -816,7 +819,7 @@ Suggested fields:
 - productId
 - productOptionId
 - adminUserId
-- changeType: PRICE / PRODUCT_STATUS / COMPLIANCE_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE
+- changeType: PRICE / PRODUCT_STATUS / COMPLIANCE_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / ORDER_QUANTITY / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE
 - beforeValue
 - afterValue
 - reason

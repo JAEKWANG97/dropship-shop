@@ -108,7 +108,11 @@ export default async function AdminProductNewPage({ searchParams }: AdminProduct
               </label>
               <label>
                 최소 주문수량
-                <input defaultValue="1" min="1" type="number" />
+                <input defaultValue="1" max="99" min="1" name="minimumOrderQuantity" required type="number" />
+              </label>
+              <label>
+                주문 증가단위
+                <input defaultValue="1" max="99" min="1" name="orderQuantityStep" required type="number" />
               </label>
             </div>
           </section>

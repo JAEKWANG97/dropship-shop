@@ -334,6 +334,8 @@ Relationships:
 - `source_sync_error`: nullable last source sync failure, admin-only
 - `source_url`: nullable supplier source URL, admin-only, maximum 2,000 characters
 - `base_price`
+- `minimum_order_quantity`: integer 1-99, not null, default 1
+- `order_quantity_step`: integer 1-99, not null, default 1
 - `category_code`: fixed product taxonomy code such as `PPE_SAFETY_HELMET`
 - `status`: `ACTIVE` / `SOLD_OUT` / `HIDDEN` / `STOPPED`
 - `compliance_status`: `PENDING` / `NOT_REQUIRED` / `VERIFIED` / `REJECTED`
@@ -345,6 +347,7 @@ Rules:
 
 - No real stock quantity.
 - `base_price` is the customer-facing sale price. `source_price` and `source_url` must not be exposed by public customer APIs.
+- Valid customer quantities are at least `minimum_order_quantity` and divisible by `order_quantity_step`.
 - `source_url` accepts only `http` or `https`; the backend stores it for operator traceability and does not request the URL.
 - Existing order item price snapshots are not changed when product source or sale prices change.
 - One product has one `category_code`; category admin and multi-category mapping are future scope.

@@ -145,6 +145,8 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.options[0].sourceStockQuantity", is(120)))
 			.andExpect(jsonPath("$.complianceStatus", is("PENDING")))
 			.andExpect(jsonPath("$.sourceUrl", is("https://mobile.domeggook.com/8667274")))
+			.andExpect(jsonPath("$.minimumOrderQuantity", is(1)))
+			.andExpect(jsonPath("$.orderQuantityStep", is(1)))
 			.andExpect(jsonPath("$.saleReady", is(false)))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("THUMBNAIL")))
 			.andExpect(jsonPath("$.saleBlockers", hasItem("PRODUCT_NOTICE")))
@@ -233,13 +235,17 @@ class CatalogApiIntegrationTest {
 					  "sourcePrice": 31200,
 					  "sourceUrl": "https://mobile.domeggook.com/8667274",
 					  "basePrice": 39000,
+					  "minimumOrderQuantity": 6,
+					  "orderQuantityStep": 6,
 					  "categoryCode": "PPE_SAFETY_HELMET",
 					  "complianceStatus": "VERIFIED",
 					  "reason": "Certification reviewed"
 					}
 					""".formatted(supplierId)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.complianceStatus", is("VERIFIED")));
+			.andExpect(jsonPath("$.complianceStatus", is("VERIFIED")))
+			.andExpect(jsonPath("$.minimumOrderQuantity", is(6)))
+			.andExpect(jsonPath("$.orderQuantityStep", is(6)));
 
 		mockMvc.perform(patch("/api/admin/products/{productId}/status", productId)
 				.with(authentication(TestAuthentication.admin()))
@@ -260,6 +266,8 @@ class CatalogApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.products", hasSize(1)))
 			.andExpect(jsonPath("$.products[0].id", is(productId.toString())))
+			.andExpect(jsonPath("$.products[0].minimumOrderQuantity", is(6)))
+			.andExpect(jsonPath("$.products[0].orderQuantityStep", is(6)))
 			.andExpect(jsonPath("$.products[0].sourcePrice").doesNotExist())
 			.andExpect(jsonPath("$.page", is(0)))
 			.andExpect(jsonPath("$.size", is(24)))
@@ -290,6 +298,8 @@ class CatalogApiIntegrationTest {
 			.andExpect(jsonPath("$.supplierName").doesNotExist())
 			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
 			.andExpect(jsonPath("$.sourceUrl").doesNotExist())
+			.andExpect(jsonPath("$.minimumOrderQuantity", is(6)))
+			.andExpect(jsonPath("$.orderQuantityStep", is(6)))
 			.andExpect(jsonPath("$.salesEnabled", is(true)))
 			.andExpect(jsonPath("$.salesNotice").doesNotExist())
 			.andExpect(jsonPath("$.complianceStatus", is("VERIFIED")))
@@ -368,6 +378,8 @@ class CatalogApiIntegrationTest {
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.basePrice", is(39000)))
+			.andExpect(jsonPath("$.minimumOrderQuantity", is(6)))
+			.andExpect(jsonPath("$.orderQuantityStep", is(6)))
 			.andExpect(jsonPath("$.complianceStatus", is("VERIFIED")))
 			.andExpect(jsonPath("$.options[0].status", is("ACTIVE")))
 			.andExpect(jsonPath("$.images", hasSize(2)));
@@ -387,8 +399,10 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.changes", hasSize(7)))
+			.andExpect(jsonPath("$.changes", hasSize(8)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'IMAGES')]", hasSize(1)))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'ORDER_QUANTITY')].beforeValue", hasItem("1/1")))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'ORDER_QUANTITY')].afterValue", hasItem("6/6")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeValue", hasItem("ACTIVE")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].afterValue", hasItem("HIDDEN")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].adminUserId", hasItem(TestAuthentication.ADMIN_ID.toString())));
@@ -528,6 +542,24 @@ class CatalogApiIntegrationTest {
 					  "sourcePrice": 1000,
 					  "sourceUrl": "javascript:alert(1)",
 					  "basePrice": 1300,
+					  "categoryCode": "PPE_SAFETY_HELMET",
+					  "status": "HIDDEN"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId": "%s",
+					  "name": "Invalid MOQ product",
+					  "summary": "Invalid ordering rules",
+					  "sourcePrice": 1000,
+					  "basePrice": 1300,
+					  "minimumOrderQuantity": 100,
+					  "orderQuantityStep": 1,
 					  "categoryCode": "PPE_SAFETY_HELMET",
 					  "status": "HIDDEN"
 					}
