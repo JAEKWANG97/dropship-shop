@@ -91,7 +91,7 @@ class DomeggookPurchaseClient {
 		long minimumResalePrice = number(resale.path("minimum"));
 		if (minimumResalePrice <= 0) minimumResalePrice = number(resale.path("minumum"));
 		long supplyUnit = number(detail.path("qty").path("supplyUnit"));
-		if (supplyUnit < 1 || supplyUnit > 99) {
+		if (supplyUnit < 1 || supplyUnit > Integer.MAX_VALUE) {
 			throw new DomeggookApiException("MOQ_INVALID", "Domeggook product has an invalid supply unit", false);
 		}
 		return new CatalogSnapshot(

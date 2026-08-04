@@ -88,7 +88,9 @@ class DomeggookCatalogSyncService {
 			.orElseGet(() -> salePrice(snapshot.sourcePrice(), snapshot.minimumResalePrice(), policy));
 
 		updateProductPrice(product, snapshot.sourcePrice(), basePrice);
-		updateOrderQuantityRules(product, snapshot.minimumOrderQuantity(), snapshot.orderQuantityStep());
+		if (snapshot.minimumOrderQuantity() <= 99 && snapshot.orderQuantityStep() <= 99) {
+			updateOrderQuantityRules(product, snapshot.minimumOrderQuantity(), snapshot.orderQuantityStep());
+		}
 		updateOptions(product, pricedOptions, basePrice);
 
 		boolean previouslyUnavailable = Boolean.FALSE.equals(product.getSourceAvailable());

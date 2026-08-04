@@ -109,6 +109,20 @@ class DomeggookCatalogSyncServiceTest {
 	}
 
 	@Test
+	void hidesMoqAboveStoredRangeWithoutCorruptingExistingRules() {
+		when(client.catalogSnapshot("12345")).thenReturn(new DomeggookPurchaseClient.CatalogSnapshot(
+			true, 1000, 0, 100, 100,
+			List.of(new DomeggookPurchaseClient.SourceOption("00", "기본", 0, 10L, true, 0))
+		));
+
+		service.sync(productId, true);
+
+		assertThat(product.getMinimumOrderQuantity()).isEqualTo(1);
+		assertThat(product.getOrderQuantityStep()).isEqualTo(1);
+		assertThat(product.getStatus()).isEqualTo(ProductStatus.HIDDEN);
+	}
+
+	@Test
 	void leavesExistingDataAndRecordsTheFailure() {
 		when(client.catalogSnapshot("12345")).thenThrow(new DomeggookApiException("429", "rate limited", false));
 

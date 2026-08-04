@@ -1560,7 +1560,7 @@ function selfCheck() {
   }
   const selfCheckCategories = readCategoryDefinitions();
   const helmetCategory = selfCheckCategories.find((category) => category.code === "PPE_SAFETY_HELMET");
-  const moqSix = openApiProduct({
+  const moqFixture = {
     basis: { no: "6", title: "안전모", status: "판매중" },
     price: { supply: "1000" },
     channel: { supply: "true" },
@@ -1568,7 +1568,8 @@ function selfCheck() {
     detail: { country: "대한민국", manufacturer: "제조사" },
     deli: { supply: { pay: "무료배송", type: "고정배송비" } },
     desc: { license: { usable: "true" }, contents: { item: '<img src="https://example.com/a.jpg">' } },
-  }, {}, helmetCategory, "안전모", ["rd"], selfCheckCategories);
+  };
+  const moqSix = openApiProduct(moqFixture, {}, helmetCategory, "안전모", ["rd"], selfCheckCategories);
   if (
     moqSix.hardReasons.length
     || moqSix.product.minimumOrderQuantity !== 6
@@ -1576,6 +1577,22 @@ function selfCheck() {
     || moqSix.product.sourceWholesaleMinimumOrderQuantity !== 12
     || moqSix.product.sourceMaximumOrderQuantity !== 60
   ) throw new Error("Open API MOQ 6 파서 self-check 실패");
+  const moqTen = openApiProduct({
+    ...moqFixture,
+    basis: { ...moqFixture.basis, no: "10" },
+    qty: { supplyUnit: "10" },
+  }, {}, helmetCategory, "안전모", ["rd"], selfCheckCategories);
+  if (moqTen.hardReasons.length || moqTen.product.minimumOrderQuantity !== 10) {
+    throw new Error("Open API MOQ 10 파서 self-check 실패");
+  }
+  const conditionalShipping = openApiProduct({
+    ...moqFixture,
+    basis: { ...moqFixture.basis, no: "conditional" },
+    deli: { supply: { pay: "착불", type: "수량별비례", fee: "3000" } },
+  }, {}, helmetCategory, "안전모", ["rd"], selfCheckCategories);
+  if (!conditionalShipping.hardReasons.includes("SHIPPING_FEE_CONDITIONAL")) {
+    throw new Error("조건부 배송비 제외 self-check 실패");
+  }
   const moqEleven = listCandidateIssue({ no: "11", title: "안전모", price: "1000", unitQty: "11" }, {
     code: "PPE_SAFETY_HELMET", label: "안전모",
   });
