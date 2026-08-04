@@ -1413,3 +1413,16 @@ Consequences:
 - `price.supply`는 도매매 개당 공급가로 저장하고 MOQ를 곱한 묶음 총액으로 재해석하지 않는다.
 - 정기 동기화는 MOQ와 주문단위 변경 이력을 남긴다. 10개를 초과하게 된 ACTIVE 상품은 `HIDDEN`으로 전환하고 실패 시 기존 값을 보존한다.
 - 기존 주문 snapshot과 운영자가 설정한 `HIDDEN`, `STOPPED`, 수동 `SOLD_OUT` 보호는 유지한다.
+
+## 2026-08-05: Separate Source Discovery From Sale Eligibility
+
+Decision:
+
+좋은 상품군의 참조 상품에서 도매꾹 원본 카테고리를 찾아 랭킹 후보를 별도로 수집한다. 원본 카테고리 탐색은 상품 발견 범위를 넓히는 용도이며 자동 등록 예외로 사용하지 않는다.
+
+Consequences:
+
+- 고정된 코어러블 카테고리명 검색에 잡히지 않는 상품도 `REVIEW_CANDIDATE` 수집본과 원본 카테고리 보고서에 남긴다.
+- 참조 링크는 `docs/domeggook-reference-items.txt`에서 운영하며 장갑 외 상품군도 같은 방식으로 추가한다.
+- 미분류 상품은 코어러블 카테고리를 확정하기 전까지 import하지 않는다. 원본 카테고리만으로 고객 카테고리를 자동 생성하지 않는다.
+- 판매 상태, 도매매 채널, MOQ, 이미지 사용, 완제품, 배송비와 인증 검증은 기존 정책을 그대로 적용한다.

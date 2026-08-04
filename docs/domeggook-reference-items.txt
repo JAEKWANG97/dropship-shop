@@ -1,0 +1,7 @@
+# 좋은 상품군을 놓치지 않기 위한 도매꾹 참조 상품이다.
+# 자동 등록 예외가 아니며, 원본 카테고리 확장 수집의 시작점으로만 사용한다.
+https://www.domeggook.com/44092831?from=lstGen
+https://www.domeggook.com/43675480?from=lstGen
+https://www.domeggook.com/33832643?from=lstGen
+https://www.domeggook.com/8667274?from=lstGen
+https://www.domeggook.com/57723620?from=lstGen
