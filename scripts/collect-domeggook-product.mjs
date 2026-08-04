@@ -20,6 +20,8 @@ const DEFAULT_OUT_DIR = "tmp/domeggook-products";
 const CATEGORY_FILE = "apps/web/src/lib/categories.ts";
 const COVERAGE_OUT_DIR = "tmp/domeggook-category-coverage";
 const OPEN_API_COVERAGE_OUT_DIR = "tmp/domeggook-open-api-coverage";
+const SOURCE_DISCOVERY_OUT_DIR = "tmp/domeggook-source-discovery";
+const DEFAULT_REFERENCE_FILE = "docs/domeggook-reference-items.txt";
 const OPTION_BACKFILL_REPORT = "tmp/domeggook-option-backfill-report.json";
 const SELLER_SCORE_BACKFILL_REPORT = "tmp/domeggook-seller-score-backfill-report.json";
 const OPEN_API_REFRESH_REPORT = "tmp/domeggook-open-api-refresh-report.json";
@@ -38,6 +40,7 @@ function usage() {
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 30
   node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --ranking-count 60 --fresh
+  node scripts/collect-domeggook-product.mjs --source-category-discovery --target-per-category 30
   node scripts/collect-domeggook-product.mjs --open-api-refresh
   node scripts/collect-domeggook-product.mjs --self-check
 
@@ -48,7 +51,8 @@ Output:
   tmp/domeggook-option-backfill-report.json
   tmp/domeggook-seller-score-backfill-report.json
   tmp/domeggook-category-coverage/*
-  tmp/domeggook-open-api-coverage/*`);
+  tmp/domeggook-open-api-coverage/*
+  tmp/domeggook-source-discovery/*`);
 }
 
 function parseArgs(argv) {
@@ -64,6 +68,16 @@ function parseArgs(argv) {
       maxCategories: numberArg(argv, "--max-categories", 0),
       delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
       fresh: argv.includes("--fresh"),
+    };
+  }
+
+  if (argv.includes("--source-category-discovery")) {
+    return {
+      sourceCategoryDiscovery: true,
+      file: stringArg(argv, "--file", DEFAULT_REFERENCE_FILE),
+      targetPerCategory: numberArg(argv, "--target-per-category", 30),
+      rankingCount: numberArg(argv, "--ranking-count", 60),
+      delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
     };
   }
 
@@ -862,8 +876,28 @@ function openApiListParams(keyword, size) {
   };
 }
 
+function openApiSourceCategoryListParams(categoryCode, size) {
+  return {
+    ver: "4.1",
+    mode: "getItemList",
+    ca: categoryCode,
+    so: OPEN_API_RANKING_SORT,
+    sz: size,
+    pg: 1,
+    mxq: 10,
+  };
+}
+
 async function openApiList(apiKey, keyword, size) {
   const result = await openApiRequest(apiKey, openApiListParams(keyword, size));
+  return {
+    total: Number(result.header?.numberOfItems || 0),
+    items: arrayValue(result.list?.item),
+  };
+}
+
+async function openApiSourceCategoryList(apiKey, categoryCode, size) {
+  const result = await openApiRequest(apiKey, openApiSourceCategoryListParams(categoryCode, size));
   return {
     total: Number(result.header?.numberOfItems || 0),
     items: arrayValue(result.list?.item),
@@ -963,12 +997,8 @@ function titleHasAny(title, keywords) {
   return keywords.some((keyword) => normalized.includes(normalizedText(keyword)));
 }
 
-function listCandidateIssue(item, category) {
+function commonListCandidateIssue(item) {
   const title = String(item.title || "");
-  const categoryKeywords = OPEN_API_REQUIRED_TITLE_KEYWORDS[category.code] || [
-    cleanKeyword(category.label),
-    ...(CATEGORY_KEYWORD_OVERRIDES[category.code] || []),
-  ];
   if (!item.no) return "ITEM_NO_MISSING";
   if (numberOrNull(item.price) <= 0) return "PRICE_MISSING";
   const minimumOrderQuantity = numberOrNull(item.unitQty);
@@ -979,6 +1009,17 @@ function listCandidateIssue(item, category) {
   if (item.market?.supply !== undefined && !booleanValue(item.market.supply)) return "SUPPLY_MARKET_INACTIVE";
   if (titleHasAny(title, CUSTOMER_EXPOSURE_KEYWORDS)) return "CUSTOMER_EXPOSURE_KEYWORD";
   if (titleHasAny(title, NON_SAFETY_KEYWORDS)) return "NON_SAFETY_KEYWORD";
+  return "";
+}
+
+function listCandidateIssue(item, category) {
+  const title = String(item.title || "");
+  const commonIssue = commonListCandidateIssue(item);
+  if (commonIssue) return commonIssue;
+  const categoryKeywords = OPEN_API_REQUIRED_TITLE_KEYWORDS[category.code] || [
+    cleanKeyword(category.label),
+    ...(CATEGORY_KEYWORD_OVERRIDES[category.code] || []),
+  ];
   if (titleHasAny(title, OPEN_API_DISALLOWED_TITLE_KEYWORDS[category.code] || [])) {
     return "CATEGORY_MISMATCH";
   }
@@ -1065,7 +1106,7 @@ function openApiCategoryPath(detail) {
   return [...parents, current].filter(Boolean).join(" > ");
 }
 
-function openApiProduct(detail, candidate, category, keyword, sorts, scoringCategories) {
+function openApiProduct(detail, candidate, category, keyword, sorts, scoringCategories, discovery = false) {
   const itemNo = String(detail.basis?.no || candidate.no || "");
   const title = cleanText(detail.basis?.title || candidate.title);
   const sourcePrice = numberOrNull(detail.price?.supply ?? candidate.price);
@@ -1098,10 +1139,10 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
   }
   if (options.length > 20) reviewReasons.push("OPTION_COUNT_GT_20");
   const categoryScore = scoreCategory({ title, options }, scoringCategories);
-  if (
+  if (!discovery && (
     categoryScore.code !== category.code
     || categoryScore.secondScore >= categoryScore.score - 4
-  ) {
+  )) {
     reviewReasons.push("CATEGORY_AMBIGUOUS");
   }
   hardReasons.push(...reviewReasons);
@@ -1161,6 +1202,169 @@ function openApiProduct(detail, candidate, category, keyword, sorts, scoringCate
     hardReasons,
     reviewReasons,
   };
+}
+
+function referenceItemNo(value) {
+  return String(value || "").match(/(?:domeggook\.com\/|^)(\d{5,})(?:\D|$)/)?.[1] || "";
+}
+
+function candidateFromDetail(detail) {
+  return {
+    no: String(detail.basis?.no || ""),
+    title: detail.basis?.title || "",
+    price: detail.price?.supply,
+    unitQty: detail.qty?.supplyUnit,
+    adultOnly: detail.basis?.adultOnly,
+    deli: { fromOversea: detail.deli?.fromOversea },
+    market: { supply: detail.channel?.supply },
+  };
+}
+
+async function sourceCategoryDiscovery(args) {
+  const apiKey = await readOpenApiKey();
+  const references = (await readFile(args.file, "utf8"))
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map(referenceItemNo)
+    .filter(Boolean);
+  if (references.length === 0) throw new Error(`참조 상품이 없습니다: ${args.file}`);
+
+  const scoringCategories = readCategoryDefinitions();
+  const details = new Map();
+  const sourceCategories = new Map();
+  for (const itemNo of [...new Set(references)]) {
+    const detail = await openApiDetail(apiKey, itemNo);
+    details.set(itemNo, detail);
+    const code = String(detail.category?.current?.code || "");
+    if (!code) throw new Error(`참조 상품 원본 카테고리 누락: ${itemNo}`);
+    const category = sourceCategories.get(code) || {
+      code,
+      path: openApiCategoryPath(detail),
+      references: [],
+    };
+    category.references.push(itemNo);
+    sourceCategories.set(code, category);
+    await sleep(args.delayMs);
+  }
+
+  await mkdir(SOURCE_DISCOVERY_OUT_DIR, { recursive: true });
+  const reports = [];
+  for (const sourceCategory of sourceCategories.values()) {
+    const reportPath = path.join(SOURCE_DISCOVERY_OUT_DIR, `${sourceCategory.code}.json`);
+    const report = {
+      collectorVersion: OPEN_API_COLLECTOR_VERSION,
+      generatedAt: new Date().toISOString(),
+      sourceCategoryCode: sourceCategory.code,
+      sourceCategoryPath: sourceCategory.path,
+      references: sourceCategory.references,
+      target: args.targetPerCategory,
+      discovered: [],
+      excluded: [],
+    };
+    const result = await openApiSourceCategoryList(apiKey, sourceCategory.code, args.rankingCount);
+    const candidates = new Map();
+    for (const itemNo of sourceCategory.references) {
+      candidates.set(itemNo, { ...candidateFromDetail(details.get(itemNo)), reference: true });
+    }
+    for (const item of result.items) {
+      const itemNo = String(item.no || "");
+      if (itemNo && !candidates.has(itemNo)) candidates.set(itemNo, item);
+    }
+    await sleep(args.delayMs);
+
+    for (const candidate of candidates.values()) {
+      if (report.discovered.length >= args.targetPerCategory && !candidate.reference) break;
+      const itemNo = String(candidate.no || "");
+      const listIssue = commonListCandidateIssue(candidate);
+      if (listIssue) {
+        report.excluded.push({ itemNo, title: candidate.title, reference: Boolean(candidate.reference), reasons: [listIssue], stage: "list" });
+        continue;
+      }
+      try {
+        const detail = details.get(itemNo) || await openApiDetail(apiKey, itemNo);
+        const categoryScore = scoreCategory({
+          title: detail.basis?.title || candidate.title,
+          options: parseOpenApiOptions(detail.selectOpt),
+        }, scoringCategories);
+        const category = scoringCategories.find((item) => item.code === categoryScore.code) || { code: "", label: "" };
+        const parsed = openApiProduct(
+          detail,
+          candidate,
+          category,
+          `source-category:${sourceCategory.code}`,
+          [OPEN_API_RANKING_SORT],
+          scoringCategories,
+          true,
+        );
+        const existing = await readExistingProduct(itemNo);
+        const collectionCategory = category.code ? category : {
+          code: existing?.collectionCategoryCode || "",
+          label: existing?.collectionCategoryLabel || "",
+        };
+        const reasons = [...new Set([
+          ...parsed.hardReasons,
+          ...(collectionCategory.code ? [] : ["CATEGORY_UNMAPPED"]),
+        ])];
+        if (reasons.includes("IMAGE_USAGE_NOT_ALLOWED") || reasons.includes("DETAIL_IMAGE_MISSING")) {
+          report.excluded.push({ itemNo, title: parsed.product.title, reference: Boolean(candidate.reference), reasons, stage: "detail" });
+        } else {
+          parsed.product.collectionCategoryCode = collectionCategory.code;
+          parsed.product.collectionCategoryLabel = collectionCategory.label;
+          Object.assign(parsed.product, {
+            collectionDecision: reasons.length ? "REVIEW_CANDIDATE" : "IMPORT_CANDIDATE",
+            collectionReviewReasons: reasons,
+            discoveryReference: Boolean(candidate.reference),
+          });
+          await saveOpenApiProduct(parsed.product);
+          report.discovered.push({
+            itemNo,
+            title: parsed.product.title,
+            reference: Boolean(candidate.reference),
+            decision: parsed.product.collectionDecision,
+            reasons,
+            collectionCategoryCode: collectionCategory.code,
+          });
+          console.log(`${sourceCategory.code}: ${parsed.product.collectionDecision} ${itemNo} ${parsed.product.title}`);
+        }
+      } catch (error) {
+        if (/일일 한도|호출 제한\(429\)/.test(String(error.message))) throw error;
+        report.excluded.push({ itemNo, title: candidate.title, reference: Boolean(candidate.reference), reasons: [error.message], stage: "collect" });
+      }
+      await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+      await sleep(args.delayMs);
+    }
+    Object.assign(report, {
+      sourceTotal: result.total,
+      requested: args.rankingCount,
+      actual: report.discovered.length,
+      shortfall: report.discovered.length < args.targetPerCategory,
+      pass: true,
+      completed: true,
+    });
+    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+    reports.push(report);
+  }
+
+  const summary = {
+    collectorVersion: OPEN_API_COLLECTOR_VERSION,
+    generatedAt: new Date().toISOString(),
+    referenceCount: references.length,
+    sourceCategoryCount: reports.length,
+    discoveredProducts: reports.reduce((sum, report) => sum + report.discovered.length, 0),
+    reviewCandidates: reports.reduce((sum, report) => sum + report.discovered.filter((item) => item.decision === "REVIEW_CANDIDATE").length, 0),
+    excludedCandidates: reports.reduce((sum, report) => sum + report.excluded.length, 0),
+    categories: reports.map((report) => ({
+      sourceCategoryCode: report.sourceCategoryCode,
+      sourceCategoryPath: report.sourceCategoryPath,
+      references: report.references,
+      actual: report.actual,
+      shortfall: report.shortfall,
+      pass: true,
+    })),
+  };
+  await writeFile(path.join(SOURCE_DISCOVERY_OUT_DIR, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+  console.log(`${SOURCE_DISCOVERY_OUT_DIR}/summary.json 저장 완료`);
 }
 
 async function saveOpenApiProduct(product) {
@@ -1621,6 +1825,19 @@ function selfCheck() {
     market: { supply: "true" },
   }, { code: "PPE_SAFETY_HELMET", label: "안전모" });
   if (mismatch !== "CATEGORY_MISMATCH") throw new Error("카테고리 연관성 self-check 실패");
+  if (referenceItemNo("https://www.domeggook.com/44092831?from=lstGen") !== "44092831") {
+    throw new Error("참조 상품번호 파서 self-check 실패");
+  }
+  if (commonListCandidateIssue({
+    no: "44092831",
+    title: "폴리에스터 NBR 그립왕 안전 장갑",
+    price: "1040",
+    unitQty: "1",
+    market: { supply: "true" },
+  })) throw new Error("원본 카테고리 후보 공통 필터 self-check 실패");
+  if (openApiSourceCategoryListParams("12_16_05_07_00", 60).ca !== "12_16_05_07_00") {
+    throw new Error("원본 카테고리 조회 파라미터 self-check 실패");
+  }
   const vehicleBelt = listCandidateIssue({
     no: "3",
     title: "자동차 안전벨트 고정클립",
@@ -1743,6 +1960,10 @@ async function main() {
   }
   if (args.openApiCoverage) {
     await openApiCoverage(args);
+    return;
+  }
+  if (args.sourceCategoryDiscovery) {
+    await sourceCategoryDiscovery(args);
     return;
   }
   if (args.openApiRefresh) {
