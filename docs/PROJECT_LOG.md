@@ -982,3 +982,9 @@
 - 해결: 성공 항목을 다시 처리하지 않고 실패 상품번호만 retry manifest로 분리해 멱등 재시도했다.
 - 결과: 운영 상품 `ACTIVE 478 / HIDDEN 133`, 상품번호 중복 0건, 원본 옵션 966개, 공개 상품 API 478개를 확인했다. 임시 관리자 토큰 파일과 S3 전달 객체는 삭제했다.
 - 후속: ACTIVE 상품의 가격·옵션·재고 정기 동기화는 B-086에서 처리한다.
+## 2026-08-05 (GitHub Actions SSM 배포 전환)
+
+- 관련 항목: B-059
+- 문제·고민: SSH 22 인바운드를 제거한 뒤 기존 SCP/SSH 배포 job이 타임아웃되어 새 이미지는 생성돼도 EC2에 반영되지 않았다.
+- 해결방안: GitHub OIDC provider와 `main` 전용 IAM role을 만들고, 대상 EC2 한 대의 `AWS-RunShellScript` 실행·결과 조회만 허용했다. workflow는 commit SHA의 compose/nginx를 내려받고 GHCR 이미지를 pull한 뒤 readiness까지 SSM에서 확인한다.
+- 결정: SSH 22는 다시 열지 않고 GitHub Secrets의 장기 EC2 SSH 키도 더 이상 배포에 사용하지 않는다.

@@ -28,7 +28,7 @@ Current state: manually running on `2026-07-28`; both automatic schedules remain
 - Stop: every day at `01:00 KST` (`coreable-ec2-stop-daily`).
 - Scheduler role: `coreable-ec2-scheduler-role`, limited to starting and stopping `i-0c795cb4b0f0b4177`.
 
-This schedule saves only EC2 compute time; EBS and public IPv4 charges continue. Disable the stop schedule before live orders are enabled. A deployment attempted while the instance is stopped still requires a manual start until the deploy workflow is migrated from SSH to SSM.
+This schedule saves only EC2 compute time; EBS and public IPv4 charges continue. Disable the stop schedule before live orders are enabled. A deployment attempted while the instance is stopped still requires a manual start before SSM can receive the command.
 
 ## One-Time AWS Setup
 
@@ -38,7 +38,7 @@ infra/aws/ec2/create-test-instance.sh
 
 The script creates or reuses:
 
-- key pair `coreable-saf-deploy-key`
+- SSM managed instance with the `coreable-temp-ssm-profile` instance profile
 - security group `coreable-saf-test-sg`
 - EC2 instance `coreable-saf-test`
 - Elastic IP tagged `coreable-saf-test-eip`
@@ -52,11 +52,11 @@ Current deployment:
 
 Security group baseline:
 
-- SSH `22`: `0.0.0.0/0` for GitHub-hosted Actions SSH deploy
-- HTTP `80`: `0.0.0.0/0`
-- HTTPS `443`: `0.0.0.0/0`
+- SSH `22`: no inbound rule
+- HTTP `80`: Cloudflare public IPv4 ranges only
+- HTTPS `443`: Cloudflare public IPv4 ranges only
 
-GitHub-hosted runners do not have a stable small source IP range. SSH is therefore open to the internet for this first deployment, but access is key-only with the deploy key stored in GitHub Secrets. If this becomes long-lived production infrastructure, replace this with SSM Session Manager, a self-hosted runner, or a fixed egress deploy host.
+GitHub Actions assumes `coreable-github-deploy` through OIDC only from this repository's `main` branch. The role can send `AWS-RunShellScript` only to the production EC2 instance and read that command's result. No long-lived AWS key or public SSH ingress is used for deployment.
 
 ## One-Time Server Setup
 
@@ -88,13 +88,9 @@ scp tmp/cloudflare-origin.pem tmp/cloudflare-origin.key ubuntu@<elastic-ip>:/tmp
 ssh ubuntu@<elastic-ip> 'sudo install -m 0644 /tmp/cloudflare-origin.pem /var/lib/coreable/proxy/certs/cloudflare-origin.pem && sudo install -m 0600 /tmp/cloudflare-origin.key /var/lib/coreable/proxy/certs/cloudflare-origin.key && sudo rm -f /tmp/cloudflare-origin.pem /tmp/cloudflare-origin.key'
 ```
 
-## GitHub Secrets
+## GitHub Authentication
 
-Required repository secrets:
-
-- `EC2_HOST`: Elastic IP or DNS host
-- `EC2_USER`: `ubuntu`
-- `EC2_SSH_PRIVATE_KEY`: private key matching the EC2 key pair
+No EC2 SSH secret or long-lived AWS access key is required. The workflow requests a short-lived AWS credential through GitHub OIDC and passes the job-scoped `GITHUB_TOKEN` to the managed instance only for the GHCR pull.
 
 Application secrets stay on EC2 in `/opt/coreable/.env`, not in GitHub Actions.
 
@@ -104,7 +100,7 @@ On push to `main`:
 
 1. GitHub Actions builds API and Web Docker images for `linux/arm64`.
 2. Images are pushed to GHCR with both commit SHA and `latest` tags.
-3. Actions copies compose/nginx config to EC2.
+3. Actions sends an SSM command that downloads the commit SHA's compose/nginx config.
 4. EC2 updates `API_IMAGE` and `WEB_IMAGE` in `/opt/coreable/.env`.
 5. EC2 runs `docker compose pull && docker compose up -d`.
 6. Actions checks `http://localhost:8080/actuator/health/readiness`.
