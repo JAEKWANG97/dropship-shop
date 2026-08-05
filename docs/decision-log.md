@@ -7,6 +7,19 @@
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
 - 완료 로그와 과거 결정이 위 항목과 충돌하면 이 절과 각 정책 문서의 `Confirmed Policy`를 우선한다.
 
+## 2026-08-06: Domeggook Search Policy Separates Import, Review, and No-Search Categories
+
+Decision:
+
+Use the approved B-093 policy for 81 Coreable categories: 33 A categories may become automated import candidates, 34 R categories remain review-only, and 14 M categories do not run independent product searches. A and R use only their approved keywords in order, with `rd`, supply-market filtering, and `mxq=10`; each category retains at most 60 valid local candidates and reports a shortfall as PASS without relaxing checks.
+
+Consequences:
+
+- An R candidate with no hard failure is written as `REVIEW` and never enters an import manifest as an importable item.
+- M categories create a completed no-search report with zero list queries.
+- The five reference products remain local `REVIEW_CANDIDATE` evidence. General work gloves are not part of the B-093 independent-search policy.
+- Collection output remains local review data until an explicitly authorized import; this decision does not alter production products or public status.
+
 ## 2026-08-04: Disclose Domeggook Supplier Delivery Data Sharing
 
 Decision:

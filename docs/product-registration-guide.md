@@ -67,7 +67,7 @@ node scripts/audit-sale-catalog.mjs --cookie-file tmp/admin-cookie.txt
 
 ## Domeggook Collection
 
-도매꾹 상품은 자동 수집·선별하며 상품별 수동 `REVIEW` 큐를 만들지 않는다.
+도매꾹 상품은 자동 수집·선별한다. B-093의 R(검토 전용) 카테고리만 자동 import하지 않는 `REVIEW` 결과로 보존하며, 그 외 불확실하거나 판매 조건을 충족하지 못한 상품은 자동 제외한다.
 
 상품 페이지에서 확인되는 상품 정보를 원문 그대로 수집·등록한다.
 
@@ -87,7 +87,7 @@ node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
 node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
 node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
 node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 30
-node --env-file=.env scripts/collect-domeggook-product.mjs --open-api-coverage --expanded-keywords --target-per-category 60
+node --env-file=.env scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 60 --ranking-count 60
 node --env-file=.env scripts/collect-domeggook-product.mjs --source-category-discovery --target-per-category 60
 node --env-file=.env scripts/collect-domeggook-product.mjs --open-api-refresh
 node scripts/audit-domeggook-kosha-certifications.mjs --run-ocr
@@ -98,12 +98,12 @@ node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs
 - 결과는 `tmp/domeggook-products/{상품번호}/`에 저장된다.
 - 공공데이터포털 키는 `.env`의 `DATA_GO_KR_SERVICE_KEY_DECODED`, `DATA_GO_KR_SERVICE_KEY_ENCODED`에 저장한다. 감사 도구는 디코딩 키를 먼저 사용하고 인증 실패 시 인코딩 키로 한 번 재시도한다.
 - 공식 Open API 수집은 로컬 `.env`의 `DOMEGGOOK_OPEN_API_KEY`를 사용하며 key를 산출물이나 git에 남기지 않는다.
-- `--open-api-coverage`는 카테고리별 도매꾹랭킹순(`rd`) 60개를 한 번 조회하고 상품번호 중복을 제거한다. 목표 30개 미달도 확보된 상품만 사용하고 PASS 처리한다.
-- `--expanded-keywords`는 승인된 26개 판매 카테고리에 구체 검색어를 순서대로 보충 적용한다. 기존 수집본을 먼저 세어 카테고리당 총 60개까지만 채우고 미달은 확보 수량으로 PASS 처리한다.
+- `--open-api-coverage`는 B-093의 81개 카테고리를 A 33개, R 34개, M 14개 정책으로 처리한다. A/R은 승인 검색어를 순서대로 조회하고, M은 독립 목록 검색을 하지 않는다.
+- A/R은 도매꾹랭킹순(`rd`) 후보를 기존 수집본과 합산해 카테고리당 최대 60개까지만 보존한다. 미달은 확보 수량으로 PASS 처리하며 검색·판매 조건을 완화하지 않는다.
 - `--source-category-discovery`는 `docs/domeggook-reference-items.txt`의 참조 상품에서 공급처 원본 카테고리를 찾고, 각 원본 카테고리의 도매꾹랭킹순 후보를 지정 상한까지 수집한다. 장갑에 한정하지 않으며 새 참조 링크를 파일에 추가하면 같은 방식으로 상품군을 확장한다.
 - 참조 상품은 자동 등록 예외가 아니다. 고정 키워드와 코어러블 카테고리에 매핑되지 않아도 `REVIEW_CANDIDATE`로 수집해 `tmp/domeggook-source-discovery/` 보고서에 남기고, 배송·MOQ·이미지·판매 상태 검증은 기존 기준을 그대로 적용한다.
 - 원본 카테고리 탐색으로 수집된 미분류 상품은 운영자가 코어러블 판매 카테고리를 확정하기 전까지 import하지 않는다. 공급처 카테고리만으로 고객 카테고리를 자동 생성하거나 확정하지 않는다.
-- 목록 조회 조건은 도매꾹랭킹순(`rd`)과 도매매 최대 주문단위 `mxq=10`을 사용한다. 기본 모드는 보충 검색을 하지 않으며, `--expanded-keywords`에서 승인된 구체 검색어만 추가 조회한다. 어느 모드도 조건 완화는 하지 않는다.
+- 목록 조회 조건은 도매꾹랭킹순(`rd`), 사업자 공급시장, 도매매 최대 주문단위 `mxq=10`을 사용한다. B-093에서 정의하지 않은 검색어와 조건 완화는 사용하지 않는다.
 - 상세 조회에서 `channel.supply=true`, 개당 공급가 `price.supply`, 도매매 주문단위 `qty.supplyUnit`을 확인한다. `supplyUnit`을 고객 최소수량과 주문단위로 저장하며 1~10만 판매 후보로 허용한다.
 - `qty.domeMoq`는 도매꾹 채널 최소수량이므로 도매매 고객 제약으로 사용하지 않는다. `qty.supplyLoq`는 공급처 최대수량 원문으로 구분해 보존한다.
 - 상세 조회에서 판매 상태, 배송비, 이미지, 옵션, 카테고리와 인증 정보를 검증한다.
@@ -128,7 +128,7 @@ node --env-file=.env scripts/audit-domeggook-kosha-certifications.mjs
 - 주문인쇄·맞춤·로고·문구선택·시안 옵션은 `STOPPED`로 적재한다. 기성 옵션이 없으면 상품을 자동 제외한다.
 - 기존 수집본은 `--backfill-options`로 이미지를 다시 받지 않고 옵션 정보만 보강한다.
 - 전체 카테고리 후보는 `--coverage-scan`으로 카테고리별 검색 후보와 부족 카테고리 리포트를 만든다.
-- 수집 선별에서 확정할 수 없는 가격, 카테고리, 배송, 옵션 조건은 `REVIEW`로 보내지 않고 자동 제외한다.
+- 수집 선별에서 확정할 수 없는 가격, 카테고리, 배송, 옵션 조건은 자동 제외한다. B-093의 R군만 하드 실패가 없을 때 정책상 `REVIEW`로 남기며 자동 import하지 않는다.
 - 보호구 인증 감사 결과는 `tmp/domeggook-kosha-cert-audit.json`과 CSV로 저장한다.
 - `review-domeggook-products.mjs`는 감사 결과를 자동으로 읽고 인증 미확인 상품은 compliance `PENDING`으로 기록한다.
 - 원본의 인증번호는 공공데이터포털 보호구 인증현황 API에서 정확히 일치하는 번호를 조회하고, 공식 등록 모델과 판매 모델까지 일치해야 인증 확인 완료로 본다.
