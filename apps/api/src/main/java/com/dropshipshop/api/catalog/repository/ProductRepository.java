@@ -69,9 +69,18 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 		select product.categoryCode as categoryCode, count(product) as productCount
 		from Product product
 		where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+		and (:keyword is null
+			or lower(product.name) like :keyword
+			or lower(product.summary) like :keyword)
+		and product.basePrice >= :minPrice
+		and (:maxPrice is null or product.basePrice <= :maxPrice)
 		group by product.categoryCode
 		""")
-	List<ProductCategoryCount> countPublicProductsByCategory();
+	List<ProductCategoryCount> countPublicProductsByCategory(
+		@Param("keyword") String keyword,
+		@Param("minPrice") long minPrice,
+		@Param("maxPrice") Long maxPrice
+	);
 
 	@Query(
 		value = """

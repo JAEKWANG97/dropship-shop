@@ -236,7 +236,7 @@ Customer visibility rules:
 - `page`: zero-based page, default `0`.
 - `size`: default `24`, range `1..100`.
 
-The response is `{ products, page, size, totalElements, totalPages, categoryCounts }`. `categoryCounts` contains active product counts for each leaf category and is used by the customer category filter.
+The response is `{ products, page, size, totalElements, totalPages, categoryCounts }`. `categoryCounts` contains active product counts for each leaf category after applying `q`, `minPrice`, and `maxPrice`, but before a selected `category` or `categories` filter. It is used to show related categories within the current search result.
 - Do not expose raw supplier information to customers.
 - Product detail responses include `policyLinks` for shipping, cancellation/refund, and payment-after-stockout notices so operational policy is not embedded only in arbitrary product HTML/images.
 - Product detail `productNotice.noticeRows` contains structured `{ label, value }` rows from the supplier product information notice. Supplier trade terms and supplier identity are not public fields.
