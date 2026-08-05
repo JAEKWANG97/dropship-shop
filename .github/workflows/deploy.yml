@@ -55,14 +55,13 @@ jobs:
         run: git diff --check
 
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: verify
     outputs:
       api-image: ${{ steps.meta.outputs.api-image }}
       web-image: ${{ steps.meta.outputs.web-image }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: actions/setup-java@v4
         with:
