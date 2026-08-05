@@ -28,6 +28,34 @@ const OPEN_API_REFRESH_REPORT = "tmp/domeggook-open-api-refresh-report.json";
 const OPEN_API_COLLECTOR_VERSION = 10;
 const OPEN_API_DAILY_LIMIT = 5000;
 const OPEN_API_RANKING_SORT = "rd";
+const EXPANDED_COLLECTION_KEYWORDS = {
+  PPE_SAFETY_HELMET: ["안전모", "산업용 안전모", "경량 안전모"],
+  PPE_SAFETY_SHOES: ["안전화", "경량 안전화", "산업용 작업화", "건설 작업화"],
+  PPE_SAFETY_GLASSES: ["보안경", "산업용 보안경", "보호안경"],
+  PPE_RESPIRATOR: ["방진마스크", "방독마스크"],
+  PPE_EAR_PROTECTION: ["산업용 귀마개", "산업용 귀덮개", "청력보호구"],
+  PPE_WELDING_GLOVES: ["용접장갑", "알곤장갑"],
+  PPE_HIGH_VISIBILITY_VEST: ["안전조끼", "반사 안전조끼", "형광 안전조끼"],
+  PPE_FALL_ARREST_HARNESS: ["전체식 안전대", "전신 하네스"],
+  FALL_PREVENTION_NET: ["추락방지망", "추락 방지망"],
+  FALLING_OBJECT_NET: ["낙하물방지망", "낙하 방지망"],
+  OPENING_COVER: ["개구부 덮개", "개구부 안전덮개"],
+  WORK_PLATFORM: ["작업발판", "말비계", "고소작업 발판"],
+  SAFETY_BLOCK: ["안전블록", "추락방지 안전블록"],
+  SAFETY_SIGN: ["안전표지판", "공사중 표지판"],
+  TRAFFIC_CONE: ["라바콘", "안전콘", "칼라콘"],
+  SAFETY_FENCE: ["안전휀스", "안전펜스"],
+  BARRICADE: ["바리케이드", "바리케이트"],
+  WARNING_LIGHT: ["경광등", "점멸 경광등"],
+  SIGNAL_BATON: ["신호봉", "교통 유도봉"],
+  BARRIER_TAPE: ["차단테이프", "안전띠"],
+  GAS_DETECTOR: ["가스검지기", "가스감지기", "복합가스측정기"],
+  OXYGEN_METER: ["산소측정기", "산소농도측정기"],
+  NOISE_METER: ["소음계", "소음측정기"],
+  LIGHT_METER: ["조도계", "조도측정기"],
+  ANEMOMETER: ["풍속계", "풍속측정기"],
+  FIRST_AID_KIT: ["구급함", "구급가방", "응급처치키트"],
+};
 
 function usage() {
   console.log(`Usage:
@@ -38,6 +66,7 @@ function usage() {
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 30
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --expanded-keywords --target-per-category 60
   node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --ranking-count 60 --fresh
   node scripts/collect-domeggook-product.mjs --source-category-discovery --target-per-category 30
@@ -68,6 +97,7 @@ function parseArgs(argv) {
       maxCategories: numberArg(argv, "--max-categories", 0),
       delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
       fresh: argv.includes("--fresh"),
+      expandedKeywords: argv.includes("--expanded-keywords"),
     };
   }
 
@@ -663,10 +693,12 @@ const OPEN_API_REQUIRED_TITLE_KEYWORDS = {
     "공장용귀마개",
     "현장용귀마개",
   ],
+  SAFETY_SIGN: ["안전표지판", "안전표지", "공사중표지판"],
   WORK_PLATFORM: ["작업발판", "작업대", "우마"],
   OPENING_COVER: ["개구부덮개", "개구부안전덮개", "맨홀커버"],
   SAFETY_BLOCK: ["안전블록", "안전블럭"],
   GAS_DETECTOR: ["가스감지기", "가스검지기", "누출감지기", "복합가스측정기", "휴대용가스측정기"],
+  FIRST_AID_KIT: ["구급함", "구급상자", "구급가방", "응급처치키트", "응급키트"],
   LIGHT_METER: ["조도계", "조명조도", "광량측정", "LUX", "LX"],
   VIBRATION_METER: ["디지털진동측정기", "휴대용진동측정기", "산업용진동측정기", "진동계", "진동분석기"],
   EYEWASH_STATION: ["비상세안기", "응급세안기", "산업용세안기", "눈세척기", "아이워시"],
@@ -689,7 +721,36 @@ const OPEN_API_DISALLOWED_TITLE_KEYWORDS = {
     "인형",
     "이너캡",
     "헤어밴드",
+    "경작업",
+    "범프캡",
+    "볼캡",
+    "실내안전모",
+    "귀마개",
+    "헤드셋",
+    "벌초",
+    "예초기",
+    "교육용",
+    "훈련용",
   ],
+  PPE_SAFETY_SHOES: [
+    "운동화",
+    "러닝",
+    "런닝",
+    "워킹화",
+    "헬스",
+    "레인로퍼",
+    "레인 로퍼",
+    "구두",
+    "패션",
+    "등산화",
+  ],
+  PPE_SAFETY_GLASSES: ["코로나", "방역", "스포츠", "선글라스", "벌초", "예초"],
+  PPE_RESPIRATOR: ["비말", "코로나", "기침", "재채기"],
+  PPE_HIGH_VISIBILITY_VEST: ["유아", "러닝", "런닝"],
+  WORK_PLATFORM: ["경보기", "경고음"],
+  BARRIER_TAPE: ["전체식", "상체식", "죔줄", "벨트", "허리띠", "암밴드", "각반", "짐끈", "팔토시"],
+  WARNING_LIGHT: ["건전지", "자전거", "오토바이"],
+  ANEMOMETER: ["만들기", "집콕과학", "4인세트"],
   PPE_SAFETY_BELT: [
     "자동차",
     "차량",
@@ -1426,13 +1487,19 @@ function mergeListCandidates(target, items, keyword, sort) {
 
 function processedItemNos(report) {
   return new Set([
-    ...report.valid.map((item) => String(item.itemNo)),
     ...report.excluded.map((item) => String(item.itemNo)),
     ...report.duplicates.map((item) => String(item.itemNo)),
   ]);
 }
 
+function collectedCategoryItemNos(owners, categoryCode) {
+  return new Set([...owners.entries()]
+    .filter(([, owner]) => owner === categoryCode)
+    .map(([itemNo]) => itemNo));
+}
+
 async function collectOpenApiCategory(apiKey, category, args, owners, scoringCategories, reportPath, previous) {
+  const keywordMode = args.expandedKeywords ? "expanded" : "primary";
   const report = previous || {
     collectorVersion: OPEN_API_COLLECTOR_VERSION,
     generatedAt: new Date().toISOString(),
@@ -1445,13 +1512,18 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
     duplicates: [],
     shortfall: false,
     completed: false,
+    keywordMode,
   };
-  const seen = processedItemNos(report);
+  const categoryItemNos = collectedCategoryItemNos(owners, category.code);
+  const seen = new Set([...processedItemNos(report), ...categoryItemNos]);
   const primaryKeyword = cleanKeyword(category.label);
-  const acceptedCount = () => report.valid.length;
+  const keywords = args.expandedKeywords
+    ? EXPANDED_COLLECTION_KEYWORDS[category.code]
+    : [primaryKeyword];
+  const acceptedCount = () => categoryItemNos.size;
   const checkpoint = async () => writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
-  async function runKeyword(keyword) {
+  async function runKeyword(keyword, index) {
     const candidates = new Map();
     const result = await openApiList(apiKey, keyword, args.rankingCount);
     report.queries.push({
@@ -1464,7 +1536,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
       requested: args.rankingCount,
       returned: result.items.length,
       total: result.total,
-      supplemental: false,
+      supplemental: index > 0,
     });
     await checkpoint();
     mergeListCandidates(candidates, result.items, keyword, OPEN_API_RANKING_SORT);
@@ -1507,7 +1579,10 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
             owners.set(itemNo, category.code);
           }
           const entry = { itemNo, title: existing.title, reasons: existing.collectionReviewReasons || [], reused: true };
-          if (existing.collectionDecision === "IMPORT_CANDIDATE") report.valid.push(entry);
+          if (existing.collectionDecision === "IMPORT_CANDIDATE") {
+            report.valid.push(entry);
+            categoryItemNos.add(itemNo);
+          }
           else report.excluded.push({ ...entry, stage: "existing" });
           await checkpoint();
           continue;
@@ -1537,6 +1612,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
           sourceCategoryPath: parsed.product.sourceCategoryPath,
         };
         report.valid.push(entry);
+        categoryItemNos.add(itemNo);
         await checkpoint();
         console.log(`${category.code}: ${parsed.product.collectionDecision} ${itemNo} ${parsed.product.title}`);
       } catch (error) {
@@ -1548,7 +1624,10 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
     }
   }
 
-  await runKeyword(primaryKeyword);
+  for (const [index, keyword] of keywords.entries()) {
+    if (acceptedCount() >= args.targetPerCategory) break;
+    await runKeyword(keyword, index);
+  }
   report.candidateCount = acceptedCount();
   report.actual = acceptedCount();
   report.shortfall = report.candidateCount < args.targetPerCategory;
@@ -1566,6 +1645,8 @@ async function openApiCoverage(args) {
   if (args.category) {
     categories = categories.filter((category) => category.code === args.category);
     if (categories.length === 0) throw new Error(`알 수 없는 카테고리: ${args.category}`);
+  } else if (args.expandedKeywords) {
+    categories = categories.filter((category) => EXPANDED_COLLECTION_KEYWORDS[category.code]);
   } else if (args.maxCategories > 0) {
     categories = categories.slice(0, args.maxCategories);
   }
@@ -1579,9 +1660,15 @@ async function openApiCoverage(args) {
     let report;
     if (!args.fresh && existsSync(reportPath)) {
       const previous = JSON.parse(await readFile(reportPath, "utf8"));
+      const activeItemNos = collectedCategoryItemNos(owners, category.code);
+      previous.valid = previous.valid.filter((item) => activeItemNos.has(String(item.itemNo)));
+      previous.actual = activeItemNos.size;
+      previous.shortfall = previous.actual < args.targetPerCategory;
+      previous.shortfallCount = Math.max(0, args.targetPerCategory - previous.actual);
       const reusable =
         previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
         && previous.target === args.targetPerCategory
+        && (previous.keywordMode || "primary") === (args.expandedKeywords ? "expanded" : "primary")
         && previous.completed === true;
       if (reusable) {
         report = previous;
@@ -1589,6 +1676,7 @@ async function openApiCoverage(args) {
       } else if (
         previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
         && previous.target === args.targetPerCategory
+        && (previous.keywordMode || "primary") === (args.expandedKeywords ? "expanded" : "primary")
       ) {
         report = await collectOpenApiCategory(
           apiKey, category, args, owners, scoringCategories, reportPath, previous,
@@ -1603,7 +1691,7 @@ async function openApiCoverage(args) {
       reportPath,
       `${JSON.stringify(report, null, 2)}\n`,
     );
-    console.log(`${category.code}: valid=${report.valid.length}, shortfall=${report.shortfall}`);
+    console.log(`${category.code}: valid=${report.actual}, shortfall=${report.shortfall}`);
   }
 
   const summary = {
@@ -1612,15 +1700,16 @@ async function openApiCoverage(args) {
     categoryCount: reports.length,
     targetPerCategory: args.targetPerCategory,
     rankingCount: args.rankingCount,
+    keywordMode: args.expandedKeywords ? "expanded" : "primary",
     coveredCategories: reports.filter((report) => !report.shortfall).length,
     shortfallCategories: reports.filter((report) => report.shortfall).map((report) => ({
       categoryCode: report.categoryCode,
       categoryLabel: report.categoryLabel,
-      valid: report.valid.length,
+      valid: report.actual,
       shortfall: report.shortfallCount,
       pass: report.pass,
     })),
-    validProducts: reports.reduce((sum, report) => sum + report.valid.length, 0),
+    validProducts: reports.reduce((sum, report) => sum + report.actual, 0),
     excludedCandidates: reports.reduce((sum, report) => sum + report.excluded.length, 0),
   };
   await writeFile(
@@ -1804,7 +1893,7 @@ function selfCheck() {
   const resumed = processedItemNos({
     valid: [{ itemNo: "1" }], excluded: [{ itemNo: "2" }], duplicates: [{ itemNo: "3" }],
   });
-  if (!["1", "2", "3"].every((itemNo) => resumed.has(itemNo))) throw new Error("수집 재개 self-check 실패");
+  if (!resumed.has("2") || !resumed.has("3") || resumed.has("1")) throw new Error("수집 재개 self-check 실패");
   const helmetIssue = listCandidateIssue({
     no: "1",
     title: "안전모 이름표 식별표 24개입",
@@ -1838,6 +1927,15 @@ function selfCheck() {
   if (openApiSourceCategoryListParams("12_16_05_07_00", 60).ca !== "12_16_05_07_00") {
     throw new Error("원본 카테고리 조회 파라미터 self-check 실패");
   }
+  if (
+    Object.keys(EXPANDED_COLLECTION_KEYWORDS).length !== 26
+    || !EXPANDED_COLLECTION_KEYWORDS.PPE_SAFETY_SHOES.includes("경량 안전화")
+    || !EXPANDED_COLLECTION_KEYWORDS.FIRST_AID_KIT.includes("응급처치키트")
+  ) throw new Error("확장 검색어 정책 self-check 실패");
+  if (collectedCategoryItemNos(
+    new Map([["1", "PPE_SAFETY_SHOES"], ["2", "PPE_SAFETY_GLASSES"]]),
+    "PPE_SAFETY_SHOES",
+  ).size !== 1) throw new Error("기존 수집 상품 포함 상한 계산 self-check 실패");
   const vehicleBelt = listCandidateIssue({
     no: "3",
     title: "자동차 안전벨트 고정클립",
@@ -1858,6 +1956,16 @@ function selfCheck() {
     market: { supply: "true" },
   }, { code: "PPE_SAFETY_GLASSES", label: "보안경" });
   if (replacementLens !== "ACCESSORY_SUSPECT") throw new Error("보안경 부속품 self-check 실패");
+  const harnessAsBarrierTape = listCandidateIssue({
+    no: "10",
+    title: "전체식 벨트 죔줄 안전띠",
+    price: "1000",
+    unitQty: "1",
+    adultOnly: "false",
+    deli: { fromOversea: "false" },
+    market: { supply: "true" },
+  }, { code: "BARRIER_TAPE", label: "안전띠(차단테이프)" });
+  if (harnessAsBarrierTape !== "CATEGORY_MISMATCH") throw new Error("차단테이프 동음이의어 self-check 실패");
   const householdRail = listCandidateIssue({
     no: "5",
     title: "나무 핸드레일 계단 안전난간",
