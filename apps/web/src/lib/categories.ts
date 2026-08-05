@@ -6,6 +6,7 @@ export const PRODUCT_CATEGORIES = [
   ["개인보호구", "", "PPE_SAFETY_GLASSES", "보안경"],
   ["개인보호구", "", "PPE_RESPIRATOR", "방진·방독마스크"],
   ["개인보호구", "", "PPE_EAR_PROTECTION", "귀마개·귀덮개"],
+  ["개인보호구", "", "PPE_WORK_GLOVES", "일반 작업장갑"],
   ["개인보호구", "", "PPE_INSULATED_GLOVES", "절연장갑"],
   ["개인보호구", "", "PPE_WELDING_GLOVES", "용접장갑"],
   ["개인보호구", "", "PPE_HIGH_VISIBILITY_VEST", "고가시성 안전조끼"],
