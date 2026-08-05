@@ -201,7 +201,7 @@ function RelatedCategoryFilterPanel({
             href={withCategory(params, category[2])}
             key={category[2]}
           >
-            {category[3]} <span>{categoryCounts[category[2]]}</span>
+            {category[3]}
           </Link>
         ))}
       </div>
