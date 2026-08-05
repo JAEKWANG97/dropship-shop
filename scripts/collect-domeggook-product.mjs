@@ -1641,7 +1641,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
 async function openApiCoverage(args) {
   const apiKey = await readOpenApiKey();
   let categories = await readCategories();
-  if (categories.length !== 81) throw new Error(`카테고리 정의가 81개가 아닙니다: ${categories.length}`);
+  if (categories.length !== 82) throw new Error(`카테고리 정의가 82개가 아닙니다: ${categories.length}`);
   if (args.category) {
     categories = categories.filter((category) => category.code === args.category);
     if (categories.length === 0) throw new Error(`알 수 없는 카테고리: ${args.category}`);

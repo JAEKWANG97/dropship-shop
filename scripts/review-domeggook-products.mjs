@@ -41,7 +41,7 @@ const DEFAULT_PRICING_POLICY = {
 const VERIFIED_KOSHA_STATUSES = new Set([
   "KOSHA_REGISTRY_MODEL_VERIFIED",
 ]);
-const AUTO_NOT_REQUIRED_CATEGORY_CODES = new Set(["BARRIER_TAPE"]);
+const AUTO_NOT_REQUIRED_CATEGORY_CODES = new Set(["BARRIER_TAPE", "PPE_WORK_GLOVES"]);
 const COREABLE_AS_INFO =
   "A/S 및 상품 문의: 코어블SAF 고객센터 010-8277-7369 / contact@coreable-saf.com / 평일 10:00-18:00";
 const COREABLE_RETURN_EXCHANGE_INFO =
@@ -63,6 +63,7 @@ export const CATEGORY_KEYWORD_OVERRIDES = {
   PPE_SAFETY_GLASSES: ["보안경", "고글", "보호안경", "보호경"],
   PPE_RESPIRATOR: ["방진마스크", "방독마스크", "분진마스크", "호흡보호구"],
   PPE_EAR_PROTECTION: ["귀마개", "귀덮개", "이어플러그"],
+  PPE_WORK_GLOVES: ["작업장갑", "안전장갑", "코팅장갑", "반코팅장갑", "목장갑", "NBR 장갑", "PU 장갑", "면장갑", "니트릴폼 장갑"],
   PPE_INSULATED_GLOVES: ["절연장갑", "전기장갑"],
   PPE_WELDING_GLOVES: ["용접장갑", "알곤장갑"],
   PPE_HIGH_VISIBILITY_VEST: ["안전조끼", "형광조끼", "반사조끼", "고가시성 조끼"],
@@ -186,6 +187,7 @@ export const NON_COMPLETE_PRODUCT_KEYWORDS = [
 ];
 export const CATEGORY_NON_COMPLETE_PRODUCT_KEYWORDS = {
   PPE_SAFETY_HELMET: ["내피", "턱끈", "햇빛가리개", "땀받이", "패드", "헤드랜턴", "헬멧랜턴"],
+  PPE_WORK_GLOVES: ["팔토시", "장갑집게", "장갑걸이", "예식장갑"],
 };
 export const REVIEW_KEYWORDS = [
   "판촉",
@@ -466,6 +468,40 @@ function businessCategoryCode(product, scored) {
 
 export function resolveReviewCategory(product, categories) {
   const scored = scoreCategory(product, categories);
+  const source = normalize(`${product.title || ""} ${(product.options || []).map((option) => option.name).join(" ")}`);
+  const specificGloveCode = /용접|알곤|아르곤/.test(source)
+    ? "PPE_WELDING_GLOVES"
+    : /절연|전기장갑/.test(source)
+      ? "PPE_INSULATED_GLOVES"
+      : "";
+  if (specificGloveCode) {
+    const specificGloves = categories.find((category) => category.code === specificGloveCode);
+    if (specificGloves) {
+      return {
+        ...scored,
+        code: specificGloves.code,
+        label: specificGloves.label,
+        confidence: "HIGH",
+        resolution: "BUSINESS_RULE",
+        matchedKeywords: [specificGloves.label],
+      };
+    }
+  }
+  const workGloves = categories.find((category) => category.code === "PPE_WORK_GLOVES");
+  if (
+    workGloves
+    && scored.confidence !== "HIGH"
+    && String(product.sourceCategoryPath || "").endsWith("> 안전장갑")
+  ) {
+    return {
+      ...scored,
+      code: workGloves.code,
+      label: workGloves.label,
+      confidence: "HIGH",
+      resolution: "SOURCE_CATEGORY",
+      matchedKeywords: ["안전장갑"],
+    };
+  }
   const collected = categories.find((category) => category.code === product.collectionCategoryCode);
   if (!collected) return { ...scored, resolution: "SCORED" };
 
@@ -482,7 +518,6 @@ export function resolveReviewCategory(product, categories) {
     };
   }
 
-  const source = normalize(`${product.title || ""} ${(product.options || []).map((option) => option.name).join(" ")}`);
   const matchedKeywords = collected.keywords.filter((keyword) => {
     const normalizedKeyword = normalize(keyword);
     return normalizedKeyword && source.includes(normalizedKeyword);
@@ -660,14 +695,14 @@ async function reviewProduct(entry, context) {
   const thumbnailSize = await fileSize(product.thumbnailImagePath);
   const detailSizes = await Promise.all(detailImagePaths.map(fileSize));
   const hardReasons = [];
-  const categoryResolved = ["COLLECTION_TARGET", "BUSINESS_RULE"].includes(category.resolution);
+  const categoryResolved = category.confidence === "HIGH";
   const reviewReasons = (Array.isArray(product.collectionReviewReasons)
     ? [...product.collectionReviewReasons]
     : [])
     .filter((reason) => (
       reason !== "DOMAIN_OR_CUSTOM_PRODUCT_SUSPECT"
       && reason !== "OPTION_COUNT_GT_20"
-      && (!categoryResolved || !["CATEGORY_AMBIGUOUS", "CATEGORY_LOW_CONFIDENCE"].includes(reason))
+      && (!categoryResolved || !["CATEGORY_AMBIGUOUS", "CATEGORY_LOW_CONFIDENCE", "CATEGORY_UNMAPPED"].includes(reason))
     ));
   const textForKeyword = `${title} ${saleOptions.filter((option) => option.status !== "STOPPED").map((option) => option.name).join(" ")}`;
   const koshaAudit = context.koshaAudit.get(String(product.itemNo));
@@ -938,6 +973,20 @@ async function main() {
       collectionDecision: "EXCLUDE",
     }).hardReason, "KOSHA_COLLECTION_EXCLUDED");
     assert.equal(complianceStatusFor({}, "BARRIER_TAPE", "NOT_APPLICABLE"), "NOT_REQUIRED");
+    assert.equal(complianceStatusFor({}, "PPE_WORK_GLOVES", "NOT_APPLICABLE"), "NOT_REQUIRED");
+    const gloveCategories = [
+      { code: "PPE_WORK_GLOVES", label: "일반 작업장갑", keywords: ["작업장갑", "안전장갑"] },
+      { code: "PPE_WELDING_GLOVES", label: "용접장갑", keywords: ["용접장갑"] },
+      { code: "PPE_INSULATED_GLOVES", label: "절연장갑", keywords: ["절연장갑"] },
+    ];
+    assert.equal(resolveReviewCategory({
+      title: "반코팅 안전장갑",
+      sourceCategoryPath: "생활용품 > 공구 > 안전용품 > 안전장갑",
+    }, gloveCategories).code, "PPE_WORK_GLOVES");
+    assert.equal(resolveReviewCategory({
+      title: "용접 작업장갑",
+      sourceCategoryPath: "생활용품 > 공구 > 안전용품 > 안전장갑",
+    }, gloveCategories).code, "PPE_WELDING_GLOVES");
     assert.equal(complianceStatusFor({
       productInfoDuty: { item: [{ name: "인증·허가 사항", desc: "KC 인증 미대상 품목" }] },
     }, "HEAVY_EQUIPMENT_REAR_DETECTOR", "NOT_APPLICABLE"), "NOT_REQUIRED");
@@ -974,8 +1023,8 @@ async function main() {
   }
 
   const categories = readCategoryDefinitions();
-  if (categories.length !== 81) {
-    throw new Error(`카테고리 정의가 81개가 아닙니다: ${categories.length}`);
+  if (categories.length !== 82) {
+    throw new Error(`카테고리 정의가 82개가 아닙니다: ${categories.length}`);
   }
 
   let entries = await readCollectedProducts(args.productsDir);
