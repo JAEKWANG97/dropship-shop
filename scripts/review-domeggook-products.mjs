@@ -4,6 +4,7 @@ import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { policyForCategory } from "./domeggook-b093-policy.mjs";
 
 const USER_AGENT =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -13,7 +14,7 @@ const DEFAULT_REVIEW_JSON = "tmp/domeggook-product-review.json";
 const DEFAULT_REVIEW_CSV = "tmp/domeggook-product-review.csv";
 const DEFAULT_FILTERED_MANIFEST = "tmp/domeggook-import-manifest.filtered.json";
 const DEFAULT_KOSHA_AUDIT = "tmp/domeggook-kosha-cert-audit.json";
-const DEFAULT_TARGET_PER_CATEGORY = 30;
+const DEFAULT_TARGET_PER_CATEGORY = 60;
 const CATEGORY_FILE = "apps/web/src/lib/categories.ts";
 const KOSHA_CATEGORY_CODES = new Set([
   "PPE_SAFETY_HELMET",
@@ -218,6 +219,7 @@ Options:
   --cookie "ACCESS_TOKEN=..."
   --cookie-file tmp/admin-cookie.txt
   --limit 10
+  --target-per-category 60
   --shipping-concurrency 4
   --no-fetch-shipping`);
 }
@@ -242,6 +244,7 @@ function parseArgs(argv) {
     cookie: argValue(argv, "--cookie"),
     cookieFile: argValue(argv, "--cookie-file"),
     limit: numberArg(argv, "--limit", 0),
+    targetPerCategory: numberArg(argv, "--target-per-category", DEFAULT_TARGET_PER_CATEGORY),
     shippingConcurrency: numberArg(argv, "--shipping-concurrency", 4),
     fetchShipping: !argv.includes("--no-fetch-shipping"),
   };
@@ -325,6 +328,12 @@ function calculateSalePrice(sourcePrice, minimumResalePrice, policy = DEFAULT_PR
   const roundingUnit = Number(policy.roundingUnit || 100);
   const minimum = Math.ceil(Number(minimumResalePrice || 0) / roundingUnit) * roundingUnit;
   return Math.max(calculateBasePrice(sourcePrice, policy), minimum);
+}
+
+function reviewDecision(hardReasons, reviewReasons, collectionPolicy) {
+  if (hardReasons.length > 0) return "EXCLUDE";
+  if (collectionPolicy === "R") return "REVIEW";
+  return reviewReasons.length > 0 ? "EXCLUDE" : "IMPORT";
 }
 
 function hasAny(text, keywords) {
@@ -747,7 +756,8 @@ async function reviewProduct(entry, context) {
     ? calculateSalePrice(sourcePrice, minimumResalePrice, context.policy)
     : null;
   const reasonCodes = [...new Set([...hardReasons, ...reviewReasons])];
-  const decision = reasonCodes.length ? "EXCLUDE" : "IMPORT";
+  const collectionPolicy = policyForCategory(product.collectionCategoryCode)?.collectionPolicy || "";
+  const decision = reviewDecision(hardReasons, reviewReasons, collectionPolicy);
   const complianceStatus = complianceStatusFor(product, category.code, koshaGate.status);
   const status = decision === "IMPORT" && complianceStatus !== "REJECTED" ? "ACTIVE" : "HIDDEN";
   const manifestOptions = manifestOptionsFor(
@@ -769,6 +779,7 @@ async function reviewProduct(entry, context) {
     categoryResolution: category.resolution,
     collectionCategoryCode: product.collectionCategoryCode || "",
     collectionCategoryLabel: product.collectionCategoryLabel || "",
+    collectionPolicy,
     sourceCategoryCode: product.sourceCategoryCode || "",
     sourceCategoryPath: product.sourceCategoryPath || "",
     sourcePrice,
@@ -823,7 +834,7 @@ async function reviewProduct(entry, context) {
       shippingInfo: shipping.known ? "고객에게 별도 배송비를 청구하지 않습니다." : "",
       asInfo: COREABLE_AS_INFO,
       returnExchangeInfo: COREABLE_RETURN_EXCHANGE_INFO,
-      memo: `B-090 review=${decision}; MOQ=${minimumOrderQuantity}/${orderQuantityStep}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; KOSHA=${koshaGate.status}; compliance=${complianceStatus}; target=${status}`,
+      memo: `B-093 review=${decision}; policy=${collectionPolicy || "LEGACY"}; MOQ=${minimumOrderQuantity}/${orderQuantityStep}; ${reasonCodes.join(",") || "AUTO_IMPORT_CANDIDATE"}; KOSHA=${koshaGate.status}; compliance=${complianceStatus}; target=${status}`,
     },
   };
 }
@@ -910,11 +921,12 @@ function reviewCsv(items) {
   return `${headers.join(",")}\n${rows.join("\n")}\n`;
 }
 
-function summarize(items, categories) {
+function summarize(items, categories, targetPerCategory) {
   const itemNos = items.map((item) => String(item.itemNo));
   const summary = {
     total: items.length,
     import: items.filter((item) => item.decision === "IMPORT").length,
+    review: items.filter((item) => item.decision === "REVIEW").length,
     exclude: items.filter((item) => item.decision === "EXCLUDE").length,
     duplicateItemNumbers: itemNos.length - new Set(itemNos).size,
     moq: {
@@ -928,9 +940,9 @@ function summarize(items, categories) {
       return {
         categoryCode: category.code,
         categoryLabel: category.label,
-        target: DEFAULT_TARGET_PER_CATEGORY,
+        target: targetPerCategory,
         actual,
-        shortfall: Math.max(0, DEFAULT_TARGET_PER_CATEGORY - actual),
+        shortfall: Math.max(0, targetPerCategory - actual),
         pass: true,
       };
     }),
@@ -993,6 +1005,10 @@ async function main() {
     assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "KOSHA_REGISTRY_MODEL_VERIFIED"), "VERIFIED");
     assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "KOSHA_REGISTRY_VERIFIED"), "PENDING");
     assert.equal(complianceStatusFor({}, "PPE_SAFETY_HELMET", "SOURCE_EVIDENCE_MISSING"), "PENDING");
+    assert.equal(policyForCategory("FALL_PREVENTION_GUARDRAIL")?.collectionPolicy, "R");
+    assert.equal(policyForCategory("PPE_SAFETY_HELMET")?.collectionPolicy, "A");
+    assert.equal(reviewDecision([], ["POLICY_REVIEW_ONLY"], "R"), "REVIEW");
+    assert.equal(reviewDecision(["SHIPPING_FEE_CONDITIONAL"], [], "R"), "EXCLUDE");
     assert.equal(productInfoNoticeFor({ title: "안전용품" }), "");
     const rawNotice = productInfoNoticeFor({
       origin: "상세정보별도표기",
@@ -1042,10 +1058,10 @@ async function main() {
   };
 
   const reviewed = await mapLimit(entries, args.shippingConcurrency, (entry) => reviewProduct(entry, context));
-  const summary = summarize(reviewed, categories);
+  const summary = summarize(reviewed, categories, args.targetPerCategory);
   const manifest = {
     generatedAt: new Date().toISOString(),
-    source: "B-090 domeggook MOQ product selection",
+    source: "B-093 Domeggook search-policy review",
     summary,
     items: reviewed.map((item) => item.manifestItem),
   };

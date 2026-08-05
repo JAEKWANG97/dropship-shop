@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, statfs, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
@@ -13,6 +13,12 @@ import {
   scoreCategory,
   stopCustomOptions,
 } from "./review-domeggook-products.mjs";
+import {
+  assertB093Policy,
+  DEFERRED_CATEGORY_CODES,
+  policyForCategory,
+  REFERENCE_ITEM_NUMBERS,
+} from "./domeggook-b093-policy.mjs";
 
 const USER_AGENT =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -28,34 +34,9 @@ const OPEN_API_REFRESH_REPORT = "tmp/domeggook-open-api-refresh-report.json";
 const OPEN_API_COLLECTOR_VERSION = 10;
 const OPEN_API_DAILY_LIMIT = 5000;
 const OPEN_API_RANKING_SORT = "rd";
-const EXPANDED_COLLECTION_KEYWORDS = {
-  PPE_SAFETY_HELMET: ["안전모", "산업용 안전모", "경량 안전모"],
-  PPE_SAFETY_SHOES: ["안전화", "경량 안전화", "산업용 작업화", "건설 작업화"],
-  PPE_SAFETY_GLASSES: ["보안경", "산업용 보안경", "보호안경"],
-  PPE_RESPIRATOR: ["방진마스크", "방독마스크"],
-  PPE_EAR_PROTECTION: ["산업용 귀마개", "산업용 귀덮개", "청력보호구"],
-  PPE_WELDING_GLOVES: ["용접장갑", "알곤장갑"],
-  PPE_HIGH_VISIBILITY_VEST: ["안전조끼", "반사 안전조끼", "형광 안전조끼"],
-  PPE_FALL_ARREST_HARNESS: ["전체식 안전대", "전신 하네스"],
-  FALL_PREVENTION_NET: ["추락방지망", "추락 방지망"],
-  FALLING_OBJECT_NET: ["낙하물방지망", "낙하 방지망"],
-  OPENING_COVER: ["개구부 덮개", "개구부 안전덮개"],
-  WORK_PLATFORM: ["작업발판", "말비계", "고소작업 발판"],
-  SAFETY_BLOCK: ["안전블록", "추락방지 안전블록"],
-  SAFETY_SIGN: ["안전표지판", "공사중 표지판"],
-  TRAFFIC_CONE: ["라바콘", "안전콘", "칼라콘"],
-  SAFETY_FENCE: ["안전휀스", "안전펜스"],
-  BARRICADE: ["바리케이드", "바리케이트"],
-  WARNING_LIGHT: ["경광등", "점멸 경광등"],
-  SIGNAL_BATON: ["신호봉", "교통 유도봉"],
-  BARRIER_TAPE: ["차단테이프", "안전띠"],
-  GAS_DETECTOR: ["가스검지기", "가스감지기", "복합가스측정기"],
-  OXYGEN_METER: ["산소측정기", "산소농도측정기"],
-  NOISE_METER: ["소음계", "소음측정기"],
-  LIGHT_METER: ["조도계", "조도측정기"],
-  ANEMOMETER: ["풍속계", "풍속측정기"],
-  FIRST_AID_KIT: ["구급함", "구급가방", "응급처치키트"],
-};
+const MIN_FREE_DISK_BYTES = 8 * 1024 * 1024 * 1024;
+const REJECTED_OUT_DIR = "tmp/domeggook-rejected";
+const FETCH_TIMEOUT_MS = 60_000;
 
 function usage() {
   console.log(`Usage:
@@ -65,8 +46,7 @@ function usage() {
   node scripts/collect-domeggook-product.mjs --backfill-seller-score --limit 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 5
   node scripts/collect-domeggook-product.mjs --coverage-scan --target-per-category 1 --max-categories 3
-  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 30
-  node scripts/collect-domeggook-product.mjs --open-api-coverage --expanded-keywords --target-per-category 60
+  node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 60
   node scripts/collect-domeggook-product.mjs --open-api-coverage --category PPE_SAFETY_HELMET --target-per-category 2
   node scripts/collect-domeggook-product.mjs --open-api-coverage --target-per-category 10 --ranking-count 60 --fresh
   node scripts/collect-domeggook-product.mjs --source-category-discovery --target-per-category 30
@@ -97,7 +77,6 @@ function parseArgs(argv) {
       maxCategories: numberArg(argv, "--max-categories", 0),
       delayMs: Math.max(1000, numberArg(argv, "--delay-ms", 1000)),
       fresh: argv.includes("--fresh"),
-      expandedKeywords: argv.includes("--expanded-keywords"),
     };
   }
 
@@ -182,6 +161,7 @@ async function readUrls(args) {
 
 async function fetchText(url) {
   const response = await fetch(url, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
       "user-agent": USER_AGENT,
       accept: "text/html,application/xhtml+xml",
@@ -193,18 +173,28 @@ async function fetchText(url) {
 }
 
 async function fetchBuffer(url) {
-  const response = await fetch(url, {
-    headers: {
-      "user-agent": USER_AGENT,
-      accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-      referer: "https://mobile.domeggook.com/",
-    },
-  });
-  if (!response.ok) throw new Error(`이미지 다운로드 실패: ${response.status} ${url}`);
-  return {
-    bytes: Buffer.from(await response.arrayBuffer()),
-    contentType: response.headers.get("content-type") || "",
-  };
+  let error;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          "user-agent": USER_AGENT,
+          accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          referer: "https://mobile.domeggook.com/",
+        },
+      });
+      if (!response.ok) throw new Error(`이미지 다운로드 실패: ${response.status} ${url}`);
+      return {
+        bytes: Buffer.from(await response.arrayBuffer()),
+        contentType: response.headers.get("content-type") || "",
+      };
+    } catch (caught) {
+      error = caught;
+      if (attempt === 0) await sleep(1000);
+    }
+  }
+  throw error;
 }
 
 function htmlDecode(value) {
@@ -374,6 +364,14 @@ async function downloadImage(url, fileBase) {
   const filePath = `${fileBase}.${imageExt(url, contentType)}`;
   await writeFile(filePath, bytes);
   return filePath;
+}
+
+async function assertFreeDiskSpace() {
+  const disk = await statfs(".");
+  const freeBytes = Number(disk.bavail) * Number(disk.bsize);
+  if (freeBytes < MIN_FREE_DISK_BYTES) {
+    throw new Error(`DISK_SPACE_BELOW_8_GIB:${Math.floor(freeBytes / 1024 / 1024 / 1024)}GiB`);
+  }
 }
 
 function csvEscape(value) {
@@ -902,6 +900,7 @@ async function openApiRequest(apiKey, params) {
   }
   await recordOpenApiCall(params.mode);
   const response = await fetch(url, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
       "user-agent": USER_AGENT,
       accept: "application/json",
@@ -1359,7 +1358,7 @@ async function sourceCategoryDiscovery(args) {
           true,
         );
         const existing = await readExistingProduct(itemNo);
-        const collectionCategory = category.code ? category : {
+        const collectionCategory = category.code && !DEFERRED_CATEGORY_CODES.has(category.code) ? category : {
           code: existing?.collectionCategoryCode || "",
           label: existing?.collectionCategoryLabel || "",
         };
@@ -1429,6 +1428,7 @@ async function sourceCategoryDiscovery(args) {
 }
 
 async function saveOpenApiProduct(product) {
+  await assertFreeDiskSpace();
   const existing = await readExistingProduct(product.itemNo);
   const dir = path.join(DEFAULT_OUT_DIR, product.itemNo);
   const imageDir = path.join(dir, "images");
@@ -1458,8 +1458,7 @@ async function loadOpenApiOwners() {
     try {
       const product = JSON.parse(await readFile(path.join(DEFAULT_OUT_DIR, entry.name, "product.json"), "utf8"));
       if (
-        product.collectorVersion === OPEN_API_COLLECTOR_VERSION
-        && Object.hasOwn(product, "minimumOrderQuantity")
+        Object.hasOwn(product, "minimumOrderQuantity")
         && product.collectionCategoryCode
         && !product.collectionReviewReasons?.includes("CATEGORY_AMBIGUOUS")
       ) {
@@ -1498,13 +1497,49 @@ function collectedCategoryItemNos(owners, categoryCode) {
     .map(([itemNo]) => itemNo));
 }
 
+function exclusionReasonCounts(excluded) {
+  const counts = {};
+  for (const entry of excluded) {
+    for (const reason of entry.reasons || []) counts[reason] = (counts[reason] || 0) + 1;
+  }
+  return counts;
+}
+
+function reportReferenceProducts() {
+  return Promise.all(REFERENCE_ITEM_NUMBERS.map(async (itemNo) => {
+    const product = await readExistingProduct(itemNo);
+    return {
+      itemNo,
+      present: Boolean(product),
+      decision: product?.collectionDecision || "",
+      categoryCode: product?.collectionCategoryCode || "",
+    };
+  }));
+}
+
+async function checkpointCoverageReport(reportPath, report) {
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  if (report.excluded.length === 0) return;
+  const date = new Date().toISOString().slice(0, 10);
+  const rejectedDir = path.join(REJECTED_OUT_DIR, date);
+  await mkdir(rejectedDir, { recursive: true });
+  await writeFile(
+    path.join(rejectedDir, `${report.categoryCode}.json`),
+    `${JSON.stringify({ categoryCode: report.categoryCode, generatedAt: new Date().toISOString(), excluded: report.excluded }, null, 2)}\n`,
+  );
+}
+
 async function collectOpenApiCategory(apiKey, category, args, owners, scoringCategories, reportPath, previous) {
-  const keywordMode = args.expandedKeywords ? "expanded" : "primary";
+  const categoryPolicy = policyForCategory(category.code);
+  if (!categoryPolicy) throw new Error(`B-093 정책 없는 카테고리: ${category.code}`);
   const report = previous || {
     collectorVersion: OPEN_API_COLLECTOR_VERSION,
     generatedAt: new Date().toISOString(),
     categoryCode: category.code,
     categoryLabel: category.label,
+    collectionPolicy: categoryPolicy.collectionPolicy,
+    keywords: categoryPolicy.keywords,
+    executedKeywords: [],
     target: args.targetPerCategory,
     queries: [],
     valid: [],
@@ -1512,16 +1547,29 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
     duplicates: [],
     shortfall: false,
     completed: false,
-    keywordMode,
   };
   const categoryItemNos = collectedCategoryItemNos(owners, category.code);
+  report.existingCount = categoryItemNos.size;
+  report.newCount = report.valid.filter((item) => !item.reused).length;
   const seen = new Set([...processedItemNos(report), ...categoryItemNos]);
-  const primaryKeyword = cleanKeyword(category.label);
-  const keywords = args.expandedKeywords
-    ? EXPANDED_COLLECTION_KEYWORDS[category.code]
-    : [primaryKeyword];
   const acceptedCount = () => categoryItemNos.size;
-  const checkpoint = async () => writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  const checkpoint = async () => checkpointCoverageReport(reportPath, report);
+
+  if (categoryPolicy.collectionPolicy === "M") {
+    Object.assign(report, {
+      actual: report.existingCount,
+      acceptedCount: report.existingCount,
+      excludedCount: 0,
+      exclusionReasons: {},
+      shortfall: false,
+      shortfallCount: 0,
+      pass: false,
+      notApplicable: true,
+      completed: true,
+    });
+    await checkpoint();
+    return report;
+  }
 
   async function runKeyword(keyword, index) {
     const candidates = new Map();
@@ -1538,6 +1586,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
       total: result.total,
       supplemental: index > 0,
     });
+    report.executedKeywords.push(keyword);
     await checkpoint();
     mergeListCandidates(candidates, result.items, keyword, OPEN_API_RANKING_SORT);
     await sleep(args.delayMs);
@@ -1566,8 +1615,7 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
         const existing = await readExistingProduct(itemNo);
         if (
           !args.fresh
-          && existing?.collectorVersion === OPEN_API_COLLECTOR_VERSION
-          && Object.hasOwn(existing, "minimumOrderQuantity")
+          && Object.hasOwn(existing || {}, "minimumOrderQuantity")
           && Object.hasOwn(existing, "orderQuantityStep")
           && existing?.collectionCategoryCode === category.code
           && existsSync(existing.thumbnailImagePath || "")
@@ -1578,12 +1626,6 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
           if (!existing.collectionReviewReasons?.includes("CATEGORY_AMBIGUOUS")) {
             owners.set(itemNo, category.code);
           }
-          const entry = { itemNo, title: existing.title, reasons: existing.collectionReviewReasons || [], reused: true };
-          if (existing.collectionDecision === "IMPORT_CANDIDATE") {
-            report.valid.push(entry);
-            categoryItemNos.add(itemNo);
-          }
-          else report.excluded.push({ ...entry, stage: "existing" });
           await checkpoint();
           continue;
         }
@@ -1603,12 +1645,18 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
           continue;
         }
 
+        if (categoryPolicy.collectionPolicy === "R") {
+          parsed.product.collectionDecision = "REVIEW_CANDIDATE";
+          parsed.product.collectionReviewReasons = ["POLICY_REVIEW_ONLY"];
+        }
+
         await saveOpenApiProduct(parsed.product);
         owners.set(itemNo, category.code);
         const entry = {
           itemNo,
           title: parsed.product.title,
-          reasons: [],
+          reasons: parsed.product.collectionReviewReasons,
+          decision: parsed.product.collectionDecision,
           sourceCategoryPath: parsed.product.sourceCategoryPath,
         };
         report.valid.push(entry);
@@ -1624,14 +1672,18 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
     }
   }
 
-  for (const [index, keyword] of keywords.entries()) {
+  for (const [index, keyword] of categoryPolicy.keywords.entries()) {
     if (acceptedCount() >= args.targetPerCategory) break;
     await runKeyword(keyword, index);
   }
+  report.newCount = report.valid.filter((item) => !item.reused).length;
   report.candidateCount = acceptedCount();
   report.actual = acceptedCount();
-  report.shortfall = report.candidateCount < args.targetPerCategory;
-  report.shortfallCount = Math.max(0, args.targetPerCategory - report.candidateCount);
+  report.acceptedCount = acceptedCount();
+  report.excludedCount = report.excluded.length;
+  report.exclusionReasons = exclusionReasonCounts(report.excluded);
+  report.shortfall = report.acceptedCount < args.targetPerCategory;
+  report.shortfallCount = Math.max(0, args.targetPerCategory - report.acceptedCount);
   report.pass = true;
   report.completed = true;
   await checkpoint();
@@ -1640,13 +1692,17 @@ async function collectOpenApiCategory(apiKey, category, args, owners, scoringCat
 
 async function openApiCoverage(args) {
   const apiKey = await readOpenApiKey();
-  let categories = await readCategories();
-  if (categories.length !== 82) throw new Error(`카테고리 정의가 82개가 아닙니다: ${categories.length}`);
+  const allCategories = await readCategories();
+  assertB093Policy(allCategories.map((category) => category.code));
+  let categories = allCategories.filter((category) => policyForCategory(category.code));
   if (args.category) {
     categories = categories.filter((category) => category.code === args.category);
-    if (categories.length === 0) throw new Error(`알 수 없는 카테고리: ${args.category}`);
-  } else if (args.expandedKeywords) {
-    categories = categories.filter((category) => EXPANDED_COLLECTION_KEYWORDS[category.code]);
+    if (categories.length === 0) {
+      if (DEFERRED_CATEGORY_CODES.has(args.category)) {
+        throw new Error(`${args.category}는 B-093 독립 검색 대상이 아닙니다.`);
+      }
+      throw new Error(`알 수 없는 B-093 카테고리: ${args.category}`);
+    }
   } else if (args.maxCategories > 0) {
     categories = categories.slice(0, args.maxCategories);
   }
@@ -1663,12 +1719,15 @@ async function openApiCoverage(args) {
       const activeItemNos = collectedCategoryItemNos(owners, category.code);
       previous.valid = previous.valid.filter((item) => activeItemNos.has(String(item.itemNo)));
       previous.actual = activeItemNos.size;
+      previous.existingCount = activeItemNos.size;
+      previous.acceptedCount = activeItemNos.size;
       previous.shortfall = previous.actual < args.targetPerCategory;
       previous.shortfallCount = Math.max(0, args.targetPerCategory - previous.actual);
       const reusable =
         previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
         && previous.target === args.targetPerCategory
-        && (previous.keywordMode || "primary") === (args.expandedKeywords ? "expanded" : "primary")
+        && previous.collectionPolicy === policyForCategory(category.code).collectionPolicy
+        && JSON.stringify(previous.keywords) === JSON.stringify(policyForCategory(category.code).keywords)
         && previous.completed === true;
       if (reusable) {
         report = previous;
@@ -1676,7 +1735,8 @@ async function openApiCoverage(args) {
       } else if (
         previous.collectorVersion === OPEN_API_COLLECTOR_VERSION
         && previous.target === args.targetPerCategory
-        && (previous.keywordMode || "primary") === (args.expandedKeywords ? "expanded" : "primary")
+        && previous.collectionPolicy === policyForCategory(category.code).collectionPolicy
+        && JSON.stringify(previous.keywords) === JSON.stringify(policyForCategory(category.code).keywords)
       ) {
         report = await collectOpenApiCategory(
           apiKey, category, args, owners, scoringCategories, reportPath, previous,
@@ -1691,26 +1751,36 @@ async function openApiCoverage(args) {
       reportPath,
       `${JSON.stringify(report, null, 2)}\n`,
     );
-    console.log(`${category.code}: valid=${report.actual}, shortfall=${report.shortfall}`);
+    console.log(`${category.code}: existing=${report.existingCount}, new=${report.newCount}, accepted=${report.actual}, shortfall=${report.shortfall}`);
   }
+
+  const referenceProducts = await reportReferenceProducts();
 
   const summary = {
     collectorVersion: OPEN_API_COLLECTOR_VERSION,
     generatedAt: new Date().toISOString(),
     categoryCount: reports.length,
+    policyCounts: Object.fromEntries(["A", "R", "M"].map((policy) => [
+      policy,
+      reports.filter((report) => report.collectionPolicy === policy).length,
+    ])),
+    deferredCategoryCodes: [...DEFERRED_CATEGORY_CODES],
     targetPerCategory: args.targetPerCategory,
     rankingCount: args.rankingCount,
-    keywordMode: args.expandedKeywords ? "expanded" : "primary",
     coveredCategories: reports.filter((report) => !report.shortfall).length,
     shortfallCategories: reports.filter((report) => report.shortfall).map((report) => ({
       categoryCode: report.categoryCode,
       categoryLabel: report.categoryLabel,
-      valid: report.actual,
+      accepted: report.actual,
       shortfall: report.shortfallCount,
       pass: report.pass,
     })),
-    validProducts: reports.reduce((sum, report) => sum + report.actual, 0),
+    existingProducts: reports.reduce((sum, report) => sum + (report.existingCount || 0), 0),
+    newProducts: reports.reduce((sum, report) => sum + (report.newCount || 0), 0),
+    acceptedProducts: reports.reduce((sum, report) => sum + report.actual, 0),
     excludedCandidates: reports.reduce((sum, report) => sum + report.excluded.length, 0),
+    executedListSearches: reports.reduce((sum, report) => sum + report.queries.length, 0),
+    referenceProducts,
   };
   await writeFile(
     path.join(OPEN_API_COVERAGE_OUT_DIR, "summary.json"),
@@ -1768,7 +1838,7 @@ async function refreshOpenApiProducts(args) {
   console.log(`refresh 완료: 성공 ${report.refreshed.length}개, 실패 ${report.failed.length}개`);
 }
 
-function selfCheck() {
+async function selfCheck() {
   const listParams = openApiListParams("안전모", 60);
   if (
     listParams.so !== "rd"
@@ -1927,11 +1997,16 @@ function selfCheck() {
   if (openApiSourceCategoryListParams("12_16_05_07_00", 60).ca !== "12_16_05_07_00") {
     throw new Error("원본 카테고리 조회 파라미터 self-check 실패");
   }
-  if (
-    Object.keys(EXPANDED_COLLECTION_KEYWORDS).length !== 26
-    || !EXPANDED_COLLECTION_KEYWORDS.PPE_SAFETY_SHOES.includes("경량 안전화")
-    || !EXPANDED_COLLECTION_KEYWORDS.FIRST_AID_KIT.includes("응급처치키트")
-  ) throw new Error("확장 검색어 정책 self-check 실패");
+  assertB093Policy((await readCategories()).map((category) => category.code));
+  if (policyForCategory("PPE_SAFETY_SHOES")?.keywords[2] !== "경량 안전화") {
+    throw new Error("B-093 검색어 정책 self-check 실패");
+  }
+  if (policyForCategory("SMART_CCTV_AI_VIDEO_ANALYTICS")?.collectionPolicy !== "M") {
+    throw new Error("B-093 M 카테고리 정책 self-check 실패");
+  }
+  if (policyForCategory("PPE_WORK_GLOVES") || !DEFERRED_CATEGORY_CODES.has("PPE_WORK_GLOVES")) {
+    throw new Error("일반 작업장갑 보존 정책 self-check 실패");
+  }
   if (collectedCategoryItemNos(
     new Map([["1", "PPE_SAFETY_SHOES"], ["2", "PPE_SAFETY_GLASSES"]]),
     "PPE_SAFETY_SHOES",
@@ -2063,7 +2138,7 @@ async function main() {
     return;
   }
   if (args.selfCheck) {
-    selfCheck();
+    await selfCheck();
     return;
   }
   if (args.openApiCoverage) {
