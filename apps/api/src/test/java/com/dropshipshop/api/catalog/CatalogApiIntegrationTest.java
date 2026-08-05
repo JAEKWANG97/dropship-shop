@@ -422,6 +422,25 @@ class CatalogApiIntegrationTest {
 	}
 
 	@Test
+	void scopesPublicCategoryCountsToSearchConditionsWithoutSelectedCategory() throws Exception {
+		UUID supplierId = createSupplier();
+		createPublicProduct(supplierId, "Blue work glove", "PPE_WELDING_GLOVES", 39000);
+		createPublicProduct(supplierId, "Insulated work glove", "PPE_INSULATED_GLOVES", 39000);
+		createPublicProduct(supplierId, "Work safety helmet", "PPE_SAFETY_HELMET", 60000);
+
+		mockMvc.perform(get("/api/products")
+				.param("q", "work")
+				.param("category", "PPE_WELDING_GLOVES")
+				.param("maxPrice", "40000"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products", hasSize(1)))
+			.andExpect(jsonPath("$.products[0].categoryCode", is("PPE_WELDING_GLOVES")))
+			.andExpect(jsonPath("$.categoryCounts.PPE_WELDING_GLOVES", is(1)))
+			.andExpect(jsonPath("$.categoryCounts.PPE_INSULATED_GLOVES", is(1)))
+			.andExpect(jsonPath("$.categoryCounts.PPE_SAFETY_HELMET", is(0)));
+	}
+
+	@Test
 	void pagesAndFiltersAdminProducts() throws Exception {
 		UUID alphaSupplier = createSupplier("Alpha Safety");
 		UUID betaSupplier = createSupplier("Beta Industrial");
@@ -831,6 +850,35 @@ class CatalogApiIntegrationTest {
 					  "reason":"readiness test"
 					}
 					""".formatted(supplierId)))
+			.andExpect(status().isOk());
+	}
+
+	private void createPublicProduct(UUID supplierId, String name, String categoryCode, long basePrice) throws Exception {
+		UUID productId = createProduct(supplierId, name, name + " summary", categoryCode, "HIDDEN");
+		prepareProductForSale(productId, supplierId);
+		mockMvc.perform(patch("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId":"%s",
+					  "name":"%s",
+					  "summary":"%s summary",
+					  "sourcePrice":31200,
+					  "sourceUrl":"https://mobile.domeggook.com/%s",
+					  "basePrice":%s,
+					  "categoryCode":"%s",
+					  "complianceStatus":"VERIFIED",
+					  "reason":"search facet test"
+					}
+					""".formatted(supplierId, name, name, Integer.toUnsignedString(name.hashCode()), basePrice, categoryCode)))
+			.andExpect(status().isOk());
+		mockMvc.perform(patch("/api/admin/products/{productId}/status", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"status":"ACTIVE","reason":"search facet test"}
+					"""))
 			.andExpect(status().isOk());
 	}
 

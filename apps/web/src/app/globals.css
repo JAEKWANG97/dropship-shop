@@ -1231,10 +1231,30 @@ img.admin-product-detail-image {
 }
 
 .catalog-layout {
+  display: block;
+}
+
+.catalog-layout.has-search-filters {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   align-items: start;
   gap: 22px;
+}
+
+.catalog-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.catalog-active-filters a {
+  padding: 7px 10px;
+  border: 1px solid #ffd4c2;
+  border-radius: 999px;
+  background: #fff3ed;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .catalog-sidebar {
@@ -3330,7 +3350,7 @@ body:has(.admin-shell) > .page-shell {
     gap: 16px;
   }
 
-  .catalog-layout,
+  .catalog-layout.has-search-filters,
   .product-hero,
   .cart-layout,
   .checkout-layout,

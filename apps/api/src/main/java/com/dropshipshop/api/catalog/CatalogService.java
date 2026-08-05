@@ -547,7 +547,7 @@ public class CatalogService {
 		);
 		Map<ProductCategory, Long> categoryCounts = new EnumMap<>(ProductCategory.class);
 		Arrays.stream(ProductCategory.values()).forEach(value -> categoryCounts.put(value, 0L));
-		productRepository.countPublicProductsByCategory()
+		productRepository.countPublicProductsByCategory(keyword, minPrice, maxPrice)
 			.forEach(count -> categoryCounts.put(count.getCategoryCode(), count.getProductCount()));
 		return new CatalogDtos.PublicProductPageResponse(
 			result.getContent().stream().map(this::toProductSummaryResponse).toList(),

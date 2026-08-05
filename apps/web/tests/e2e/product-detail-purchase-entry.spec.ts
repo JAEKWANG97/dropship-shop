@@ -93,18 +93,17 @@ test("mobile purchase bar submits the product form", async ({ page }, testInfo) 
   expect(url.searchParams.get("redirectTo")).toBe(`/products/${productId}`);
 });
 
-test("product category selection follows the actual query", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "Desktop sidebar exposes the category state.");
+test("catalog shows related categories only after a search", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop search facets are desktop-only.");
 
   await page.goto("/products");
-  const sidebar = page.locator("aside.catalog-sidebar");
-  await expect(sidebar.getByRole("link", { name: /전체 상품/ })).toHaveClass(/active/);
-  await expect(sidebar.getByRole("link", { name: /개인보호구/ })).not.toHaveClass(/active/);
+  await expect(page.locator("aside.catalog-sidebar")).toHaveCount(0);
 
-  await sidebar.getByRole("link", { name: /개인보호구/ }).click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("group")).toBe("개인보호구");
-  await expect(sidebar.getByRole("link", { name: /전체 상품/ })).not.toHaveClass(/active/);
-  await expect(sidebar.getByRole("link", { name: /개인보호구/ })).toHaveClass(/active/);
+  await page.goto("/products?q=%EC%95%88%EC%A0%84");
+  const sidebar = page.locator("aside.catalog-sidebar");
+  await expect(sidebar.getByRole("heading", { name: "관련 카테고리" })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: /전체 검색 결과/ })).toHaveClass(/active/);
+  await expect(sidebar.getByRole("link", { name: /개인보호구/ })).toHaveCount(0);
 });
 
 test("customer can add product detail item to cart", async ({ page, context }, testInfo) => {

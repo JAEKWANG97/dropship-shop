@@ -63,7 +63,7 @@ test("mobile catalog controls stay horizontal at narrow widths", async ({ page }
   for (const width of [320, 390, 430]) {
     await test.step(`${width}px`, async () => {
       await page.setViewportSize({ width, height: 844 });
-      await page.goto("/products");
+      await page.goto("/products?q=%EC%95%88%EC%A0%84");
 
       const filters = page.locator(".catalog-mobile-filters");
       await filters.locator("summary").click();
@@ -390,7 +390,7 @@ test("mobile public smoke screenshots remain stable", async ({ page }, testInfo)
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("mobile-home.png");
 
-  await page.goto("/products");
+  await page.goto("/products?q=%EC%95%88%EC%A0%84");
   await expectNoHorizontalOverflow(page);
   await expect(page).toHaveScreenshot("mobile-products.png", {
     mask: [
