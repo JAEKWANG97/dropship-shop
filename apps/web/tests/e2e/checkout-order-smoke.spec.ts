@@ -138,7 +138,7 @@ async function createPendingCheckout(customerCookie: string): Promise<CheckoutFi
       termsAgreed: true,
       privacyAgreed: true,
       termsVersion: "2026-08-02",
-      privacyVersion: "2026-08-02",
+      privacyVersion: "2026-08-04",
     }),
   });
   const cart = (await apiRequest("/api/cart", customerCookie)) as Cart;

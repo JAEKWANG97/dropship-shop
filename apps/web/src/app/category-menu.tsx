@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PRODUCT_CATEGORIES } from "@/lib/categories";
 
-const CATEGORY_GROUPS = Object.entries(
-  Object.groupBy(PRODUCT_CATEGORIES, (category) => category[0]),
-);
-
-export function CategoryMenu() {
+export function CategoryMenu({ visibleCategoryCodes }: { visibleCategoryCodes?: string[] }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDetailsElement>(null);
+  const visibleCategorySet = visibleCategoryCodes ? new Set(visibleCategoryCodes) : null;
+  const categoryGroups = Object.entries(
+    Object.groupBy(
+      PRODUCT_CATEGORIES.filter((category) => !visibleCategorySet || visibleCategorySet.has(category[2])),
+      (category) => category[0],
+    ),
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +52,7 @@ export function CategoryMenu() {
           <Link href="/products" onClick={() => setOpen(false)}>전체 상품 보기</Link>
         </div>
         <div className="header-category-groups">
-          {CATEGORY_GROUPS.map(([group, categories]) => (
+          {categoryGroups.map(([group, categories]) => (
             <details className="header-category-group" key={group} name="header-category-group">
               <summary>
                 <span>{group}</span>

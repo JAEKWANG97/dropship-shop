@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test";
 test("header category menu navigates by group and category", async ({ page }) => {
   await page.goto("/");
 
+  await expect(page.getByRole("link", { name: "AI 안전모 착용 인식 CCTV", exact: true })).toHaveCount(0);
+
   const menu = page.locator(".header-category-menu");
   await menu.locator(":scope > summary").click();
   await expect(menu).toHaveAttribute("open", "");
   await expect(menu.getByRole("link", { name: "전체 상품 보기" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "일반 작업장갑", exact: true })).toHaveCount(0);
 
   const personalProtectiveEquipment = menu
     .locator(".header-category-group")

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BUSINESS_PROFILE, POLICY_PAGES } from "@/lib/legal";
+import { getProducts } from "@/lib/catalog";
 import { getAdminUser, getCurrentUser } from "@/lib/session";
 import { CategoryMenu } from "./category-menu";
 import "./globals.css";
@@ -15,7 +16,16 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [session, admin] = await Promise.all([getCurrentUser(), getAdminUser()]);
+  const [session, admin, catalog] = await Promise.all([
+    getCurrentUser(),
+    getAdminUser(),
+    getProducts({ size: 1 }).catch(() => null),
+  ]);
+  const visibleCategoryCodes = catalog
+    ? Object.entries(catalog.categoryCounts)
+        .filter(([, count]) => (count ?? 0) > 0)
+        .map(([code]) => code)
+    : undefined;
 
   return (
     <html lang="ko">
@@ -29,7 +39,7 @@ export default async function RootLayout({
         ) : null}
         <header className="site-header">
           <div className="site-header-main">
-            <CategoryMenu />
+            <CategoryMenu visibleCategoryCodes={visibleCategoryCodes} />
             <Link href="/" className="brand" aria-label="코어블SAF home">
               <strong>
                 <span>코어블</span>
