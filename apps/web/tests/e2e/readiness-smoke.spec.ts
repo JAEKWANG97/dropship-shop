@@ -338,11 +338,13 @@ test("admin reviews a ready hidden product and activates it individually", async
 });
 
 test("admin order detail renders through selected order query", async ({ page, context }) => {
-  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin order smoke.");
-
-  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
-  await page.goto("/admin/orders");
+  const adminCookie = await requireAdminCookie();
+  await addCookie(context, adminCookie);
+  await page.goto("/admin/orders?status=SUPPLIER_ORDER_PENDING");
+  await expect(page.getByRole("navigation", { name: "주문 목록 페이지" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "주문 목록 페이지" }).getByText("1", { exact: true })).toHaveAttribute("aria-current", "page");
   const orderLink = await firstAdminOrderLink(page);
+  await expect(orderLink).toHaveAttribute("href", /status=SUPPLIER_ORDER_PENDING/);
 
   await orderLink.click();
   await expect(page.locator("text=주문 상세").first()).toBeVisible();

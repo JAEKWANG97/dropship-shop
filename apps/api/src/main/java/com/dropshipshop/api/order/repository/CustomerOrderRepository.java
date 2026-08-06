@@ -1,11 +1,16 @@
 package com.dropshipshop.api.order.repository;
 
-import java.util.List;
+import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
@@ -17,6 +22,36 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UU
 	List<CustomerOrder> findAllByPaymentGroup_IdOrderByCreatedAtAsc(UUID paymentGroupId);
 
 	List<CustomerOrder> findAllByStatusOrderByCreatedAtAsc(OrderStatus status);
+
+	@Query(
+		value = """
+			select customerOrder from CustomerOrder customerOrder
+			join fetch customerOrder.user customer
+			join fetch customerOrder.supplier supplier
+			join fetch customerOrder.paymentGroup paymentGroup
+			where customerOrder.status = :status
+			and (lower(customerOrder.orderNumber) like :keyword
+				or lower(customer.email) like :keyword)
+			and customerOrder.createdAt >= :fromTime
+			and customerOrder.createdAt < :toTime
+			""",
+		countQuery = """
+			select count(customerOrder) from CustomerOrder customerOrder
+			join customerOrder.user customer
+			where customerOrder.status = :status
+			and (lower(customerOrder.orderNumber) like :keyword
+				or lower(customer.email) like :keyword)
+			and customerOrder.createdAt >= :fromTime
+			and customerOrder.createdAt < :toTime
+			"""
+	)
+	Page<CustomerOrder> findAdminOrders(
+		@Param("status") OrderStatus status,
+		@Param("keyword") String keyword,
+		@Param("fromTime") Instant fromTime,
+		@Param("toTime") Instant toTime,
+		Pageable pageable
+	);
 
 	List<CustomerOrder> findAllByUser_IdAndStatusInOrderByCreatedAtDesc(UUID userId, Collection<OrderStatus> statuses);
 

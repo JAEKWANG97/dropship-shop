@@ -1,8 +1,15 @@
 package com.dropshipshop.api.order;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +42,9 @@ import com.dropshipshop.api.user.domain.UserAccount;
 
 @Service
 class AdminOrderQueryService {
+	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+	private static final Instant EARLIEST_ORDER_TIME = Instant.parse("1970-01-01T00:00:00Z");
+	private static final Instant LATEST_ORDER_TIME = Instant.parse("9999-12-31T00:00:00Z");
 
 	private final CustomerOrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
@@ -72,20 +82,37 @@ class AdminOrderQueryService {
 	}
 
 	@Transactional(readOnly = true)
-	AdminOrderDtos.AdminOrderListResponse listSupplierOrderPendingOrders() {
-		return listOrders(OrderStatus.SUPPLIER_ORDER_PENDING);
-	}
-
-	@Transactional(readOnly = true)
-	AdminOrderDtos.AdminOrderListResponse listOrders(OrderStatus status) {
-		List<CustomerOrder> source = status == null
-			? orderRepository.findAllByOrderByCreatedAtAsc()
-			: orderRepository.findAllByStatusOrderByCreatedAtAsc(status);
-		List<AdminOrderDtos.AdminOrderSummaryResponse> orders = source
-			.stream()
+	AdminOrderDtos.AdminOrderListResponse listOrders(
+		String query,
+		OrderStatus status,
+		LocalDate from,
+		LocalDate to,
+		int page,
+		int size
+	) {
+		if (from != null && to != null && from.isAfter(to)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
+		}
+		String keyword = query == null || query.isBlank()
+			? "%"
+			: "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+		Sort sort = Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id"));
+		Page<CustomerOrder> orders = orderRepository.findAdminOrders(
+			status == null ? OrderStatus.SUPPLIER_ORDER_PENDING : status,
+			keyword,
+			from == null ? EARLIEST_ORDER_TIME : from.atStartOfDay(SEOUL).toInstant(),
+			to == null ? LATEST_ORDER_TIME : to.plusDays(1).atStartOfDay(SEOUL).toInstant(),
+			PageRequest.of(page, size, sort)
+		);
+		return new AdminOrderDtos.AdminOrderListResponse(
+			orders.getContent().stream()
 			.map(this::toSummaryResponse)
-			.toList();
-		return new AdminOrderDtos.AdminOrderListResponse(orders);
+			.toList(),
+			orders.getNumber(),
+			orders.getSize(),
+			orders.getTotalElements(),
+			orders.getTotalPages()
+		);
 	}
 
 	@Transactional(readOnly = true)

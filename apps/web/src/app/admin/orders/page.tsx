@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   adminStatusLabel,
   getAdminOrder,
@@ -39,28 +40,23 @@ import {
 } from "./actions";
 
 type AdminOrdersPageProps = {
-  searchParams: Promise<{ from?: string; message?: string; orderId?: string; q?: string; status?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; message?: string; orderId?: string; page?: string; q?: string; status?: string; to?: string }>;
 };
 
 export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
   const params = await searchParams;
-  const data = await loadOrders(params.status);
-  const orders = data.orders;
-  const keyword = params.q?.trim().toLowerCase();
-  const fromTime = params.from ? new Date(params.from).getTime() : undefined;
-  const toTime = params.to ? new Date(`${params.to}T23:59:59`).getTime() : undefined;
-  const filteredOrders = orders.filter((order) => {
-    const createdAt = new Date(order.createdAt).getTime();
-    const matchesKeyword =
-      !keyword || `${order.orderNumber} ${order.customerEmail}`.toLowerCase().includes(keyword);
-    const matchesStatus = !params.status || order.status === params.status;
-    const matchesFrom = fromTime === undefined || createdAt >= fromTime;
-    const matchesTo = toTime === undefined || createdAt <= toTime;
+  const requestedPage = positivePage(params.page);
+  const data = await loadOrders(params, requestedPage - 1);
 
-    return matchesKeyword && matchesStatus && matchesFrom && matchesTo;
-  });
-  const selectedOrderId = params.orderId ?? filteredOrders[0]?.orderId;
-  const selectedSummary = filteredOrders.find((order) => order.orderId === selectedOrderId) ?? filteredOrders[0];
+  if (!data.error && data.orders.totalPages > 0 && requestedPage > data.orders.totalPages) {
+    redirect(orderPageHref(params, data.orders.totalPages));
+  }
+
+  const orders = data.error ? [] : data.orders.orders;
+  const currentPage = data.error ? 1 : data.orders.page + 1;
+  const totalPages = data.error ? 0 : data.orders.totalPages;
+  const selectedOrderId = params.orderId ?? orders[0]?.orderId;
+  const selectedSummary = orders.find((order) => order.orderId === selectedOrderId) ?? orders[0];
   const [detail, actionHistory] = selectedOrderId
     ? await Promise.all([loadOrderDetail(selectedOrderId), loadOrderActions(selectedOrderId)])
     : [{ error: false as const, order: null }, { error: false as const, actions: [] }];
@@ -103,7 +99,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
             <option value="REFUNDED">환불완료</option>
             <option value="OUT_OF_STOCK">품절</option>
           </select>
-          <input name="q" placeholder="주문번호 또는 고객사 검색" defaultValue={params.q ?? ""} />
+          <input name="q" placeholder="주문번호 또는 고객 이메일 검색" defaultValue={params.q ?? ""} />
           <button className="button" type="submit">
             검색
           </button>
@@ -111,21 +107,11 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
       ) : null}
 
       {!data.error ? (
-        <div className="admin-metrics">
-          <Metric label="입금대기" value={filteredOrders.filter((order) => order.status === "PAYMENT_PENDING").length} />
-          <Metric label="발주대기" value={filteredOrders.filter((order) => order.status === "SUPPLIER_ORDER_PENDING").length} />
-          <Metric label="배송중" value={filteredOrders.filter((order) => order.status === "SHIPPED").length} />
-          <Metric label="취소/환불" value={filteredOrders.filter((order) => order.status.includes("REFUND")).length} />
-          <Metric label="품절" value={filteredOrders.filter((order) => order.status === "OUT_OF_STOCK").length} />
-        </div>
-      ) : null}
-
-      {!data.error ? (
         <div className="admin-orders-layout">
           <section className="admin-panel">
             <div className="admin-panel-head">
               <h2>주문 목록</h2>
-              <span>총 {filteredOrders.length}건</span>
+              <span>총 {data.orders.totalElements}건</span>
             </div>
             <div className="admin-table orders">
               <div className="admin-table-row admin-table-head">
@@ -135,7 +121,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 <span>결제금액</span>
                 <span>주문상태</span>
               </div>
-              {filteredOrders.map((order) => (
+              {orders.map((order) => (
                 <Link
                   className={`admin-table-row ${order.orderId === selectedOrder?.orderId ? "selected" : ""}`}
                   href={orderHref(order.orderId, params)}
@@ -150,13 +136,34 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                   </span>
                 </Link>
               ))}
-              {filteredOrders.length === 0 ? (
+              {orders.length === 0 ? (
                 <div className="admin-empty">
                   <strong>조회된 주문이 없습니다</strong>
                   <span>검색 조건을 바꾸거나 새 주문이 들어온 뒤 다시 확인하세요.</span>
                 </div>
               ) : null}
             </div>
+            {totalPages > 0 ? (
+              <nav className="admin-pagination" aria-label="주문 목록 페이지">
+                {currentPage > 1 ? (
+                  <Link href={orderPageHref(params, currentPage - 1)}>이전</Link>
+                ) : (
+                  <span aria-disabled="true">이전</span>
+                )}
+                {pageNumbers(currentPage, totalPages).map((page) =>
+                  page === currentPage ? (
+                    <strong aria-current="page" key={page}>{page}</strong>
+                  ) : (
+                    <Link href={orderPageHref(params, page)} key={page}>{page}</Link>
+                  ),
+                )}
+                {currentPage < totalPages ? (
+                  <Link href={orderPageHref(params, currentPage + 1)}>다음</Link>
+                ) : (
+                  <span aria-disabled="true">다음</span>
+                )}
+              </nav>
+            ) : null}
           </section>
 
           {selectedOrder ? (
@@ -237,11 +244,23 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
   );
 }
 
-async function loadOrders(status?: string) {
+async function loadOrders(
+  params: { from?: string; q?: string; status?: string; to?: string },
+  page: number,
+) {
   try {
-    return { error: false as const, orders: await getAdminOrders(status || undefined) };
+    return {
+      error: false as const,
+      orders: await getAdminOrders({
+        q: params.q?.trim(),
+        status: params.status,
+        from: params.from,
+        to: params.to,
+        page,
+      }),
+    };
   } catch {
-    return { error: true as const, orders: [] };
+    return { error: true as const, orders: null };
   }
 }
 
@@ -261,16 +280,6 @@ async function loadOrderActions(orderId: string) {
   }
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <article className="admin-metric">
-      <span>{label}</span>
-      <strong>{value}건</strong>
-      <small>상태 기준 집계</small>
-    </article>
-  );
-}
-
 function mergeOrderDetail(summary?: AdminOrder, detail?: AdminOrder | null) {
   if (!detail) {
     return summary;
@@ -287,10 +296,10 @@ function mergeOrderDetail(summary?: AdminOrder, detail?: AdminOrder | null) {
 
 function orderHref(
   orderId: string,
-  params: { from?: string; q?: string; status?: string; to?: string },
+  params: { from?: string; page?: string; q?: string; status?: string; to?: string },
 ) {
   const search = new URLSearchParams({ orderId });
-  for (const key of ["from", "q", "status", "to"] as const) {
+  for (const key of ["from", "page", "q", "status", "to"] as const) {
     if (params[key]) {
       search.set(key, params[key]);
     }
@@ -298,14 +307,38 @@ function orderHref(
   return `/admin/orders?${search.toString()}`;
 }
 
-function orderListHref(params: { from?: string; q?: string; status?: string; to?: string }) {
+function orderListHref(params: { from?: string; page?: string; q?: string; status?: string; to?: string }) {
   const search = new URLSearchParams();
-  for (const key of ["from", "q", "status", "to"] as const) {
+  for (const key of ["from", "page", "q", "status", "to"] as const) {
     if (params[key]) {
       search.set(key, params[key]);
     }
   }
   return `/admin/orders${search.size ? `?${search.toString()}` : ""}`;
+}
+
+function positivePage(value?: string) {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
+function orderPageHref(
+  params: { from?: string; q?: string; status?: string; to?: string },
+  page: number,
+) {
+  const search = new URLSearchParams();
+  for (const key of ["from", "q", "status", "to"] as const) {
+    if (params[key]) search.set(key, params[key]);
+  }
+  if (page > 1) search.set("page", String(page));
+  const value = search.toString();
+  return value ? `/admin/orders?${value}` : "/admin/orders";
+}
+
+function pageNumbers(currentPage: number, totalPages: number) {
+  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
 function shippingAddressText(address: AdminOrder["shippingAddress"]) {
