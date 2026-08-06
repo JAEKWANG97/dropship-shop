@@ -34,7 +34,11 @@ final class AdminOrderDtos {
 	}
 
 	record AdminOrderListResponse(
-		List<AdminOrderSummaryResponse> orders
+		List<AdminOrderSummaryResponse> orders,
+		int page,
+		int size,
+		long totalElements,
+		int totalPages
 	) {
 	}
 

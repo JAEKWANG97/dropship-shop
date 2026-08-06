@@ -141,12 +141,12 @@ export default async function AdminDashboardPage() {
 
 async function loadDashboard() {
   try {
-    const [productPage, soldOutPage, orders] = await Promise.all([
+    const [productPage, soldOutPage, orderPage] = await Promise.all([
       getAdminProducts({ size: 1 }),
       getAdminProducts({ status: "SOLD_OUT", size: 4 }),
       getAdminOrders(),
     ]);
-    return { error: false as const, orders, productPage, soldOutPage };
+    return { error: false as const, orders: orderPage.orders, productPage, soldOutPage };
   } catch {
     return { error: true as const, orders: [], productPage: null, soldOutPage: null };
   }

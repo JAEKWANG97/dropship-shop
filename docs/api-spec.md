@@ -429,7 +429,7 @@ Rules:
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Supplier order pending admin queue by default; supports `status` filter |
+| `GET` | `/api/admin/orders` | `ADMIN` | Implemented | Paginated admin queue; supports `status`, `q`, `from`, `to`, `page`, and `size` filters |
 | `GET` | `/api/admin/orders/{orderId}` | `ADMIN` | Implemented | Admin order detail |
 | `POST` | `/api/admin/orders/{orderId}/confirm-deposit` | `ADMIN` | Implemented | Confirm exact direct bank-transfer deposit evidence and move checkout orders to supplier order pending |
 | `POST` | `/api/admin/orders/{orderId}/unpaid-cancel` | `ADMIN` | Implemented | Cancel unpaid bank-transfer checkout |
@@ -451,6 +451,8 @@ Rules:
 - Admin actions must map to valid transition table actions.
 - Admin order queue defaults to `SUPPLIER_ORDER_PENDING` orders.
 - `GET /api/admin/orders?status=PAYMENT_PENDING` returns the bank-transfer deposit waiting queue.
+- Admin order search and order-date filters run on the server. Dates use the Asia/Seoul day boundary.
+- Admin order pages default to 20 rows, allow at most 100 rows, and return `page`, `size`, `totalElements`, and `totalPages`.
 - Admin order summaries include `itemCount` so the list does not depend on detail API data.
 - `PAYMENT_PENDING` and `EXPIRED` orders are excluded from the supplier order queue.
 - Admin deposit confirmation requires `actualDepositorName`, positive `actualAmount`, past-or-present `depositedAt`, `transactionReference`, reason, confirmed checkout policies, `PAYMENT_PENDING` checkout orders, and currently sellable products/options. `actualAmount` must exactly equal the payment group total; mismatch returns `400` without approving the payment group or orders.

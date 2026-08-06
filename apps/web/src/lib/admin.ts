@@ -205,8 +205,12 @@ export type AdminOrder = {
   paymentMethod?: string;
 };
 
-type AdminOrderListResponse = {
+export type AdminOrderPage = {
   orders: AdminOrder[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 };
 
 export type AdminOrderActionHistory = {
@@ -261,10 +265,22 @@ export async function getAdminSuppliers() {
 	return readAdmin<AdminSupplier[]>("/api/admin/suppliers");
 }
 
-export async function getAdminOrders(status?: string) {
-  const path = status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders";
-	const data = await readAdmin<AdminOrderListResponse>(path);
-	return data.orders;
+export async function getAdminOrders(params: {
+  q?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  size?: number;
+} = {}) {
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.status) query.set("status", params.status);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  query.set("page", String(params.page ?? 0));
+  query.set("size", String(params.size ?? 20));
+	return readAdmin<AdminOrderPage>(`/api/admin/orders?${query}`);
 }
 
 export async function getAdminReferrals() {

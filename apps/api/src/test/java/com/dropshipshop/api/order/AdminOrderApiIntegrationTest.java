@@ -152,6 +152,41 @@ class AdminOrderApiIntegrationTest {
 	}
 
 	@Test
+	void paginatesAdminOrdersWithServerSideKeywordFilter() throws Exception {
+		UserAccount customer = createCustomer("admin-order-page");
+		createApprovedOrder(customer, "ADM-PAGE-1", "ADM-PAGE-CO-1", 11000);
+		createApprovedOrder(customer, "ADM-PAGE-2", "ADM-PAGE-CO-2", 12000);
+		createApprovedOrder(customer, "ADM-PAGE-3", "ADM-PAGE-CO-3", 13000);
+
+		mockMvc.perform(get("/api/admin/orders")
+				.param("q", "admin-order-page")
+				.param("page", "1")
+				.param("size", "2")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.orders", hasSize(1)))
+			.andExpect(jsonPath("$.orders[0].customerEmail", is("admin-order-page@example.com")))
+			.andExpect(jsonPath("$.page", is(1)))
+			.andExpect(jsonPath("$.size", is(2)))
+			.andExpect(jsonPath("$.totalElements", is(3)))
+			.andExpect(jsonPath("$.totalPages", is(2)));
+	}
+
+	@Test
+	void rejectsInvalidAdminOrderPageAndDateRange() throws Exception {
+		mockMvc.perform(get("/api/admin/orders")
+				.param("size", "0")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(get("/api/admin/orders")
+				.param("from", "2026-08-05")
+				.param("to", "2026-08-04")
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void confirmsBankTransferDepositAndRejectsDuplicateConfirmation() throws Exception {
 		UserAccount customer = createCustomer("admin-order-customer-bank-confirm");
 		CustomerOrder order = createPaymentPendingOrder(customer, "ADM-BANK-CONFIRM-1", "ADM-BANK-CONFIRM-CO-1", 45000);
