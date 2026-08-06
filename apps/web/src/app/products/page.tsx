@@ -98,7 +98,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {!error && products.length === 0 ? (
         <div className="notice empty">
           <strong>판매 중인 상품이 없습니다</strong>
-          <span>검색 조건을 바꾸거나 관리자에서 상품을 등록해 주세요.</span>
+          <span>다른 검색어 또는 카테고리를 확인해 주세요.</span>
         </div>
       ) : null}
 

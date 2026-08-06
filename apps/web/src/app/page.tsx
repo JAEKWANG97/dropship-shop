@@ -9,9 +9,9 @@ import { ProductImage } from "./products/product-image";
 
 async function loadProducts() {
   try {
-    const products = (await getProducts({ size: 100 })).products;
+    const result = await getProducts({ size: 100 });
     const names = new Set<string>();
-    return products.filter((product) => {
+    const products = result.products.filter((product) => {
       const name = product.name.trim();
       if (
         name.length > 60 ||
@@ -25,14 +25,16 @@ async function loadProducts() {
       names.add(key);
       return true;
     }).slice(0, 20).slice(0, 6);
+    return { products, categoryCounts: result.categoryCounts };
   } catch {
-    return [] as ProductSummary[];
+    return { products: [] as ProductSummary[], categoryCounts: {} };
   }
 }
 
 export default async function Home() {
-  const products = await loadProducts();
+  const { products, categoryCounts } = await loadProducts();
   const groups = [...new Set(PRODUCT_CATEGORIES.map((category) => category[0]))];
+  const featuredCategories = FEATURED_CATEGORIES.filter((category) => (categoryCounts[category] ?? 0) > 0);
 
   return (
     <div className="home-page">
@@ -69,7 +71,7 @@ export default async function Home() {
           </div>
           <nav className="home-category-chips" aria-label="자주 찾는 품목">
             <span>자주 찾는 품목</span>
-            {FEATURED_CATEGORIES.map((category) => (
+            {featuredCategories.map((category) => (
               <Link href={`/products?category=${encodeURIComponent(category)}`} key={category}>
                 {categoryLabel(category)}
               </Link>

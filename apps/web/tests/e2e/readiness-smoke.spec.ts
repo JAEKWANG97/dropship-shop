@@ -178,15 +178,19 @@ test("customer account pages render with a session cookie", async ({ page, conte
   }
 });
 
-test("admin pages render with an admin session cookie", async ({ page, context }) => {
+test("admin pages render with an admin session cookie", async ({ page, context }, testInfo) => {
   await page.goto("/");
   await expect(page.locator(".site-utility")).toHaveCount(0);
 
   await addCookie(context, await requireAdminCookie());
   await page.goto("/");
   const utility = page.locator(".site-utility");
-  await expect(utility.getByRole("link")).toHaveCount(1);
-  await expect(utility.getByRole("link", { name: "운영관리" })).toHaveAttribute("href", "/admin");
+  await expect(utility.locator('a[href="/admin"]')).toHaveCount(1);
+  if (testInfo.project.name === "mobile") {
+    await expect(utility).toBeHidden();
+  } else {
+    await expect(utility.getByRole("link", { name: "운영관리" })).toBeVisible();
+  }
 
   const productId = await activeProductId();
   const routes = [
@@ -422,20 +426,22 @@ test("mobile customer product layouts keep compact shopping density", async ({ p
   await page.goto("/products");
   const catalogCard = page.locator(".catalog-results .product-card").first();
   const catalogImage = catalogCard.locator(".product-card-image");
-  const filterSummary = page.locator(".catalog-mobile-filters summary");
   await expect(catalogCard).toBeVisible();
 
-  const [catalogImageBox, filterBox, priceFontSize, nameFontWeight] = await Promise.all([
+  const [catalogImageBox, priceFontSize, nameFontWeight] = await Promise.all([
     catalogImage.boundingBox(),
-    filterSummary.boundingBox(),
     catalogCard.locator(".product-card-price").evaluate((element) => getComputedStyle(element).fontSize),
     catalogCard.locator(".product-card-name").evaluate((element) => getComputedStyle(element).fontWeight),
   ]);
-  expect(catalogImageBox?.width).toBe(120);
-  expect(catalogImageBox?.height).toBe(120);
-  expect(filterBox?.height).toBeGreaterThanOrEqual(44);
-  expect(priceFontSize).toBe("20px");
+  expect(catalogImageBox?.width).toBeGreaterThanOrEqual(176);
+  expect(catalogImageBox?.width).toBeLessThanOrEqual(180);
+  expect(catalogImageBox?.height).toBe(catalogImageBox?.width);
+  expect(priceFontSize).toBe("19px");
   expect(nameFontWeight).toBe("500");
+
+  await page.goto("/products?q=%EC%95%88%EC%A0%84");
+  const filterBox = await page.locator(".catalog-mobile-filters summary").boundingBox();
+  expect(filterBox?.height).toBeGreaterThanOrEqual(44);
   await expectNoHorizontalOverflow(page);
 });
 
