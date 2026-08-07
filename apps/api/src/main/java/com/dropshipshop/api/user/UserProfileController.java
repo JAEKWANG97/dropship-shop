@@ -40,7 +40,7 @@ class UserProfileController {
 	}
 
 	@PostMapping("/deletion-request")
-	@PreAuthorize("hasRole('CUSTOMER')")
+	@PreAuthorize("hasRole('CUSTOMER') and !hasRole('ADMIN')")
 	ResponseEntity<Void> requestDeletion(Authentication authentication) {
 		accountDeletionService.deleteCustomerAccount(currentUser.id(authentication));
 		return ResponseEntity.noContent()
