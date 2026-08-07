@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.dropshipshop.api.auth.JwtAccessTokenService;
 import com.dropshipshop.api.auth.AuthProperties;
 import com.dropshipshop.api.user.domain.UserAccount;
+import com.dropshipshop.api.user.domain.UserRole;
 import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
@@ -74,7 +75,12 @@ class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
 		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 			principal,
 			null,
-			List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+			user.getRole() == UserRole.ADMIN
+				? List.of(
+					new SimpleGrantedAuthority("ROLE_ADMIN"),
+					new SimpleGrantedAuthority("ROLE_CUSTOMER")
+				)
+				: List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
 		);
 		SecurityContextHolder.getContext().setAuthentication(authentication);
 	}

@@ -176,7 +176,7 @@ class OAuthLoginApiIntegrationTest {
 	}
 
 	@Test
-	void preservesAdminRoleFromDatabaseAfterSocialLogin() throws Exception {
+	void preservesAdminRoleAndAllowsCustomerShoppingAccessAfterSocialLogin() throws Exception {
 		UserAccount admin = userAccountRepository.save(new UserAccount(
 			SocialProvider.NAVER,
 			"naver-admin-1",
@@ -205,6 +205,14 @@ class OAuthLoginApiIntegrationTest {
 				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.userId", is(admin.getId().toString())));
+
+		mockMvc.perform(get("/api/cart")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/me/deletion-request")
+				.cookie(callbackResult.getResponse().getCookie("ACCESS_TOKEN")))
+			.andExpect(status().isForbidden());
 	}
 
 	@Test

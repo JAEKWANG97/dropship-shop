@@ -1466,3 +1466,15 @@ Consequences:
 - B-013 모바일/디자인 QA와 B-008 검색/필터 고도화는 완료 이력으로 이동한다.
 - B-065는 루트 worktree의 미커밋 변경을 보존해 최신 `origin/main` 기준 검증·PR을 마치기 전까지 `Now`에 둔다.
 - B-062는 월 50달러 Budget과 실제 비용 15·25·50달러 이메일 알림, CloudWatch alarm 4개 완료 상태를 반영한다. DLM AssumeRole 오류와 메모리·container 관측, 장애 대응 문서는 남은 작업이다.
+
+## 2026-08-07: Allow Admin Accounts To Use The Customer Shopping Flow
+
+Decision:
+
+DB에 `ADMIN`으로 등록된 계정도 관리자 기능을 유지하면서 고객 상품 조회, 장바구니, 주문 흐름을 사용할 수 있다. 관리자 계정의 셀프서비스 탈퇴는 허용하지 않는다.
+
+Consequences:
+
+- 실제 JWT 관리자 세션에는 `ROLE_ADMIN`과 `ROLE_CUSTOMER`를 함께 부여한다.
+- 고객 전용 구매 API는 관리자 본인 계정의 데이터만 사용하므로 기존 소유권 경계를 유지한다.
+- 고객 탈퇴 API는 `ROLE_ADMIN`이 함께 있는 세션을 거부해 운영 계정이 고객 화면에서 삭제되지 않게 한다.
