@@ -15,6 +15,8 @@ Browser
   -> Backup job copies database and uploads to S3
 ```
 
+이 다이어그램은 현재 구현 기준이다. 공급처 포털은 `B-100`~`B-105`의 Planned 확장이며 기존 Next.js web, Spring Boot modular monolith와 PostgreSQL 안에 추가한다. 별도 판매자 서비스, 정산 시스템 또는 결제 시스템을 만들지 않는다.
+
 ## Repository Structure
 
 Use a monorepo for MVP development.
@@ -81,6 +83,18 @@ Primary data:
 - refunds
 - order_status_histories
 
+Planned supplier portal data (`B-100`~`B-105`):
+
+- public supplier applications and one-time invitation digests
+- one active supplier manager link per supplier
+- product review state separated from existing compliance state
+- `TRACKED` option inventory and order-item reservation lifecycle
+- fulfillment channel/request timestamp, minimal supplier PII access logs and append-only claim access grants
+- multiple shipments with item quantity allocations and correction/void/delivery evidence
+- shortage reports, Coreable-owned claim tasks, append-only supplier claim facts and supplier email audit linkage
+
+These are schema extensions, not current implemented tables or fields. Existing options and orders are backfilled or interpreted as `UNTRACKED` and legacy fulfillment channels through expand-contract migrations.
+
 ## Frontend
 
 Use Next.js.
@@ -102,6 +116,18 @@ Initial route groups:
 /admin/suppliers
 ```
 
+Planned supplier portal routes:
+
+```text
+/supplier/apply                 B-100 public application
+/supplier/activate              B-100 one-time invitation exchange and Kakao login
+/supplier                       B-100 supplier home
+/supplier/products              B-101 individual product management
+/supplier/orders                B-103 fulfillment request queue
+/supplier/orders/:orderNumber   B-103 minimum-PII detail and B-104 tracking registration
+/supplier/claim-tasks           B-105 Coreable-requested safe fact tasks
+```
+
 ## Admin
 
 Admin should not be treated as an afterthought. For this business model, admin workflows are part of the core product.
@@ -116,6 +142,38 @@ First admin screens:
 - Order detail
 - Fulfillment action panel
 - Refund action panel
+
+## Supplier Portal — Planned (`B-100`~`B-105`)
+
+The portal is a tenant-scoped operational surface for approved suppliers. Coreable remains the only customer-facing seller and keeps customer price, payment, refund, CS, claim decisions and final product control. The portal has no supplier settlement or seller-led customer transaction flow.
+
+```text
+Public applicant
+  -> Coreable approval
+  -> one-time email invitation
+  -> Kakao-only login
+  -> one active manager for one supplier in the first version
+
+Supplier manager
+  -> own individual products and tracked option inventory
+  -> own paid fulfillment requests
+  -> item-allocated tracking registrations
+  -> whole-delivery-group shortage reports
+  -> Coreable-requested claim facts
+```
+
+Implementation boundaries:
+
+- `B-100` reuses the current OAuth/JWT cookie stack but derives supplier authority from an active user, active portal status and the manager link. `Supplier.status` independently gates new sales, not access to already-paid fulfillment. Suspension/disconnect persists Coreable operational ownership for open work; KEEP routes new paid work to `COREABLE_MANUAL` until access returns. Existing `CUSTOMER` or `ADMIN` roles are not replaced.
+- `B-101` reuses catalog, image storage, product notice, sanitize, pricing and audit boundaries. A no-option product receives one internal `기본` option. Only a never-submitted, unreferenced portal DRAFT can be hard-deleted under Product -> Option locks; submitted/used rows remain hidden or stopped, while immutable subject ids and durable image-cleanup jobs preserve audit/storage integrity. One visible registration action auto-publishes ordinary valid products and queues only flagged products for Coreable review. B-102 inventory support is necessary but does not by itself open production sale.
+- `B-102` defaults new portal options to `TRACKED` with 24-hour reservations while allowing an explicit `UNTRACKED` choice. Existing manual/Domeggook options remain `UNTRACKED`. It also owns the shared bank-transfer exception boundary: a mismatched receipt becomes one actual-amount PaymentGroup Refund with no fulfillment, while exact late/saleability failures keep order-scoped Refunds. An exact receipt found after qualifying unpaid cancellation also uses order-scoped Refunds but never reacquires or revives the checkout, for portal and legacy groups alike.
+- `B-103` creates the portal fulfillment request and address lock in the successful deposit-confirmation transaction. There is no supplier accept/reject step.
+- `B-104` expands Shipment from the legacy single record to multiple records with immutable item allocations for portal orders. Tracking registration uses `TRACKING_REGISTERED`, generates an official carrier URL and does not call a live carrier-status API. Supplier carrier/tracking correction and Coreable void/delivery-complete/guarded delivery-correction actions are idempotent, preserve evidence and recalculate the Order aggregate.
+- `B-105` accepts shortage only before any tracking registration and lets suppliers answer only Coreable-created claim tasks without granting refund or claim-decision authority.
+
+Supplier order lists contain no customer PII. Supplier order detail returns only the recipient and address data needed for the owning supplier's delivery, for a limited access window, and every access is audited without copying PII values into the log.
+
+Supplier operational notifications use verified email only. The invitation is the sole pre-verification contact-validation message and contains only the token/link and generic connection instructions. Later fulfillment-request, product-review and approved claim-task messages include identifiers and portal links but no customer name, phone, address, delivery memo, payment or refund data.
 
 ## External Services
 
@@ -143,12 +201,19 @@ Runtime storage rules:
 - Domeggook source snapshot orders use the approved Private API after customer deposit confirmation and pay with prefunded e-money.
 - The API revalidates item, option, source price, shipping, and e-money immediately before purchase.
 - Orders without a supported source snapshot stay on the manual supplier-order path.
-- Real-time stock guarantees and additional supplier integrations are deferred.
+- The Planned supplier portal is an authenticated first-party workflow inside the existing application, not another supplier purchasing API. It adds supplier-managed `TRACKED` inventory while preserving existing manual/Domeggook `UNTRACKED` behavior.
+- Additional automated supplier purchasing APIs and live carrier-status APIs are not part of `B-100`~`B-105`.
 
 ## Security Notes
 
 - Admin APIs require admin role.
 - Customer APIs must scope data by authenticated user.
+- Planned supplier APIs require an active user, active portal status and manager link, then scope every query by both resource id and supplier id. `Supplier.status` separately gates new catalog sales/checkouts. Cross-supplier access returns `404` without revealing existence.
+- One-time invitation tokens are stored only as digests and must not appear in application logs, email payload snapshots, access logs or Referer values.
+- Supplier list responses contain no customer PII. Detail responses expose only delivery-required fields for a bounded period and use `Cache-Control: no-store` on PII-bearing responses.
+- Supplier PII access logs record only actor, order, access basis and time, never PII values or the response body.
+- Supplier cookie-authenticated unsafe methods require an allowlisted `Origin`; when `Origin` is absent they require a same-origin `Referer`, otherwise return `403`. Production cookies use `HttpOnly`, `Secure`, and `SameSite=Lax`.
+- Supplier invitation exchange binds a short-lived HttpOnly cookie to OAuth state and permits only Kakao callback; invite consumption and manager activation are atomic.
 - Do not log bank-transfer evidence, supplier credentials, e-money balances, recipient personal information, or raw external API payloads without filtering.
 - Keep OAuth, Domeggook, database, email, and backup credentials only in runtime secrets or IAM roles.
 - Use HTTPS in production.
@@ -168,6 +233,10 @@ Single EC2 server
 ```
 
 Do not introduce microservices before order and fulfillment workflows are stable.
+
+The supplier portal does not change this deployment topology. New routes, tables, schedulers and email templates ship in the existing web/API containers, and each `B-100`~`B-105` slice must preserve legacy customer/admin and Domeggook contracts.
+
+Production keeps `APP_SUPPLIER_PORTAL_ENABLED=false` by default. External routes and portal-product sale stay disabled, and admin commands or dispatch jobs that would create/send an activation invite fail closed, until B-100 through B-105, required tenant/CSRF/migration/concurrency tests, real email delivery, the new privacy disclosure and B-098 supplier contract/privacy obligations all pass their activation gates. Safety/admin cleanup paths remain available. Even afterward each portal-product public read and checkout requires its Supplier to be ACTIVE with time-valid VERIFIED contract evidence; a global flag never substitutes for that per-supplier gate.
 
 Production baseline is tracked in [Production Readiness](production-readiness.md).
 

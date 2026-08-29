@@ -4,6 +4,26 @@
 
 ## Now
 
+### B-099 외부 공급처 포털 정책과 구현 설계
+
+Status: Review Ready
+
+Notes:
+- Coreable이 단일 판매자 책임을 유지하면서 승인된 공급처가 자기 상품·재고·출고만 처리하는 포털을 설계한다.
+- 기존 B-097 실제 연락과 B-098 계약·상품 반영은 그대로 보존하며, 포털 구현이 외부 연락·계약·운영 활성화를 자동 실행하지 않는다.
+- 현재 구현과 충돌하는 재고 미관리, 관리자 발주 단계, 단일 Shipment 정책은 기존 데이터와 API를 보존하는 expand-contract 방식으로 전환한다.
+- 상세 기준은 `docs/supplier-portal-design.md`다.
+
+Tasks:
+- [x] 공급처 신청, 관리자 승인, 이메일 초대, Kakao 연결과 1공급처 1담당자 경계를 확정한다.
+- [x] 개별 상품 등록, Coreable 가격 통제, 일반 상품 자동 공개와 위험 상품 검토 정책을 확정한다.
+- [x] `TRACKED`/`UNTRACKED` 재고, 24시간 예약, 금액 불일치 결제그룹 전액 환불, 만료와 늦은 입금 처리 정책을 확정한다.
+- [x] 입금확인 즉시 출고 요청, 최소 PII, 접근기한과 감사 로그를 확정한다.
+- [x] 복수 송장, 수량 할당, 공식 택배사 링크와 배송완료 경계를 확정한다.
+- [x] 공급처 품절·클레임 사실 입력과 Coreable 최종 승인·환불 경계를 확정한다.
+- [x] 정책, decision log, product scope, domain, ERD, API, order flow, architecture 문서를 `Planned` 상태로 동기화한다.
+- [x] 후속 구현을 B-100~B-105의 review 가능한 단위로 분리한다.
+
 ### B-096 전문 공급처 발굴과 연락 우선순위
 
 Status: Ready for Contact
@@ -22,6 +42,115 @@ Tasks:
 - [ ] 실제 연락 전에 상위 업체와 문의 문안을 사용자가 최종 확인한다.
 
 ## Next
+
+### B-100 공급처 신청·승인·초대와 tenant 인증
+
+Status: Todo
+
+Notes:
+- B-099의 확정 설계를 기준으로 공개 신청부터 이메일 초대와 Kakao 세션 연결까지 구현한다.
+- 기존 CUSTOMER/ADMIN 저장 role을 바꾸지 않고 활성 supplier manager 연결로 공급처 권한을 파생한다.
+
+Tasks:
+- [ ] 공급처 신청과 관리자 승인/거절을 keyed-HMAC 기반으로 idempotent하게 구현하고, review key/action/mode/대상/reason/result를 durable하게 저장하며, review-time deadline lazy expiry와 미검토 90일 EXPIRED·REJECTED review+90일 비식별화 scheduler를 추가한다.
+- [ ] digest만 저장하는 만료·폐기 가능한 1회용 초대와 PENDING_ACTIVATION/no-manager/unverified guard의 allowlisted reason-code 재발급, terminal+30일 recipient/key/HMAC cleanup과 기존 NotificationLog recipient nullable 호환 migration을 구현한다.
+- [ ] Kakao 전용 초대 수락과 `/api/supplier/me`를 구현한다.
+- [ ] portal 접근 상태와 Supplier 판매 상태를 분리하고 정지·해제·연락 이메일 변경의 명시적 `salesAction`, immutable handover command history, additive Fulfillment channel/owner schema와 기존 열린 주문의 Coreable operational-owner 인계를 구현한다. 신규 KEEP fallback 활성화는 B-103이 맡는다.
+- [ ] CREATE_NEW는 INACTIVE/contract UNVERIFIED로 만들고 sales-status ACTIVE와 portal 상품 saleability에 B-098 per-supplier effective/expiry 포함 time-valid VERIFIED guard를 연결한다. Terminal/overdue contract는 supplier 권한·paid-work/Claim-grant 접근을 닫고 open work를 Coreable로 인계해야 한다.
+- [ ] `/api/supplier/**` tenant guard와 cookie mutation CSRF/origin 방어를 구현한다.
+- [ ] production 기본 off인 supplier portal feature gate와 개인정보·email·계약 activation guard를 구현하고, flag-off 승인/재발급/초대 dispatch가 mutation 전에 fail closed하는 회귀 테스트를 추가한다.
+- [ ] 신청·초대·권한·타 공급처 접근 회귀 테스트와 UI를 추가한다.
+
+### B-101 공급처 개별 상품 등록과 검토 흐름
+
+Status: Todo
+
+Notes:
+- CSV 없이 개별 등록부터 제공하고, 일반 상품은 자동 공개하되 안전·필수정보 위험만 Coreable이 검토한다.
+
+Tasks:
+- [ ] 공급처 소유 상품·기본 옵션·이미지·상세·상품 고시 CRUD를 구현한다. 최초 submit 전 DRAFT만 tenant/version/Product->Option lock 아래 hard-delete하고 CartItem/OrderItem 참조, 제출 이력과 마지막 옵션을 막으며, 그 밖의 상품은 숨김·판매중지로 보존한다.
+- [ ] 공급처 화면의 단일 `상품 등록` 동작이 내부 draft submit과 분류를 끝내도록 구현한다.
+- [ ] 공급처가 supplierId, 고객 판매가, 판매/검토 상태를 위조하지 못하게 한다.
+- [ ] option 총공급가에 동일 정책을 적용하는 deterministic Coreable 가격 계산, monotonic policy version/full calculator snapshot과 별도 product review 상태·분류기를 구현한다.
+- [ ] Product managementChannel/version과 pricing-policy version을 backfill하고 모든 legacy admin/source writer를 같은 aggregate version·actor history로 이관한다. 기존 음수 source price/additional price를 사전 스캔해 발견 시 명시적 데이터 정정 승인 전 migration을 막고, 모든 writer 검증 뒤 nonnegative 제약을 추가한다.
+- [ ] 자동 승인, 보완 요청, 승인, 거절과 PII-free review 문구, allowlisted business-field snapshot의 actor 기반 변경 이력을 구현한다. 삭제 이력은 immutable subject id와 nullable live FK로 보존하고 image metadata와 durable binary-cleanup job을 함께 commit한다.
+- [ ] 공급처용 allowlist 검토 상태·사유·안내·다음 행동과 같은 화면 재제출 UX를 구현하고 내부 review 정보 비노출을 검증한다.
+- [ ] 공개/관리자/공급처 응답 노출 차이와 HTML/image 안전 테스트를 추가한다. 미제출 DRAFT 삭제 성공, 제출/CartItem/OrderItem/마지막 옵션/tenant/version 거절, cart·checkout 경합, 삭제 후 404·감사이력·binary cleanup 재시도를 검증한다.
+
+### B-102 공급처 옵션 재고와 24시간 주문 예약
+
+Status: Todo
+
+Notes:
+- 기존 COREABLE 옵션은 `UNTRACKED`, B-101에서 먼저 생긴 portal 옵션은 `TRACKED/onHand=0`, B-102 이후 새 포털 옵션은 `TRACKED` 기본으로 이관한다.
+
+Tasks:
+- [ ] option on-hand/reserved 불변식과 canonical replay response·immutable change history를 가진 idempotent 재고 수정을 구현한다.
+- [ ] 재고 이력은 immutable subject option id와 nullable live FK를 사용해 미제출 DRAFT option 삭제 뒤에도 audit과 `(subjectOptionId,idempotencyKey)` replay uniqueness가 보존되게 한다.
+- [ ] 기존/portal option과 OrderItem의 management-channel·inventory-mode·reservation-status snapshot을 expand-contract로 backfill한다.
+- [ ] `수량 관리 (권장)`/`재고 수량 관리 안 함`, 공급처 `주문 받기`/`주문 중지`, mode별 validation·도움말과 고객 내부 재고/`무제한` 비노출 UI를 구현한다.
+- [ ] checkout/입금이 Supplier→Product→모든 Option(UNTRACKED 포함)을 공통 순서로 잠그고 catalog/inventory writer도 Product→Option을 따르게 해 PAUSE·상품상태·주문중지와 직렬화하며 원자적 예약/소비를 구현한다.
+- [ ] 미입금 취소·24시간 만료 자동 해제와 중복 실행 guard를 구현한다.
+- [ ] normal/late portal 입금 명령의 key/hash/immutable result replay, portal-origin contract lazy expiry를 포함한 Supplier lifecycle/saleability lock recheck, 기한 내 늦은 입금의 원자적 재확보와 실패 `PAYMENT_EXCEPTION`을 구현한다.
+- [ ] portal/legacy 공통 금액 불일치 명령이 전체 실입금 증적과 `PAYMENT_EXCEPTION`, 실제 수령액의 단일 `PAYMENT_GROUP/PAYMENT_AMOUNT_MISMATCH` Refund, 모든 Order `REFUND_REQUESTED`, HELD exactly-once 해제와 supplier 비노출을 원자·멱등 처리하도록 구현한다.
+- [ ] 기존 group-scope/비양수/cross-PaymentGroup Refund 사전 스캔으로 부적합 데이터의 migration을 차단한 뒤 금액 불일치 Refund의 nullable order/schema scope 제약, payment-group partial unique와 Payment/Order 동일 aggregate 복합 FK를 추가한다. Coreable 승인·수동 완료는 별도 key/hash/result replay로 정확한 실입금액 한 건만 반환한 뒤 Payment/PaymentGroup/모든 Order를 `REFUNDED`로 끝내도록 구현한다.
+- [ ] 늦은 입금과 portal/legacy 미입금취소 뒤 exact receipt의 Payment 증적, Order별 `LATE_DEPOSIT_EXCEPTION` Refund 자동 생성과 exception 전용 환불 경로를 구현한다. qualifying `CANCELLED`는 입금시각·재고와 무관하게 재개하지 않고 supplier 비노출·새 checkout으로 끝내며, PaymentGroup의 `PAYMENT_EXCEPTION` 환불 guard는 승인된 B-102 received-payment exception Refund에만 좁게 확장한다.
+- [ ] normal exact receipt의 판매불가·mode mismatch·scheduler 지연 기한초과를 `SALE_UNAVAILABLE_AT_DEPOSIT|LATE_DEPOSIT_EXCEPTION` whole-PaymentGroup exception outcome과 사유가 맞는 Order별 Refund로 exactly once 처리한다.
+- [ ] PostgreSQL 동시성·migration smoke, 부족·초과/복수 배송그룹/만료·미입금취소 경합/동일·변경 replay/수동환불 완료, 공급처 404·무알림과 재고 상태 회귀 테스트를 추가한다. exact-after-cancel은 portal/legacy, 기한 전후 입금시각, 미입금취소 동시성, refundable amount 복구, Refund 합계, 거절·금액변경 금지, Refund별 완료 replay, 부분/전체 완료와 절대 재개되지 않는 동작을 검증한다. `CANCELLED`+금액 불일치는 최우선 단일 `PAYMENT_AMOUNT_MISMATCH` group Refund, exact `CANCELLED`+saleability/late 결합은 cancellation-terminal `LATE_DEPOSIT_EXCEPTION`이어야 하며, prior Payment/Refund/Fulfillment 또는 미입금취소가 아닌 혼합 Order가 있으면 `409` 무변경이어야 한다. 고객 응답은 환불 처리 상태와 해당 환불액만 노출하고 입금자·거래 식별값·관리자 사유·계좌 증적을 숨기며, admin은 full evidence와 scope-correct identifiers를 보고, supplier는 list/detail `404`, email·알림·PII log가 모두 없어야 한다. Group-scope admin 응답은 nullable `orderId` 대신 `paymentGroupId`와 `appliedOrderIds`를 검증한다.
+
+### B-103 공급처 출고 요청·최소 PII·이메일 알림
+
+Status: Todo
+
+Notes:
+- 입금확인 완료 즉시 수락 단계 없이 공급처에 출고 요청을 보여준다.
+- 실제 email 전달 검증 전에는 production supplier activation을 열지 않는다.
+
+Tasks:
+- [ ] portal fulfillment 생성, 요청시각·배송지 잠금과 portal access가 비활성인 `salesAction=KEEP` 신규 주문의 `COREABLE_MANUAL` fallback을 구현한다.
+- [ ] PII 없는 목록과 stable order-item id·수량을 가진 최소 상세 DTO를 구현해 B-104 allocation 입력 경계를 준비한다.
+- [ ] 요청 +60일로 시작해 각 송장 등록 +30일로만 짧아지는 stored monotonic cutoff, scheduler·mutation lazy takeover, cutoff/terminal MASKED read와 PII-free 사유의 승인 클레임 FULL 한시 재개, time-valid contract 직접 guard, admin takeover command history와 PII 접근 로그 1년 삭제를 구현한다.
+- [ ] checkout 배송 메모 snapshot과 공급처 최소 PII 응답의 `no-store`를 구현한다.
+- [ ] PII 없는 신규 주문·검토·클레임 이메일 알림과 발송 이력을 구현하고 dispatch/retry마다 active manager·time-valid contract·검증 이메일을 재확인해 old/unauthorized recipient를 `SKIPPED` 처리하며 raw exception 미저장, invite generic-retry 금지, supplier FAILED-only 7일 retry, terminal+30일 recipient/legacy failure reason cleanup을 적용한다.
+- [ ] 권한, 타 공급처 404, PII 필드 부재와 기간 경계 테스트를 추가한다.
+
+### B-104 공급처 복수 송장과 공식 배송조회 링크
+
+Status: Todo
+
+Notes:
+- 송장 등록과 실제 출고를 분리하고 택배사 실시간 API 없이 공식 조회 링크를 제공한다.
+
+Tasks:
+- [ ] Shipment 1:N과 order item 수량 allocation을 expand-contract migration으로 구현한다.
+- [ ] 단일 송장 기본 전체 할당, 분할 출고 opt-in과 추가 송장 명시 할당을 구현한다.
+- [ ] over-allocation·중복·타 주문 item·동시 등록을 거절한다.
+- [ ] carrier registry 기반 공식 URL과 `TRACKING_REGISTERED` 표시를 구현한다.
+- [ ] 고객 plural shipment 응답과 `송장 등록 · 배송조회 가능` 링크 UI를 구현하고 legacy singular 응답을 호환한다.
+- [ ] action+actor+canonical body를 hash하는 supplier/admin 공유-key creation/action idempotency와 immutable result, Shipment version 0 backfill·writer 이관, optimistic guard, 배송완료 전 carrier/tracking 정정과 allocation 오류 void+재등록을 구현한다.
+- [ ] Coreable void/배송완료와 후속 Claim/Refund 전 guarded 배송완료 재개·시각 정정 이력을 구현한다.
+- [ ] 각 송장 등록이 stored cutoff를 `min(current, registeredAt+30일)`로만 단축하고 void/replacement가 늘리지 않도록 B-103 경계를 확장한다.
+- [ ] `TRACKING_REGISTERED`를 Claim/refund transition guard와 customer/admin allowlist에 이관하고 Claim 기준시각을 `max(non-voided deliveredAt)` aggregate로 교체한다.
+- [ ] Shipment와 admin portal-shipment가 Order→Fulfillment→all Shipment→OrderItems 공통 lock을 공유하도록 구현한다. Shortage report lock/guard 확장은 B-105가 맡는다.
+- [ ] 모든 Claim/Refund writer가 parent Order를 해당 row보다 먼저 잠그도록 이관한다. Payment-origin Refund는 PaymentGroup→Supplier→Product→Option→Order→Refund 전역 순서를 유지해 배송완료 correction과 후속 처리 생성이 경합하지 않게 한다.
+- [ ] 기존 단일 shipment 응답·Domeggook tracking·관리자 수동 보정·취소 Claim 호환 테스트를 추가한다.
+
+### B-105 공급처 품절 보고와 클레임 사실 입력
+
+Status: Todo
+
+Notes:
+- 공급처는 사실만 입력하고 Claim/Refund 최종 결정과 실제 계좌환불은 Coreable만 수행한다.
+
+Tasks:
+- [ ] 송장 등록 전 배송 그룹 주문 전체 품절을 REPORTED로 기록하고 Order/Refund를 바꾸지 않은 채 Coreable owner로 인계하는 supplier list/detail을 구현한다. Submit hash와 immutable safe result로 동일 key만 replay하고 같은 order의 새 key는 충돌시킨다.
+- [ ] `supplier_shortage_reports` 추가 뒤 supplier/admin Shipment service의 공통 lock을 Order→Fulfillment→report→all Shipment→OrderItems로 확장하고 open REPORTED report가 admin portal-shipment와 경합하지 않게 막는다.
+- [ ] Coreable shortage list/detail과 free-text 없는 allowlisted-code 승인·거절을 구현한다. 승인만 기존 out-of-stock/refund service를 실행하고 거절은 Coreable owner를 유지한다.
+- [ ] Coreable이 만드는 orderNumber·자기 상품 요약 포함 safe claim task, 정정 가능한 same-task fact history projection과 request hash/immutable result를 저장하는 idempotent append-only supplier fact 입력·tenant 경계를 구현한다.
+- [ ] Claim terminal/dueAt에서 열린 task를 닫고 create/fact/close의 allowed status와 idempotency를 구현한다.
+- [ ] 공급처 입력이 Claim/Order/Refund 상태를 직접 변경하지 않는 회귀 테스트를 추가한다.
+- [ ] Coreable 승인·거절·반품입고·환불 기존 흐름과 통합 검증한다.
 
 ### B-057 관리자 회원 관리와 알림 발송 이력
 
@@ -112,6 +241,9 @@ Notes:
 
 Tasks:
 - [ ] 계약·정산·반품·개인정보 처리 범위를 검토한다.
+- [ ] 공급처별 계약 version·effective/expiry·검증/만료/폐기·검증 관리자 증적과 idempotent history를 기록하고, expected current version/버전당 terminal 1건 guard로 stale scheduler·관리자 명령을 막는다. Terminal/lazy expiry는 sales INACTIVE, portal SUSPENDED, invite 폐기와 open work Coreable 인계를 원자적으로 수행하고 time-valid VERIFIED만 sales/paid-work/Claim-grant 접근이 되게 한다.
+- [ ] privacy notice에 관계 종료 후 공급처 연락 PII 보관기간을 확정하고 영구종료+미처리 업무 없음 이후 Supplier/approved application 중복 연락정보 cleanup을 구현한다.
+- [ ] invite 소비자와 catalog/inventory/lifecycle supplier actor FK는 관계 종료 보관기한에, shipment/shortage/claim actor FK는 parent 법정 보존기한에 null/delete하도록 retention migration과 scheduler를 구현한다.
 - [ ] 확정된 공급처의 SKU·가격·재고·MOQ·이미지 제공 방식을 문서화한다.
 - [ ] 공급처별 최소 importer와 동기화 범위를 별도 구현 backlog로 분리한다.
 - [ ] dry-run·백업·검수 뒤 승인된 상품만 운영에 반영한다.
