@@ -45,21 +45,21 @@ Tasks:
 
 ### B-100 공급처 신청·승인·초대와 tenant 인증
 
-Status: Todo
+Status: Review Ready
 
 Notes:
 - B-099의 확정 설계를 기준으로 공개 신청부터 이메일 초대와 Kakao 세션 연결까지 구현한다.
 - 기존 CUSTOMER/ADMIN 저장 role을 바꾸지 않고 활성 supplier manager 연결로 공급처 권한을 파생한다.
 
 Tasks:
-- [ ] 공급처 신청과 관리자 승인/거절을 keyed-HMAC 기반으로 idempotent하게 구현하고, review key/action/mode/대상/reason/result를 durable하게 저장하며, review-time deadline lazy expiry와 미검토 90일 EXPIRED·REJECTED review+90일 비식별화 scheduler를 추가한다.
-- [ ] digest만 저장하는 만료·폐기 가능한 1회용 초대와 PENDING_ACTIVATION/no-manager/unverified guard의 allowlisted reason-code 재발급, terminal+30일 recipient/key/HMAC cleanup과 기존 NotificationLog recipient nullable 호환 migration을 구현한다.
-- [ ] Kakao 전용 초대 수락과 `/api/supplier/me`를 구현한다.
-- [ ] portal 접근 상태와 Supplier 판매 상태를 분리하고 정지·해제·연락 이메일 변경의 명시적 `salesAction`, immutable handover command history, additive Fulfillment channel/owner schema와 기존 열린 주문의 Coreable operational-owner 인계를 구현한다. 신규 KEEP fallback 활성화는 B-103이 맡는다.
-- [ ] CREATE_NEW는 INACTIVE/contract UNVERIFIED로 만들고 sales-status ACTIVE와 portal 상품 saleability에 B-098 per-supplier effective/expiry 포함 time-valid VERIFIED guard를 연결한다. Terminal/overdue contract는 supplier 권한·paid-work/Claim-grant 접근을 닫고 open work를 Coreable로 인계해야 한다.
-- [ ] `/api/supplier/**` tenant guard와 cookie mutation CSRF/origin 방어를 구현한다.
-- [ ] production 기본 off인 supplier portal feature gate와 개인정보·email·계약 activation guard를 구현하고, flag-off 승인/재발급/초대 dispatch가 mutation 전에 fail closed하는 회귀 테스트를 추가한다.
-- [ ] 신청·초대·권한·타 공급처 접근 회귀 테스트와 UI를 추가한다.
+- [x] 공급처 신청과 관리자 승인/거절을 keyed-HMAC 기반으로 idempotent하게 구현하고, review key/action/mode/대상/reason/result를 durable하게 저장하며, review-time deadline lazy expiry와 미검토 90일 EXPIRED·REJECTED review+90일 비식별화 scheduler를 추가한다.
+- [x] digest만 저장하는 만료·폐기 가능한 1회용 초대와 PENDING_ACTIVATION/no-manager/unverified guard의 allowlisted reason-code 재발급, terminal+30일 recipient/key/HMAC cleanup과 기존 NotificationLog recipient nullable 호환 migration을 구현한다.
+- [x] Kakao 전용 초대 수락과 `/api/supplier/me`를 구현한다.
+- [x] portal 접근 상태와 Supplier 판매 상태를 분리하고 정지·해제·연락 이메일 변경의 명시적 `salesAction`, immutable handover command history, additive Fulfillment channel/owner schema와 기존 열린 주문의 Coreable operational-owner 인계를 구현한다. 신규 KEEP fallback 활성화는 B-103이 맡는다.
+- [x] CREATE_NEW는 INACTIVE/contract UNVERIFIED로 만들고 sales-status ACTIVE와 portal 상품 saleability에 B-098 per-supplier effective/expiry 포함 time-valid VERIFIED guard를 연결한다. Terminal/overdue contract는 supplier 권한·paid-work/Claim-grant 접근을 닫고 open work를 Coreable로 인계해야 한다.
+- [x] `/api/supplier/**` tenant guard와 cookie mutation CSRF/origin 방어를 구현한다.
+- [x] production 기본 off인 supplier portal feature gate와 개인정보·email·계약 activation guard를 구현하고, flag-off 승인/재발급/초대 dispatch가 mutation 전에 fail closed하는 회귀 테스트를 추가한다.
+- [x] 신청·초대·권한·타 공급처 접근 회귀 테스트와 UI를 추가한다.
 
 ### B-101 공급처 개별 상품 등록과 검토 흐름
 

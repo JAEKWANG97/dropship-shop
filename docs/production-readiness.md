@@ -37,7 +37,11 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `EMAIL_SES_REGION` | SES region. 기본값 `ap-northeast-2` |
 | `EMAIL_FROM_ADDRESS` | 문의 답변 발신/회신 주소. 기본값 `contact@coreable-saf.com` |
 | `APP_PUBLIC_BASE_URL` | 문의 조회 링크에 사용하는 공개 웹 origin. 운영값 `https://coreable-saf.com` |
+| `DROPSHIP_WEB_ORIGIN` | Web server action이 B-100 mutation에 보내는 canonical Origin. 운영값은 API CORS allowlist와 같은 `https://coreable-saf.com`; 미설정 시 `APP_PUBLIC_BASE_URL` 사용 |
 | `APP_INQUIRY_LOOKUP_SECRET` | 문의 조회 HMAC secret. 32자 이상 랜덤 값이며 변경 시 기존 조회 링크가 무효화됨 |
+| `APP_SUPPLIER_PORTAL_ENABLED` | 공급처 신청·초대·포털 외부 경로 활성화. Production 기본값은 `false` |
+| `APP_SUPPLIER_PORTAL_HMAC_SECRET` | 공급처 신청·초대 명령 HMAC secret. 32자 이상 랜덤 값이며 실제 값은 커밋하거나 로그에 출력하지 않음 |
+| `APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI` | 공급처 Kakao 연결 성공 후 이동할 frontend URI. 운영값 `https://coreable-saf.com/supplier` |
 | `APP_CORS_ALLOWED_ORIGINS` | 브라우저에서 API 호출을 허용할 origin 목록. 쉼표로 구분 |
 | `APP_INTERNAL_SYNC_TOKEN` | 내부 배송조회 동기화 API 호출용 shared token. 서버/스케줄러에서만 사용 |
 | `APP_AUTH_JWT_SECRET` | JWT access token 서명 secret. 충분히 긴 랜덤 값 사용 |
@@ -50,6 +54,7 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `OAUTH_KAKAO_CLIENT_ID` | Kakao REST API key/client id |
 | `OAUTH_KAKAO_CLIENT_SECRET` | Kakao client secret. Kakao 설정에서 사용하지 않으면 빈 값 가능 |
 | `OAUTH_KAKAO_REDIRECT_URI` | Kakao OAuth redirect URI |
+| `OAUTH_KAKAO_SUPPLIER_REDIRECT_URI` | 공급처 초대 수락 전용 Kakao OAuth redirect URI |
 | `OAUTH_NAVER_CLIENT_ID` | Naver OAuth client id |
 | `OAUTH_NAVER_CLIENT_SECRET` | Naver OAuth client secret |
 | `OAUTH_NAVER_REDIRECT_URI` | Naver OAuth redirect URI |
@@ -64,7 +69,9 @@ SPRING_PROFILES_ACTIVE=prod java -jar build/libs/dropship-shop-api-0.0.1-SNAPSHO
 | `DOMEGGOOK_PURCHASE_USER_PASSWORD` | 일반 Domeggook 구매 계정 비밀번호. 서버에서만 사용 |
 | `DOMEGGOOK_PURCHASE_CLIENT_IP` | Private API에 등록한 고정 client IP |
 
-현재 고객 결제 경로는 계좌입금이며, PG 결제 key는 사용하지 않는다. `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+현재 고객 결제 경로는 계좌입금이며, PG 결제 key는 사용하지 않는다. `SMS_SENS_SECRET_KEY`, `APP_AUTH_JWT_SECRET`, `APP_SUPPLIER_PORTAL_HMAC_SECRET`, `APP_INTERNAL_SYNC_TOKEN`, OAuth client secret, DB password, Linear/GitHub token은 커밋하지 않는다.
+
+`APP_SUPPLIER_PORTAL_ENABLED`는 production에서 `false`를 유지한다. `B-100`~`B-105`, active managed 공급처 신청 개인정보 고지, 실제 초대·운영 email 도착, `B-098`의 공급처별 time-valid contract evidence를 모두 검증한 뒤에만 연다. `B-102` 재고·checkout guard 완료만으로는 이 flag를 켜지 않는다.
 
 `DOMEGGOOK_PURCHASE_ENABLED=true`, `DOMEGGOOK_AUTO_ORDER_ENABLED=false`로 먼저 로그인·상품 검증·자산 조회와 관리자 상태 화면을 확인한다. 최저가 실제 상품의 주문 생성·조회·취소와 e-money 반환까지 확인하기 전에는 자동 주문을 켜지 않는다.
 
@@ -178,6 +185,9 @@ GROUP BY status;
 - `git diff --check`
 - staging 또는 운영 동일 profile에서 `/api/health`, `/actuator/health/readiness`, `/actuator/health/liveness` 확인
 - `DATABASE_*`, `APP_CORS_ALLOWED_ORIGINS`, `APP_AUTH_*`, `OAUTH_*` 설정 확인
+- `APP_SUPPLIER_PORTAL_ENABLED=false`와 `APP_SUPPLIER_PORTAL_HMAC_SECRET` 32자 이상 설정을 값 출력 없이 확인
+- Kakao 개발자 설정에 `OAUTH_KAKAO_SUPPLIER_REDIRECT_URI`를 등록하고 `APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI`를 확인
+- 공급처 포털 활성화 전 `B-100`~`B-105`, active managed 개인정보 고지, 실제 email delivery와 `B-098` contract evidence 검증 완료 확인. `B-102`만으로 활성화하지 않음
 - `SMS_SENS_*` 설정과 SENS 발신번호 승인 상태 확인
 - SES `coreable-saf.com` identity/DKIM과 production access, EC2 role의 제한된 `ses:SendEmail` 권한 확인
 - 실제 문의 답변 이메일 도착, 조회 링크, `FAILED`/`SKIPPED` 재시도 확인

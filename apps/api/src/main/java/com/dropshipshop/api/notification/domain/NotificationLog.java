@@ -39,6 +39,12 @@ public class NotificationLog {
 	@Column(name = "customer_inquiry_id")
 	private UUID customerInquiryId;
 
+	@Column(name = "supplier_id")
+	private UUID supplierId;
+
+	@Column(name = "supplier_invite_id")
+	private UUID supplierInviteId;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 50)
 	private NotificationType type;
@@ -54,8 +60,14 @@ public class NotificationLog {
 	@Column(nullable = false, length = 30)
 	private NotificationStatus status;
 
-	@Column(nullable = false, length = 320)
+	@Column(length = 320)
 	private String recipient;
+
+	@Column(name = "recipient_retention_expires_at")
+	private Instant recipientRetentionExpiresAt;
+
+	@Column(name = "recipient_anonymized_at")
+	private Instant recipientAnonymizedAt;
 
 	@Column(name = "template_key", nullable = false, length = 100)
 	private String templateKey;
@@ -106,6 +118,30 @@ public class NotificationLog {
 		this.payloadSnapshot = payloadSnapshot;
 	}
 
+	public static NotificationLog supplierInvitation(
+		UUID supplierId,
+		UUID supplierInviteId,
+		String recipient,
+		String payloadSnapshot
+	) {
+		NotificationLog log = new NotificationLog(
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			NotificationType.SUPPLIER_INVITATION,
+			NotificationChannel.EMAIL,
+			recipient,
+			"supplier_invitation",
+			payloadSnapshot
+		);
+		log.supplierId = supplierId;
+		log.supplierInviteId = supplierInviteId;
+		return log;
+	}
+
 	@PrePersist
 	void prePersist() {
 		Instant now = Instant.now();
@@ -150,6 +186,14 @@ public class NotificationLog {
 		return customerInquiryId;
 	}
 
+	public UUID getSupplierId() {
+		return supplierId;
+	}
+
+	public UUID getSupplierInviteId() {
+		return supplierInviteId;
+	}
+
 	public NotificationChannel getChannel() {
 		return channel;
 	}
@@ -190,6 +234,14 @@ public class NotificationLog {
 		return updatedAt;
 	}
 
+	public Instant getRecipientRetentionExpiresAt() {
+		return recipientRetentionExpiresAt;
+	}
+
+	public Instant getRecipientAnonymizedAt() {
+		return recipientAnonymizedAt;
+	}
+
 	public void markSent(Instant sentAt) {
 		this.status = NotificationStatus.SENT;
 		this.failureReason = null;
@@ -212,5 +264,15 @@ public class NotificationLog {
 		this.status = NotificationStatus.PENDING;
 		this.failureReason = null;
 		this.sentAt = null;
+	}
+
+	public void scheduleRecipientCleanup(Instant expiresAt) {
+		this.recipientRetentionExpiresAt = expiresAt;
+	}
+
+	public void anonymizeRecipient(Instant now) {
+		this.recipient = null;
+		this.failureReason = null;
+		this.recipientAnonymizedAt = now;
 	}
 }

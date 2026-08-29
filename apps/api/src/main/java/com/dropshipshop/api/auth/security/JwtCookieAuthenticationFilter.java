@@ -3,6 +3,8 @@ package com.dropshipshop.api.auth.security;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +19,7 @@ import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
 import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
+import com.dropshipshop.api.catalog.repository.SupplierRepository;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -29,15 +32,18 @@ class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
 	private final AuthProperties authProperties;
 	private final JwtAccessTokenService jwtAccessTokenService;
 	private final UserAccountRepository userAccountRepository;
+	private final SupplierRepository supplierRepository;
 
 	JwtCookieAuthenticationFilter(
 		AuthProperties authProperties,
 		JwtAccessTokenService jwtAccessTokenService,
-		UserAccountRepository userAccountRepository
+		UserAccountRepository userAccountRepository,
+		SupplierRepository supplierRepository
 	) {
 		this.authProperties = authProperties;
 		this.jwtAccessTokenService = jwtAccessTokenService;
 		this.userAccountRepository = userAccountRepository;
+		this.supplierRepository = supplierRepository;
 	}
 
 	@Override
@@ -72,15 +78,18 @@ class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
 
 	private void authenticate(UserAccount user) {
 		AuthenticatedUser principal = new AuthenticatedUser(user.getId(), user.getRole());
+		List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+		authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+		if (user.getRole() == UserRole.ADMIN) {
+			authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+		}
+		supplierRepository.findByManagerUserId(user.getId())
+			.filter(supplier -> supplier.isPortalAuthorityActive(Instant.now()))
+			.ifPresent(supplier -> authorities.add(new SimpleGrantedAuthority("ROLE_SUPPLIER")));
 		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 			principal,
 			null,
-			user.getRole() == UserRole.ADMIN
-				? List.of(
-					new SimpleGrantedAuthority("ROLE_ADMIN"),
-					new SimpleGrantedAuthority("ROLE_CUSTOMER")
-				)
-				: List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
+			authorities
 		);
 		SecurityContextHolder.getContext().setAuthentication(authentication);
 	}

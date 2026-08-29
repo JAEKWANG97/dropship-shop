@@ -87,6 +87,23 @@ public class NotificationService {
 		return log;
 	}
 
+	public NotificationLog supplierInvitation(
+		UUID supplierId,
+		UUID supplierInviteId,
+		String recipient,
+		java.time.Instant expiresAt,
+		String rawToken
+	) {
+		NotificationLog log = notificationLogRepository.saveAndFlush(NotificationLog.supplierInvitation(
+			supplierId,
+			supplierInviteId,
+			recipient,
+			"supplierInviteId=%s, expiresAt=%s".formatted(supplierInviteId, expiresAt)
+		));
+		eventPublisher.publishEvent(new SupplierInviteDispatchRequested(log.getId(), rawToken));
+		return log;
+	}
+
 	public boolean exists(CustomerOrder order, NotificationType type) {
 		return notificationLogRepository.existsByOrderIdAndType(order.getId(), type);
 	}
@@ -134,6 +151,7 @@ public class NotificationService {
 			case CLAIM_STATUS_CHANGED -> "[코어블SAF] 클레임 처리 상태가 변경되었습니다. 주문상세 확인";
 			case REFUND_COMPLETED -> "[코어블SAF] 환불 완료 처리되었습니다. 주문상세 확인";
 			case CUSTOMER_INQUIRY_ANSWERED -> "[코어블SAF] 고객 문의 답변이 등록되었습니다";
+			case SUPPLIER_INVITATION -> "[코어블SAF] 공급처 포털 초대";
 			case MARKETING -> "[코어블SAF] 안내 메시지입니다";
 		};
 	}

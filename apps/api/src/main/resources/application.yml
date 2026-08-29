@@ -40,6 +40,15 @@ app:
     access-token-ttl-seconds: 7200
     oauth-state-cookie-name: OAUTH2_STATE
     oauth-state-ttl-seconds: 300
+  supplier-portal:
+    enabled: ${APP_SUPPLIER_PORTAL_ENABLED:false}
+    hmac-secret: ${APP_SUPPLIER_PORTAL_HMAC_SECRET:local-supplier-portal-hmac-secret-change-me}
+    invite-ttl-seconds: 604800
+    invite-context-ttl-seconds: 300
+    application-retention-days: 90
+    invite-recipient-retention-days: 30
+    application-rate-limit: 10
+    application-rate-window-seconds: 600
   policies:
     required-terms-version: "2026-08-02"
     required-privacy-version: "2026-08-04"

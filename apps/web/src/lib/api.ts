@@ -13,6 +13,7 @@ export function publicApiUrl(path: string) {
 }
 
 type ApiErrorBody = {
+  code?: unknown;
   message?: unknown;
 };
 
@@ -20,22 +21,25 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly responseMessage = "",
+    public readonly responseCode = "",
   ) {
     super(responseMessage || `API request failed: ${status}`);
   }
 }
 
 async function apiError(response: Response) {
+  let responseCode = "";
   let responseMessage = "";
   if (response.headers.get("content-type")?.includes("application/json")) {
     try {
       const body = (await response.json()) as ApiErrorBody;
+      responseCode = typeof body.code === "string" ? body.code : "";
       responseMessage = typeof body.message === "string" ? body.message : "";
     } catch {
       responseMessage = "";
     }
   }
-  return new ApiError(response.status, responseMessage);
+  return new ApiError(response.status, responseMessage, responseCode);
 }
 
 export async function apiGet<T>(path: string) {

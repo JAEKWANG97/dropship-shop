@@ -90,7 +90,7 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 - Fulfillment/Shipment: admin supplier actions, shipment entry, tracking sync, shipment correction.
 - Refund/Claim: customer claim submission and admin review/refund execution.
 - Policy Pages: public policy, business disclosure, privacy processing table, admin policy management.
-- Supplier Portal (Planned B-100 through B-105): public application, one-time Kakao invitation, own catalog/inventory, paid fulfillment, tracking, and requested claim facts.
+- Supplier Portal: B-100 public application, one-time Kakao invitation, lifecycle and tenant session are implemented; B-101 through B-105 catalog/inventory, paid fulfillment, tracking, and requested claim facts remain planned.
 
 ## Implemented Endpoints
 
@@ -217,28 +217,28 @@ PATCH /api/me/addresses/{addressId}
 
 ## Supplier Portal APIs
 
-Status: Planned (`B-100` through `B-105`). No endpoint in this section is implemented. Existing customer/admin endpoints and their legacy response shapes remain unchanged until the owning slice documents and ships a compatible extension.
+Status: `B-100` onboarding, lifecycle, Kakao activation and tenant/session endpoints are Implemented. The `B-098` contract-evidence endpoint and `B-101` through `B-105` endpoints remain Planned. Existing customer/admin legacy response shapes remain compatible.
 
-### Application, Approval, Invitation, And Session (Planned B-100)
+### Application, Approval, Invitation, And Session (Implemented B-100)
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/policies/SUPPLIER_APPLICATION_PRIVACY/current` | Public | Planned B-100 | Read the active supplier-application privacy notice and canonical version before consent |
-| `POST` | `/api/supplier-applications` | Public + allowed origin | Planned B-100 | Submit the minimum supplier/contact application with privacy consent evidence |
-| `GET` | `/api/admin/supplier-applications` | `ADMIN` | Planned B-100 | Paginated review queue by application status |
-| `GET` | `/api/admin/supplier-applications/{applicationId}` | `ADMIN` | Planned B-100 | Review one application and its consent/audit metadata |
-| `POST` | `/api/admin/supplier-applications/{applicationId}/approve` | `ADMIN` | Planned B-100 | Idempotently create one pending portal supplier and invitation |
-| `POST` | `/api/admin/supplier-applications/{applicationId}/reject` | `ADMIN` | Planned B-100 | Reject with required reason and set 90-day anonymization deadline |
-| `POST` | `/api/admin/suppliers/{supplierId}/invite/reissue` | `ADMIN` | Planned B-100 | Revoke the open invitation and send one replacement |
-| `PATCH` | `/api/admin/suppliers/{supplierId}/portal-status` | `ADMIN` | Planned B-100 | Suspend/reactivate portal; require an explicit independent sales action |
-| `PATCH` | `/api/admin/suppliers/{supplierId}/sales-status` | `ADMIN` | Planned B-100 | Explicitly pause or resume the independent supplier trade/catalog status |
+| `GET` | `/api/policies/SUPPLIER_APPLICATION_PRIVACY/current` | Public | Implemented B-100 | Read the active supplier-application privacy notice and canonical version before consent |
+| `POST` | `/api/supplier-applications` | Public + allowed origin | Implemented B-100 | Submit the minimum supplier/contact application with privacy consent evidence |
+| `GET` | `/api/admin/supplier-applications` | `ADMIN` | Implemented B-100 | Paginated review queue by application status |
+| `GET` | `/api/admin/supplier-applications/{applicationId}` | `ADMIN` | Implemented B-100 | Review one application and its consent/audit metadata |
+| `POST` | `/api/admin/supplier-applications/{applicationId}/approve` | `ADMIN` | Implemented B-100 | Idempotently create one pending portal supplier and invitation |
+| `POST` | `/api/admin/supplier-applications/{applicationId}/reject` | `ADMIN` | Implemented B-100 | Reject with required reason and set 90-day anonymization deadline |
+| `POST` | `/api/admin/suppliers/{supplierId}/invite/reissue` | `ADMIN` | Implemented B-100 | Revoke the open invitation and send one replacement |
+| `PATCH` | `/api/admin/suppliers/{supplierId}/portal-status` | `ADMIN` | Implemented B-100 | Suspend/reactivate portal; require an explicit independent sales action |
+| `PATCH` | `/api/admin/suppliers/{supplierId}/sales-status` | `ADMIN` | Implemented B-100 | Explicitly pause or resume the independent supplier trade/catalog status |
 | `POST` | `/api/admin/suppliers/{supplierId}/portal-contract-status` | `ADMIN` | Planned B-098 | Record verified/expired/revoked per-supplier portal contract evidence before sales activation |
-| `POST` | `/api/admin/suppliers/{supplierId}/manager-disconnect` | `ADMIN` | Planned B-100 | Remove the manager link, revoke open invite, and remove supplier authority |
-| `PATCH` | `/api/admin/suppliers/{supplierId}/contact-email` | `ADMIN` | Planned B-100 | Replace contact email, disconnect manager, revoke invite, and require reverification |
-| `POST` | `/api/supplier-invites/session` | Public + allowed origin | Planned B-100 | Validate fragment token and issue short-lived HttpOnly invite context; do not consume yet |
-| `GET` | `/api/supplier/auth/kakao/authorize` | Valid invite context | Planned B-100 | Start Kakao-only OAuth with state bound to the invite context |
-| `GET` | `/api/supplier/auth/kakao/callback` | Valid invite context + OAuth state | Planned B-100 | Atomically bind the Kakao user, activate portal, verify contact email, and consume invite |
-| `GET` | `/api/supplier/me` | `ROLE_SUPPLIER` | Planned B-100 | Return current supplier tenant and portal status without customer/admin data |
+| `POST` | `/api/admin/suppliers/{supplierId}/manager-disconnect` | `ADMIN` | Implemented B-100 | Remove the manager link, revoke open invite, and remove supplier authority |
+| `PATCH` | `/api/admin/suppliers/{supplierId}/contact-email` | `ADMIN` | Implemented B-100 | Replace contact email, disconnect manager, revoke invite, and require reverification |
+| `POST` | `/api/supplier-invites/session` | Public + allowed origin | Implemented B-100 | Validate fragment token and issue short-lived HttpOnly invite context; do not consume yet |
+| `GET` | `/api/supplier/auth/kakao/authorize` | Valid invite context | Implemented B-100 | Start Kakao-only OAuth with state bound to the invite context |
+| `GET` | `/api/supplier/auth/kakao/callback` | Valid invite context + OAuth state | Implemented B-100 | Atomically bind the Kakao user, activate portal, verify contact email, and consume invite |
+| `GET` | `/api/supplier/me` | `ROLE_SUPPLIER` | Implemented B-100 | Return current supplier tenant and portal status without customer/admin data |
 
 Application request:
 
@@ -371,7 +371,7 @@ B-100 rules:
 - Invitation is the only email allowed before contact verification and contains only the token/link plus generic connection instructions. Approval and invitation persistence do not roll back when email delivery fails. Stored notification subject/body/payload contain only token-free invite metadata; the raw fragment link exists only in ephemeral after-commit sending context. A failed/lost invitation is not generically retried because the token cannot be reconstructed and instead requires a new-key revoke/reissue; later token-free operational emails remain retryable.
 - Invite recipient email and its linked notification recipient are nulled 30 days after consumed, revoked, or expired state; audit keeps only invite id, digest, terminal timestamps, template/delivery state, and actor evidence. Supplier operational contact PII lives only in the Supplier record while needed. Before production activation, B-098 and the managed privacy notice must supply a concrete post-relationship retention duration; permanent portal disable plus inactive trade and no open fulfillment/claim/refund sets that cleanup deadline. At the deadline the scheduler locks the Supplier and rechecks every lifecycle/open-work predicate; new open work clears or defers the deadline, and only continuing eligibility permits contact cleanup.
 - Invite `consumedByUserId` plus catalog/inventory/lifecycle supplier actor FKs are nulled at that relationship deadline. Shipment/shortage/claim supplier actor FKs follow their parent Order/Claim legal-retention deadline, then are nulled or removed with the parent. Non-PII event evidence may remain; supplier PII access logs instead delete after one year.
-- Invite reissue requires `Idempotency-Key` and one allowlisted `reasonCode`: `DELIVERY_FAILED`, `INVITE_EXPIRED`, `RECIPIENT_CHANGED`, or `ADMIN_REISSUE`. It accepts no free text. After scoped key/hash replay lookup, a new command locks Supplier and requires `portalStatus=PENDING_ACTIVATION`, `managerUserId=null`, a non-null current contact email, and `contactEmailVerifiedAt=null`; ACTIVE, SUSPENDED, terminal DISABLED, or manager-bound suppliers return `409 INVITE_REISSUE_NOT_ALLOWED`. Contact replacement first establishes that pending/unverified state in its lifecycle transaction. An identical retry returns the existing invite metadata without revoking it or sending another message, while a reused key with a different request returns `409`. A confirmed delivery failure is recovered with an explicitly new reissue key, which revokes the failed invite and creates one replacement rather than trying to recover the raw token.
+- Invite reissue requires `Idempotency-Key` and one allowlisted `reasonCode`: `DELIVERY_FAILED`, `INVITE_EXPIRED`, `RECIPIENT_CHANGED`, or `ADMIN_REISSUE`. It accepts no free text. The command key/result remains the external idempotency contract, while the created invite uses a separate `reissue:` server-HMAC issuance namespace so it cannot collide with an `application:` approval invite. After scoped key/hash replay lookup, a new command locks Supplier and requires `portalStatus=PENDING_ACTIVATION`, `managerUserId=null`, a non-null current contact email, and `contactEmailVerifiedAt=null`; ACTIVE, SUSPENDED, terminal DISABLED, or manager-bound suppliers return `409 INVITE_REISSUE_NOT_ALLOWED`. Contact replacement first establishes that pending/unverified state in its lifecycle transaction. An identical retry returns the existing invite metadata without revoking it or sending another message, while a reused key with a different request returns `409`. A confirmed delivery failure is recovered with an explicitly new reissue key, which revokes the failed invite and creates one replacement rather than trying to recover the raw token.
 - Invite activation failures use a safe allowlist: `INVITE_INVALID`, `INVITE_EXPIRED`, `INVITE_ALREADY_USED`, `INVITE_REVOKED`, `MANAGER_ALREADY_LINKED`, and `ACCOUNT_ALREADY_LINKED`. `/supplier/activate` shows no supplier/account existence detail and offers only `초대 링크를 다시 확인해 주세요` or `Coreable에 새 초대를 요청해 주세요`; retry is shown only for transient OAuth failures.
 - `sales-status` locks the Supplier, requires `Idempotency-Key` and a PII-free reason, and accepts only `ACTIVE|INACTIVE`. Activating a portal-enrolled supplier requires time-valid VERIFIED evidence (`effectiveAt <= now`, no expiry or `now < expiresAt`) and first lazily expires overdue evidence; otherwise it returns `409 CONTRACT_NOT_VERIFIED`. It never changes portal status, manager, invite, or handed-over ownership. With ACTIVE sales but unavailable portal access, later paid work uses `COREABLE_MANUAL`; resumption never hands earlier work back.
 - B-100 owns the denormalized contract-status columns/default UNVERIFIED and makes sales activation fail closed; B-098 owns immutable command/history, expiry index, evidence, and scheduler. Every command carries `expectedCurrentContractVersion` and locks Supplier. VERIFIED requires the expected value (including null initially) to match, a unique new `contractVersion`, valid effective/expiry times, evidence, reason, and key. EXPIRED/REVOKED require current status VERIFIED and the matching non-null target version; only one terminal event is allowed per version. Scheduler rechecks candidate status/version/expiry after locking and no-ops if terminal processing or re-verification won. Current means VERIFIED with `effectiveAt <= now` and no expiry or `now < expiresAt`. A terminal command or lazy expiry atomically makes sales INACTIVE, changes an ACTIVE portal to SUSPENDED while retaining the manager, revokes any open invite, and hands every still-SUPPLIER-owned open portal Fulfillment to COREABLE with `CONTRACT_EXPIRED|CONTRACT_REVOKED` evidence. PENDING_ACTIVATION remains non-authorized but loses its open invite. The same time-valid check directly guards paid-work list/detail/mutations and Claim-grant access so scheduler lag cannot expose PII. Re-verification uses a new version/key but never reactivates portal/sales or restores handed-over ownership; explicit guarded admin commands are required. Documents/secrets are never exposed.
@@ -1043,9 +1043,9 @@ B-105 rules:
 - Supplier cannot approve/reject a claim, read customer claim content, change Order/Claim/Refund status, or execute/refund payment.
 - Coreable ADMIN keeps all CS, cancellation, return/exchange decision, refund approval, and manual bank-transfer completion authority through existing admin flows.
 
-### Supplier Tenant And Browser Security Contract (Planned B-100)
+### Supplier Tenant And Browser Security Contract (Implemented B-100)
 
-- Production defaults `APP_SUPPLIER_PORTAL_ENABLED=false`. While false, public application, invite exchange/auth callback and `/api/supplier/**` return `404`. After ADMIN/resource scope and stored idempotency replay lookup, a new application approval, invite reissue, or contact-email workflow step that would issue a replacement invite fails before mutation with `409 SUPPLIER_PORTAL_NOT_RELEASED`; an identical completed-command replay may return its token-free stored result but never redispatches. Application rejection, contract-evidence administration, supplier suspension/disable, retention cleanup, existing admin order takeover, and legacy customer/admin APIs remain available. Invitation dispatch rechecks the flag immediately before sending and marks the attempt `SKIPPED/PORTAL_NOT_RELEASED`, so a stale after-commit job cannot leak an activation link while the gate is closed; recovery after reopening requires a new-key reissue. B-102 is only a necessary catalog/inventory prerequisite: the flag remains false until B-100 through B-105, privacy/email/contract gates, and their required tests are all ready. After the global flag opens, every portal-product public/read/checkout guard still requires that specific supplier's `Supplier.status=ACTIVE` and time-valid VERIFIED evidence (`effectiveAt <= now` and no expiry or `now < expiresAt`); a newly approved or expired/revoked supplier cannot sell merely because the global gate is on.
+- Production defaults `APP_SUPPLIER_PORTAL_ENABLED=false`. While false, public application, invite exchange/auth callback and `/api/supplier/**` return `404`. After ADMIN/resource scope and stored idempotency replay lookup, a new application approval, invite reissue, or contact-email workflow step that would issue a replacement invite fails before mutation with `409 SUPPLIER_PORTAL_NOT_RELEASED`; an identical completed-command replay may return its token-free stored result but never redispatches. Application rejection, supplier suspension/disable, retention cleanup, existing admin order takeover, and legacy customer/admin APIs remain available; the Planned B-098 contract-evidence administration will also remain outside this release gate when implemented. Invitation dispatch rechecks the flag immediately before sending and marks the attempt `SKIPPED/PORTAL_NOT_RELEASED`, so a stale after-commit job cannot leak an activation link while the gate is closed; recovery after reopening requires a new-key reissue. B-102 is only a necessary catalog/inventory prerequisite: the flag remains false until B-100 through B-105, privacy/email/contract gates, and their required tests are all ready. After the global flag opens, every portal-product public/read/checkout guard still requires that specific supplier's `Supplier.status=ACTIVE` and time-valid VERIFIED evidence (`effectiveAt <= now` and no expiry or `now < expiresAt`); a newly approved or expired/revoked supplier cannot sell merely because the global gate is on.
 - `/api/supplier/**` requires dynamic `ROLE_SUPPLIER` from an active user, active portal status and manager link, and rejects terminal or already-overdue VERIFIED contract state before resolving one current supplier. Initial UNVERIFIED onboarding remains limited to non-PII catalog work. Independent `Supplier.status` gates new sales/checkouts but not already-paid fulfillment while the contract is time-valid; paid-work services recheck time-valid VERIFIED explicitly. Every repository lookup contains both resource identifier and resolved supplier id.
 - A missing supplier role returns `403`. An id/order number belonging to another supplier returns `404` to avoid existence disclosure.
 - UUID/order-number unguessability is not authorization. Payload `supplierId`, product ownership, image storage owner, order supplier, shipment item order, and claim order are always server-verified.
@@ -1054,11 +1054,11 @@ B-105 rules:
 - Access and invite-context cookies are `HttpOnly` and `SameSite=Lax`; production cookies require `Secure` and HTTPS. OAuth callback additionally requires the existing one-time state check bound to invite context.
 - Raw invite tokens, applicant/supplier contact PII, customer PII, PII-bearing idempotency keys/HMACs, email bodies, supplier costs, and internal/admin memo must not be written to request/application logs.
 
-### Planned Web Client Surface
+### Web Client Surface (`B-100` Implemented, Later Slices Planned)
 
-- Public: `/supplier/apply`, `/supplier/activate`
-- Supplier: `/supplier`, `/supplier/products`, `/supplier/products/new`, `/supplier/products/{productId}`, `/supplier/orders`, `/supplier/orders/{orderNumber}`, `/supplier/claim-tasks`, `/supplier/claim-tasks/{taskId}`
-- Admin: `/admin/supplier-applications`, `/admin/supplier-applications/{applicationId}`, `/admin/suppliers`, `/admin/suppliers/{supplierId}`, `/admin/product-reviews`; supplier task create/read/close stays inside the existing admin Claim detail surface
+- Public, Implemented B-100: `/supplier/apply`, `/supplier/activate`
+- Supplier, Implemented B-100: `/supplier`; Planned B-101/B-103/B-105: `/supplier/products`, `/supplier/products/new`, `/supplier/products/{productId}`, `/supplier/orders`, `/supplier/orders/{orderNumber}`, `/supplier/claim-tasks`, `/supplier/claim-tasks/{taskId}`
+- Admin, Implemented B-100: `/admin/supplier-applications`, `/admin/supplier-applications/{applicationId}`, `/admin/suppliers`, `/admin/suppliers/{supplierId}`; Planned B-101/B-105: `/admin/product-reviews` and supplier task create/read/close inside the existing admin Claim detail surface
 - Supplier routes use `/api/supplier/me` as their session/tenant gate and never accept supplier id from URL/query/client state.
 - Supplier order detail must use uncached server/client fetching and avoid embedding PII in static HTML, page metadata, analytics, email, or browser-persistent storage.
 
@@ -1451,7 +1451,7 @@ Rules:
 | `GET` | `/api/admin/orders/{orderId}/status-history` | `ADMIN` | Implemented | Order status transition history |
 | `GET` | `/api/admin/actions?orderId={orderId}` | `ADMIN` | Implemented | Admin order action history, optionally filtered to one order |
 | `GET` | `/api/admin/notifications?status=FAILED` | `ADMIN` | Implemented | Notification log search, optionally filtered by status |
-| `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Implemented; supplier guard planned B-100/B-103 | Retry an eligible failed/skipped legacy notification; supplier rows use stricter rules below |
+| `POST` | `/api/admin/notifications/{notificationId}/retry` | `ADMIN` | Implemented; invite guard implemented B-100, operational guard planned B-103 | Retry an eligible failed/skipped legacy notification; supplier rows use stricter rules below |
 | `POST` | `/api/admin/orders/{orderId}/delay-notice` | `ADMIN` | Implemented | Send manual supplier delay notice before shipment |
 
 Rules:
@@ -1461,7 +1461,7 @@ Rules:
 - B-011 sends transactional notifications through SMS first. Logs start as `PENDING` and become `SENT`, `FAILED`, or `SKIPPED`.
 - `sms.sens.enabled=false` is the default safe fallback and records logs as `SKIPPED`.
 - DS-44 exposes order status history and admin order action history read APIs.
-- B-100/B-103 preserve this route for legacy notifications but add fail-closed supplier guards. Any `supplierInviteId` row always rejects generic retry because its raw token/link is not stored; recovery uses a new-key invite reissue. A supplier operational row is retryable only from `FAILED`, before `createdAt + 7 days`, with non-null recipient, and only after the normal current ACTIVE portal/manager/time-valid-contract/verified-email/recipient recheck. `SKIPPED`, `SENT`, recipient-null, expired-retry-window, and lifecycle/contract-mismatched supplier rows are terminal and return `409 SUPPLIER_NOTIFICATION_RETRY_NOT_ALLOWED`; they are never revived by later recovery.
+- B-100 preserves this route for legacy notifications and implements the fail-closed invite guard: any `supplierInviteId` row rejects generic retry because its raw token/link is not stored, so recovery uses a new-key invite reissue. Planned B-103 permits an operational supplier row only from `FAILED`, before `createdAt + 7 days`, with non-null recipient and after the current ACTIVE portal/manager/time-valid-contract/verified-email/recipient recheck. `SKIPPED`, `SENT`, recipient-null, expired-retry-window and lifecycle/contract-mismatched supplier rows remain terminal.
 
 ## DS-6 Catalog Request And Response Expectations
 

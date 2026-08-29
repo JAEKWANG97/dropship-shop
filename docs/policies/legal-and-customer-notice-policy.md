@@ -114,12 +114,12 @@ Status: Planned (B-102). The current public policy and memo-only operation remai
 - 입금자명, 은행 거래 식별값, 관리자 사유와 환불 계좌·이체 증적은 고객·공급처·알림 payload에 복제하지 않는다. 공급처에는 해당 주문, 예외와 환불 존재 자체를 노출하지 않는다.
 - B-102 production 전환 전에 managed 공개 정책의 새 시행 버전, checkout/주문 표시와 동의 snapshot을 함께 검증한다.
 
-## Supplier Portal Privacy And Notice — Planned (B-100, B-103, B-105)
+## Supplier Portal Privacy And Notice — B-100 Handling Implemented, Later Notices Planned
 
-Status: Planned (B-100, B-103, B-105). The current `2026-08-04` privacy version and Domeggook provision remain the implemented legacy disclosure until a new effective version is verified.
+Status: B-100 exact-version consent handling and application/invite retention are Implemented. The active supplier notice row, external-supplier disclosure, real email delivery, B-098 relationship cleanup and B-103/B-105 privacy surfaces remain unverified or Planned. The current `2026-08-04` privacy version and Domeggook provision remain the production disclosure until a new effective version is verified.
 
-- 공개 공급처 신청은 필수 담당자 이름·연락 이메일과 선택 전화번호 등 신청 심사에 필요한 연락처 PII를 받기 전에 별도 managed `SUPPLIER_APPLICATION_PRIVACY` 필수 동의를 받아야 한다. 서버는 active exact version을 검증하고 canonical 동의시각을 저장한다. Planned in B-100.
-- 정규화 연락 이메일별 non-expired `SUBMITTED` 또는 `APPROVED` 신청은 합쳐서 하나만 허용한다. 새 submit은 같은 이메일의 overdue SUBMITTED를 lock 아래 EXPIRED·비식별화한 뒤 중복을 판단한다. 사업자 식별번호는 이 신청 범위에서 수집하지 않으므로 “동일 사업자”를 자동 판정한다고 주장하지 않는다. 미검토 신청은 생성 90일 뒤 EXPIRED·비식별화하고, 거절 신청 원문 PII는 거절 90일 뒤 비식별화한다. 승인 신청 연락은 Supplier 운영 기록이 되며 B-098/privacy notice가 정한 관계 종료 기한에 Supplier와 application 중복 PII를 함께 정리한다. Planned in B-100/B-098.
+- 공개 공급처 신청은 필수 담당자 이름·연락 이메일과 선택 전화번호 등 신청 심사에 필요한 연락처 PII를 받기 전에 별도 managed `SUPPLIER_APPLICATION_PRIVACY` 필수 동의를 받아야 한다. 서버의 active exact-version 검증과 canonical 동의시각 저장은 B-100에서 구현됐다; production용 active 문서 내용과 시행은 별도 검증 gate다.
+- 정규화 연락 이메일별 non-expired `SUBMITTED` 또는 `APPROVED` 신청은 합쳐서 하나만 허용한다. 새 submit은 같은 이메일의 overdue SUBMITTED를 lock 아래 EXPIRED·비식별화한 뒤 중복을 판단한다. 사업자 식별번호는 이 신청 범위에서 수집하지 않으므로 “동일 사업자”를 자동 판정한다고 주장하지 않는다. 미검토 신청과 거절 신청의 90일 cleanup은 B-100에서 구현됐다. 승인 신청 연락의 Supplier 관계 종료 cleanup은 B-098/privacy notice가 기한을 정한 뒤 구현할 Planned 범위다.
 - 기존 도매꾹 주문 이행을 위한 제3자 제공 문구는 legacy 흐름에 한정한다. 공급처 포털을 production에서 활성화하기 전 새 개인정보처리방침 시행 버전에 외부 공급처와 택배사에 대한 제공받는 자, 목적, 항목, 보유·이용기간을 구분해 반영하고 실제 공개·동의 동작을 검증한다.
 - 공급처 주문 목록에는 고객 PII를 제공하지 않는다. 공급처 주문 상세는 인증된 본인 공급처의 입금확인 완료 주문에 한해 수령인 이름, 수령인 전화번호, 우편번호, 주소1, 주소2와 배송 메모만 제공한다.
 - 공급처에는 고객 이메일, 회원 식별자·프로필, 결제·입금·은행·금액 정보, 환불 계좌·실행 정보, 관리자 메모와 다른 공급처 정보를 제공하지 않는다. 주문 이행 최소 PII도 time-valid VERIFIED contract가 있을 때만 제공하고 EXPIRED/REVOKED 시 open work를 Coreable로 인계해 즉시 접근을 닫는다.
@@ -131,11 +131,11 @@ Status: Planned (B-100, B-103, B-105). The current `2026-08-04` privacy version 
 - 최초 초대는 아직 검증되지 않은 신청 이메일로 보내는 1회성 연락처 검증 메일이며 token과 일반 안내만 포함한다. 그 외 공급처 이메일 알림은 검증된 연락 이메일로만 보내고 제목, 본문과 payload snapshot에 고객 이름, 전화번호, 주소, 배송 메모, 결제 또는 환불 정보를 포함하지 않는다.
 - 초대 recipient와 issuance key/HMAC, 연결된 notification recipient는 소비·폐기·만료 30일 뒤 null 처리한다. 일반 공급처 운영 email은 최초 7일 동안만 retry할 수 있고 SENT/SKIPPED 또는 retry 종료 30일 뒤 recipient를 null 처리하며 비PII event/template/delivery audit만 보존한다.
 - Invite 소비자와 catalog/inventory/lifecycle의 supplier actor 식별자는 B-098 관계 종료 보관기한까지만, Shipment/shortage/claim supplier actor 식별자는 parent Order/Claim 법정 보존기한까지만 유지한 뒤 FK를 null 처리하거나 parent와 함께 파기한다. 비PII action/state/time 증적은 원장 보존 규칙에 따라 남기고 PII access log는 1년 뒤 row 자체를 삭제한다.
-- 실제 초대·운영 이메일 delivery와 새 개인정보처리방침 시행 버전의 공개·동의·제3자 제공 내용을 검증하기 전에는 production supplier activation을 차단한다. Planned in B-100 and B-103.
+- 실제 초대·운영 이메일 delivery와 새 개인정보처리방침 시행 버전의 공개·동의·제3자 제공 내용을 검증하기 전에는 production supplier activation을 차단한다. B-100 구현 뒤에도 이 gate는 열지 않는다.
 
-### Planned System Impact
+### Mixed Implementation Status
 
-- B-100 공개 신청 API는 필수 연락처 개인정보 동의 버전·시각, 중복 방지와 거절 후 90일 비식별화를 함께 구현해야 한다.
+- B-100 공개 신청 API는 필수 연락처 개인정보 동의 버전·시각, 중복 방지와 거절 후 90일 비식별화를 함께 구현했다.
 - B-103 공급처 주문 API는 목록과 상세의 PII 범위를 분리하고 tenant, 기간, claim grant, masking, cache와 최소 접근 로그를 서버에서 검증해야 한다.
 - B-103 이메일 발송은 검증된 supplier contact만 대상으로 삼고 PII 없는 template과 payload를 사용해야 한다.
 - B-105 claim fact는 개인정보 접근 재개 사유가 아니며, 승인된 Claim에 대한 별도 Coreable grant가 있을 때만 접근기간을 연장할 수 있다.

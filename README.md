@@ -41,15 +41,15 @@
 - 송장번호 입력
 - 취소/환불 처리
 
-### Supplier Portal — Planned (`B-100`~`B-105`)
+### Supplier Portal — `B-100` Implemented, `B-101`~`B-105` Planned
 
-- 공개 신청을 Coreable이 승인한 공급처만 이메일 초대와 Kakao 로그인으로 담당자 1명을 연결한다.
+- 공개 신청, Coreable 승인/거절, 1회용 이메일 초대, Kakao 담당자 연결과 포털 기본 화면은 `B-100`에서 구현했다.
 - 공급처는 자기 상품을 개별 등록하고 공급가와 `TRACKED`/`UNTRACKED` 옵션 재고를 관리한다. 고객 판매가와 최종 판매 통제는 Coreable이 유지한다.
 - 일반 유효상품은 자동 공개하고 인증·카테고리·법정 필수정보 위험만 Coreable이 검토한다.
 - 입금확인 완료 주문은 공급처 수락 단계 없이 즉시 출고 요청으로 보이며, 공급처는 기한이 제한된 최소 배송정보만 조회한다.
 - 공급처는 복수 송장과 수량 할당, 송장 전 주문 전체 품절, Coreable이 요청한 클레임 사실만 입력한다. 결제·환불·CS·클레임 결정과 정산은 제공하지 않는다.
 
-상세 Planned 계약과 기존 동작의 호환 경계는 [Supplier Portal Design](docs/supplier-portal-design.md)을 기준으로 한다.
+`B-101`~`B-105` 상세 Planned 계약과 기존 동작의 호환 경계는 [Supplier Portal Design](docs/supplier-portal-design.md)을 기준으로 한다. Production 포털은 active 공급처 신청 개인정보 고지, 실제 이메일 delivery, `B-098` 계약 증적과 `B-101`~`B-105` gate를 검증할 때까지 기본 `off`다.
 
 ## Non-Goals For MVP
 

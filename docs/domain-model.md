@@ -779,7 +779,7 @@ Implemented B-011 scope:
 - `sms.sens.enabled=false` records transactional SMS as `SKIPPED` instead of pretending to send.
 - Implemented triggers include payment pending bank-transfer 안내, payment completed, out-of-stock, shipment started, delivery completed, manual delay notice, claim status changed, and refund completed.
 - Order-related notifications use the order recipient phone number, not the account phone number.
-- Admin can list notification logs with `GET /api/admin/notifications?status=...` and currently retry failed or skipped legacy logs with `POST /api/admin/notifications/{notificationId}/retry`. Planned B-100/B-103 rejects every invite-linked generic retry, and permits supplier operational retry only for FAILED, non-null-recipient rows before creation+7 days after current portal/manager/time-valid-contract/verified-email/recipient revalidation. Supplier SKIPPED/SENT, recipient-null, expired-window, or lifecycle/contract-mismatch rows are terminal even if the relationship later recovers.
+- Admin can list notification logs with `GET /api/admin/notifications?status=...` and currently retry failed or skipped legacy logs with `POST /api/admin/notifications/{notificationId}/retry`. Implemented B-100 rejects every invite-linked generic retry. Planned B-103 permits supplier operational retry only for FAILED, non-null-recipient rows before creation+7 days after current portal/manager/time-valid-contract/verified-email/recipient revalidation; supplier SKIPPED/SENT, recipient-null, expired-window or lifecycle/contract-mismatch rows remain terminal even if the relationship later recovers.
 
 ## OrderStatusHistory
 
@@ -873,7 +873,7 @@ Implemented DS-41 scope:
 - Public APIs expose the current active policy and specific versions.
 - updatedAt
 
-Planned B-100 extends the managed type enum with `SUPPLIER_APPLICATION_PRIVACY`. Public supplier application submit validates the exact current ACTIVE version server-side; this planned notice is separate from the currently implemented customer privacy policy.
+B-100 implements the managed type `SUPPLIER_APPLICATION_PRIVACY` and exact-current-ACTIVE-version validation on public supplier application submit. Production still requires an active reviewed notice row; this notice remains separate from the customer privacy policy.
 
 ## BusinessProfile
 
@@ -1194,17 +1194,18 @@ Rules:
 
 ## Supplier Portal Extension
 
-Status: Planned (`B-100` through `B-105`).
+Status: `B-100` onboarding, lifecycle, application/invite retention, browser security and V39 additive schema are Implemented. `B-098` contract evidence/expiry automation and relationship cleanup plus `B-101` through `B-105` remain Planned.
 
-이 절의 모델은 아직 구현되지 않았다. 위의 기존 `Implemented` 필드와 legacy 주문·배송 의미는 그대로 유지하고, 공급처 포털 구현에서 expand-contract 방식으로 추가한다.
+`B-100`은 기존 legacy 주문·배송 의미를 유지한 expand-contract 변경이다. 이후 slice도 같은 호환 경계를 따른다.
 
-### Supplier Manager Authority (Planned B-100)
+### Supplier Manager Authority (Implemented B-100)
 
 `User.role`의 저장 값은 계속 `CUSTOMER` / `ADMIN`만 사용한다. 공급처 권한은 별도 저장 role이나 다인원 membership이 아니라 현재 활성 연결에서 파생한다.
 
-Planned `Supplier` fields:
+Implemented `Supplier` fields (V39):
 
 - managerUserId: nullable unique FK to `User`
+- portalEnrolledAt: nullable immutable first-enrollment marker; legacy backfill remains null
 - portalStatus: DISABLED / PENDING_ACTIVATION / ACTIVE / SUSPENDED
 - contactEmailVerifiedAt
 - portalContractStatus: UNVERIFIED / VERIFIED / EXPIRED / REVOKED
@@ -1218,7 +1219,7 @@ Planned `Supplier` fields:
 
 Rules:
 
-- 기존 공급처는 `portalStatus=DISABLED`로 backfill하고 기존 `Supplier.status`의 `ACTIVE` / `INACTIVE` 거래·catalog 의미를 바꾸지 않는다.
+- 기존 공급처는 `portalStatus=DISABLED`, `portalEnrolledAt=null`로 backfill하고 기존 `Supplier.status`의 `ACTIVE` / `INACTIVE` 거래·catalog 의미를 바꾸지 않는다. 승인으로 한 번 포털에 들어간 Supplier는 영구 DISABLED 뒤에도 marker를 보존해 legacy PATCH나 계약 없는 sales 재개 경로로 돌아가지 않는다.
 - 한 공급처는 담당자 한 명만, 한 사용자는 공급처 한 곳만 관리한다. `managerUserId`의 nullable unique 제약으로 양방향 1:1을 보장한다.
 - `ROLE_SUPPLIER`는 활성 사용자, `portalStatus=ACTIVE`와 manager 연결이 모두 유효할 때 요청 시점에 파생한다. Terminal 또는 already-overdue VERIFIED contract는 즉시 권한을 막고 최초 UNVERIFIED onboarding은 비PII catalog 작업만 허용한다. `Supplier.status`는 신규 판매·checkout만 막는 독립 gate이므로 `INACTIVE`여도 time-valid contract가 있을 때만 이미 입금확인된 주문을 계속 처리할 수 있다.
 - 기존 CUSTOMER 또는 ADMIN 계정이 담당자가 되어도 저장 role과 기존 권한을 잃지 않는다.
@@ -1231,7 +1232,7 @@ Rules:
 - 신규 CREATE_NEW Supplier는 `status=INACTIVE`, `portalContractStatus=UNVERIFIED`로 시작한다. B-100은 denormalized contract columns/default와 fail-closed sales guard를 소유하고, B-098은 history/command/evidence/expiry index와 scheduler를 소유한다. B-098이 supplier-unique version의 current evidence를 `VERIFIED`로 기록한 뒤에만 sales-status ACTIVE를 허용한다. Current는 `effectiveAt <= now`이고 expiresAt이 없거나 `now < expiresAt`인 경우다. Sales activation과 checkout은 Supplier를 잠그고 overdue VERIFIED를 lazy EXPIRED로 바꾼 뒤 아래 terminal routine을 실행해 scheduler 지연 판매와 PII 접근을 막는다. Global flag가 열린 뒤에도 portal 상품 public query/checkout은 supplier ACTIVE와 time-valid VERIFIED를 모두 재검증한다.
 - Supplier 운영 연락 PII는 관계 이행 중에만 유지한다. Production 전 B-098/privacy notice가 post-relationship duration을 확정해야 하며, 영구 portal DISABLED + trade INACTIVE + open fulfillment/Claim/Refund 없음이 모두 성립하면 `contactRetentionExpiresAt`을 계산한다. 기한 뒤 scheduler는 Supplier를 잠그고 같은 lifecycle/open-work 조건을 다시 확인한다. 새 open work가 있으면 deadline을 clear/defer하고, 모두 여전히 참일 때만 Supplier contact name/phone/email/memo, approved application 중복 PII와 replay material을 함께 지우고 시각을 기록한다. 주문·계약 법정 원장은 별도 보존한다.
 
-Planned `SupplierPortalActionHistory` fields:
+Implemented `SupplierPortalActionHistory` fields (V39):
 
 - id
 - supplierId
@@ -1267,11 +1268,11 @@ Planned B-098 `SupplierPortalContractHistory` fields:
 
 Contract status is changed only through this append-only B-098 command. Every admin command carries `expectedCurrentContractVersion` and locks Supplier. VERIFIED requires the expected value (including null initially) to match current, a supplier-unique new version/evidence, `effectiveAt <= now`, and null/future `expiresAt`. EXPIRED/REVOKED require current status VERIFIED, record the non-null target current version, and permit only one terminal event for that version. The expiry scheduler compares candidate status/version/expiry after locking and no-ops if terminal processing or re-verification already won. Terminal status and every lazy expiry share one routine: set sales INACTIVE; change ACTIVE portal to SUSPENDED while retaining manager; revoke any open invite; and move all still-SUPPLIER-owned open portal Fulfillments to COREABLE with `CONTRACT_EXPIRED|CONTRACT_REVOKED` evidence. A pending activation stays unauthorized but loses its invite. Paid-work list/detail/mutation and effective Claim-grant access recheck time-valid VERIFIED directly, so an overdue row cannot expose PII before this routine commits. Same supplier/key/hash replays its result and changed payload conflicts. Re-verification uses a new version/key but does not reactivate portal/sales or restore ownership. Supplier/customer projections never expose evidence.
 
-### SupplierApplication (Planned B-100)
+### SupplierApplication (Implemented B-100)
 
 외부 업체가 로그인 없이 제출하는 공급처 신청이다.
 
-Planned fields:
+Implemented fields (V39):
 
 - id
 - supplierName: nullable after retention cleanup
@@ -1314,11 +1315,11 @@ Rules:
 - Review reason code는 `APPLICATION_APPROVED`, `INCOMPLETE_INFORMATION`, `OUT_OF_SCOPE`, `POLICY_NOT_MET`, `DUPLICATE_OR_EXISTING_RELATIONSHIP`만 허용한다. 승인에는 첫 code, 거절에는 나머지만 허용하고 internal reason은 PII 입력을 거절한다.
 - Production `APP_SUPPLIER_PORTAL_ENABLED=false`에서는 ADMIN/application scope와 기존 review key/hash/result replay 조회 뒤 새 신청 승인처럼 초대를 생성하는 command가 application/Supplier/invite를 바꾸기 전에 `SUPPLIER_PORTAL_NOT_RELEASED`로 거절된다. 이미 완료된 동일 command는 token-free 저장 결과만 반환하고 재발송하지 않으며 신청 거절은 계속 허용한다.
 
-### SupplierInvite (Planned B-100)
+### SupplierInvite (Implemented B-100)
 
 관리자 승인을 받은 공급처의 담당자 한 명을 Kakao 계정에 연결하기 위한 1회용 email 초대다.
 
-Planned fields:
+Implemented fields (V39):
 
 - id
 - supplierId
@@ -1341,7 +1342,7 @@ Rules:
 
 - 최소 256-bit 무작위 token 원문은 연락 이메일 검증용 email에 한 번만 사용하고 DB와 application/access log에는 저장하지 않는다. DB에는 unique digest만 저장하며 메일에는 token/link와 일반 연결 안내 외 운영 내용을 넣지 않는다.
 - 초대 기본 유효기간은 7일이다. 재발급은 기존 미사용 초대를 먼저 폐기하며 공급처마다 사용 가능한 초대는 하나뿐이다.
-- 승인 발급은 application 기반 deterministic key를, 관리자 재발급은 요청 `Idempotency-Key`와 allowlisted `revocationReasonCode`를 사용한다. 재발급은 free-text reason을 받지 않는다. Scoped key/hash replay 조회 뒤 새 재발급은 Supplier lock에서 `portalStatus=PENDING_ACTIVATION`, manager 없음, current contact email 존재, 미검증 상태만 허용한다. ACTIVE/SUSPENDED/DISABLED 또는 manager-bound 상태는 거절하고, contact change는 먼저 pending/unverified 상태를 원자적으로 만든다. `(supplierId, issuanceIdempotencyKey)`는 unique이며 동일 payload retry는 기존 invite metadata를 반환하고 key를 다른 payload에 재사용하면 거절한다. 새 key의 명시적 재발급만 이전 open invite를 폐기한다.
+- 승인 발급은 application 기반 deterministic key를 사용한다. 관리자 재발급 command는 요청 `Idempotency-Key`와 allowlisted `revocationReasonCode`를 저장하되, invite issuance key는 `reissue:` server-HMAC namespace로 파생해 `application:` 최초 발급 key와 충돌하지 않게 한다. 재발급은 free-text reason을 받지 않는다. Scoped key/hash replay 조회 뒤 새 재발급은 Supplier lock에서 `portalStatus=PENDING_ACTIVATION`, manager 없음, current contact email 존재, 미검증 상태만 허용한다. ACTIVE/SUSPENDED/DISABLED 또는 manager-bound 상태는 거절하고, contact change는 먼저 pending/unverified 상태를 원자적으로 만든다. `(supplierId, issuanceIdempotencyKey)`는 unique이며 동일 payload retry는 기존 invite metadata를 반환하고 key를 다른 payload에 재사용하면 거절한다. 새 key의 명시적 재발급만 이전 open invite를 폐기한다.
 - Global supplier-portal flag가 false이면 scoped key/hash/result replay 조회 뒤 새 승인 발급, 재발급과 연락 이메일 변경 뒤 후속 발급은 invite/lifecycle mutation 전에 fail closed한다. 동일 완료-command replay는 token-free result만 반환하고 발송하지 않는다. After-commit dispatch도 발송 직전에 flag를 다시 확인해 `SKIPPED/PORTAL_NOT_RELEASED`로 끝내며, 다시 연 뒤에는 새 key로 재발급해야 한다. Portal 정지/종료와 retention cleanup은 이 gate 뒤에도 가능하다.
 - email 링크는 URL fragment로 token을 전달한다. Web은 token을 즉시 교환하고 fragment를 제거한 뒤 짧은 수명의 HttpOnly invite-context cookie만 사용한다.
 - 초대 email은 연락 email을 검증하기 위한 유일한 pre-verification 발송 예외다. 그 밖의 운영 email은 `contactEmailVerifiedAt`이 있어야 한다.
@@ -1481,14 +1482,14 @@ Rules:
 - 이 normal pre-expiry 예외 transaction은 모든 portal TRACKED HELD 예약을 exactly once RELEASED로 바꾸고 reserved를 감소시키며 `releasedAt`을 기록한다. Late path의 tentative 재확보가 실패하면 rollback되어 기존 RELEASED 상태를 유지한다.
 - 입금 증적, exception reason과 환불 다음 작업은 ADMIN 응답에만 포함한다. 고객 checkout 결과와 주문 내역은 raw 상태 대신 `입금 확인 및 환불 처리 중`과 적용되는 환불 예정액만 보고, 입금자·거래 식별값·관리자 사유·계좌/이체 증적은 받지 않는다. 공급처는 예외·환불 존재 여부도 알 수 없다.
 
-### Portal Fulfillment And Order Snapshot (Planned B-100/B-103/B-104)
+### Portal Fulfillment And Order Snapshot (B-100 Base Implemented; B-103/B-104 Planned)
 
 Planned `Order` fields/status:
 
 - deliveryMemo: nullable shipping-address snapshot field
 - B-104 status addition for portal orders: TRACKING_REGISTERED
 
-Planned `Fulfillment` fields:
+V39 implements the additive `Fulfillment` fields below. B-103/B-104 still own portal fulfillment creation, PII cutoff behavior and shipment use:
 
 - channel: COREABLE_MANUAL / DOMEGGOOK_API / SUPPLIER_PORTAL
 - requestedAt
@@ -1511,7 +1512,7 @@ Rules:
 - B-103 scheduler는 `now >= piiAccessCutoffAt`인데 owner가 SUPPLIER인 open portal work를 reason `PII_CUTOFF_REACHED`로 exactly once COREABLE에 인계한다. Supplier mutation도 Fulfillment lock 아래 cutoff를 lazy-enforce해 기한이 지났으면 같은 인계를 수행한 뒤 mutation을 거절한다. ADMIN도 개별 portal-takeover 명령의 idempotency key/reason으로 더 일찍 인계할 수 있다. 어느 경로도 자동 반환하지 않는다.
 - supplier paid-work list/detail와 shipment/shortage mutation은 time-valid VERIFIED contract, `channel=SUPPLIER_PORTAL`, `operationalOwner=SUPPLIER`, tenant 및 허용 Order 상태를 함께 검증한다. Detail은 original supplier의 ACTIVE portal/current manager도 요구한다. COREABLE-owner work는 cutoff/terminal 경계에서만 MASKED read를 허용하고 active allowed-status Claim grant와 time-valid contract가 함께 있을 때만 read-only FULL을 허용한다. Contract expiry/revoke는 lifecycle authorization 실패 `403`, admin takeover/shortage 등 다른 비공개 인계는 grant와 무관한 `404`로 닫고 별도 safe queue를 쓴다. 어느 read 예외도 mutation을 열지 않는다. `OUT_OF_STOCK`, `CANCELLED`, `REFUND_REQUESTED`, `REFUNDED` 또는 contract terminal transition으로 supplier work가 끝나면 open portal Fulfillment를 COREABLE로 인계한다.
 
-Planned `FulfillmentHandoverHistory` fields:
+Implemented B-100 `FulfillmentHandoverHistory` schema fields:
 
 - id
 - fulfillmentId
@@ -1524,7 +1525,7 @@ Planned `FulfillmentHandoverHistory` fields:
 - resultSnapshot: ADMIN-safe immutable command result, nullable for non-request system transitions
 - createdAt
 
-ADMIN portal takeover validates reason against email, phone, address, delivery memo, customer identifiers, line breaks, and the 200-character bound, then changes owner and appends this row in one transaction. `(fulfillmentId,idempotencyKey)` is unique when the key is non-null; identical hash replay returns `resultSnapshot` and a changed payload returns conflict even after ownership changed. Scheduler/lifecycle transitions use the locked owner compare-and-set and append one history row without requiring an external key.
+B-100 lifecycle transitions change owner and append this row under the locked Fulfillment. V39 provides the partial unique `(fulfillmentId,idempotencyKey)` boundary. The ADMIN portal-takeover command and B-103 cutoff scheduler remain Planned.
 
 ### Multiple Shipments And Allocation (Planned B-104)
 
@@ -1746,6 +1747,8 @@ Rules:
 - 공급처 사실 입력은 Claim, Order, Refund 상태를 직접 변경하지 않는다. 승인·거절·환불·CS는 Coreable만 수행한다.
 
 ### Supplier Tenant, Email, And Browser Security
+
+Status: Dynamic `ROLE_SUPPLIER`, invite/session feature gating, allowed Origin/Referer checks and B-100 invite email/retention boundaries are Implemented. Resource-specific tenant queries and operational email behavior owned by `B-101` through `B-105` remain Planned.
 
 - Supplier-side actor FK는 영구 식별자가 아니다. Invite 소비자와 catalog/inventory/lifecycle actor는 B-098 관계 종료 보관기한 뒤 null 처리하고, Shipment/shortage/claim actor는 parent Order/Claim 법정 보존기한까지 보존한 뒤 null 처리하거나 parent와 함께 파기한다. Actor type, supplier/business object, action, state/version과 timestamp 같은 비PII 증적은 해당 원장의 보존 규칙에 따라 남길 수 있다. `SupplierPiiAccessLog`는 이 일반 규칙 대신 1년 뒤 row 자체를 삭제한다.
 

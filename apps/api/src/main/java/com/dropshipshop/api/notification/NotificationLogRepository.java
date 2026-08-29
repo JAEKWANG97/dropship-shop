@@ -23,6 +23,20 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
 
 	Optional<NotificationLog> findFirstByCustomerInquiryIdOrderByCreatedAtDesc(UUID customerInquiryId);
 
+	Optional<NotificationLog> findFirstBySupplierInviteIdOrderByCreatedAtDesc(UUID supplierInviteId);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+		update NotificationLog log
+		set log.recipient = null,
+			log.recipientAnonymizedAt = :now
+		where log.supplierInviteId = :supplierInviteId
+		""")
+	int anonymizeSupplierInviteRecipients(
+		@Param("supplierInviteId") UUID supplierInviteId,
+		@Param("now") Instant now
+	);
+
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query(value = """
 		UPDATE notification_logs

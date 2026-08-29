@@ -22,7 +22,9 @@
 - 탈퇴 후 같은 소셜 계정으로 재가입하면 새 고객 계정으로 생성되고 기존 주문 내역은 고객 화면에 자동 복구되지 않아야 한다.
 - 관리자는 카카오 소셜 로그인 후 DB에 등록된 관리자 권한으로 접근할 수 있어야 한다.
 
-### Supplier Portal Onboarding — Planned (`B-100`)
+### Supplier Portal Onboarding — Implemented (`B-100`), Production Gated
+
+`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면은 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup은 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 `B-101`~`B-105`가 준비될 때까지 production flag는 기본 `off`를 유지한다.
 
 - 비로그인 사용자는 필수 공급처명·담당자명·연락 이메일과 선택 전화번호·문의 메모로 공급처 신청을 제출할 수 있어야 한다.
 - 신청 화면은 active `SUPPLIER_APPLICATION_PRIVACY`의 수집 목적, 항목, 보유 기간, 동의 거부 시 신청 불가를 고지해야 한다. 서버는 exact active version을 검증하고 canonical 동의시각을 저장해야 한다.

@@ -16,6 +16,8 @@ import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
+import com.dropshipshop.api.catalog.domain.SupplierPortalStatus;
+import com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -49,7 +51,17 @@ final class CatalogDtos {
 		String phone,
 		String email,
 		String memo,
-		SupplierStatus status
+		SupplierStatus status,
+		UUID supplierId,
+		String contactEmail,
+		UUID managerUserId,
+		SupplierPortalStatus portalStatus,
+		SupplierStatus salesStatus,
+		SupplierPortalContractStatus contractStatus,
+		String contractVersion,
+		Instant contractEffectiveAt,
+		Instant contractExpiresAt,
+		Instant contactEmailVerifiedAt
 	) {
 	}
 

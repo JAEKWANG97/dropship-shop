@@ -11,6 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.notification.domain.NotificationLog;
 import com.dropshipshop.api.notification.domain.NotificationStatus;
+import com.dropshipshop.api.common.error.ApiErrorCode;
+import com.dropshipshop.api.common.error.ApiErrorException;
 
 @Service
 class AdminNotificationService {
@@ -38,6 +40,13 @@ class AdminNotificationService {
 	NotificationLog retry(UUID notificationId) {
 		NotificationLog log = notificationLogRepository.findById(notificationId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
+		if (log.getSupplierInviteId() != null) {
+			throw new ApiErrorException(
+				HttpStatus.CONFLICT,
+				ApiErrorCode.INVITE_REISSUE_NOT_ALLOWED,
+				"Supplier invitations require an explicit reissue"
+			);
+		}
 		if (log.getStatus() != NotificationStatus.FAILED && log.getStatus() != NotificationStatus.SKIPPED) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only failed or skipped notifications can be retried");
 		}

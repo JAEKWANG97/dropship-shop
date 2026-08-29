@@ -150,6 +150,29 @@ class AccountDeletionApiIntegrationTest {
 		assertThat(userAccountRepository.findById(customer.getId()).orElseThrow().getStatus()).isEqualTo(UserStatus.ACTIVE);
 	}
 
+	@Test
+	void blocksDeletionUntilSupplierManagerIsDisconnected() throws Exception {
+		UserAccount manager = createCustomer("supplier-manager-delete-blocked");
+		Supplier supplier = Supplier.portalApplicant(
+			"Deletion Guard Supplier",
+			"Deletion Guard Manager",
+			"010-0000-0000",
+			"deletion-guard@supplier.example",
+			null
+		);
+		supplier.bindManager(manager.getId(), Instant.now());
+		supplierRepository.saveAndFlush(supplier);
+
+		mockMvc.perform(post("/api/me/deletion-request").cookie(accessToken(manager)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.message", containsString("disconnected by an administrator")));
+
+		assertThat(userAccountRepository.findById(manager.getId()).orElseThrow().getStatus())
+			.isEqualTo(UserStatus.ACTIVE);
+		assertThat(supplierRepository.findById(supplier.getId()).orElseThrow().getManagerUserId())
+			.isEqualTo(manager.getId());
+	}
+
 	private Cookie accessToken(UserAccount user) {
 		return new Cookie("ACCESS_TOKEN", jwtAccessTokenService.issue(user));
 	}

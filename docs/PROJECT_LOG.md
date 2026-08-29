@@ -1115,3 +1115,13 @@
 - 결정: 결제 예외는 Coreable이 실제 계좌환불을 완료하고 고객은 새 checkout을 만든다. 삭제 이력은 immutable subject id와 nullable live FK, `PRODUCT_DELETED`/`OPTION_DELETED` change type, `DRAFT_ABANDONED`/`DRAFT_OPTION_REMOVED` 서버 reason으로 보존한다. Supplier 상세 이미지는 같은 상품의 `DETAIL` ProductImage만 참조하고, single-use storage key와 durable cleanup job으로 metadata commit 뒤 binary 삭제를 재시도한다. B-102 재고 이력도 subject option id를 사용해 draft Option 삭제 뒤 audit과 replay uniqueness를 유지한다.
 - 검증: 문서 전용 변경으로 `git diff --check`, Markdown fence parity와 상대 링크 검사를 통과했고 runtime 파일이 바뀌지 않았음을 확인했다. 결제 예외, DRAFT 삭제 문서, schema/implementation-readiness 독립 재감사도 모두 P0/P1 PASS였다. API test와 Web lint/build는 실행하지 않았다.
 - 후속작업: B-099는 `Review Ready`다. 사용자 승인 시 로컬 커밋하고, main 반영·동기화 후 B-100부터 한 backlog/commit씩 구현한다. 외부 연락·계약·production 활성화는 기존 승인 경계를 유지한다.
+
+## 2026-08-30 01:41 KST
+
+- 관련 항목: B-100
+- 작업: 공개 공급처 신청, 관리자 승인·거절, digest-only 이메일 초대, Kakao 전용 활성화, 파생 supplier 권한과 `/api/supplier/me`, 관리자 공급처 수명주기 화면을 구현했다. 기존 CUSTOMER/ADMIN 저장 role은 유지하고 활성 manager 연결과 유효 계약으로 접근 권한을 계산한다.
+- 정책·데이터: 신청 review와 초대 재발급은 keyed-HMAC idempotency와 immutable action record를 사용한다. 신청·초대 개인정보 보관기한과 비식별화 scheduler, portal 접근 상태와 판매 상태 분리, `portal_enrolled_at` 영구 경계, Fulfillment operational owner 인계 이력을 V39 expand migration으로 추가했다. 기존 중복 legacy 이메일이 있어도 migration이 통과하도록 portal 등록 대상에만 정규화 이메일 unique 조건을 적용했다.
+- 보호: production에서는 supplier portal을 기본 off로 두고 신청·관리자 mutation·초대 dispatch·supplier route를 fail closed한다. cookie mutation은 신뢰 Origin/Referer를 확인하고, 타 공급처 접근·만료 계약·정지 계정·manager 연결 중 사용자 탈퇴를 차단한다. raw 초대 토큰은 DB와 notification payload에 저장하지 않고 commit 이후 email event에만 전달한다.
+- 문서: 요구사항, 정책, API, domain model, ERD, architecture, 배포·production readiness, 환경변수 예시를 구현 상태와 운영 gate에 맞게 동기화했다.
+- 검증: API 전체 테스트 `180 passed`, 실제 PostgreSQL 17 migration smoke `2 passed`(fresh V39와 V38 duplicate legacy email upgrade), Web lint `0 errors / 기존 3 warnings`, production build, 공급처 온보딩 Playwright desktop/mobile `6 passed`, `git diff --check`를 통과했다.
+- 후속작업: 실제 Kakao OAuth와 실 email 전달은 운영 자격증명·외부 시스템을 사용한 검증이 남아 있다. `SUPPLIER_PORTAL_ENABLED`는 production에서 계속 false이며, 외부 연락·계약은 B-097/B-098 승인 경계를 유지한다. 다음 기능 B-101은 현재 branch의 review와 main 반영·동기화 뒤 시작한다.

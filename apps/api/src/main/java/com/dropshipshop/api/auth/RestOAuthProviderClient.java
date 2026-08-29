@@ -28,8 +28,13 @@ class RestOAuthProviderClient implements OAuthProviderClient {
 
 	@Override
 	public OAuthProfile fetchProfile(SocialProvider provider, String code) {
+		return fetchProfile(provider, code, null);
+	}
+
+	@Override
+	public OAuthProfile fetchProfile(SocialProvider provider, String code, String redirectUri) {
 		OAuthProviderProperties.ProviderSettings settings = oauthProviderProperties.get(provider);
-		Map<String, Object> tokenResponse = token(settings, code);
+		Map<String, Object> tokenResponse = token(settings, code, redirectUri);
 		String accessToken = string(tokenResponse.get("access_token"));
 		if (isBlank(accessToken)) {
 			throw new OAuthProviderException("OAuth provider did not return access token");
@@ -42,14 +47,14 @@ class RestOAuthProviderClient implements OAuthProviderClient {
 		};
 	}
 
-	private Map<String, Object> token(OAuthProviderProperties.ProviderSettings settings, String code) {
+	private Map<String, Object> token(OAuthProviderProperties.ProviderSettings settings, String code, String redirectUri) {
 		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
 		body.add("grant_type", "authorization_code");
 		body.add("client_id", settings.clientId());
 		if (!isBlank(settings.clientSecret())) {
 			body.add("client_secret", settings.clientSecret());
 		}
-		body.add("redirect_uri", settings.redirectUri());
+		body.add("redirect_uri", isBlank(redirectUri) ? settings.redirectUri() : redirectUri);
 		body.add("code", code);
 
 		try {

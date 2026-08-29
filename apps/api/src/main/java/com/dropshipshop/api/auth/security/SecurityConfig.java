@@ -1,6 +1,5 @@
 package com.dropshipshop.api.auth.security;
 
-import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -19,6 +18,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.dropshipshop.api.common.error.ApiErrorCode;
+import com.dropshipshop.api.supplierportal.AllowedWebOrigins;
 
 @Configuration
 @EnableMethodSecurity
@@ -28,7 +28,8 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(
 		HttpSecurity http,
 		CorsConfigurationSource corsConfigurationSource,
-		ObjectProvider<JwtCookieAuthenticationFilter> jwtCookieAuthenticationFilterProvider
+		ObjectProvider<JwtCookieAuthenticationFilter> jwtCookieAuthenticationFilterProvider,
+		ObjectProvider<SupplierPortalFeatureGateFilter> supplierPortalFeatureGateFilterProvider
 	) throws Exception {
 		http
 			.cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -54,14 +55,19 @@ public class SecurityConfig {
 				))
 			);
 
-		jwtCookieAuthenticationFilterProvider.ifAvailable(
-			filter -> http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class)
-		);
+		jwtCookieAuthenticationFilterProvider.ifAvailable(filter -> {
+			http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class);
+			supplierPortalFeatureGateFilterProvider.ifAvailable(
+				gateFilter -> http.addFilterBefore(gateFilter, JwtCookieAuthenticationFilter.class)
+			);
+		});
 
 		return http
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/api/health", "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
 				.requestMatchers("/api/auth/oauth2/**").permitAll()
+				.requestMatchers("/api/supplier-applications", "/api/supplier-invites/session").permitAll()
+				.requestMatchers("/api/supplier/auth/**").permitAll()
 				.requestMatchers("/api/dev/login", "/api/dev/login/**").permitAll()
 				.requestMatchers("/api/internal/**").permitAll()
 				.requestMatchers("/api/products", "/api/products/**").permitAll()
@@ -70,17 +76,25 @@ public class SecurityConfig {
 				.requestMatchers("/api/business-profile", "/api/privacy-processing-items").permitAll()
 				.requestMatchers("/api/customer-inquiries", "/api/customer-inquiries/**").permitAll()
 				.requestMatchers("/api/admin/**").hasRole("ADMIN")
+				.requestMatchers("/api/supplier/**").hasRole("SUPPLIER")
 				.anyRequest().authenticated()
 			)
 			.build();
 	}
 
 	@Bean
+	AllowedWebOrigins allowedWebOrigins(
+		@Value("${app.cors.allowed-origins:}") String configuredOrigins
+	) {
+		return new AllowedWebOrigins(configuredOrigins);
+	}
+
+	@Bean
 	CorsConfigurationSource corsConfigurationSource(
-		@Value("${app.cors.allowed-origins:}") String allowedOrigins
+		AllowedWebOrigins allowedOrigins
 	) {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(splitCsv(allowedOrigins));
+		configuration.setAllowedOrigins(allowedOrigins.values());
 		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
 		configuration.setExposedHeaders(List.of("Location"));
@@ -92,13 +106,4 @@ public class SecurityConfig {
 		return source;
 	}
 
-	private List<String> splitCsv(String value) {
-		if (value == null || value.isBlank()) {
-			return List.of();
-		}
-		return Arrays.stream(value.split(","))
-			.map(String::trim)
-			.filter(item -> !item.isBlank())
-			.toList();
-	}
 }

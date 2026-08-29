@@ -13,6 +13,14 @@ spring:
 app:
   sales:
     enabled: true
+  cors:
+    allowed-origins: http://localhost:3000
+  supplier-portal:
+    enabled: true
+    hmac-secret: test-supplier-portal-hmac-secret-1234567890
+    kakao-redirect-uri: http://localhost/api/supplier/auth/kakao/callback
+    success-redirect-uri: http://localhost:3000/supplier
+    application-rate-limit: 100
   internal:
     sync-token: test-internal-sync-token
   auth:

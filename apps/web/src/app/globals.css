@@ -2603,6 +2603,7 @@ body:has(.admin-shell) > .page-shell {
 }
 
 .admin-badge.active,
+.admin-badge.approved,
 .admin-badge.supplier_order_pending {
   border-color: #a7f3d0;
   background: #ecfdf5;
@@ -2611,7 +2612,10 @@ body:has(.admin-shell) > .page-shell {
 
 .admin-badge.sold_out,
 .admin-badge.out_of_stock,
-.admin-badge.cancelled {
+.admin-badge.cancelled,
+.admin-badge.rejected,
+.admin-badge.disabled,
+.admin-badge.suspended {
   border-color: #fecaca;
   background: #fff1f2;
   color: #b42318 !important;
@@ -3079,6 +3083,175 @@ body:has(.admin-shell) > .page-shell {
 
 .admin-inline-form .wide {
   grid-column: 1 / -1;
+}
+
+.supplier-apply-page {
+  gap: 20px;
+}
+
+.supplier-policy-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.supplier-policy-card > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.supplier-policy-card h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.supplier-policy-card span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.supplier-policy-card p {
+  white-space: pre-wrap;
+}
+
+.supplier-apply-form textarea {
+  resize: vertical;
+}
+
+.supplier-activation-card {
+  justify-items: start;
+  padding-block: 40px;
+}
+
+.button.kakao {
+  border-color: #fee500;
+  background: #fee500;
+  color: #191919;
+}
+
+.supplier-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 680px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+body:has(.supplier-shell) > .site-utility,
+body:has(.supplier-shell) > .site-header,
+body:has(.supplier-shell) > .mobile-bottom-nav,
+body:has(.supplier-shell) > .site-footer {
+  display: none;
+}
+
+body:has(.supplier-shell) > .page-shell {
+  max-width: none;
+  padding: 0;
+}
+
+.supplier-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  padding: 24px 18px;
+  border-right: 1px solid var(--line);
+  background: #f8fafc;
+}
+
+.supplier-sidebar nav {
+  display: grid;
+  gap: 8px;
+}
+
+.supplier-sidebar nav a {
+  padding: 12px;
+  border-radius: 6px;
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.supplier-sidebar nav a:hover {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.supplier-sidebar form .button {
+  width: 100%;
+}
+
+.supplier-main {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+
+.supplier-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.supplier-topbar > div:first-child,
+.supplier-status-row span,
+.supplier-home-list > div {
+  display: grid;
+  gap: 3px;
+}
+
+.supplier-topbar span,
+.supplier-status-row small,
+.supplier-home-list span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.supplier-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.supplier-status-row span {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.supplier-page {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.supplier-home-list {
+  display: grid;
+  gap: 12px;
+}
+
+.supplier-home-list > div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+}
+
+.supplier-admin-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.supplier-admin-summary > div:nth-child(odd):not(:last-child) {
+  border-right: 1px solid var(--line);
 }
 
 @media (max-width: 760px) {
@@ -3946,6 +4119,51 @@ body:has(.admin-shell) > .page-shell {
     padding: 14px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .supplier-shell {
+    grid-template-columns: 1fr;
+    border-radius: 0;
+  }
+
+  .supplier-sidebar {
+    gap: 12px;
+    padding: 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .supplier-sidebar nav {
+    grid-template-columns: 1fr;
+  }
+
+  .supplier-sidebar nav a {
+    min-height: 44px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .supplier-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .supplier-page {
+    padding: 16px;
+  }
+
+  .supplier-policy-card > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .supplier-admin-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .supplier-admin-summary > div:nth-child(odd):not(:last-child) {
+    border-right: 0;
   }
 
   .admin-sidebar nav {
