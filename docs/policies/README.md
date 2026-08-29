@@ -19,6 +19,7 @@
 ## Source Of Truth
 
 - 각 정책 파일의 `Confirmed Policy`가 현재 제품/구현 기준이다.
+- `Supplier Portal ... — Planned (B-...)`처럼 명시된 별도 절은 합의된 후속 구현 계약이지만 아직 현재 동작이 아니다.
 - `Initial Direction`은 논의 초기의 방향성 기록이며, 현재 기준과 충돌하면 `Confirmed Policy`를 우선한다.
 - 결정 이유와 변경 이력은 [Decision Log](../decision-log.md)에 남긴다.
 - 실행 단위는 [Backlog](../BACKLOG.md)를 기준으로 한다.
@@ -30,11 +31,12 @@ Use these statuses in policy files:
 - `Draft`: 아직 논의 중
 - `Proposed`: 추천안은 있으나 확정 전
 - `Confirmed`: 제품/구현 기준으로 확정
+- `Planned`: 제품 결정은 확정됐지만 명시된 backlog 구현 전에는 현재 동작이 아님
 - `Deferred`: MVP 이후로 미룸
 
 ## How To Use
 
-1. 변경할 정책 파일의 `Confirmed Policy`를 갱신한다.
+1. 현재 구현을 바꾸는 경우 `Confirmed Policy`를 갱신하고, 후속 설계만 정한 경우 backlog ID가 있는 `Planned` 절에 분리한다.
 2. 결정 이유는 `docs/decision-log.md`에 남긴다.
 3. 정책 변경이 ERD, API, 주문 상태, 관리자 기능에 영향을 주면 관련 문서도 함께 갱신한다.
 4. 실제 법률 문구는 출시 전 별도 검토한다.

@@ -105,6 +105,41 @@ Status: Confirmed
 - 실제 결제 오픈 전에는 구매안전서비스 안내를 실제 제공자와 이용 방법으로 교체하고, 홈택스 발급 권한과 의무발행 업종 해당 여부를 확인해야 한다.
 - 출시 차단 항목은 `docs/legal-launch-checklist.md`를 기준으로 확인한다.
 
+## Bank-Receipt Exception Refund Notice — Planned (B-102)
+
+Status: Planned (B-102). The current public policy and memo-only operation remain implemented until the new payment exception flow ships.
+
+- 금액이 다른 실제 계좌입금 또는 미입금 취소 뒤 발견된 입금을 확인하면 주문을 출고하지 않고 실제 수령액 전부를 반환하며, 고객이 구매를 계속하려면 새 주문이 필요하다는 내용을 결제·취소/환불 정책의 별도 텍스트로 고지한다.
+- 처리 중 고객 화면은 `입금 확인 및 환불 처리 중`, 실제 환불 예정액과 문의 경로를 표시한다. 실제 계좌이체 증적이 완료되기 전에는 `환불 완료`로 표시하지 않는다.
+- 입금자명, 은행 거래 식별값, 관리자 사유와 환불 계좌·이체 증적은 고객·공급처·알림 payload에 복제하지 않는다. 공급처에는 해당 주문, 예외와 환불 존재 자체를 노출하지 않는다.
+- B-102 production 전환 전에 managed 공개 정책의 새 시행 버전, checkout/주문 표시와 동의 snapshot을 함께 검증한다.
+
+## Supplier Portal Privacy And Notice — Planned (B-100, B-103, B-105)
+
+Status: Planned (B-100, B-103, B-105). The current `2026-08-04` privacy version and Domeggook provision remain the implemented legacy disclosure until a new effective version is verified.
+
+- 공개 공급처 신청은 필수 담당자 이름·연락 이메일과 선택 전화번호 등 신청 심사에 필요한 연락처 PII를 받기 전에 별도 managed `SUPPLIER_APPLICATION_PRIVACY` 필수 동의를 받아야 한다. 서버는 active exact version을 검증하고 canonical 동의시각을 저장한다. Planned in B-100.
+- 정규화 연락 이메일별 non-expired `SUBMITTED` 또는 `APPROVED` 신청은 합쳐서 하나만 허용한다. 새 submit은 같은 이메일의 overdue SUBMITTED를 lock 아래 EXPIRED·비식별화한 뒤 중복을 판단한다. 사업자 식별번호는 이 신청 범위에서 수집하지 않으므로 “동일 사업자”를 자동 판정한다고 주장하지 않는다. 미검토 신청은 생성 90일 뒤 EXPIRED·비식별화하고, 거절 신청 원문 PII는 거절 90일 뒤 비식별화한다. 승인 신청 연락은 Supplier 운영 기록이 되며 B-098/privacy notice가 정한 관계 종료 기한에 Supplier와 application 중복 PII를 함께 정리한다. Planned in B-100/B-098.
+- 기존 도매꾹 주문 이행을 위한 제3자 제공 문구는 legacy 흐름에 한정한다. 공급처 포털을 production에서 활성화하기 전 새 개인정보처리방침 시행 버전에 외부 공급처와 택배사에 대한 제공받는 자, 목적, 항목, 보유·이용기간을 구분해 반영하고 실제 공개·동의 동작을 검증한다.
+- 공급처 주문 목록에는 고객 PII를 제공하지 않는다. 공급처 주문 상세는 인증된 본인 공급처의 입금확인 완료 주문에 한해 수령인 이름, 수령인 전화번호, 우편번호, 주소1, 주소2와 배송 메모만 제공한다.
+- 공급처에는 고객 이메일, 회원 식별자·프로필, 결제·입금·은행·금액 정보, 환불 계좌·실행 정보, 관리자 메모와 다른 공급처 정보를 제공하지 않는다. 주문 이행 최소 PII도 time-valid VERIFIED contract가 있을 때만 제공하고 EXPIRED/REVOKED 시 open work를 Coreable로 인계해 즉시 접근을 닫는다.
+- 공급처 상세의 기본 PII 접근 종료시각은 `fulfillment.requestedAt + 60일`로 저장해 시작하고, 각 송장 등록 시 `min(현재 저장 cutoff, registeredAt + 30일)`로만 단축한다. 송장 void·교체·추가 등록은 이미 짧아진 cutoff를 늘리지 않는다. 이 접근 종료는 법정 보존 대상 원장 삭제 시점과 별개다. Planned in B-103.
+- 주문이 `OUT_OF_STOCK`, `CANCELLED`, `REFUND_REQUESTED` 또는 `REFUNDED`가 되면 non-voided 송장 유무와 관계없이 기본 종료시각을 기다리지 않고 즉시 마스킹한다.
+- 기본 종료시각부터(`now >= cutoff`) 한 글자 이름은 `*`, 두 글자 이상 이름은 첫 Unicode code point와 고정 `**`로 반환한다. 전화번호는 숫자만 정규화한 뒤 4자리 이하면 전부 `*`, 5자리 이상이면 마지막 4자리만 남기고 앞자리를 `*`로 반환한다. 우편번호, 주소1, 주소2와 배송 메모는 `null`로 반환하며 전체 상세 응답을 단일 placeholder로 대체하지 않는다.
+- 승인된 진행 중 Claim의 이행에 필요한 경우에만 Coreable 관리자가 사유와 요청시점부터 최대 30일인 명시적 만료시각을 기록해 전체 PII 접근을 한시적으로 다시 열 수 있다. `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 상태에서만 최신 non-revoked grant가 유효하고 다른/terminal 상태가 되면 별도 revoke 없이 즉시 masking한다. grant/extension/revoke는 append-only 이력으로 남긴다. Planned in B-103 and B-105.
+- 공급처 PII 응답에는 `Cache-Control: no-store`를 적용한다. 각 공급처 주문 상세 접근 로그는 actor, order, access reason, accessed-at만 저장하며 실제 PII나 응답 본문을 저장하지 않는다. 로그는 관리자만 조회하고 1년 뒤 삭제한다. Planned in B-103.
+- 최초 초대는 아직 검증되지 않은 신청 이메일로 보내는 1회성 연락처 검증 메일이며 token과 일반 안내만 포함한다. 그 외 공급처 이메일 알림은 검증된 연락 이메일로만 보내고 제목, 본문과 payload snapshot에 고객 이름, 전화번호, 주소, 배송 메모, 결제 또는 환불 정보를 포함하지 않는다.
+- 초대 recipient와 issuance key/HMAC, 연결된 notification recipient는 소비·폐기·만료 30일 뒤 null 처리한다. 일반 공급처 운영 email은 최초 7일 동안만 retry할 수 있고 SENT/SKIPPED 또는 retry 종료 30일 뒤 recipient를 null 처리하며 비PII event/template/delivery audit만 보존한다.
+- Invite 소비자와 catalog/inventory/lifecycle의 supplier actor 식별자는 B-098 관계 종료 보관기한까지만, Shipment/shortage/claim supplier actor 식별자는 parent Order/Claim 법정 보존기한까지만 유지한 뒤 FK를 null 처리하거나 parent와 함께 파기한다. 비PII action/state/time 증적은 원장 보존 규칙에 따라 남기고 PII access log는 1년 뒤 row 자체를 삭제한다.
+- 실제 초대·운영 이메일 delivery와 새 개인정보처리방침 시행 버전의 공개·동의·제3자 제공 내용을 검증하기 전에는 production supplier activation을 차단한다. Planned in B-100 and B-103.
+
+### Planned System Impact
+
+- B-100 공개 신청 API는 필수 연락처 개인정보 동의 버전·시각, 중복 방지와 거절 후 90일 비식별화를 함께 구현해야 한다.
+- B-103 공급처 주문 API는 목록과 상세의 PII 범위를 분리하고 tenant, 기간, claim grant, masking, cache와 최소 접근 로그를 서버에서 검증해야 한다.
+- B-103 이메일 발송은 검증된 supplier contact만 대상으로 삼고 PII 없는 template과 payload를 사용해야 한다.
+- B-105 claim fact는 개인정보 접근 재개 사유가 아니며, 승인된 Claim에 대한 별도 Coreable grant가 있을 때만 접근기간을 연장할 수 있다.
+
 ## System Impact
 
 - 상품 상세와 체크아웃 화면에 정책 링크가 필요하다. Backend API responses include policy links by DS-16.

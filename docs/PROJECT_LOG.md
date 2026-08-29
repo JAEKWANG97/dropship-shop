@@ -1095,3 +1095,23 @@
 - 해결방안: 공식 회사·B2B몰·카탈로그를 우선 근거로 사용하고, 동일 모델·규격·수량만 비교했다. 비공개 조건은 `확인 필요`로 남기고 가격·운영 점수를 주지 않았으며 적격 업체가 목표 20곳보다 3곳 부족한 결과를 PASS 처리했다.
 - 결정: 1차 연락 순위는 코레카, 크레텍, 아주세이프티다. 현행 공급가×1.25 가격 정책은 유지하고 10%는 비교 시나리오에만 사용한다. 실제 연락·계약·상품 반영은 B-097로 분리한다.
 - 후속작업: 사용자가 대상과 문안을 확인한 뒤 B-097에서 도매가·MOQ·VAT·배송비·중립포장·직배송·상품 데이터 사용권을 문의하고, 확정된 공급처에 대해서만 동기화/import 개발 범위를 만든다.
+
+## 2026-08-29 14:04 KST
+
+- 관련 항목: B-099
+- 작업: Coreable 단일 판매자 책임을 유지하면서 승인된 외부 공급처 한 명의 담당자가 자기 상품·재고·입금확인 완료 출고 요청·송장을 처리하는 Supplier Portal의 Planned 정책과 구현 계약을 정리했다. 실행 코드와 migration은 변경하지 않았다.
+- 문제·고민: 현재 구현은 실제 재고 미관리, 관리자 발주 단계와 주문당 단일 Shipment를 전제로 한다. 이를 바로 바꾸면 기존 수동/Domeggook 흐름이 깨질 수 있고, 공급처 편의를 높이는 과정에서 고객 PII·결제·환불 권한이 과도하게 노출될 위험이 있었다.
+- 해결방안: 현재 `Confirmed Policy`와 B-100~B-105 `Planned` 계약을 분리하고 expand-contract 방식으로 설계했다. 한 번의 개별 상품 등록, TRACKED 기본·UNTRACKED 선택, 24시간 예약, 수락 없는 즉시 출고 요청, 최소 PII, 단일 송장 기본·분할 opt-in, 공식 택배사 링크, Coreable claim task·환불 권한을 각 slice에 배치했다.
+- 결정: portal 접근 상태와 Supplier 판매 상태를 분리한다. 늦은 입금 예외는 정상 주문으로 재개하지 않고 배송 그룹마다 `LATE_DEPOSIT_EXCEPTION` Refund를 하나만 자동 생성한다. 공급처는 raw 주문 상태·고객 결제·환불을 보지 않고 Coreable이 요청한 구조화 사실만 기록한다.
+- 검증: 변경 문서의 `git diff --check`, 상대 Markdown 링크 존재 검사와 정책/API/ERD 용어 대조를 수행했다. 문서 전용 작업이므로 API test와 Web lint/build는 실행하지 않았다.
+- 후속작업: B-099 검토와 로컬 커밋 승인을 받은 뒤 main 반영·동기화를 거쳐 B-100부터 한 backlog/commit씩 구현한다. 실제 외부 연락·계약·production 활성화는 B-097/B-098, 개인정보 고지, 실 email 전달과 feature flag gate를 충족하고 사용자 승인을 받은 뒤 진행한다.
+
+## 2026-08-29 23:59 KST
+
+- 관련 항목: B-099
+- 작업: 14:04 기록 이후 확정된 결제 예외와 공급처 상품 삭제 계약을 정책·요구사항·도메인·ERD·API·order flow·architecture·backlog에 동기화했다. 실행 코드와 migration은 변경하지 않았다.
+- 문제·고민: 금액 불일치 입금을 기존 주문별 환불과 섞으면 실제 수령액과 환불 합계가 어긋날 수 있었고, 미입금 취소 뒤 발견된 정확한 입금을 되살리면 재고·출고 상태가 복잡해졌다. 상품은 전부 soft delete하면 조회 필터와 FK가 불필요하게 늘지만, 단순 hard delete는 제출·검토·주문 이력과 이미지 감사를 잃을 수 있었다. 최종 감사에서는 Fulfillment를 만들지 않는 결제 예외와 Order당 Fulfillment 1건을 강제하던 ERD cardinality 충돌도 발견됐다.
+- 해결방안: 금액 불일치는 실제 수령액 기준 `PAYMENT_GROUP/PAYMENT_AMOUNT_MISMATCH` Refund 한 건으로 분리하고, 미입금 취소 뒤 정확한 입금은 배송 그룹 Order별 `LATE_DEPOSIT_EXCEPTION` Refund로 끝내 재개·재고 재확보·공급처 노출을 금지했다. 상품·옵션은 `firstSubmittedAt=null`인 미사용 `SUPPLIER_PORTAL/DRAFT`만 version·tenant·Product→Option lock·CartItem/OrderItem guard 아래 hard delete하고, 그 밖에는 `HIDDEN`/`STOPPED`로 보존한다. Order-Fulfillment 관계는 현재/Planned ERD 모두 `0..1`로 바로잡았다.
+- 결정: 결제 예외는 Coreable이 실제 계좌환불을 완료하고 고객은 새 checkout을 만든다. 삭제 이력은 immutable subject id와 nullable live FK, `PRODUCT_DELETED`/`OPTION_DELETED` change type, `DRAFT_ABANDONED`/`DRAFT_OPTION_REMOVED` 서버 reason으로 보존한다. Supplier 상세 이미지는 같은 상품의 `DETAIL` ProductImage만 참조하고, single-use storage key와 durable cleanup job으로 metadata commit 뒤 binary 삭제를 재시도한다. B-102 재고 이력도 subject option id를 사용해 draft Option 삭제 뒤 audit과 replay uniqueness를 유지한다.
+- 검증: 문서 전용 변경으로 `git diff --check`, Markdown fence parity와 상대 링크 검사를 통과했고 runtime 파일이 바뀌지 않았음을 확인했다. 결제 예외, DRAFT 삭제 문서, schema/implementation-readiness 독립 재감사도 모두 P0/P1 PASS였다. API test와 Web lint/build는 실행하지 않았다.
+- 후속작업: B-099는 `Review Ready`다. 사용자 승인 시 로컬 커밋하고, main 반영·동기화 후 B-100부터 한 backlog/commit씩 구현한다. 외부 연락·계약·production 활성화는 기존 승인 경계를 유지한다.
