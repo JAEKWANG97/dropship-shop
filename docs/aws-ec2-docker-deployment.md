@@ -153,6 +153,33 @@ done
 
 The deploy workflow runs the same non-empty check before replacing containers. The `prod` Spring profile also requires all three environment variables, while local and test profiles keep their development defaults.
 
+## Supplier Portal Production Gate
+
+Keep the supplier portal closed in `/opt/coreable/.env` until its full release gate is verified:
+
+```dotenv
+APP_SUPPLIER_PORTAL_ENABLED=false
+APP_SUPPLIER_PORTAL_HMAC_SECRET=
+OAUTH_KAKAO_SUPPLIER_REDIRECT_URI=https://coreable-saf.com/api/supplier/auth/kakao/callback
+APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI=https://coreable-saf.com/supplier
+DROPSHIP_WEB_ORIGIN=https://coreable-saf.com
+```
+
+Generate `APP_SUPPLIER_PORTAL_HMAC_SECRET` as a random value of at least 32 characters. Do not commit, print, or copy the real value into deployment logs.
+
+`DROPSHIP_WEB_ORIGIN` must be the same canonical HTTPS origin allowed by `APP_CORS_ALLOWED_ORIGINS`. The Web falls back to `APP_PUBLIC_BASE_URL`, but keeping the explicit value makes the Origin/CSRF boundary auditable.
+
+Set `APP_SUPPLIER_PORTAL_ENABLED=true` only after all of the following pass:
+
+- `B-100` through `B-105`
+- active managed supplier-application privacy notice
+- real invitation and operational email delivery
+- B-098 time-valid contract evidence for the supplier
+
+`B-102` inventory and checkout guards alone are not sufficient to open the portal.
+
+The production API uses Spring Boot's native forwarded-header handling. Keep the API bound to localhost/Docker networking behind the configured Nginx proxy so public application rate limits resolve the forwarded client address instead of sharing one Nginx address bucket.
+
 ## Runtime Memory Limits
 
 The first deployment runs on `t4g.micro`, so Docker services have conservative memory limits:
@@ -180,6 +207,7 @@ OAuth redirect URIs:
 
 - `https://coreable-saf.com/api/auth/oauth2/google/callback`
 - `https://coreable-saf.com/api/auth/oauth2/kakao/callback`
+- `https://coreable-saf.com/api/supplier/auth/kakao/callback`
 - `https://coreable-saf.com/api/auth/oauth2/naver/callback`
 
 ## Validation

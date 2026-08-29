@@ -1,0 +1,12 @@
+package com.dropshipshop.api.supplierportal.domain;
+
+public enum SupplierPortalAction {
+	INVITE_REISSUED,
+	INVITE_REVOKED,
+	PORTAL_SUSPENDED,
+	PORTAL_REACTIVATED,
+	PORTAL_DISABLED,
+	MANAGER_DISCONNECTED,
+	CONTACT_EMAIL_CHANGED,
+	SALES_STATUS_CHANGED
+}

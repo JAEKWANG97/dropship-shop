@@ -4,6 +4,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,14 @@ import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
 class ApiExceptionHandler {
+
+	@ExceptionHandler(ApiErrorException.class)
+	ResponseEntity<ApiErrorResponse> handleApiErrorException(
+		ApiErrorException exception,
+		HttpServletRequest request
+	) {
+		return error(exception.getStatus(), exception.getCode(), message(exception.getMessage()), request);
+	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	ResponseEntity<ApiErrorResponse> handleMethodArgumentNotValid(
@@ -110,6 +119,14 @@ class ApiExceptionHandler {
 		HttpServletRequest request
 	) {
 		return error(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT, "Order state was just changed. Please refresh and try again.", request);
+	}
+
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+		DataIntegrityViolationException exception,
+		HttpServletRequest request
+	) {
+		return error(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT, "Request conflicts with current data", request);
 	}
 
 	@ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

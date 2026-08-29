@@ -855,7 +855,17 @@ public class CatalogService {
 			supplier.getPhone(),
 			supplier.getEmail(),
 			supplier.getMemo(),
-			supplier.getStatus()
+			supplier.getStatus(),
+			supplier.getId(),
+			supplier.getEmail(),
+			supplier.getManagerUserId(),
+			supplier.getPortalStatus(),
+			supplier.getStatus(),
+			supplier.getPortalContractStatus(),
+			supplier.getPortalContractVersion(),
+			supplier.getPortalContractEffectiveAt(),
+			supplier.getPortalContractExpiresAt(),
+			supplier.getContactEmailVerifiedAt()
 		);
 	}
 

@@ -1,6 +1,6 @@
 # Supplier Portal Design
 
-Status: Planned (`B-100`~`B-105`), design owned by `B-099`
+Status: `B-100` Implemented, `B-101`~`B-105` Planned; design owned by `B-099`
 
 이 문서는 외부 공급처가 Coreable 안에서 상품과 출고 업무를 직접 처리하는 포털의 구현 기준을 정리한다. 정책의 원문 기준은 `docs/policies/*`와 `docs/decision-log.md`이며, 이 문서는 도메인·API·마이그레이션·구현 순서를 한곳에서 연결하는 설계 인덱스다.
 
@@ -271,9 +271,11 @@ unpaid cancel or 24-hour expiry:
 - 기존 admin notification retry는 invite-linked row를 항상 거절한다. Supplier 운영 row는 `FAILED`, recipient 존재, 생성+7일 전이면서 현재 portal/manager/time-valid contract/verified email이 다시 일치할 때만 재시도하고, `SKIPPED`/`SENT`/recipient-null/기한 종료 row는 lifecycle/contract가 회복돼도 다시 열지 않는다.
 - 공급처의 상품, 재고, 주문, 송장, 클레임 사실 변경은 actor와 supplier tenant를 감사 로그에 남긴다. invite 소비자와 catalog/inventory/lifecycle actor 연결은 B-098 관계 종료 보관기한 뒤 null 처리하고 비PII 행위 증적을 남긴다. Shipment/shortage/claim actor 연결은 parent Order/Claim의 법정 보존기간까지만 유지한 뒤 null 처리하거나 parent와 함께 파기한다. PII access log는 별도 1년 삭제 기준을 따른다.
 
-## Planned Data Changes
+## Data Changes Status
 
-| Area | Planned change |
+V39 implements the `B-100` access, invitation, lifecycle, fulfillment-handover base and notification linkage schema. `B-098` contract history/command/scheduler and `B-101`~`B-105` changes remain Planned.
+
+| Area | Change |
 | --- | --- |
 | Access | managed `SUPPLIER_APPLICATION_PRIVACY`; application status/consent/submit+review idempotency/result/retention fields; `supplier_invites` digest/issuance-idempotency/status/binding/actor-retention fields; `suppliers.manager_user_id`, `portal_status`, contact verification/retention and B-100-owned denormalized contract fields; B-098-owned contract history; append-only lifecycle action history |
 | Product | `products.management_channel`, optimistic `version`, immutable nullable `first_submitted_at`, `review_status`, allowlisted `review_reason_code`, supplier-safe `supplier_review_message`; product change history immutable subject id/nullable live FK/actor/version expand-contract; unique server-owned image key와 durable cleanup job |
@@ -285,11 +287,13 @@ unpaid cancel or 24-hour expiry:
 | Claim | `supplier_shortage_reports`, Coreable-owned `supplier_claim_tasks`, idempotent append-only `supplier_claim_facts`와 supplier-safe fact history projection |
 | Notification | 기존 `notification_logs.recipient` nullable expand; token-free invitation log와 ephemeral raw link; supplier recipient linkage, dispatch-time lifecycle revalidation, 7일 retry와 terminal+30일 recipient cleanup, PII-free payload |
 
-마이그레이션 번호는 구현 branch를 만들 때 최신 번호를 다시 확인한다. B-099는 migration이나 실행 코드를 만들지 않는다.
+`B-100` uses V39. Later implementation branches must recheck the latest migration number; B-099 itself created no migration or runtime code.
 
-## Planned API Surface
+## API Surface
 
-### Public and admin onboarding
+### Public and admin onboarding (Implemented B-100; contract command Planned B-098)
+
+All routes below are Implemented by B-100 except `/portal-contract-status`, which remains Planned in B-098.
 
 ```text
 GET  /api/policies/SUPPLIER_APPLICATION_PRIVACY/current
@@ -388,7 +392,7 @@ Supplier shortage와 claim-task list/detail은 현재 tenant의 supplier-safe pr
 
 ## Security And Release Gates
 
-- production은 `APP_SUPPLIER_PORTAL_ENABLED=false`를 기본으로 두고, false일 때 외부 신청·초대 수락·supplier route와 portal 상품 고객 구매를 열지 않는다. ADMIN/resource scope와 저장된 idempotency replay 뒤 새 신청 승인·invite 재발급·연락 이메일 후속 초대 발급은 mutation 전에 `SUPPLIER_PORTAL_NOT_RELEASED`로 거절한다. 동일 완료 command는 token-free 결과만 반환하고 재발송하지 않는다. Dispatch도 발송 직전 flag를 재검사해 stale job을 `SKIPPED/PORTAL_NOT_RELEASED`로 끝내고, 다시 연 뒤에는 새 key 재발급으로 복구한다. 신청 거절, portal 정지/종료, contract evidence와 retention cleanup, 관리자 문서 검토와 기존 Coreable 주문 운영은 계속 가능하다. B-102 완료만으로 이 flag를 열지 않는다.
+- production은 `APP_SUPPLIER_PORTAL_ENABLED=false`를 기본으로 두고, false일 때 외부 신청·초대 수락·supplier route와 portal 상품 고객 구매를 열지 않는다. ADMIN/resource scope와 저장된 idempotency replay 뒤 새 신청 승인·invite 재발급·연락 이메일 후속 초대 발급은 mutation 전에 `SUPPLIER_PORTAL_NOT_RELEASED`로 거절한다. 동일 완료 command는 token-free 결과만 반환하고 재발송하지 않는다. Dispatch도 발송 직전 flag를 재검사해 stale job을 `SKIPPED/PORTAL_NOT_RELEASED`로 끝내고, 다시 연 뒤에는 새 key 재발급으로 복구한다. 신청 거절, portal 정지/종료, retention cleanup, 관리자 문서 검토와 기존 Coreable 주문 운영은 계속 가능하다. Planned B-098 contract evidence도 구현 뒤에는 이 release gate 밖에서 관리한다. B-102 완료만으로 이 flag를 열지 않는다.
 - B-100은 cookie 인증 supplier `POST`/`PUT`/`PATCH`/`DELETE` 요청의 `Origin`을 설정된 web origin allowlist와 비교한다. `Origin`이 없는 요청은 같은 origin의 `Referer`가 있을 때만 허용하고 둘 다 없거나 불일치하면 `403`으로 거절한다.
 - 인증 cookie는 production에서 `HttpOnly`, `Secure`, `SameSite=Lax`를 강제하며 Origin/Referer 성공·실패 경계를 통합 테스트한다.
 - 모든 supplier query가 supplier predicate를 포함하는지 통합 테스트로 검증한다.
@@ -400,12 +404,12 @@ Supplier shortage와 claim-task list/detail은 현재 tenant의 supplier-safe pr
 
 ## Implementation Slices
 
-1. `B-100`: 신청, 관리자 승인, 이메일 초대, Kakao 연결, supplier tenant guard, denormalized contract fail-closed columns, fulfillment channel/owner/handover additive schema와 lifecycle audit
-2. `B-101`: 개별 상품·옵션·이미지·고시 등록, 미제출 DRAFT 삭제와 감사/asset cleanup, 자동/수동 검토, Coreable 가격 계산
-3. `B-102`: TRACKED/UNTRACKED 재고, 24시간 예약·만료, 금액 불일치 결제그룹 전액 환불, 늦은 입금 재확보
-4. `B-103`: 공급처 출고 요청 생성·목록/상세, KEEP `COREABLE_MANUAL` fallback, 배송 메모 snapshot, `requestedAt + 60일` PII fallback, 접근 로그, 이메일 알림
-5. `B-104`: report table에 의존하지 않는 복수 Shipment 공통 lock/service, 수량 할당, 공식 택배사 링크, 송장마다 monotonic PII cutoff 단축, 고객/admin 호환
-6. `B-105`: REPORTED 품절 인계와 Coreable 승인/거절, 기존 Shipment service에 report lock/open guard 확장, supplier claim facts, 환불 경계
+1. `B-100` — Implemented: 신청, 관리자 승인, 이메일 초대, Kakao 연결, supplier tenant guard, denormalized contract fail-closed columns, fulfillment channel/owner/handover additive schema와 lifecycle audit
+2. `B-101` — Planned: 개별 상품·옵션·이미지·고시 등록, 미제출 DRAFT 삭제와 감사/asset cleanup, 자동/수동 검토, Coreable 가격 계산
+3. `B-102` — Planned: TRACKED/UNTRACKED 재고, 24시간 예약·만료, 금액 불일치 결제그룹 전액 환불, 늦은 입금 재확보
+4. `B-103` — Planned: 공급처 출고 요청 생성·목록/상세, KEEP `COREABLE_MANUAL` fallback, 배송 메모 snapshot, `requestedAt + 60일` PII fallback, 접근 로그, 이메일 알림
+5. `B-104` — Planned: report table에 의존하지 않는 복수 Shipment 공통 lock/service, 수량 할당, 공식 택배사 링크, 송장마다 monotonic PII cutoff 단축, 고객/admin 호환
+6. `B-105` — Planned: REPORTED 품절 인계와 Coreable 승인/거절, 기존 Shipment service에 report lock/open guard 확장, supplier claim facts, 환불 경계
 
 ## Cross-Slice Verification Contract
 

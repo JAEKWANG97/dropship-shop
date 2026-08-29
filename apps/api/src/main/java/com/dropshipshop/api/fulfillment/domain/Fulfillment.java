@@ -2,6 +2,7 @@ package com.dropshipshop.api.fulfillment.domain;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
 
 import com.dropshipshop.api.catalog.domain.Supplier;
@@ -40,6 +41,29 @@ public class Fulfillment {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
 	private FulfillmentStatus status = FulfillmentStatus.PENDING;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 30)
+	private FulfillmentChannel channel = FulfillmentChannel.COREABLE_MANUAL;
+
+	@Column(name = "requested_at")
+	private Instant requestedAt;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "operational_owner", nullable = false, length = 20)
+	private FulfillmentOperationalOwner operationalOwner = FulfillmentOperationalOwner.COREABLE;
+
+	@Column(name = "pii_access_cutoff_at")
+	private Instant piiAccessCutoffAt;
+
+	@Column(name = "handed_over_at")
+	private Instant handedOverAt;
+
+	@Column(name = "handed_over_reason", length = 200)
+	private String handedOverReason;
+
+	@Column(name = "handed_over_by_admin_id")
+	private UUID handedOverByAdminId;
 
 	@Column(name = "supplier_order_started_at")
 	private Instant supplierOrderStartedAt;
@@ -102,6 +126,42 @@ public class Fulfillment {
 	public Fulfillment(CustomerOrder order) {
 		this.order = order;
 		this.supplier = order.getSupplier();
+	}
+
+	public void routeToSupplierPortal(Instant requestedAt, Instant piiAccessCutoffAt) {
+		Objects.requireNonNull(requestedAt, "requestedAt");
+		Objects.requireNonNull(piiAccessCutoffAt, "piiAccessCutoffAt");
+		if (piiAccessCutoffAt.isBefore(requestedAt)) {
+			throw new IllegalArgumentException("PII access cutoff cannot precede the request time");
+		}
+		if (handedOverAt != null) {
+			throw new IllegalStateException("Handed-over fulfillment cannot return to supplier ownership");
+		}
+		channel = FulfillmentChannel.SUPPLIER_PORTAL;
+		operationalOwner = FulfillmentOperationalOwner.SUPPLIER;
+		this.requestedAt = requestedAt;
+		this.piiAccessCutoffAt = piiAccessCutoffAt;
+	}
+
+	public boolean isOpenPortalSupplierOwned() {
+		return channel == FulfillmentChannel.SUPPLIER_PORTAL
+			&& operationalOwner == FulfillmentOperationalOwner.SUPPLIER
+			&& (status == FulfillmentStatus.PENDING || status == FulfillmentStatus.ORDERED);
+	}
+
+	public boolean handOverToCoreable(
+		Instant handedOverAt,
+		FulfillmentHandoverReasonCode reasonCode,
+		UUID handedOverByAdminId
+	) {
+		if (!isOpenPortalSupplierOwned()) {
+			return false;
+		}
+		this.operationalOwner = FulfillmentOperationalOwner.COREABLE;
+		this.handedOverAt = Objects.requireNonNull(handedOverAt, "handedOverAt");
+		this.handedOverReason = Objects.requireNonNull(reasonCode, "reasonCode").name();
+		this.handedOverByAdminId = handedOverByAdminId;
+		return true;
 	}
 
 	@PrePersist
@@ -244,8 +304,40 @@ public class Fulfillment {
 		return order;
 	}
 
+	public Supplier getSupplier() {
+		return supplier;
+	}
+
 	public FulfillmentStatus getStatus() {
 		return status;
+	}
+
+	public FulfillmentChannel getChannel() {
+		return channel;
+	}
+
+	public Instant getRequestedAt() {
+		return requestedAt;
+	}
+
+	public FulfillmentOperationalOwner getOperationalOwner() {
+		return operationalOwner;
+	}
+
+	public Instant getPiiAccessCutoffAt() {
+		return piiAccessCutoffAt;
+	}
+
+	public Instant getHandedOverAt() {
+		return handedOverAt;
+	}
+
+	public String getHandedOverReason() {
+		return handedOverReason;
+	}
+
+	public UUID getHandedOverByAdminId() {
+		return handedOverByAdminId;
 	}
 
 	public Instant getSupplierOrderStartedAt() {
@@ -306,5 +398,13 @@ public class Fulfillment {
 
 	public String getSupplierCancelStatus() {
 		return supplierCancelStatus;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
+	}
+
+	public Instant getUpdatedAt() {
+		return updatedAt;
 	}
 }

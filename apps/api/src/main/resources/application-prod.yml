@@ -9,6 +9,9 @@ spring:
     hibernate:
       ddl-auto: validate
 
+server:
+  forward-headers-strategy: native
+
 sms:
   sens:
     enabled: ${SMS_SENS_ENABLED:false}
@@ -19,6 +22,11 @@ sms:
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL}
+  supplier-portal:
+    enabled: ${APP_SUPPLIER_PORTAL_ENABLED:false}
+    hmac-secret: ${APP_SUPPLIER_PORTAL_HMAC_SECRET}
+    kakao-redirect-uri: ${OAUTH_KAKAO_SUPPLIER_REDIRECT_URI}
+    success-redirect-uri: ${APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI}
   sales:
     enabled: ${APP_SALES_ENABLED:false}
   bank-transfer:

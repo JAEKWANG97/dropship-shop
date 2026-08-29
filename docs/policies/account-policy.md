@@ -59,9 +59,9 @@ Status: Confirmed
 - 필수 이용약관/개인정보처리방침 현재 버전에 동의하지 않은 고객은 주문 생성으로 진행할 수 없다.
 - 상품 조회와 장바구니 조회/수정은 동의 전에도 허용하지만, `POST /api/checkouts`는 현재 필수 동의가 있어야 한다.
 
-## Supplier Portal Account Policy — Planned (`B-100`)
+## Supplier Portal Account Policy — Implemented (`B-100`), Production Gated
 
-Status: Planned (`B-100`). Existing customer/admin account behavior remains unchanged until this slice ships.
+Status: `B-100` onboarding, Kakao activation, dynamic authority, lifecycle and application/invite retention are Implemented without changing existing customer/admin roles. `B-098` contract evidence automation and post-relationship cleanup remain Planned, so production activation stays disabled pending all release gates.
 
 - 외부 공급처 신청은 로그인 없이 받지만, 공급처 포털 접근은 Coreable 승인과 이메일 초대 수락을 모두 거쳐야 한다.
 - 공급처 신청은 active `SUPPLIER_APPLICATION_PRIVACY` exact version을 서버에서 검증해 canonical 동의시각과 함께 저장하고, 정규화 연락 이메일별 non-expired `SUBMITTED` 또는 `APPROVED` 신청을 합쳐 하나만 허용한다. 새 submit은 matching overdue SUBMITTED를 lock 아래 EXPIRED·cleanup한 뒤 중복을 판단한다.
@@ -114,7 +114,7 @@ Status: Planned (`B-100`). Existing customer/admin account behavior remains unch
 - 진행 중 주문, 환불, 클레임이 하나라도 있으면 회원 탈퇴를 즉시 처리하지 않고 400으로 거부한다. 진행 중 주문은 `DELIVERED`, `CANCELLED`, `REFUNDED`, `EXPIRED`가 아닌 주문이다. 진행 중 환불은 `COMPLETED`, `REJECTED`가 아닌 환불이고, 진행 중 클레임은 `COMPLETED`, `REJECTED`, `WITHDRAWN`이 아닌 클레임이다.
 - 이번 MVP에서는 별도 `LegalRetentionRecord` 색인 테이블을 만들지 않는다. 주문, 결제, 배송, 환불, 클레임, 약관 동의 기록은 비식별화된 유저 row를 참조한 채 보존해 참조 무결성과 법정 보존 근거를 유지한다.
 
-### Planned B-100 Impact
+### Implemented B-100 Impact
 
 - 공급처 권한은 JWT의 고정 role claim만 신뢰하지 않고, 요청 시점의 활성 user, portal 상태와 `suppliers.manager_user_id` 연결을 함께 확인해야 한다. Supplier 거래 상태는 공개 판매·checkout에서 별도로 확인한다.
 - `/api/supplier/**`는 인증 principal에서 supplier tenant를 결정하고 요청 payload의 supplier id를 신뢰하지 않는다.

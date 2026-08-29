@@ -63,13 +63,13 @@ Status: Confirmed
   - 이미지, 상세 블록, 상품 고시 변경
 - 상품 상세 HTML diff, 이미지 교체/정렬 diff, 상품명/요약문 상세 diff처럼 필드별 상세 diff는 MVP 이후로 미룬다.
 
-## Supplier Portal Operations Boundary — Planned (B-100, B-102, B-103, B-104, B-105)
+## Supplier Portal Operations Boundary — B-100 Implemented, B-102~B-105 Planned
 
-Status: Planned (B-100, B-102, B-103, B-104, B-105). Existing implemented admin actions remain authoritative for legacy and Coreable-managed flows until each slice ships.
+Status: B-100 application review, invitation and supplier lifecycle admin actions are Implemented. B-102 through B-105 remain Planned, and existing admin actions remain authoritative for legacy and Coreable-managed flows until each later slice ships.
 
-- Coreable 관리자는 공개 공급처 신청을 승인 또는 거절하고, 승인된 연락 이메일에만 1회용 초대를 발급한다. 신청·승인·초대와 중복 신청 방지는 B-100에서 구현한다.
+- Coreable 관리자는 공개 공급처 신청을 승인 또는 거절하고, 승인된 연락 이메일에만 1회용 초대를 발급한다. 신청·승인·초대와 중복 신청 방지는 B-100에서 구현됐다.
 - B-102 이후 확인된 금액 불일치는 단순 메모가 아니다. 관리자는 실제 입금자·금액·시각·거래 식별값과 사유를 결제그룹 전체 명령으로 기록하고, 시스템은 실제 수령액의 `PAYMENT_GROUP` Refund 한 건과 모든 포함 Order의 `REFUND_REQUESTED`를 원자적으로 만든다. `PAYMENT_PENDING`, `EXPIRED`뿐 아니라 수령 Payment/Refund/Fulfillment 없이 미입금 취소만 된 `CANCELLED` 그룹도 이 경로로 반환한다. Coreable만 승인·실제 계좌이체 완료를 기록할 수 있고 공급처에는 노출하지 않는다.
-- 신청/초대와 portal/contact/manager/sales lifecycle 명령은 idempotency key, actor, reason과 전후 상태를 append-only 감사 이력에 남긴다. LINK_EXISTING은 신청 email을 기존 Supplier 연락처에 동기화하고 재검증한다. Planned in B-100.
+- 신청/초대와 portal/contact/manager/sales lifecycle 명령은 idempotency key, actor, reason과 전후 상태를 append-only 감사 이력에 남긴다. LINK_EXISTING은 신청 email을 기존 Supplier 연락처에 동기화하고 재검증한다. Implemented in B-100.
 - 포털 주문은 입금확인과 동시에 공급처에 노출되고 배송지가 잠기며 별도 공급처 수락 액션을 두지 않는다. 기존 Coreable 수동 발주와 Domeggook 주문의 관리자 발주 시작·완료 액션은 유지한다. Planned in B-103.
 - 공급처 주문 목록 응답에는 고객 PII를 넣지 않는다. 주문 상세는 인증 principal에 연결된 본인 공급처 주문에 한해 수령인 이름, 수령인 전화번호, 우편번호, 주소1, 주소2, 배송 메모만 제공한다.
 - 공급처 주문 상세에는 고객 이메일, 회원 식별자·프로필, 결제·입금·은행·금액 정보, 환불 계좌·실행 정보, 관리자 메모, 다른 공급처와 그 상품을 제공하지 않는다. Time-valid VERIFIED contract가 없으면 최소 PII 상세와 Claim grant 접근도 제공하지 않는다.
@@ -83,11 +83,11 @@ Status: Planned (B-100, B-102, B-103, B-104, B-105). Existing implemented admin 
 - Coreable로 인계된 portal 주문에는 supplier와 같은 plural/allocation 계약의 admin shipment 생성 action을 사용한다. 기존 발주 시작/완료·단일 shipment·tracking-sync/manual-correction은 portal channel에서 차단한다. 배송완료와 시각정정은 등록시각, 완료시각, 증거확인시각, 현재시각 순서를 검증한다. Planned in B-104.
 - 공급처는 첫 송장 전 배송 그룹 주문 전체 품절과 Coreable이 만든 열린 claim task가 요청한 유형의 append-only fact만 입력할 수 있다. Claim/Refund 최종 판단, 실제 계좌환불, 고객 CS와 주문·배송 관리자 보정은 Coreable 전용이다. Planned in B-105.
 - Supplier task 생성은 idempotency key/request hash로 중복 workflow를 막는다. Coreable admin은 task list/detail에서 Claim/order linkage, 내부 context와 전체 same-task fact history를 읽은 뒤 별도 명시적 Claim/Refund action으로 판단한다. Planned in B-105.
-- 최초 초대는 아직 검증되지 않은 신청 이메일로 보내는 1회성 연락처 검증 메일이며 token과 일반 안내만 포함한다. 그 외 공급처 운영 이메일은 검증된 연락 이메일에만 보내고 제목, 본문과 payload snapshot에 고객 PII, 결제 또는 환불 정보를 포함하지 않는다. 실제 초대·운영 이메일 도착과 신규 개인정보처리방침 시행 버전을 검증하기 전에는 production supplier activation을 허용하지 않는다. Planned in B-100 and B-103.
+- 최초 초대의 token-free 저장과 ephemeral 발송 경계는 B-100에서 구현됐다. 실제 초대·운영 이메일 도착, 신규 개인정보처리방침 시행 버전과 B-103 운영 알림을 검증하기 전에는 production supplier activation을 허용하지 않는다.
 
-### Planned System Impact
+### Mixed Implementation Status
 
-- B-100은 공급처 신청 승인·거절, 초대 발급과 중복 방지 액션을 관리자 이력으로 남겨야 한다.
+- B-100은 공급처 신청 승인·거절, 초대 발급과 중복 방지 액션을 관리자 이력으로 남기도록 구현됐다.
 - B-102 금액 불일치와 그룹 환불 완료는 각각 idempotency key/request hash/immutable result를 남기고 같은 key/hash 재요청에는 최초 결과를 반환해야 한다. 실제 송금 응답을 잃은 경우 새 송금 대신 같은 key로 완료 결과를 조회·재시도하도록 관리자 UI가 경고해야 한다.
 - B-102 late-deposit 명령은 portal `EXPIRED`와 portal/legacy qualifying 미입금 `CANCELLED`를 구분한다. `CANCELLED`에서 정확한 입금을 확인하면 입금시각이나 재고를 근거로 주문을 되살리지 않고 Order별 환불 큐와 새 checkout 안내로 끝낸다.
 - B-103 supplier order query는 인증 principal의 supplier tenant와 order supplier를 함께 검증하고 목록·상세 DTO를 분리해야 한다.

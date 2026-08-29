@@ -24,6 +24,7 @@
 - Bank-transfer checkout/deposit and manual refund fields: implemented in `apps/api/src/main/resources/db/migration/V23__add_bank_transfer_payment_fields.sql`.
 - User deletion timestamp fields: implemented in `apps/api/src/main/resources/db/migration/V26__add_user_deletion_fields.sql`.
 - User referral fields: implemented in `apps/api/src/main/resources/db/migration/V28__add_user_referral_fields.sql`.
+- Supplier portal onboarding, lifecycle, application/invite retention, fulfillment handover base and notification linkage: implemented in `apps/api/src/main/resources/db/migration/V39__add_supplier_portal_onboarding.sql` (`B-100`).
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -1015,11 +1016,11 @@ Rules:
 - DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
 - Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
-## Supplier Portal Planned ERD (B-100 Through B-105)
+## Supplier Portal ERD (`B-100` Implemented; Later Slices Planned)
 
-Status: Planned. None of the tables, columns, constraints, indexes, or cardinality changes in this section are implemented yet. Existing implemented tables and legacy rows above remain valid until their owning backlog slice applies an expand-contract migration.
+Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. `B-098` contract history/command/scheduler and `B-101` through `B-105` schema remain Planned. Existing legacy rows remain valid through the expand-contract migration.
 
-Planned B-100 also extends `policy_documents.type` with `SUPPLIER_APPLICATION_PRIVACY`. The supplier application service reads the current ACTIVE row and validates the submitted version before persisting canonical consent evidence.
+B-100 also implements `SUPPLIER_APPLICATION_PRIVACY` in `policy_documents.type`. The supplier application service reads the current ACTIVE row and validates the submitted version before persisting canonical consent evidence.
 
 ```mermaid
 erDiagram
@@ -1056,9 +1057,10 @@ erDiagram
     USERS ||--o{ SUPPLIER_CLAIM_FACTS : acts
 ```
 
-### suppliers additions (Planned B-100)
+### suppliers additions (Implemented B-100, V39)
 
 - `manager_user_id`: nullable FK to `users(id)`, unique
+- `portal_enrolled_at`: nullable immutable first-enrollment marker; existing legacy rows backfill null
 - `portal_status`: `DISABLED` / `PENDING_ACTIVATION` / `ACTIVE` / `SUSPENDED`, not null
 - `contact_email_verified_at`: nullable
 - `portal_contract_status`: `UNVERIFIED` / `VERIFIED` / `EXPIRED` / `REVOKED`, not null
@@ -1073,7 +1075,8 @@ erDiagram
 Rules and compatibility:
 
 - Existing `status` keeps its catalog/trade meaning `ACTIVE` / `INACTIVE`; `portal_status` is an independent access lifecycle.
-- Existing supplier rows backfill `portal_status=DISABLED` and `manager_user_id=null`.
+- Existing supplier rows backfill `portal_status=DISABLED`, `manager_user_id=null`, and `portal_enrolled_at=null`. CREATE_NEW/LINK_EXISTING sets the marker once; permanent DISABLED retains it so legacy PATCH and contract-free sales activation cannot treat that row as never enrolled.
+- Normalized contact-email uniqueness is partial to `portal_enrolled_at is not null` and non-anonymized rows, so V39 remains compatible with pre-existing legacy duplicate email data. Application/link/contact commands still query all trimmed case-insensitive Supplier emails and reject a current collision before enrolling a portal supplier.
 - Existing supplier rows backfill `portal_contract_status=UNVERIFIED`. B-100 owns these denormalized columns/default and fail-closed sales guard; B-098 depends on them and owns history/command/evidence/expiry index/scheduler. A portal-enrolled supplier cannot move sales to ACTIVE or expose portal products unless status is VERIFIED, effective time has arrived, and expiry has not passed.
 - One supplier has at most one manager and one user manages at most one supplier. No `supplier_memberships` or team table is planned for B-100.
 - Dynamic `ROLE_SUPPLIER` requires an ACTIVE user, `portal_status=ACTIVE`, the manager FK, and the matching supplier tenant at request time. A terminal or already-overdue VERIFIED contract suppresses this authority immediately; initial UNVERIFIED onboarding may still use non-PII catalog surfaces. Existing `status` independently gates new catalog sales/checkouts, so an INACTIVE supplier manager may finish already-paid work only while the contract remains time-valid.
@@ -1083,7 +1086,7 @@ Rules and compatibility:
 - `SUSPENDED -> ACTIVE` portal reactivation requires the retained active manager, verified contact email, and time-valid VERIFIED contract. Contract re-verification alone changes none of portal status, sales status, or handed-over ownership.
 - Production activation first configures a concrete B-098/privacy-notice post-relationship duration. Permanent `portal_status=DISABLED`, trade `status=INACTIVE`, and no open Fulfillment/Claim/Refund set `contact_retention_expires_at`. At the deadline a scheduler locks Supplier and rechecks all lifecycle/open-work predicates; new open work clears/defers the deadline, and only continuing eligibility permits contact name/phone/email/memo plus approved-application duplicate PII/replay cleanup. Order/contract legal records follow their separate retention rules.
 
-### supplier_portal_action_histories (Planned B-100)
+### supplier_portal_action_histories (Implemented B-100, V39)
 
 - `id`
 - `supplier_id`: FK to `suppliers(id)`
@@ -1118,7 +1121,7 @@ Rows are append-only except explicit relationship-retention anonymization of rea
 
 Partial unique `(supplier_id,idempotency_key)` where key is non-null gives deterministic ADMIN replay. Partial unique `(supplier_id,contract_version) where status='VERIFIED'` prevents verified-version reuse, and partial unique `(supplier_id,contract_version) where status in ('EXPIRED','REVOKED')` permits at most one terminal event for that version. Index `(status,expires_at)` drives expiry. Every admin command carries `expected_current_contract_version`; VERIFIED requires it to equal current (including null initially), plus `effective_at <= now`, null/future `expires_at`, and a new version/evidence. EXPIRED/REVOKED require current Supplier status VERIFIED and the non-null target current version. Scheduler locks Supplier, compares candidate version/expiry/status again, and no-ops if terminal processing or re-verification already won. Terminal/lazy expiry sets sales INACTIVE, changes ACTIVE portal to SUSPENDED while retaining the manager, revokes an open invite, and hands all still-SUPPLIER-owned open portal Fulfillments to COREABLE with contract reason in the same transaction; PENDING_ACTIVATION stays unauthorized but loses its invite. Paid-work and Claim-grant reads independently require time-valid VERIFIED. Re-verification never reactivates portal/sales or restores ownership. Current fields update with history; evidence never enters supplier/customer projections.
 
-### supplier_applications (Planned B-100)
+### supplier_applications (Implemented B-100, V39)
 
 - `id`
 - `supplier_name`: nullable after retention anonymization
@@ -1160,7 +1163,7 @@ Constraints and indexes:
 - Review reason code is `APPLICATION_APPROVED`, `INCOMPLETE_INFORMATION`, `OUT_OF_SCOPE`, `POLICY_NOT_MET`, or `DUPLICATE_OR_EXISTING_RELATIONSHIP`; approval requires the first and rejection permits only the others. Internal review reason rejects PII.
 - Supplier or User matching is never inferred from equal name/email values.
 
-### supplier_invites (Planned B-100)
+### supplier_invites (Implemented B-100, V39)
 
 - `id`
 - `supplier_id`: FK to `suppliers(id)`
@@ -1182,7 +1185,7 @@ Constraints and indexes:
 Constraints and transaction rules:
 
 - A partial unique index on `supplier_id` where `consumed_at is null and revoked_at is null` permits only one open invite. Reissue first revokes the previous row, including an expired open row.
-- Partial unique `(supplier_id, issuance_idempotency_key)` where key is non-null protects approval issuance and explicit reissue during the retention window. Identical request HMAC replay returns the existing invite metadata; a key reused with another payload is rejected. After scoped replay lookup, only a new reissue key plus an allowlisted reason code and locked Supplier with `portal_status=PENDING_ACTIVATION`, null manager, non-null contact email, and null verification time revokes/replaces an open row. ACTIVE/SUSPENDED/DISABLED or manager-bound rows reject the command.
+- Partial unique `(supplier_id, issuance_idempotency_key)` where key is non-null protects approval issuance and explicit reissue during the retention window. Approval uses an `application:` namespace; reissue derives a distinct `reissue:` server-HMAC namespace from the command key so a caller cannot replay a revoked approval invite accidentally. Identical command key/HMAC replay returns the stored action result; a key reused with another payload is rejected. After scoped replay lookup, only a new reissue key plus an allowlisted reason code and locked Supplier with `portal_status=PENDING_ACTIVATION`, null manager, non-null contact email, and null verification time revokes/replaces an open row. ACTIVE/SUSPENDED/DISABLED or manager-bound rows reject the command.
 - Only a digest of a minimum 256-bit token is stored. The raw token must not enter SQL, application logs, or access logs. This is the sole pre-verification contact email and contains only the token/link and generic connection instructions.
 - The default expiry is seven days.
 - Invitation NotificationLog payload stores token-free metadata only (`supplier_invite_id`, template, expiry, delivery state). The raw fragment link exists only in ephemeral after-commit sending memory; a crash or delivery failure requires a new reissue key/token rather than generic resend.
@@ -1297,7 +1300,7 @@ Constraints and compatibility:
 - Existing legacy `PAYMENT_EXCEPTION` rows and current admin/customer compatibility remain readable. Detailed deposit, exception and refund-next-action fields are ADMIN-only.
 - Amount-mismatch manual completion locks PaymentGroup, its Payment, every included Order, then the group Refund. It accepts only the exact outstanding actual receipt, stores bank-transfer evidence once under its own key/hash/result replay, and atomically sets Refund/Payment/PaymentGroup/all Orders to `REFUNDED`; this path never uses `PARTIALLY_REFUNDED`.
 
-### order and fulfillment additions (Planned B-100/B-103/B-104)
+### order and fulfillment additions (B-100 Base Schema Implemented; B-103/B-104 Planned)
 
 `orders`:
 
@@ -1324,7 +1327,7 @@ Rules and compatibility:
 - Supplier paid-work list/detail and shipment/shortage mutations require a time-valid VERIFIED contract, channel SUPPLIER_PORTAL, owner SUPPLIER, tenant, and action-eligible Order state. Detail also requires the original supplier's ACTIVE portal/current manager. COREABLE-owner work remains readable without a Claim grant only as `EXPIRED_MASKED` after cutoff or `TERMINAL_MASKED` after the listed terminal states; an active allowed-status Claim grant opens read-only FULL only with a time-valid contract. Contract expiry/revoke is a lifecycle authorization `403`; admin/shortage and other non-readable handover return `404` regardless of an older grant. None of these exceptions grants fulfillment mutation. OUT_OF_STOCK/CANCELLED/REFUND_REQUESTED/REFUNDED or contract terminal transition takes open portal work over to COREABLE.
 - `orders.supplier_id` remains the supplier assignment boundary; no second portal-order assignment table is added.
 
-### fulfillment_handover_histories (Planned B-100/B-103)
+### fulfillment_handover_histories (B-100 Schema/Lifecycle Implemented; B-103 Commands Planned)
 
 - `id`
 - `fulfillment_id`: FK to `fulfillments(id)`
@@ -1337,7 +1340,7 @@ Rules and compatibility:
 - `result_snapshot`: nullable ADMIN-safe JSONB command result
 - `created_at`
 
-The owner mutation and immutable history insert commit together. ADMIN takeover reason validation rejects email, phone, address, delivery memo, customer identifiers, line breaks, and values over 200 characters before writing either the history or denormalized Fulfillment field. A partial unique `(fulfillment_id,idempotency_key)` where the key is non-null makes admin takeover replay-safe: identical hash returns `result_snapshot`, while changed payload conflicts even after owner became COREABLE. Scheduler/lifecycle writers use an owner compare-and-set and append at most one row for the locked transition without an external key.
+B-100 lifecycle owner mutation and immutable history insert commit together. Planned B-103 ADMIN takeover validates the bounded PII-free reason and uses V39's partial unique `(fulfillment_id,idempotency_key)` for replay safety; its cutoff scheduler uses an owner compare-and-set under the locked transition.
 
 ### shipments and shipment_items (Planned B-104)
 
@@ -1518,14 +1521,14 @@ Rules and indexes:
 
 Supplier-side actor FKs are retention-bounded even when their business rows remain append-only. Invite consumption and catalog/inventory/lifecycle supplier identity are nulled at the configured B-098 relationship deadline. Shipment/shortage/claim supplier identity is retained only through the parent Order/Claim legal-retention boundary, then nulled or removed with the parent; actor type, supplier/business object, action/state/version and timestamp may remain as non-PII evidence. `supplier_pii_access_logs` instead delete the whole row after one year.
 
-### notification_logs supplier linkage (Planned B-100/B-103)
+### notification_logs supplier linkage (B-100 Invite Linkage Implemented; B-103 Operational Use Planned)
 
-- Existing `recipient` changes from NOT NULL to nullable in a B-100 expand migration. Compatible entity/writers/readers deploy before any cleanup job writes null; legacy notification behavior otherwise remains unchanged.
+- V39 changes existing `recipient` from NOT NULL to nullable and adds compatible entity/writer/reader handling before B-100 cleanup writes null; legacy notification behavior otherwise remains unchanged.
 - `supplier_id`: nullable FK to `suppliers(id)`
 - `supplier_invite_id`: nullable FK to `supplier_invites(id)`
 - `recipient_retention_expires_at`: nullable for non-supplier legacy logs
 - `recipient_anonymized_at`: nullable
-- Supplier notification types for invitation, fulfillment request, product review result, and approved claim work request
+- `SUPPLIER_INVITATION` notification type — Implemented B-100; fulfillment request, product review result and approved claim work request types — Planned in their later slices
 
 Rules:
 

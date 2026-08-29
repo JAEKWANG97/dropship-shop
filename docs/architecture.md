@@ -15,7 +15,7 @@ Browser
   -> Backup job copies database and uploads to S3
 ```
 
-이 다이어그램은 현재 구현 기준이다. 공급처 포털은 `B-100`~`B-105`의 Planned 확장이며 기존 Next.js web, Spring Boot modular monolith와 PostgreSQL 안에 추가한다. 별도 판매자 서비스, 정산 시스템 또는 결제 시스템을 만들지 않는다.
+이 다이어그램은 현재 구현 기준이다. 공급처 포털의 `B-100` 신청·초대·Kakao 연결·lifecycle·기본 Web과 additive schema는 같은 Next.js web, Spring Boot modular monolith와 PostgreSQL 안에 구현됐다. `B-101`~`B-105`는 Planned 확장이며 별도 판매자 서비스, 정산 시스템 또는 결제 시스템을 만들지 않는다.
 
 ## Repository Structure
 
@@ -83,17 +83,17 @@ Primary data:
 - refunds
 - order_status_histories
 
-Planned supplier portal data (`B-100`~`B-105`):
+Supplier portal data (`B-100` Implemented, `B-101`~`B-105` Planned):
 
-- public supplier applications and one-time invitation digests
-- one active supplier manager link per supplier
-- product review state separated from existing compliance state
-- `TRACKED` option inventory and order-item reservation lifecycle
-- fulfillment channel/request timestamp, minimal supplier PII access logs and append-only claim access grants
-- multiple shipments with item quantity allocations and correction/void/delivery evidence
-- shortage reports, Coreable-owned claim tasks, append-only supplier claim facts and supplier email audit linkage
+- public supplier applications and one-time invitation digests — Implemented B-100
+- one active supplier manager link per supplier — Implemented B-100
+- product review state separated from existing compliance state — Planned B-101
+- `TRACKED` option inventory and order-item reservation lifecycle — Planned B-102
+- fulfillment channel/owner/handover additive base — Implemented B-100; portal request timestamp behavior, minimal supplier PII access logs and append-only claim access grants — Planned B-103
+- multiple shipments with item quantity allocations and correction/void/delivery evidence — Planned B-104
+- shortage reports, Coreable-owned claim tasks and append-only supplier claim facts — Planned B-105; operational supplier email audit — Planned B-103
 
-These are schema extensions, not current implemented tables or fields. Existing options and orders are backfilled or interpreted as `UNTRACKED` and legacy fulfillment channels through expand-contract migrations.
+V39 implements the B-100 schema extensions without changing legacy behavior. Existing option/inventory and later order/shipment changes remain Planned and will use expand-contract migrations.
 
 ## Frontend
 
@@ -116,16 +116,16 @@ Initial route groups:
 /admin/suppliers
 ```
 
-Planned supplier portal routes:
+Supplier portal routes:
 
 ```text
-/supplier/apply                 B-100 public application
-/supplier/activate              B-100 one-time invitation exchange and Kakao login
-/supplier                       B-100 supplier home
-/supplier/products              B-101 individual product management
-/supplier/orders                B-103 fulfillment request queue
-/supplier/orders/:orderNumber   B-103 minimum-PII detail and B-104 tracking registration
-/supplier/claim-tasks           B-105 Coreable-requested safe fact tasks
+/supplier/apply                 Implemented B-100 public application
+/supplier/activate              Implemented B-100 one-time invitation exchange and Kakao login
+/supplier                       Implemented B-100 supplier home
+/supplier/products              Planned B-101 individual product management
+/supplier/orders                Planned B-103 fulfillment request queue
+/supplier/orders/:orderNumber   Planned B-103 minimum-PII detail and B-104 tracking registration
+/supplier/claim-tasks           Planned B-105 Coreable-requested safe fact tasks
 ```
 
 ## Admin
@@ -143,7 +143,7 @@ First admin screens:
 - Fulfillment action panel
 - Refund action panel
 
-## Supplier Portal — Planned (`B-100`~`B-105`)
+## Supplier Portal — `B-100` Implemented, `B-101`~`B-105` Planned
 
 The portal is a tenant-scoped operational surface for approved suppliers. Coreable remains the only customer-facing seller and keeps customer price, payment, refund, CS, claim decisions and final product control. The portal has no supplier settlement or seller-led customer transaction flow.
 
@@ -201,14 +201,14 @@ Runtime storage rules:
 - Domeggook source snapshot orders use the approved Private API after customer deposit confirmation and pay with prefunded e-money.
 - The API revalidates item, option, source price, shipping, and e-money immediately before purchase.
 - Orders without a supported source snapshot stay on the manual supplier-order path.
-- The Planned supplier portal is an authenticated first-party workflow inside the existing application, not another supplier purchasing API. It adds supplier-managed `TRACKED` inventory while preserving existing manual/Domeggook `UNTRACKED` behavior.
+- The B-100 supplier onboarding portal is an authenticated first-party workflow inside the existing application, not another supplier purchasing API. Planned B-101/B-102 add supplier-managed `TRACKED` inventory while preserving existing manual/Domeggook `UNTRACKED` behavior.
 - Additional automated supplier purchasing APIs and live carrier-status APIs are not part of `B-100`~`B-105`.
 
 ## Security Notes
 
 - Admin APIs require admin role.
 - Customer APIs must scope data by authenticated user.
-- Planned supplier APIs require an active user, active portal status and manager link, then scope every query by both resource id and supplier id. `Supplier.status` separately gates new catalog sales/checkouts. Cross-supplier access returns `404` without revealing existence.
+- B-100 dynamically derives supplier authority from an active user, active portal status and manager link. Planned B-101~B-105 resource APIs additionally scope every query by both resource id and supplier id. `Supplier.status` separately gates new catalog sales/checkouts, and cross-supplier access returns `404` without revealing existence.
 - One-time invitation tokens are stored only as digests and must not appear in application logs, email payload snapshots, access logs or Referer values.
 - Supplier list responses contain no customer PII. Detail responses expose only delivery-required fields for a bounded period and use `Cache-Control: no-store` on PII-bearing responses.
 - Supplier PII access logs record only actor, order, access basis and time, never PII values or the response body.

@@ -21,6 +21,7 @@ import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
+import com.dropshipshop.api.catalog.repository.SupplierRepository;
 
 @Service
 class AccountDeletionService {
@@ -47,23 +48,33 @@ class AccountDeletionService {
 	private final CustomerOrderRepository customerOrderRepository;
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
+	private final SupplierRepository supplierRepository;
 	private final Clock clock = Clock.systemUTC();
 
 	AccountDeletionService(
 		UserAccountRepository userAccountRepository,
 		CustomerOrderRepository customerOrderRepository,
 		RefundRepository refundRepository,
-		ClaimRepository claimRepository
+		ClaimRepository claimRepository,
+		SupplierRepository supplierRepository
 	) {
 		this.userAccountRepository = userAccountRepository;
 		this.customerOrderRepository = customerOrderRepository;
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
+		this.supplierRepository = supplierRepository;
 	}
 
 	@Transactional
 	public void deleteCustomerAccount(UUID userId) {
-		UserAccount user = userAccountRepository.findByIdAndStatus(userId, UserStatus.ACTIVE)
+		if (supplierRepository.findByManagerUserIdForUpdate(userId).isPresent()) {
+			throw new ResponseStatusException(
+				HttpStatus.CONFLICT,
+				"Supplier managers must be disconnected by an administrator before account deletion"
+			);
+		}
+		UserAccount user = userAccountRepository.findByIdForUpdate(userId)
+			.filter(account -> account.getStatus() == UserStatus.ACTIVE)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Active user account was not found"));
 		assertNoActiveCommerceWork(userId);
 		Instant now = Instant.now(clock);

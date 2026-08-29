@@ -27,6 +27,10 @@ sms:
 app:
   sales:
     enabled: ${APP_SALES_ENABLED:true}
+  supplier-portal:
+    enabled: ${APP_SUPPLIER_PORTAL_ENABLED:true}
+    kakao-redirect-uri: ${OAUTH_KAKAO_SUPPLIER_REDIRECT_URI:http://localhost:8080/api/supplier/auth/kakao/callback}
+    success-redirect-uri: ${APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI:http://localhost:3000/supplier}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
