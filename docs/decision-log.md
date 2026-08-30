@@ -6,10 +6,10 @@
 - 고객 결제의 현재 기준은 `2026-07-17: Direct Bank Transfer Only, No Toss Payments`와 `2026-07-18: Remove Unused Toss Payments Execution Paths`다. 이전 Toss/PG 항목은 역사 기록이다.
 - 상품 가격의 현재 기준은 `2026-07-28: Supplier Shipping Is Excluded From Product Markup`이다. 공급처 배송비는 수집 가능성 검증에는 사용하지만 판매가 계산에는 더하지 않는다.
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
-- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`이다. `B-100` 신청·인증과 `B-101` 개별 상품·검토는 구현됐고, `B-102`~`B-105`는 각 slice가 구현될 때까지 기존 Domeggook/수동 발주 동작을 유지한다.
-- 계좌입금 금액 불일치의 후속 설계 기준도 같은 2026-08-29 결정이다. `B-102`가 구현되면 실제 수령액을 메모-only `PAYMENT_PENDING`으로 두지 않고 결제그룹 단위 전액 환불 예외로 처리하며, 그 전까지는 B-068의 기존 동작을 현재 구현으로 읽는다.
+- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`이다. `B-100` 신청·인증, `B-101` 개별 상품·검토와 `B-102` 옵션 재고·예약·입금 예외는 구현됐고, `B-103`~`B-105` 출고·송장·품절 slice가 구현될 때까지 기존 Domeggook/수동 발주 동작을 유지한다.
+- 계좌입금 금액 불일치의 현재 기준도 같은 2026-08-29 결정과 구현된 B-102다. 식별된 양수 실제 수령액을 메모-only `PAYMENT_PENDING`으로 두지 않고 결제그룹 단위 전액 환불 예외로 처리한다. B-068의 과거 메모는 읽기 호환으로 남기며 어느 PaymentGroup인지 식별하지 못한 은행 거래는 주문을 추측해 변경하지 않는다.
 - Planned 포털 송장 등록은 실제 배송 시작과 다르다. 공식 택배사 조회 링크만 제공하고, 기존 Domeggook 배송 동기화와 관리자 수동 보정은 호환 경로로 유지한다.
-- 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 `B-102`~`B-105` 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Planned` 절을 함께 맞추되, 이를 현재 구현으로 해석하지 않는다.
+- 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 `B-103`~`B-105` 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Planned` 절을 함께 맞추되, 이를 현재 구현으로 해석하지 않는다.
 
 ## 2026-08-30: Supplier Product Auto Review Reuses The Approved Category Policy
 

@@ -100,6 +100,7 @@ export type AdminOrder = {
   totalAmount: number;
   createdAt: string;
   paymentGroup?: {
+    paymentGroupId?: string;
     checkoutNumber: string;
     status: string;
     totalAmount: number;
@@ -157,6 +158,11 @@ export type AdminOrder = {
   } | null;
   refund?: {
     refundId: string;
+    orderId?: string | null;
+    orderNumber?: string | null;
+    paymentGroupId?: string | null;
+    appliedOrderIds?: string[];
+    refundScope?: "PAYMENT_GROUP" | "DELIVERY_GROUP_ORDER";
     reason?: string;
     status: string;
     refundAmount: number;
@@ -212,6 +218,16 @@ export type AdminOrderPage = {
   totalElements: number;
   totalPages: number;
 };
+
+export function adminRefundProjection(refund: NonNullable<AdminOrder["refund"]>) {
+  const paymentGroup = refund.refundScope === "PAYMENT_GROUP";
+  return {
+    scopeLabel: paymentGroup ? "결제그룹 전체" : "배송그룹 주문",
+    paymentGroupId: refund.paymentGroupId ?? null,
+    appliedOrderIds: refund.appliedOrderIds ?? (refund.orderId ? [refund.orderId] : []),
+    refundAmount: refund.refundAmount,
+  };
+}
 
 export type AdminOrderActionHistory = {
   actionHistoryId: string;
@@ -305,6 +321,7 @@ export function adminStatusLabel(status: string) {
       HIDDEN: "숨김",
       STOPPED: "판매중지",
       PAYMENT_PENDING: "입금대기",
+      EXPIRED: "입금기한 만료",
       SUPPLIER_ORDER_PENDING: "발주대기",
       SUPPLIER_ORDERED: "발주완료",
       SHIPPED: "배송중",

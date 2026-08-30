@@ -23,11 +23,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.dropshipshop.api.auth.security.TestAuthentication;
+import com.dropshipshop.api.catalog.domain.InventoryMode;
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.catalog.domain.SupplierAvailability;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
@@ -328,6 +330,52 @@ class CartApiIntegrationTest {
 			.andExpect(jsonPath("$.items[0].unitPrice", is(0)))
 			.andExpect(jsonPath("$.items[0].lineAmount", is(0)))
 			.andExpect(jsonPath("$.items[0].sellable", is(false)));
+	}
+
+	@Test
+	void usesActualCartQuantityForTrackedInventoryAndSupplierOrderStop() throws Exception {
+		UserAccount customer = createCustomer("cart-tracked-inventory");
+		ProductOption option = createOption("Tracked Cart Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE);
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 3L);
+		productOptionRepository.saveAndFlush(option);
+
+		addItem(customer.getId(), option.getId(), 2)
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.checkoutAvailable", is(true)));
+
+		addItem(customer.getId(), option.getId(), 2)
+			.andExpect(status().isBadRequest());
+
+		UUID cartItemId = currentCartItemId(customer.getId());
+		mockMvc.perform(patch("/api/cart/items/{cartItemId}", cartItemId)
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "quantity": 4
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 1L);
+		productOptionRepository.saveAndFlush(option);
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
+			.andExpect(jsonPath("$.items[0].sellable", is(false)))
+			.andExpect(jsonPath("$.issues[0].code", is("UNSELLABLE_ITEM")));
+
+		option.updateInventory(SupplierAvailability.UNAVAILABLE, InventoryMode.TRACKED, 3L);
+		productOptionRepository.saveAndFlush(option);
+		mockMvc.perform(post("/api/cart/validate")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
+			.andExpect(jsonPath("$.issues[0].code", is("UNSELLABLE_ITEM")))
+			.andExpect(jsonPath("$.issues[0].message", is(
+				"현재 선택 수량은 품절 또는 주문 중지로 주문할 수 없습니다. 수량을 줄이거나 다른 옵션을 선택해 주세요."
+			)));
 	}
 
 	private UserAccount createCustomer(String providerUserId) {

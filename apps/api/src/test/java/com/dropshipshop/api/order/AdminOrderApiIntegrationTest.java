@@ -51,7 +51,13 @@ import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
+import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.domain.RefundReason;
+import com.dropshipshop.api.refund.domain.RefundScope;
+import com.dropshipshop.api.refund.domain.RefundStatus;
+import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
@@ -86,6 +92,12 @@ class AdminOrderApiIntegrationTest {
 
 	@Autowired
 	private PaymentRepository paymentRepository;
+
+	@Autowired
+	private PaymentEventRepository paymentEventRepository;
+
+	@Autowired
+	private RefundRepository refundRepository;
 
 	@Autowired
 	private CustomerOrderRepository orderRepository;
@@ -259,7 +271,7 @@ class AdminOrderApiIntegrationTest {
 					  "reason": "Duplicate confirmation"
 					}
 					"""))
-			.andExpect(status().isBadRequest());
+			.andExpect(status().isConflict());
 	}
 
 	@Test
@@ -281,14 +293,250 @@ class AdminOrderApiIntegrationTest {
 					  "reason": "Deposit amount checked"
 					}
 					"""))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.message", is("Actual deposit amount must match the checkout total")));
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.message", is("Deposit amount differs from checkout total; use the deposit-mismatch action")));
 
 		PaymentGroup savedPaymentGroup = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
 		assertThat(savedPaymentGroup.getStatus()).isEqualTo(PaymentGroupStatus.PAYMENT_PENDING);
 		assertThat(savedPaymentGroup.getActualDepositAmount()).isNull();
 		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(savedPaymentGroup.getId())).isEmpty();
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+	}
+
+	@Test
+	void recordsAmountMismatchExactlyOnceAndCompletesTheGroupRefund() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-b102-mismatch");
+		CustomerOrder order = createPaymentPendingOrder(
+			customer, "ADM-B102-MISMATCH-1", "ADM-B102-MISMATCH-CO-1", 45000);
+		String mismatchBody = """
+			{
+			  "actualDepositorName": "Receiver",
+			  "actualAmount": 44900,
+			  "depositedAt": "2020-07-19T09:00:00Z",
+			  "transactionReference": "BANK-B102-MISMATCH-1",
+			  "reason": "Received amount differs from checkout total"
+			}
+			""";
+
+		for (int attempt = 0; attempt < 2; attempt++) {
+			mockMvc.perform(post("/api/admin/orders/{orderId}/deposit-mismatch", order.getId())
+					.header("Idempotency-Key", "b102-mismatch-key-1")
+					.with(authentication(TestAuthentication.admin()))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(mismatchBody))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.outcome", is("PAYMENT_EXCEPTION")))
+				.andExpect(jsonPath("$.exceptionReason", is("AMOUNT_MISMATCH")))
+				.andExpect(jsonPath("$.refund.refundScope", is("PAYMENT_GROUP")))
+				.andExpect(jsonPath("$.refund.orderId").doesNotExist())
+				.andExpect(jsonPath("$.refund.refundAmount", is(44900)));
+		}
+
+		PaymentGroup group = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
+		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(group.getId()).orElseThrow();
+		Refund refund = refundRepository.findByPaymentGroup_IdAndRefundScope(group.getId(), RefundScope.PAYMENT_GROUP)
+			.orElseThrow();
+		assertThat(group.getStatus()).isEqualTo(PaymentGroupStatus.PAYMENT_EXCEPTION);
+		assertThat(group.getRefundableAmount()).isEqualTo(44900);
+		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAYMENT_EXCEPTION);
+		assertThat(payment.getRequestedAmount()).isEqualTo(44900);
+		assertThat(refund.getReason()).isEqualTo(RefundReason.PAYMENT_AMOUNT_MISMATCH);
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+			.isEqualTo(OrderStatus.REFUND_REQUESTED);
+		assertThat(paymentEventRepository.countByIdempotencyKey("b102-mismatch-key-1")).isEqualTo(1);
+
+		mockMvc.perform(get("/api/checkouts/{checkoutNumber}", group.getCheckoutNumber())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.customerDisplayStatus", is("REFUND_PROCESSING")))
+			.andExpect(jsonPath("$.customerDisplayLabel", is("입금 확인 및 환불 처리 중")))
+			.andExpect(jsonPath("$.refundAmount", is(44900)))
+			.andExpect(jsonPath("$.orders[0].customerDisplayStatus", is("REFUND_PROCESSING")))
+			.andExpect(jsonPath("$.orders[0].refundAmount", is(44900)))
+			.andExpect(jsonPath("$.actualDepositorName").doesNotExist())
+			.andExpect(jsonPath("$.depositTransactionReference").doesNotExist());
+		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.customerDisplayStatus", is("REFUND_PROCESSING")))
+			.andExpect(jsonPath("$.customerDisplayLabel", is("입금 확인 및 환불 처리 중")))
+			.andExpect(jsonPath("$.refundAmount", is(44900)))
+			.andExpect(jsonPath("$.paymentGroup.customerDisplayStatus", is("REFUND_PROCESSING")))
+			.andExpect(jsonPath("$.paymentGroup.refundAmount", is(44900)))
+			.andExpect(jsonPath("$.payment.actualDepositorName").doesNotExist())
+			.andExpect(jsonPath("$.payment.transactionReference").doesNotExist());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/deposit-mismatch", order.getId())
+				.header("Idempotency-Key", "b102-mismatch-key-1")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(mismatchBody.replace("44900", "44800")))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code", is("IDEMPOTENCY_CONFLICT")));
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-review", refund.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"status":"REJECTED","reason":"Do not discard received customer money"}
+					"""))
+			.andExpect(status().isBadRequest());
+		assertThat(refundRepository.findById(refund.getId()).orElseThrow().getStatus())
+			.isEqualTo(RefundStatus.REQUESTED);
+		assertThat(refundRepository.findById(refund.getId()).orElseThrow().getRefundAmount()).isEqualTo(44900);
+
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/approve", refund.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Verified received bank payment refund"}
+					"""))
+			.andExpect(status().isOk());
+
+		String completeBody = """
+			{
+			  "transferredAmount": 44900,
+			  "reason": "Returned received bank payment",
+			  "bankName": "Refund Bank",
+			  "accountNumber": "123-456-789",
+			  "accountHolder": "Receiver",
+			  "transferredAt": "2020-07-19T10:00:00Z",
+			  "transactionReference": "B102-REFUND-TRANSFER-1"
+			}
+			""";
+		mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-complete", refund.getId())
+				.header("Idempotency-Key", "b102-refund-wrong-amount-key-1")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(completeBody.replace("44900", "44899")))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code", is("CONFLICT")));
+		assertThat(refundRepository.findById(refund.getId()).orElseThrow().getStatus())
+			.isEqualTo(RefundStatus.APPROVED);
+		assertThat(refundRepository.findById(refund.getId()).orElseThrow().getRefundAmount()).isEqualTo(44900);
+		assertThat(paymentGroupRepository.findById(group.getId()).orElseThrow().getRefundableAmount()).isEqualTo(44900);
+		assertThat(paymentEventRepository.countByIdempotencyKey("b102-refund-wrong-amount-key-1")).isZero();
+		for (int attempt = 0; attempt < 2; attempt++) {
+			mockMvc.perform(post("/api/admin/refunds/{refundId}/manual-complete", refund.getId())
+					.header("Idempotency-Key", "b102-refund-key-1")
+					.with(authentication(TestAuthentication.admin()))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(completeBody))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status", is("COMPLETED")))
+				.andExpect(jsonPath("$.paymentGroupStatus", is("REFUNDED")))
+				.andExpect(jsonPath("$.appliedOrderIds[0]", is(order.getId().toString())));
+		}
+
+		assertThat(paymentGroupRepository.findById(group.getId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentGroupStatus.REFUNDED);
+		assertThat(paymentRepository.findById(payment.getId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentStatus.REFUNDED);
+		assertThat(refundRepository.findById(refund.getId()).orElseThrow().getStatus())
+			.isEqualTo(RefundStatus.COMPLETED);
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+			.isEqualTo(OrderStatus.REFUNDED);
+		assertThat(paymentEventRepository.countByIdempotencyKey("b102-refund-key-1")).isEqualTo(1);
+		assertThat(paymentEventRepository
+			.findByPaymentGroup_IdAndIdempotencyKeyAndCommandTypeIsNotNull(group.getId(), "b102-refund-key-1")
+			.orElseThrow().getOrderId()).isNull();
+		assertThat(paymentEventRepository
+			.findByPaymentGroup_IdAndIdempotencyKeyAndCommandTypeIsNotNull(group.getId(), "b102-refund-key-1")
+			.orElseThrow().getResultSnapshot())
+			.doesNotContain("123-456-789", "B102-REFUND-TRANSFER-1");
+		mockMvc.perform(get("/api/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.customerDisplayStatus", is("REFUNDED")))
+			.andExpect(jsonPath("$.customerDisplayLabel", is("환불 완료")))
+			.andExpect(jsonPath("$.refundAmount", is(44900)));
+	}
+
+	@Test
+	void exactDepositAfterUnpaidCancellationNeverResumesTheOrder() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-b102-cancelled");
+		CustomerOrder order = createPaymentPendingOrder(
+			customer, "ADM-B102-CANCELLED-1", "ADM-B102-CANCELLED-CO-1", 45000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/unpaid-cancel", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Checkout remained unpaid"}
+					"""))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/late-deposit", order.getId())
+				.header("Idempotency-Key", "b102-cancelled-key-1")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "actualDepositorName":"Receiver",
+					  "actualAmount":45000,
+					  "depositedAt":"2020-07-19T09:00:00Z",
+					  "transactionReference":"B102-CANCELLED-RECEIPT-1",
+					  "reason":"Receipt found after unpaid cancellation"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.outcome", is("PAYMENT_EXCEPTION")))
+			.andExpect(jsonPath("$.refunds[0].reason", is("LATE_DEPOSIT_EXCEPTION")))
+			.andExpect(jsonPath("$.status", is("REFUND_REQUESTED")));
+
+		PaymentGroup group = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
+		assertThat(group.getStatus()).isEqualTo(PaymentGroupStatus.PAYMENT_EXCEPTION);
+		assertThat(group.getRefundableAmount()).isEqualTo(45000);
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+			.isEqualTo(OrderStatus.REFUND_REQUESTED);
+		assertThat(refundRepository.findByOrder_Id(order.getId()).orElseThrow().getReason())
+			.isEqualTo(RefundReason.LATE_DEPOSIT_EXCEPTION);
+		assertThat(fulfillmentRepository.findByOrder_Id(order.getId())).isEmpty();
+	}
+
+	@Test
+	void mismatchedDepositAfterUnpaidCancellationCreatesTheGroupScopeRefund() throws Exception {
+		UserAccount customer = createCustomer("admin-order-customer-b102-cancelled-mismatch");
+		CustomerOrder order = createPaymentPendingOrder(
+			customer, "ADM-B102-CANCELLED-MISMATCH-1", "ADM-B102-CANCELLED-MISMATCH-CO-1", 45000);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/unpaid-cancel", order.getId())
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Checkout remained unpaid"}
+					"""))
+			.andExpect(status().isOk());
+
+		String body = """
+			{
+			  "actualDepositorName":"Receiver",
+			  "actualAmount":44900,
+			  "depositedAt":"2020-07-19T09:00:00Z",
+			  "transactionReference":"B102-CANCELLED-MISMATCH-RECEIPT-1",
+			  "reason":"Mismatch found after unpaid cancellation"
+			}
+			""";
+		for (int attempt = 0; attempt < 2; attempt++) {
+			mockMvc.perform(post("/api/admin/orders/{orderId}/deposit-mismatch", order.getId())
+					.header("Idempotency-Key", "b102-cancelled-mismatch-key-1")
+					.with(authentication(TestAuthentication.admin()))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(body))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.outcome", is("PAYMENT_EXCEPTION")))
+				.andExpect(jsonPath("$.exceptionReason", is("AMOUNT_MISMATCH")))
+				.andExpect(jsonPath("$.refund.refundScope", is("PAYMENT_GROUP")))
+				.andExpect(jsonPath("$.refund.refundAmount", is(44900)));
+		}
+
+		PaymentGroup group = paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow();
+		assertThat(group.getStatus()).isEqualTo(PaymentGroupStatus.PAYMENT_EXCEPTION);
+		assertThat(group.getRefundableAmount()).isEqualTo(44900);
+		assertThat(refundRepository.findByPaymentGroup_IdAndRefundScope(group.getId(), RefundScope.PAYMENT_GROUP))
+			.get().extracting(Refund::getReason).isEqualTo(RefundReason.PAYMENT_AMOUNT_MISMATCH);
+		assertThat(refundRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(group.getId())).hasSize(1);
+		assertThat(paymentEventRepository.countByIdempotencyKey("b102-cancelled-mismatch-key-1")).isEqualTo(1);
 	}
 
 	@Test
@@ -381,12 +629,13 @@ class AdminOrderApiIntegrationTest {
 	}
 
 	@Test
-	void cancelsUnpaidBankTransferAndRecordsDepositMismatchMemo() throws Exception {
+	void cancelsUnpaidBankTransferAndRejectsIncompleteDepositEvidence() throws Exception {
 		UserAccount customer = createCustomer("admin-order-customer-bank-cancel");
 		CustomerOrder mismatchOrder = createPaymentPendingOrder(customer, "ADM-BANK-MISMATCH-1", "ADM-BANK-MISMATCH-CO-1", 22000);
 		CustomerOrder cancelOrder = createPaymentPendingOrder(customer, "ADM-BANK-CANCEL-1", "ADM-BANK-CANCEL-CO-1", 23000);
 
 		mockMvc.perform(post("/api/admin/orders/{orderId}/deposit-mismatch", mismatchOrder.getId())
+				.header("Idempotency-Key", "incomplete-mismatch-key-1")
 				.with(authentication(TestAuthentication.admin()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -394,11 +643,11 @@ class AdminOrderApiIntegrationTest {
 					  "memo": "Depositor name does not match"
 					}
 					"""))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.status", is("PAYMENT_PENDING")));
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code", is("VALIDATION_FAILED")));
 
 		assertThat(paymentGroupRepository.findById(mismatchOrder.getPaymentGroup().getId()).orElseThrow().getDepositMismatchMemo())
-			.isEqualTo("Depositor name does not match");
+			.isNull();
 		assertThat(orderRepository.findById(mismatchOrder.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
 
 		mockMvc.perform(post("/api/admin/orders/{orderId}/unpaid-cancel", cancelOrder.getId())

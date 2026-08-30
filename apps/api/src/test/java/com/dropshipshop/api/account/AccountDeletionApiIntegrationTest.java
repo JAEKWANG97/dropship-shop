@@ -151,6 +151,26 @@ class AccountDeletionApiIntegrationTest {
 	}
 
 	@Test
+	void blocksDeletionForPaymentGroupRefundWithoutDereferencingAnOrder() throws Exception {
+		UserAccount customer = createCustomer("delete-group-refund-blocked");
+		PaymentGroup paymentGroup = paymentGroupRepository.save(new PaymentGroup(
+			"CK-DELETE-GROUP-REFUND",
+			customer,
+			10000,
+			Instant.now().plusSeconds(1800)
+		));
+		refundRepository.save(Refund.receivedPaymentGroup(paymentGroup, null, 11000, Instant.now()));
+
+		mockMvc.perform(post("/api/me/deletion-request").cookie(accessToken(customer)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", containsString("진행 중인 주문/환불/클레임")))
+			.andExpect(jsonPath("$.message", containsString("결제그룹 CK-DELETE-GROUP-REFUND")));
+
+		assertThat(userAccountRepository.findById(customer.getId()).orElseThrow().getStatus())
+			.isEqualTo(UserStatus.ACTIVE);
+	}
+
+	@Test
 	void blocksDeletionUntilSupplierManagerIsDisconnected() throws Exception {
 		UserAccount manager = createCustomer("supplier-manager-delete-blocked");
 		Supplier supplier = Supplier.portalApplicant(

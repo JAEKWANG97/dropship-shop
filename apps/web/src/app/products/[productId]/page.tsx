@@ -5,6 +5,8 @@ import {
   formatPrice,
   getProduct,
   getProducts,
+  isProductPurchaseAvailable,
+  purchasableProductOptions,
   type ProductDetail,
   type ProductSummary,
 } from "@/lib/catalog";
@@ -55,8 +57,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     );
   }
 
-  const activeOptions = product.options.filter((option) => option.status === "ACTIVE");
-  const purchasable = product.salesEnabled && product.status === "ACTIVE" && activeOptions.length > 0;
+  const activeOptions = purchasableProductOptions(product);
+  const purchasable = isProductPurchaseAvailable(product);
   const galleryImages = product.images.filter((image) => image.type === "GALLERY");
   const policyPages = product.policyLinks
     .map((policy) => policyPageForType(policy.policyType))
@@ -142,10 +144,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               />
             ) : (
               <div className="notice empty">
-                <strong>{product.salesEnabled ? "현재 구매할 수 없습니다" : "판매 준비 중"}</strong>
+                <strong>{product.salesEnabled ? "현재 품절입니다" : "판매 준비 중"}</strong>
                 <span>
                   {product.salesEnabled
-                    ? "판매 상태 또는 선택 가능한 옵션을 확인해 주세요."
+                    ? "재입고 후 다시 주문할 수 있습니다."
                     : product.salesNotice}
                 </span>
               </div>

@@ -1,5 +1,6 @@
 package com.dropshipshop.api.payment.repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,4 +12,9 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, UUID
 	boolean existsByIdempotencyKey(String idempotencyKey);
 
 	long countByIdempotencyKey(String idempotencyKey);
+
+	Optional<PaymentEvent> findByPaymentGroup_IdAndIdempotencyKeyAndCommandTypeIsNotNull(
+		UUID paymentGroupId,
+		String idempotencyKey
+	);
 }

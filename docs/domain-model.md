@@ -483,7 +483,7 @@ Rules:
 - Bank-transfer deposit metadata is configured at checkout creation and used on the customer checkout detail.
 - Admin deposit confirmation sets approved amount/time and records admin id/reason.
 - Admin unpaid cancellation records admin id/time/reason and moves the group to `CANCELLED`.
-- The current B-068 deposit-mismatch action records a memo while keeping the group `PAYMENT_PENDING`. Planned B-102 replaces this disposition for an identified amount-mismatched receipt with the payment-group exception/refund model below.
+- B-068 deposit-mismatch memo rows remain readable as history. Implemented B-102 uses the payment-group exception/refund model below for a newly identified amount-mismatched receipt instead of keeping it memo-only in `PAYMENT_PENDING`.
 
 ## Payment
 
@@ -496,7 +496,7 @@ Implemented fields:
 - provider: BANK_TRANSFER (현재 생성값), TOSS_PAYMENTS (과거 기록 호환 전용)
 - providerPaymentKey
 - method: BANK_TRANSFER (현재 생성값), CARD / EASY_PAY / TRANSFER (과거 기록 호환 전용)
-- status: 현재 계좌입금 흐름은 `APPROVED`와 수동 환불 관련 상태만 생성한다. 나머지 PG 상태값은 과거 기록 호환 전용이다.
+- status: 현재 계좌입금 흐름은 `APPROVED`, B-102 `PAYMENT_EXCEPTION`과 수동 환불 관련 상태를 생성한다. 나머지 PG 상태값은 과거 기록 호환 전용이다.
 - requestedAmount
 - approvedAmount
 - approvedAt
@@ -517,7 +517,7 @@ Rules:
 - B-041 creates one `Payment` on admin bank-transfer deposit confirmation.
 - Bank-transfer payments use `providerPaymentKey = BANK-{checkoutNumber}` to keep the existing unique provider key invariant.
 - `APPROVED` moves the payment group to `APPROVED` and orders to `SUPPLIER_ORDER_PENDING`.
-- Planned B-102 uses `status=PAYMENT_EXCEPTION`, `exceptionReason=AMOUNT_MISMATCH`, `requestedAmount=PaymentGroup.totalAmount`, and null approved amount/time for a received but non-approvable mismatched deposit. The actual received amount remains on the linked PaymentGroup receipt evidence and is the Refund amount.
+- Implemented B-102 uses `status=PAYMENT_EXCEPTION`, `exceptionReason=AMOUNT_MISMATCH`, `requestedAmount=PaymentGroup.totalAmount`, and null approved amount/time for a received but non-approvable mismatched deposit. The actual received amount remains on the linked PaymentGroup receipt evidence and is the Refund amount.
 
 ## PaymentEvent
 
@@ -528,10 +528,13 @@ Implemented fields:
 - id
 - paymentId
 - paymentGroupId
-- orderId: required for `DELIVERY_GROUP_ORDER`, null for planned `PAYMENT_GROUP` amount-mismatch refund
+- orderId: nullable; an order-scoped payment/refund command retains the target Order id, while a `PAYMENT_GROUP` amount-mismatch command keeps it null
 - providerPaymentKey
-- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION / PAYMENT_EXCEPTION_CANCEL_REQUESTED / PAYMENT_EXCEPTION_CANCEL_COMPLETED / PAYMENT_EXCEPTION_CANCEL_FAILED / TOSS_WEBHOOK_RECEIVED / PAYMENT_REVIEW_REQUIRED / BANK_TRANSFER_DEPOSIT_CONFIRMED / BANK_TRANSFER_UNPAID_CANCELLED / BANK_TRANSFER_DEPOSIT_MISMATCH_RECORDED / REFUND_REQUESTED / REFUND_COMPLETED / MANUAL_REFUND_COMPLETED / REFUND_FAILED
+- eventType: CONFIRM_REQUESTED / CONFIRM_APPROVED / CONFIRM_REJECTED / PAYMENT_EXCEPTION / PAYMENT_EXCEPTION_CANCEL_REQUESTED / PAYMENT_EXCEPTION_CANCEL_COMPLETED / PAYMENT_EXCEPTION_CANCEL_FAILED / TOSS_WEBHOOK_RECEIVED / PAYMENT_REVIEW_REQUIRED / BANK_TRANSFER_DEPOSIT_CONFIRMED / BANK_TRANSFER_UNPAID_CANCELLED / BANK_TRANSFER_DEPOSIT_MISMATCH_RECORDED / BANK_TRANSFER_LATE_DEPOSIT_RECORDED / REFUND_REQUESTED / REFUND_COMPLETED / MANUAL_REFUND_COMPLETED / REFUND_FAILED
 - idempotencyKey
+- commandType: nullable; populated for B-102 bank-transfer command replay rows
+- requestHash: nullable; populated with `commandType`
+- resultSnapshot: nullable ADMIN-safe immutable result JSON; populated with `commandType`
 - rawPayload
 - resultMessage
 - receivedAt
@@ -666,10 +669,10 @@ Planned fields:
 Rules:
 
 - DS-15 creates refund records for approved cancellation and supplier out-of-stock.
-- The current implemented refund scope is the delivery-group order.
-- Planned B-102 adds exactly one `PAYMENT_GROUP` Refund for `PAYMENT_AMOUNT_MISMATCH`. Its `refundAmount` equals the positive actual received amount rather than PaymentGroup total or any Order amount, and all included Order ids are resolved through the PaymentGroup.
+- The implemented refund scopes are the delivery-group order and the B-102 `PAYMENT_GROUP` amount-mismatch exception.
+- Implemented B-102 adds exactly one `PAYMENT_GROUP` Refund for `PAYMENT_AMOUNT_MISMATCH`. Its `refundAmount` equals the positive actual received amount rather than PaymentGroup total or any Order amount, and all included Order ids are resolved through the PaymentGroup.
 - A qualifying unpaid-cancelled exact receipt keeps `DELIVERY_GROUP_ORDER` scope: it creates one `LATE_DEPOSIT_EXCEPTION` Refund for every immutable Order amount, and those amounts sum to the exact received PaymentGroup total. Order-by-Order completion may leave the Payment/PaymentGroup `PARTIALLY_REFUNDED` until all are complete.
-- Refund creation and completion require `Refund.paymentGroup`, linked `Payment.paymentGroup`, and any linked `Order.paymentGroup` to be the same locked aggregate. Planned composite foreign keys enforce this at the database boundary; a service mismatch returns `409` before money or state mutation.
+- Refund creation and completion require `Refund.paymentGroup`, linked `Payment.paymentGroup`, and any linked `Order.paymentGroup` to be the same locked aggregate. V41 composite foreign keys enforce this at the database boundary; a service mismatch returns `409` before money or state mutation.
 - Customer/admin Order refund summaries must resolve a `PAYMENT_GROUP` Refund through `paymentGroupId` for every included Order instead of assuming `Refund.orderId` is always present. Existing delivery-group Refund projections remain unchanged.
 - Actual manual bank-transfer refund completion is required before an order can move to `REFUNDED`.
 - If the payment group still has active orders after one delivery-group order refund, the payment group and payment become `PARTIALLY_REFUNDED`.
@@ -1007,13 +1010,13 @@ B-080 implementation note:
 
 ## Modeling Notes
 
-## Current-Compatible MVP State Sets And Planned Portal Extensions
+## Current-Compatible MVP State Sets And Portal Extensions
 
 ### Order.status
 
 - `PAYMENT_PENDING`: 현재 MVP에서는 입금대기 주문. 공급처 발주 대상이 아니다.
 - `EXPIRED`: 입금 기한이 지나 종료된 주문.
-- `PAYMENT_EXCEPTION`: 현재 Order enum의 legacy 호환 상태다. Planned B-102 portal late-deposit command는 이를 최종 Order 상태로 커밋하지 않고 exception 이력에만 남기며, Payment/PaymentGroup 증적과 자동 Refund를 기록한 같은 transaction에서 Order를 `REFUND_REQUESTED`로 끝낸다.
+- `PAYMENT_EXCEPTION`: 현재 Order enum의 legacy 호환 상태다. Implemented B-102 portal late-deposit command는 이를 최종 Order 상태로 커밋하지 않고 exception 이력에만 남기며, Payment/PaymentGroup 증적과 자동 Refund를 기록한 같은 transaction에서 Order를 `REFUND_REQUESTED`로 끝낸다.
 - `SUPPLIER_ORDER_PENDING`: 결제 검증 완료 후 공급처 발주 전 주문.
 - `TRACKING_REGISTERED`: Planned B-104 portal 주문에서 송장은 등록됐지만 실제 인계·배송완료는 확인되지 않은 상태.
 - `SUPPLIER_ORDERED`: 공급처 발주 완료 후 송장 입력 전 주문.
@@ -1049,7 +1052,7 @@ B-080 implementation note:
 - `REFUNDED`
 - `REFUND_FAILED`
 - `REVIEW_REQUIRED`
-- `PAYMENT_EXCEPTION`: Planned B-102에서 실제 계좌입금은 확인됐지만 정상 주문으로 수용할 수 없어 환불로 보내는 증적 상태.
+- `PAYMENT_EXCEPTION`: Implemented B-102에서 실제 계좌입금은 확인됐지만 정상 주문으로 수용할 수 없어 환불로 보내는 증적 상태.
 
 ### Fulfillment.status
 
@@ -1080,9 +1083,9 @@ B-080 implementation note:
 
 `PG_CANCEL_REQUESTED`, `RETRY_REQUIRED`, `MANUAL_REVIEW_REQUIRED`를 포함한 PG 환불 상태는 과거 데이터 조회 호환을 위해 보존한다. 새 계좌입금 주문과 수동 환불에서는 생성하지 않는다.
 
-- 현행 COREABLE-managed 상품과 옵션에는 실제 재고 수량을 두지 않는다. Planned B-102 portal 옵션만 `TRACKED`의 on-hand/reserved ledger 또는 `UNTRACKED` mode를 추가한다.
+- 현행 COREABLE-managed 상품과 옵션은 `UNTRACKED`로 유지해 실제 재고 수량을 두지 않는다. Implemented B-102 portal 옵션은 `TRACKED`의 on-hand/reserved ledger 또는 명시적 `UNTRACKED` mode를 사용한다.
 - 상품 전체 상태와 상품 옵션 상태를 분리한다.
-- 현행 COREABLE baseline의 구매 가능 조건은 상품 상태가 `ACTIVE`이고 옵션 상태도 `ACTIVE`인 경우다. Planned portal 상품은 여기에 Supplier ACTIVE, time-valid VERIFIED 계약, supplier availability와 TRACKED available quantity guard를 모두 추가한다.
+- 현행 COREABLE baseline의 구매 가능 조건은 상품 상태가 `ACTIVE`이고 옵션 상태도 `ACTIVE`인 경우다. Implemented portal 상품은 여기에 Supplier ACTIVE, time-valid VERIFIED 계약, supplier availability와 TRACKED available quantity guard를 모두 추가한다.
 - 상품이 `ACTIVE`여도 특정 옵션이 `SOLD_OUT`이면 해당 옵션은 구매할 수 없다. Portal guard 중 하나라도 실패해도 고객 projection은 같은 구매불가/품절 경계로 닫힌다.
 - 상품 상세 콘텐츠는 `IMAGE`와 `HTML` 블록으로 구성하고 `sortOrder`에 따라 노출한다.
 - `HTML` 블록은 XSS 방지를 위해 서버 저장 시점에 safelist 기반으로 sanitize해야 한다.
@@ -1195,7 +1198,7 @@ Rules:
 
 ## Supplier Portal Extension
 
-Status: `B-100` onboarding, lifecycle, application/invite retention and browser security plus `B-101` catalog/review and V40 additive schema are Implemented. `B-098` contract evidence/expiry automation and relationship cleanup plus `B-102` through `B-105` remain Planned.
+Status: `B-100` onboarding, lifecycle, application/invite retention and browser security, `B-101` catalog/review and V40 additive schema, and `B-102` inventory/reservation/payment exception behavior and V41 additive schema are Implemented. `B-098` contract evidence/expiry automation and relationship cleanup plus `B-103` through `B-105` remain Planned.
 
 `B-100`은 기존 legacy 주문·배송 의미를 유지한 expand-contract 변경이다. 이후 slice도 같은 호환 경계를 따른다.
 
@@ -1225,7 +1228,7 @@ Rules:
 - `ROLE_SUPPLIER`는 활성 사용자, `portalStatus=ACTIVE`와 manager 연결이 모두 유효할 때 요청 시점에 파생한다. Terminal 또는 already-overdue VERIFIED contract는 즉시 권한을 막고 최초 UNVERIFIED onboarding은 비PII catalog 작업만 허용한다. `Supplier.status`는 신규 판매·checkout만 막는 독립 gate이므로 `INACTIVE`여도 time-valid contract가 있을 때만 이미 입금확인된 주문을 계속 처리할 수 있다.
 - 기존 CUSTOMER 또는 ADMIN 계정이 담당자가 되어도 저장 role과 기존 권한을 잃지 않는다.
 - 포털 정지는 `portalStatus=SUSPENDED`만 적용하고, 담당자 연결 해제는 manager를 비우고 `portalStatus=PENDING_ACTIVATION`으로 전환한다. 기존 결제완료 portal 주문은 channel과 증적을 유지한 Coreable 인계 큐로 보내며 portal 재활성화가 이를 자동 재배정하지 않는다.
-- 정지·연결 해제·연락 email 변경 명령은 `salesAction=KEEP|PAUSE`를 필수로 받아 판매 중지를 명시적으로 선택한 경우에만 `Supplier.status=INACTIVE`로 바꾼다. UI 기본값은 PAUSE지만 서버가 숨겨서 바꾸지 않는다. `KEEP` 중 새 입금확인 주문은 portal이 다시 활성화될 때까지 `COREABLE_MANUAL` Fulfillment로 생성하고, portal 재활성화는 판매 상태를 자동 복구하지 않는다.
+- 정지·연결 해제·연락 email 변경 명령은 `salesAction=KEEP|PAUSE`를 필수로 받아 판매 중지를 명시적으로 선택한 경우에만 `Supplier.status=INACTIVE`로 바꾼다. UI 기본값은 PAUSE지만 서버가 숨겨서 바꾸지 않는다. Planned B-103은 `KEEP` 중 새 입금확인 주문을 portal이 다시 활성화될 때까지 `COREABLE_MANUAL` Fulfillment로 생성하고, portal 재활성화는 판매 상태를 자동 복구하지 않는다.
 - 활성 담당자의 고객 셀프서비스 탈퇴는 먼저 관리자에게 공급처 연결을 해제받기 전까지 거절한다.
 - 공급처 연락 email이 바뀌면 manager 연결과 `contactEmailVerifiedAt`을 지우고 `portalStatus=PENDING_ACTIVATION`으로 바꾼 뒤 미사용 초대를 폐기하고 재초대한다. 같은 명령의 필수 sales action으로 판매 유지 여부를 명시한다.
 - 판매상태 변경은 portal 재활성화와 분리된 관리자 명령으로만 `Supplier.status=ACTIVE|INACTIVE`를 명시한다. reason과 idempotency key가 필수이며 판매 재개가 인계된 주문이나 portal 상태를 자동 복구하지 않는다.
@@ -1400,16 +1403,17 @@ Supplier draft deletion rules:
 - Cart 추가와 checkout의 CartItem·OrderItem 생성도 같은 잠금 계약 뒤 fresh ownership, resource/saleability와 참조 guard를 다시 확인한다. Stale ownership은 conflict 또는 tenant-safe `404`로 끝나며 dangling row나 raw FK 오류를 반환하지 않는다.
 - Portal upload가 만든 ProductImage metadata는 single-use unique server-owned `storageObjectKey`를 보존한다. Admin thumbnail/gallery upload도 upload endpoint가 발급한 같은 Product의 URL/key pair만 metadata에 연결할 수 있고, cleanup job이 생긴 tombstone key는 pending/terminal 여부와 무관하게 재첨부할 수 없으며 reorder/replace에서 계속 유지된 key만 보존한다. Metadata 삭제와 제거된 immutable key의 unique cleanup job enqueue를 같은 transaction에 저장하고 반복 enqueue는 멱등 처리한다. Worker는 binary 삭제 직전 live metadata 참조를 검사해 있으면 삭제 없이 `COMPLETED/LIVE_REFERENCE`로 끝내고, 이후 그 metadata가 실제 제거되면 같은 job을 `PENDING`으로 다시 연다. Not-found는 성공으로 처리하고 실패는 재시도하며 삭제 metadata를 복구하지 않는다. Legacy/external URL은 server-owned key가 없으면 binary 삭제 대상이 아니다.
 
-### Option Inventory And Reservation (Planned B-102)
+### Option Inventory And Reservation (Implemented B-102)
 
-Planned `ProductOption` fields:
+Implemented `ProductOption` fields (V41):
 
 - supplierAvailability: AVAILABLE / UNAVAILABLE
 - inventoryMode: TRACKED / UNTRACKED
 - onHandQuantity
 - reservedQuantity
+- inventoryVersion: option-local monotonic inventory/reservation version
 
-Planned `OrderItem` fields:
+Implemented `OrderItem` fields (V41):
 
 - managementChannelSnapshot: COREABLE / SUPPLIER_PORTAL
 - inventoryModeSnapshot: TRACKED / UNTRACKED
@@ -1422,10 +1426,12 @@ Planned `OrderItem` fields:
 Rules:
 
 - 기존 COREABLE 옵션은 `supplierAvailability=AVAILABLE`, `UNTRACKED`, `onHandQuantity=null`, `reservedQuantity=0`으로 backfill한다. B-101에서 B-102 전에 생성된 SUPPLIER_PORTAL 옵션은 `TRACKED/onHandQuantity=0/reservedQuantity=0`으로 이관한다. B-102 이후 새 공급처 포털 옵션은 `TRACKED`가 기본이지만 공급처가 명시적으로 `UNTRACKED`를 선택할 수 있다.
+- B-102 전 production portal 판매 gate가 닫혀 있었으므로 기존 OrderItem이 `SUPPLIER_PORTAL` Product를 참조하면 migration을 중단하고 수동 reconciliation을 요구한다. 그런 row를 COREABLE/UNTRACKED로 조용히 오분류하지 않는다.
 - `supplierAvailability`는 공급처의 신규 주문 받기/중지 값이며 Coreable 소유 Product/Option sale status와 분리한다. UNAVAILABLE은 checkout을 막고 AVAILABLE은 Coreable 중지·숨김·안전 상태를 덮어쓰지 못한다.
 - 공급처 UI의 TRACKED label은 `수량 관리 (권장)`이고 0 이상의 on-hand를 필수로 받는다. UNTRACKED label은 `재고 수량 관리 안 함`이며 on-hand 대신 `주문 받기`/`주문 중지`를 사용한다. 고객 projection은 두 모드 모두 구매 가능/품절만 반환한다.
 - Portal checkout은 이미 구현된 `OrderItem.sourceUnitPrice`에 당시 option 공급가를 보존해 비용 원장을 이중화하지 않는다. 기존 고객 `unitPrice`/`lineAmount` 스냅샷을 바꾸지 않으며 이 내부 공급가는 ADMIN 감사에만 사용하고 공급처 주문 DTO나 정산 UI에는 노출하지 않는다. 공급처 정산은 B-099 범위가 아니다.
 - `TRACKED`는 `0 <= reservedQuantity <= onHandQuantity`를 유지하고 `availableQuantity=onHandQuantity-reservedQuantity`로 계산한다. available은 저장하지 않는다.
+- 공급처 절대값 수정은 마지막 canonical `expectedInventoryVersion`을 요구한다. 공급처 수정과 checkout reserve/release/consume/reacquire가 모두 `inventoryVersion`을 증가시키며 stale 수정은 현재 canonical projection을 담은 `409 INVENTORY_CONFLICT`로 끝난다. 이 버전은 Product aggregate version/review와 분리되어 재고 수정만으로 재검토를 만들지 않는다.
 - `UNTRACKED`는 on-hand를 저장하지 않고 예약 상태를 만들지 않는다. 구매 가능 여부는 supplierAvailability와 Coreable sale guards로 결정한다. 기존 `sourceStockQuantity`는 외부 참고값일 뿐 portal 재고로 사용하지 않는다.
 - checkout은 영향받는 모든 Supplier, Product, 모든 ProductOption(UNTRACKED 포함)을 각 id 순서로 잠근다. Supplier 거래 상태, Product/Option/compliance와 availability를 다시 검사하고 portal-origin 항목에만 time-valid contract를 추가 검사한 뒤 TRACKED 수량에 한해 한 트랜잭션에서 24시간 예약을 만든다. Catalog/inventory writer도 Product -> Option 순서를 사용하며 Product를 잡은 뒤 Supplier를 역순으로 잡지 않는다. 하나라도 실패하면 전체 checkout을 롤백한다.
 - 기한 내 입금확인은 HELD 예약을 원자적으로 소비해 on-hand와 reserved를 함께 줄인다. 미입금 취소 또는 만료는 HELD 예약만 한 번 해제한다.
@@ -1434,7 +1440,7 @@ Rules:
 - 재고 절대값 update는 idempotent하며 on-hand를 현재 reserved 아래로 낮출 수 없다. 예약이 있으면 `UNTRACKED`로 바꿀 수 없다.
 - `TRACKED <-> UNTRACKED` 전환은 해당 option을 참조하는 open PAYMENT_PENDING OrderItem이 하나라도 있으면 거절한다. 만료 뒤 mode가 바뀐 주문의 late deposit은 immutable inventoryModeSnapshot과 current mode 불일치를 `SALE_UNAVAILABLE_AT_DEPOSIT`으로 처리해 새 ledger를 예약 없이 소비하지 않는다.
 
-Planned `SupplierInventoryChangeHistory` fields:
+Implemented `SupplierInventoryChangeHistory` fields (V41):
 
 - id
 - productOptionId: nullable live FK with `ON DELETE SET NULL`
@@ -1445,19 +1451,20 @@ Planned `SupplierInventoryChangeHistory` fields:
 - beforeInventoryMode / afterInventoryMode
 - beforeOnHandQuantity / afterOnHandQuantity
 - beforeReservedQuantity / afterReservedQuantity
+- beforeInventoryVersion / afterInventoryVersion
 - requestHash
 - idempotencyKey
 - createdAt
 
 Supplier inventory PUT은 `(subjectProductOptionId,idempotencyKey)` unique 경계로 이 immutable row와 option update를 함께 commit한다. 현재 supplier principal을 확인한 뒤 live Option보다 history replay를 먼저 찾고 product/option path id와 body를 hash하므로, 허용된 draft Option 삭제 뒤 같은 retry도 최초 canonical projection을 반환하며 바뀐 path/payload는 거절한다. Live option FK가 지워져도 subject id와 inventory audit은 남고 다른 tenant는 `404`다. Checkout HELD/CONSUMED/RELEASED 변화는 OrderItem reservation evidence가 기준이며 manual change history에 중복 기록하지 않는다.
 
-### Bank-Transfer Deposit Payment Exception (Planned B-102)
+### Bank-Transfer Deposit Payment Exception (Implemented B-102)
 
-Planned status semantics:
+Implemented status semantics:
 
 - Portal late-deposit command의 최종 `Order.status`는 `REFUND_REQUESTED`다. 기존 `PAYMENT_EXCEPTION` Order enum은 legacy 읽기 호환을 위해 남기지만 이 command의 별도 커밋 상태로 사용하지 않고 exception status history만 기록한다.
 - `PaymentGroup.status=PAYMENT_EXCEPTION`: 실입금은 존재하지만 주문 승인과 공급처 출고 요청은 생성되지 않은 결제 그룹이다.
-- `Payment.status=PAYMENT_EXCEPTION`: 실제 수령한 `BANK_TRANSFER` Payment를 정상 승인 Payment와 구분하는 신규 planned 값이다.
+- `Payment.status=PAYMENT_EXCEPTION`: 실제 수령한 `BANK_TRANSFER` Payment를 정상 승인 Payment와 구분하는 B-102 값이다.
 - `Payment.exceptionReason=AMOUNT_MISMATCH`: positive actual receipt가 immutable PaymentGroup total과 다른 최우선 금액 불일치 예외다.
 - `Refund(reason=PAYMENT_AMOUNT_MISMATCH, refundScope=PAYMENT_GROUP)`: `orderId=null`, `paymentId` 연결, `refundAmount=actualDepositAmount`인 결제그룹당 단일 Refund다.
 - `Refund.reason=SALE_UNAVAILABLE_AT_DEPOSIT`: portal-origin 항목을 포함한 PaymentGroup에서 실제 입금 확인 시 판매/안전 guard가 더 이상 충족되지 않아 전액을 정상 승인하지 않은 예외다.
@@ -1472,10 +1479,10 @@ Rules:
 - 금액 불일치 Refund는 `REQUESTED -> APPROVED -> COMPLETED`의 Coreable 수동 계좌환불 흐름을 사용하되 거절이나 정상 주문 재개로 전환하지 않는다. 완료 command도 별도 key/hash/immutable result를 사용하고 모든 포함 Order를 원자적으로 `REFUNDED`로 끝낸다.
 - 금액이 정확한 qualifying 미입금 `CANCELLED` 그룹도 portal/legacy 공통으로 정상 주문을 재개하지 않는다. 같은 transaction에서 immutable total은 유지하고 approved amount/time은 null로 두며 미입금 취소가 0으로 만든 `refundableAmount`를 `totalAmount=actualAmount`로 복구한다. 입금시각·saleability와 무관하게 재고를 재확보·소비하지 않고 immutable Order 금액의 `LATE_DEPOSIT_EXCEPTION` Refund를 Order마다 하나씩 만들어 전체 수령액을 반환한 뒤 새 checkout만 허용한다.
 - B-102 received-payment exception Refund인 `PAYMENT_AMOUNT_MISMATCH`, `LATE_DEPOSIT_EXCEPTION`, `SALE_UNAVAILABLE_AT_DEPOSIT`은 실제 받은 돈의 반환이므로 금액 변경·거절·정상 주문 재개를 허용하지 않는다. Order-scoped manual completion도 Refund id를 포함한 별도 key/hash/result를 상태 검사 전에 replay하고 한 Refund/Order 완료와 Payment/PaymentGroup 부분·전체 환불 집계를 원자적으로 commit한다.
-- Planned `PaymentGroup.applyRefund` accepts `PAYMENT_EXCEPTION` only through an approved B-102 received-payment exception Refund. It subtracts the immutable Refund amount from the restored positive refundable balance, rejects nonpositive/overflow amounts, and moves the group to `PARTIALLY_REFUNDED` or `REFUNDED`; unrelated payment exceptions remain non-refundable through this method.
+- Implemented `PaymentGroup.applyRefund` accepts `PAYMENT_EXCEPTION` only through an approved B-102 received-payment exception Refund. It subtracts the immutable Refund amount from the restored positive refundable balance, rejects nonpositive/overflow amounts, and moves the group to `PARTIALLY_REFUNDED` or `REFUNDED`; unrelated payment exceptions remain non-refundable through this method.
 - 재고 재확보가 실패하거나 실제 입금시각이 deadline 이후이면 PaymentGroup과 실제 수령한 Payment를 `PAYMENT_EXCEPTION`으로 저장하고 모든 배송 그룹 Order에 예외 상태 이력을 남긴 뒤 같은 transaction의 최종 상태를 `REFUND_REQUESTED`로 커밋한다.
 - PaymentGroup, affected Suppliers, Products, 모든 affected Options, Orders/Fulfillments를 공통 순서로 잠근 한 트랜잭션에서 기존 입금 증적 필드, 고유 `providerPaymentKey`, idempotency key와 PaymentEvent를 사용해 실제 입금 증적을 exactly once 기록한다. 잠긴 거래·catalog·availability와 immutable snapshot을 라우팅 직전에 다시 확인한다.
-- Planned bank-transfer payment-command PaymentEvent는 normal confirmation, amount-mismatch, late-deposit의 성공/exception과 모든 B-102 received-payment exception의 `MANUAL_REFUND_COMPLETED`에 `commandType`, `requestHash`와 ADMIN-safe immutable `resultSnapshot`을 보존한다. 완료 request hash는 Refund id, admin actor, 정확한 이체액과 이체 증적을 server-keyed HMAC으로 묶고 계좌 데이터를 event에 복제하지 않는다. 결과는 account/transfer evidence를 제외한 target Refund/Order와 Payment/PaymentGroup 집계 또는 group-scope 모든 Order 상태를 보존한다. `(paymentGroupId,idempotencyKey)` planned-command unique 경계는 현재 PaymentGroup 상태 guard보다 먼저 조회한다. 동일 hash는 최초 결과를 반환하고 다른 Refund/command/amount/depositor/time/reference/reason의 key 재사용은 `409`다.
+- Implemented bank-transfer payment-command PaymentEvent는 normal confirmation, amount-mismatch, late-deposit의 성공/exception과 모든 B-102 received-payment exception의 `MANUAL_REFUND_COMPLETED`에 `commandType`, `requestHash`와 ADMIN-safe immutable `resultSnapshot`을 보존한다. 완료 request hash는 Refund id, admin actor, 정확한 이체액과 이체 증적을 server-keyed HMAC으로 묶고 계좌 데이터를 event에 복제하지 않는다. 결과는 account/transfer evidence를 제외한 target Refund/Order와 Payment/PaymentGroup 집계 또는 group-scope 모든 Order 상태를 보존한다. `(paymentGroupId,idempotencyKey)` command unique 경계는 현재 PaymentGroup 상태 guard보다 먼저 조회한다. 동일 hash는 최초 결과를 반환하고 다른 Refund/command/amount/depositor/time/reference/reason의 key 재사용은 `409`다.
 - 예외 트랜잭션은 `SUPPLIER_ORDER_PENDING`, Fulfillment, `requestedAt`, 배송지 잠금 또는 공급처 알림을 만들지 않는다. 공급처 주문 목록과 상세에는 이 주문을 절대 노출하지 않는다.
 - Reason은 금액 불일치를 가장 먼저 평가한다. 금액이 정확하면 qualifying 미입금 `CANCELLED`를 두 번째로 평가해 바로 `LATE_DEPOSIT_EXCEPTION`으로 끝낸다. 나머지 pending/expired portal 경로에서만 판매/계약/compliance/availability 또는 immutable/current mode 실패를 `SALE_UNAVAILABLE_AT_DEPOSIT`으로 정하고, 그 guard까지 모두 통과한 경우에만 기한 초과/재고 실패를 `LATE_DEPOSIT_EXCEPTION`으로 사용한다. 뒤의 두 reason은 배송 그룹별 unique Refund를 하나씩 만들지만 금액 불일치는 실제 수령액의 결제그룹 Refund 한 건만 만든다. 어느 terminal 예외에도 정상 주문 재개 전이는 없다.
 - 일반 confirm-deposit도 exact receipt를 확인한 PaymentGroup에 portal snapshot 항목이 하나라도 있는데 현재 판매/안전 guard가 실패하면 whole-PaymentGroup exception outcome과 Order별 `SALE_UNAVAILABLE_AT_DEPOSIT` Refund를 exactly once 생성한다. portal 항목이 전혀 없는 legacy PaymentGroup의 기존 validation error 동작은 유지한다.
@@ -1503,7 +1510,7 @@ V39 implements the additive `Fulfillment` fields below. B-103/B-104 still own po
 Rules:
 
 - 기존 주문의 address snapshot에 영향을 주지 않고 새 checkout request와 `ShippingAddressSnapshot`에 `deliveryMemo`를 추가한다.
-- 관리자 입금확인 성공 시 한 delivery-group Order의 모든 item이 `managementChannelSnapshot=SUPPLIER_PORTAL`이고 portal 권한이 활성인 경우에만 예약 소비, `SUPPLIER_ORDER_PENDING` 전환, `Fulfillment(channel=SUPPLIER_PORTAL, requestedAt)`, 배송지 잠금을 한 트랜잭션에서 처리한다. 하나라도 COREABLE item이면 기존 source 조건에 따라 COREABLE_MANUAL/DOMEGGOOK 호환 경로를 사용하고, all-portal이지만 `salesAction=KEEP`으로 portal 권한이 비활성이면 `COREABLE_MANUAL`로 라우팅한다. portal item의 TRACKED 예약/입금 guard는 Coreable routing에서도 유지한다.
+- Implemented B-102는 관리자 입금확인 성공 시 예약 소비와 `SUPPLIER_ORDER_PENDING` 전환까지만 같은 트랜잭션에서 처리하고 Fulfillment를 생성하거나 라우팅하지 않는다. Planned B-103은 한 delivery-group Order의 모든 item이 `managementChannelSnapshot=SUPPLIER_PORTAL`이고 portal 권한이 활성인 경우 `Fulfillment(channel=SUPPLIER_PORTAL, requestedAt)`와 배송지 잠금을 만들며, 하나라도 COREABLE item이면 기존 source 조건에 따른 COREABLE_MANUAL/DOMEGGOOK 호환 경로를 유지하고 all-portal `KEEP` 비활성 접근이면 `COREABLE_MANUAL`로 라우팅한다. Portal item의 TRACKED 예약/입금 guard는 Coreable routing에서도 유지한다.
 - 정상 portal 출고 요청은 `operationalOwner=SUPPLIER`다. portal 정지·연결 해제 시 열린 portal Fulfillment를 `COREABLE`로 바꾸고 인계시각·사유·관리자를 기록한다. Supplier list/mutation은 SUPPLIER owner만 허용하며 재활성화가 owner를 자동 복구하지 않는다. Detail의 cutoff/terminal MASKED 예외와 active Claim FULL 예외만 아래 privacy 규칙을 따른다.
 - portal 주문은 공급처 수락 단계와 기존 관리자 발주 시작/완료 단계를 거치지 않는다. 기존 COREABLE_MANUAL/DOMEGGOOK_API 흐름은 유지한다.
 - supplier DTO는 raw Order status를 반환하지 않는다. `SUPPLIER_ORDER_PENDING`은 `FULFILLMENT_REQUESTED`로 매핑하며 `TRACKING_REGISTERED`, `DELIVERED`, `SHORTAGE_REPORTED`, `CLOSED`만 공급처용 표시 상태로 사용한다.
@@ -1749,7 +1756,7 @@ Rules:
 
 ### Supplier Tenant, Email, And Browser Security
 
-Status: Dynamic `ROLE_SUPPLIER`, invite/session feature gating, allowed Origin/Referer checks, B-100 invite email/retention boundaries and B-101 catalog tenant queries are Implemented. Operational resource/email behavior owned by `B-102` through `B-105` remains Planned.
+Status: Dynamic `ROLE_SUPPLIER`, invite/session feature gating, allowed Origin/Referer checks, B-100 invite email/retention boundaries, B-101 catalog tenant queries, and B-102 inventory tenant queries are Implemented. Operational fulfillment/PII/email behavior owned by `B-103` through `B-105` remains Planned.
 
 - Supplier-side actor FK는 영구 식별자가 아니다. Invite 소비자와 catalog/inventory/lifecycle actor는 B-098 관계 종료 보관기한 뒤 null 처리하고, Shipment/shortage/claim actor는 parent Order/Claim 법정 보존기한까지 보존한 뒤 null 처리하거나 parent와 함께 파기한다. Actor type, supplier/business object, action, state/version과 timestamp 같은 비PII 증적은 해당 원장의 보존 규칙에 따라 남길 수 있다. `SupplierPiiAccessLog`는 이 일반 규칙 대신 1년 뒤 row 자체를 삭제한다.
 

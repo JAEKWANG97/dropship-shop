@@ -149,6 +149,13 @@ public class CustomerOrder {
 		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
 	}
 
+	public void confirmLateBankTransferDeposit() {
+		if (status != OrderStatus.EXPIRED) {
+			throw new IllegalStateException("Late deposit can be confirmed only after checkout expiry");
+		}
+		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
+	}
+
 	public void cancelUnpaidDeposit() {
 		if (status != OrderStatus.PAYMENT_PENDING) {
 			throw new IllegalStateException("Unpaid deposit can be cancelled only while payment is pending");
@@ -218,7 +225,8 @@ public class CustomerOrder {
 		if (status != OrderStatus.SUPPLIER_ORDER_PENDING
 			&& status != OrderStatus.SUPPLIER_ORDERED
 			&& status != OrderStatus.OUT_OF_STOCK
-			&& status != OrderStatus.DELIVERED) {
+			&& status != OrderStatus.DELIVERED
+			&& status != OrderStatus.PAYMENT_EXCEPTION) {
 			throw new IllegalStateException("Refund can be requested only before refund completion");
 		}
 		this.status = OrderStatus.REFUND_REQUESTED;
@@ -232,6 +240,14 @@ public class CustomerOrder {
 	}
 
 	public void markPaymentException() {
+		if (status == OrderStatus.PAYMENT_EXCEPTION) {
+			return;
+		}
+		if (status != OrderStatus.PAYMENT_PENDING
+			&& status != OrderStatus.EXPIRED
+			&& status != OrderStatus.CANCELLED) {
+			throw new IllegalStateException("Payment exception cannot be recorded from the current order state");
+		}
 		this.status = OrderStatus.PAYMENT_EXCEPTION;
 	}
 
@@ -242,8 +258,12 @@ public class CustomerOrder {
 		this.status = OrderStatus.CANCELLED;
 	}
 
-	public void expire() {
+	public boolean expire() {
+		if (status != OrderStatus.PAYMENT_PENDING) {
+			return false;
+		}
 		this.status = OrderStatus.EXPIRED;
+		return true;
 	}
 
 	public void updatePaymentPendingAddress(ShippingAddressSnapshot address) {

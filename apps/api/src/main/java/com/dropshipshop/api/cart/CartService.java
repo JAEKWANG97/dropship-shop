@@ -84,8 +84,6 @@ public class CartService {
 			.filter(current -> current.getId().equals(request.productOptionId()))
 			.findFirst()
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
-		requireSellable(product, option);
-
 		CartItem item = cartItemRepository.findByCart_IdAndProductOption_Id(cart.getId(), option.getId())
 			.orElseGet(() -> new CartItem(cart, product, option, 0));
 		int nextQuantity = item.getQuantity() + request.quantity();
@@ -93,6 +91,7 @@ public class CartService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart item quantity cannot exceed 99");
 		}
 		requireOrderQuantity(product, nextQuantity);
+		requireSellable(product, option, nextQuantity);
 		item.updateQuantity(nextQuantity);
 		cartItemRepository.save(item);
 		return toCartResponse(cart);
@@ -103,6 +102,7 @@ public class CartService {
 		lockCart(userId);
 		CartItem item = findUserCartItem(userId, cartItemId);
 		requireOrderQuantity(item.getProduct(), request.quantity());
+		requireSellable(item.getProduct(), item.getProductOption(), request.quantity());
 		item.updateQuantity(request.quantity());
 		return toCartResponse(item.getCart());
 	}
@@ -155,8 +155,8 @@ public class CartService {
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cart item not found"));
 	}
 
-	private void requireSellable(Product product, ProductOption option) {
-		if (!productSaleability.isSellable(product, option)) {
+	private void requireSellable(Product product, ProductOption option, int quantity) {
+		if (!productSaleability.isSellable(product, option, quantity)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product option is not sellable");
 		}
 	}
@@ -202,7 +202,9 @@ public class CartService {
 		for (CartItem item : items) {
 			String reason = unavailableReason(item);
 			if (reason != null) {
-				String code = productSaleability.isSellable(item.getProduct(), item.getProductOption())
+				String code = productSaleability.isSellable(
+					item.getProduct(), item.getProductOption(), item.getQuantity()
+				)
 					? "INVALID_ORDER_QUANTITY"
 					: "UNSELLABLE_ITEM";
 				issues.add(new CartDtos.CartValidationIssueResponse(item.getId(), code, reason));
@@ -247,6 +249,9 @@ public class CartService {
 		}
 		if (!productSaleability.hasValidCustomerUnitPrice(product, option)) {
 			return "현재 가격을 확인 중인 상품입니다. 삭제 후 다시 선택해 주세요.";
+		}
+		if (!productSaleability.isSellable(product, option, item.getQuantity())) {
+			return "현재 선택 수량은 품절 또는 주문 중지로 주문할 수 없습니다. 수량을 줄이거나 다른 옵션을 선택해 주세요.";
 		}
 		return orderQuantityReason(product, item.getQuantity());
 	}

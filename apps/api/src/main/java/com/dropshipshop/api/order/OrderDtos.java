@@ -48,6 +48,9 @@ final class OrderDtos {
 		long discountAmount,
 		long totalAmount,
 		Instant createdAt,
+		String customerDisplayStatus,
+		String customerDisplayLabel,
+		Long refundAmount,
 		PaymentGroupSummaryResponse paymentGroup,
 		PaymentSummaryResponse payment,
 		ShippingAddressResponse shippingAddress,
@@ -66,7 +69,10 @@ final class OrderDtos {
 		PaymentGroupStatus status,
 		long totalAmount,
 		Long approvedAmount,
-		Instant approvedAt
+		Instant approvedAt,
+		String customerDisplayStatus,
+		String customerDisplayLabel,
+		Long refundAmount
 	) {
 	}
 

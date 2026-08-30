@@ -80,24 +80,24 @@ Tasks:
 
 ### B-102 공급처 옵션 재고와 24시간 주문 예약
 
-Status: Todo
+Status: Review Ready
 
 Notes:
 - 기존 COREABLE 옵션은 `UNTRACKED`, B-101에서 먼저 생긴 portal 옵션은 `TRACKED/onHand=0`, B-102 이후 새 포털 옵션은 `TRACKED` 기본으로 이관한다.
 
 Tasks:
-- [ ] option on-hand/reserved 불변식과 canonical replay response·immutable change history를 가진 idempotent 재고 수정을 구현한다.
-- [ ] 재고 이력은 immutable subject option id와 nullable live FK를 사용해 미제출 DRAFT option 삭제 뒤에도 audit과 `(subjectOptionId,idempotencyKey)` replay uniqueness가 보존되게 한다.
-- [ ] 기존/portal option과 OrderItem의 management-channel·inventory-mode·reservation-status snapshot을 expand-contract로 backfill한다.
-- [ ] `수량 관리 (권장)`/`재고 수량 관리 안 함`, 공급처 `주문 받기`/`주문 중지`, mode별 validation·도움말과 고객 내부 재고/`무제한` 비노출 UI를 구현한다.
-- [ ] checkout/입금이 Supplier→Product→모든 Option(UNTRACKED 포함)을 공통 순서로 잠그고 catalog/inventory writer도 Product→Option을 따르게 해 PAUSE·상품상태·주문중지와 직렬화하며 원자적 예약/소비를 구현한다.
-- [ ] 미입금 취소·24시간 만료 자동 해제와 중복 실행 guard를 구현한다.
-- [ ] normal/late portal 입금 명령의 key/hash/immutable result replay, portal-origin contract lazy expiry를 포함한 Supplier lifecycle/saleability lock recheck, 기한 내 늦은 입금의 원자적 재확보와 실패 `PAYMENT_EXCEPTION`을 구현한다.
-- [ ] portal/legacy 공통 금액 불일치 명령이 전체 실입금 증적과 `PAYMENT_EXCEPTION`, 실제 수령액의 단일 `PAYMENT_GROUP/PAYMENT_AMOUNT_MISMATCH` Refund, 모든 Order `REFUND_REQUESTED`, HELD exactly-once 해제와 supplier 비노출을 원자·멱등 처리하도록 구현한다.
-- [ ] 기존 group-scope/비양수/cross-PaymentGroup Refund 사전 스캔으로 부적합 데이터의 migration을 차단한 뒤 금액 불일치 Refund의 nullable order/schema scope 제약, payment-group partial unique와 Payment/Order 동일 aggregate 복합 FK를 추가한다. Coreable 승인·수동 완료는 별도 key/hash/result replay로 정확한 실입금액 한 건만 반환한 뒤 Payment/PaymentGroup/모든 Order를 `REFUNDED`로 끝내도록 구현한다.
-- [ ] 늦은 입금과 portal/legacy 미입금취소 뒤 exact receipt의 Payment 증적, Order별 `LATE_DEPOSIT_EXCEPTION` Refund 자동 생성과 exception 전용 환불 경로를 구현한다. qualifying `CANCELLED`는 입금시각·재고와 무관하게 재개하지 않고 supplier 비노출·새 checkout으로 끝내며, PaymentGroup의 `PAYMENT_EXCEPTION` 환불 guard는 승인된 B-102 received-payment exception Refund에만 좁게 확장한다.
-- [ ] normal exact receipt의 판매불가·mode mismatch·scheduler 지연 기한초과를 `SALE_UNAVAILABLE_AT_DEPOSIT|LATE_DEPOSIT_EXCEPTION` whole-PaymentGroup exception outcome과 사유가 맞는 Order별 Refund로 exactly once 처리한다.
-- [ ] PostgreSQL 동시성·migration smoke, 부족·초과/복수 배송그룹/만료·미입금취소 경합/동일·변경 replay/수동환불 완료, 공급처 404·무알림과 재고 상태 회귀 테스트를 추가한다. exact-after-cancel은 portal/legacy, 기한 전후 입금시각, 미입금취소 동시성, refundable amount 복구, Refund 합계, 거절·금액변경 금지, Refund별 완료 replay, 부분/전체 완료와 절대 재개되지 않는 동작을 검증한다. `CANCELLED`+금액 불일치는 최우선 단일 `PAYMENT_AMOUNT_MISMATCH` group Refund, exact `CANCELLED`+saleability/late 결합은 cancellation-terminal `LATE_DEPOSIT_EXCEPTION`이어야 하며, prior Payment/Refund/Fulfillment 또는 미입금취소가 아닌 혼합 Order가 있으면 `409` 무변경이어야 한다. 고객 응답은 환불 처리 상태와 해당 환불액만 노출하고 입금자·거래 식별값·관리자 사유·계좌 증적을 숨기며, admin은 full evidence와 scope-correct identifiers를 보고, supplier는 list/detail `404`, email·알림·PII log가 모두 없어야 한다. Group-scope admin 응답은 nullable `orderId` 대신 `paymentGroupId`와 `appliedOrderIds`를 검증한다.
+- [x] Product review와 분리된 option inventoryVersion, on-hand/reserved 불변식, stale canonical conflict와 replay response·immutable change history를 가진 idempotent 재고 수정을 구현한다.
+- [x] 재고 이력은 immutable subject option id와 nullable live FK를 사용해 미제출 DRAFT option 삭제 뒤에도 audit과 `(subjectOptionId,idempotencyKey)` replay uniqueness가 보존되게 한다.
+- [x] 기존/portal option과 OrderItem의 management-channel·inventory-mode·reservation-status snapshot을 expand-contract로 backfill하고, 기존 portal-origin OrderItem은 오분류하지 않도록 migration preflight에서 중단한다.
+- [x] `수량 관리 (권장)`/`재고 수량 관리 안 함`, 공급처 `주문 받기`/`주문 중지`, mode별 validation·도움말과 고객 내부 재고/`무제한` 비노출 UI를 구현한다.
+- [x] checkout/입금이 Supplier→Product→모든 Option(UNTRACKED 포함)을 공통 순서로 잠그고 catalog/inventory writer도 Product→Option을 따르게 해 PAUSE·상품상태·주문중지와 직렬화하며 원자적 예약/소비를 구현한다.
+- [x] 미입금 취소·24시간 만료 자동 해제와 중복 실행 guard를 구현한다.
+- [x] normal/late portal 입금 명령의 key/hash/immutable result replay, portal-origin contract lazy expiry를 포함한 Supplier lifecycle/saleability lock recheck, 기한 내 늦은 입금의 원자적 재확보와 실패 `PAYMENT_EXCEPTION`을 구현한다.
+- [x] portal/legacy 공통 금액 불일치 명령이 전체 실입금 증적과 `PAYMENT_EXCEPTION`, 실제 수령액의 단일 `PAYMENT_GROUP/PAYMENT_AMOUNT_MISMATCH` Refund, 모든 Order `REFUND_REQUESTED`, HELD exactly-once 해제와 supplier 비노출을 원자·멱등 처리하도록 구현한다.
+- [x] 기존 group-scope/비양수/cross-PaymentGroup Refund 사전 스캔으로 부적합 데이터의 migration을 차단한 뒤 금액 불일치 Refund의 nullable order/schema scope 제약, payment-group partial unique와 Payment/Order 동일 aggregate 복합 FK를 추가한다. Coreable 승인·수동 완료는 별도 key/hash/result replay로 정확한 실입금액 한 건만 반환한 뒤 Payment/PaymentGroup/모든 Order를 `REFUNDED`로 끝내도록 구현한다.
+- [x] 늦은 입금과 portal/legacy 미입금취소 뒤 exact receipt의 Payment 증적, Order별 `LATE_DEPOSIT_EXCEPTION` Refund 자동 생성과 exception 전용 환불 경로를 구현한다. qualifying `CANCELLED`는 입금시각·재고와 무관하게 재개하지 않고 supplier 비노출·새 checkout으로 끝내며, PaymentGroup의 `PAYMENT_EXCEPTION` 환불 guard는 승인된 B-102 received-payment exception Refund에만 좁게 확장한다.
+- [x] normal exact receipt의 판매불가·mode mismatch·scheduler 지연 기한초과를 `SALE_UNAVAILABLE_AT_DEPOSIT|LATE_DEPOSIT_EXCEPTION` whole-PaymentGroup exception outcome과 사유가 맞는 Order별 Refund로 exactly once 처리한다.
+- [x] PostgreSQL 동시성·migration smoke, 부족·초과/복수 배송그룹/만료·미입금취소 경합/동일·변경 replay/수동환불 완료, 공급처 404·무알림과 재고 상태 회귀 테스트를 추가한다. exact-after-cancel은 portal/legacy, 기한 전후 입금시각, 미입금취소 동시성, refundable amount 복구, Refund 합계, 거절·금액변경 금지, Refund별 완료 replay, 부분/전체 완료와 절대 재개되지 않는 동작을 검증한다. `CANCELLED`+금액 불일치는 최우선 단일 `PAYMENT_AMOUNT_MISMATCH` group Refund, exact `CANCELLED`+saleability/late 결합은 cancellation-terminal `LATE_DEPOSIT_EXCEPTION`이어야 하며, prior Payment/Refund/Fulfillment 또는 미입금취소가 아닌 혼합 Order가 있으면 `409` 무변경이어야 한다. 고객 응답은 환불 처리 상태와 해당 환불액만 노출하고 입금자·거래 식별값·관리자 사유·계좌 증적을 숨기며, admin은 full evidence와 scope-correct identifiers를 보고, supplier는 list/detail `404`, email·알림·PII log가 모두 없어야 한다. Group-scope admin 응답은 nullable `orderId` 대신 `paymentGroupId`와 `appliedOrderIds`를 검증한다.
 
 ### B-103 공급처 출고 요청·최소 PII·이메일 알림
 

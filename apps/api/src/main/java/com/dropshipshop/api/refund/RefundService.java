@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.dropshipshop.api.common.error.ApiErrorCode;
+import com.dropshipshop.api.common.error.ApiErrorException;
+
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
@@ -23,14 +26,23 @@ import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentEvent;
 import com.dropshipshop.api.payment.domain.PaymentEventType;
+import com.dropshipshop.api.payment.domain.PaymentCommandType;
+import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
+import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundStatus;
+import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.repository.RefundRepository;
+import com.dropshipshop.api.supplierportal.SupplierPortalHasher;
+import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class RefundService {
@@ -38,30 +50,42 @@ public class RefundService {
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
 	private final PaymentRepository paymentRepository;
+	private final PaymentGroupRepository paymentGroupRepository;
 	private final PaymentEventRepository paymentEventRepository;
 	private final CustomerOrderRepository orderRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final NotificationService notificationService;
+	private final SupplierPortalHasher hasher;
+	private final SupplierPortalInputPolicy inputPolicy;
+	private final ObjectMapper objectMapper;
 
 	RefundService(
 		RefundRepository refundRepository,
 		ClaimRepository claimRepository,
 		PaymentRepository paymentRepository,
+		PaymentGroupRepository paymentGroupRepository,
 		PaymentEventRepository paymentEventRepository,
 		CustomerOrderRepository orderRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
-		NotificationService notificationService
+		NotificationService notificationService,
+		SupplierPortalHasher hasher,
+		SupplierPortalInputPolicy inputPolicy,
+		ObjectMapper objectMapper
 	) {
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
 		this.paymentRepository = paymentRepository;
+		this.paymentGroupRepository = paymentGroupRepository;
 		this.paymentEventRepository = paymentEventRepository;
 		this.orderRepository = orderRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.notificationService = notificationService;
+		this.hasher = hasher;
+		this.inputPolicy = inputPolicy;
+		this.objectMapper = objectMapper;
 	}
 
 	@Transactional
@@ -95,7 +119,7 @@ public class RefundService {
 
 	@Transactional
 	RefundDtos.AdminRefundResponse approve(UUID refundId, UUID adminUserId, RefundDtos.RefundApprovalRequest request) {
-		Refund refund = findRefund(refundId);
+		Refund refund = findRefundForUpdate(refundId);
 		try {
 			refund.approve(adminUserId, request.reason(), Instant.now());
 			return toAdminResponse(refund);
@@ -110,7 +134,7 @@ public class RefundService {
 		UUID adminUserId,
 		RefundDtos.RefundManualReviewRequest request
 	) {
-		Refund refund = findRefund(refundId);
+		Refund refund = findRefundForUpdate(refundId);
 		try {
 			if (request.status() == RefundStatus.APPROVED) {
 				refund.approve(adminUserId, request.reason(), Instant.now());
@@ -129,18 +153,55 @@ public class RefundService {
 	RefundDtos.AdminRefundResponse completeManualBankTransferRefund(
 		UUID refundId,
 		UUID adminUserId,
+		String idempotencyKey,
 		RefundDtos.ManualBankTransferRefundCompleteRequest request
 	) {
-		Refund refund = findRefund(refundId);
-		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(refund.getPaymentGroup().getId())
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved payment not found"));
+		UUID paymentGroupId = refundRepository.findPaymentGroupIdById(refundId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
+		String key = idempotencyKey == null ? null : inputPolicy.requireIdempotencyKey(idempotencyKey);
+		String requestHash = refundCommandHash(refundId, adminUserId, request);
+		RefundDtos.AdminRefundResponse replay = refundReplay(paymentGroupId, key, requestHash);
+		if (replay != null) {
+			return replay;
+		}
+		PaymentGroup paymentGroup = paymentGroupRepository.findByIdForUpdate(paymentGroupId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment group not found"));
+		replay = refundReplay(paymentGroupId, key, requestHash);
+		if (replay != null) {
+			return replay;
+		}
+		List<Payment> payments = paymentRepository.findAllByPaymentGroupIdForUpdate(paymentGroupId);
+		List<CustomerOrder> groupOrders = orderRepository.findAllByPaymentGroupIdForUpdate(paymentGroupId);
+		Refund refund = refundRepository.findByIdForUpdate(refundId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
+		if (!refund.getPaymentGroup().getId().equals(paymentGroup.getId())) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.REFUND_PAYMENT_GROUP_MISMATCH,
+				"Refund does not belong to the locked payment group");
+		}
+		boolean receivedPaymentException = refund.isReceivedPaymentException();
+		if (receivedPaymentException && key == null) {
+			inputPolicy.requireIdempotencyKey(null);
+		}
+		if (receivedPaymentException && request.transferredAmount() == null) {
+			throw new ApiErrorException(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_FAILED,
+				"Transferred amount is required for a received-payment exception refund");
+		}
+		long transferredAmount = request.transferredAmount() == null
+			? refund.getRefundAmount()
+			: request.transferredAmount();
+		if (transferredAmount != refund.getRefundAmount()) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT,
+				"Transferred amount must equal the immutable refund amount");
+		}
+		Payment payment = refund.getPayment() != null
+			? refund.getPayment()
+			: payments.stream().findFirst()
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approved payment not found"));
 		if (payment.getProvider() != PaymentProvider.BANK_TRANSFER) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manual refund completion is allowed only for bank transfer payments");
 		}
 		Instant now = Instant.now();
-		OrderStatus beforeStatus = refund.getOrder().getStatus();
 		try {
-			refund.getOrder().markRefundRequested();
 			refund.completeManualBankTransfer(
 				payment,
 				adminUserId,
@@ -152,47 +213,45 @@ public class RefundService {
 				request.transactionReference(),
 				now
 			);
-			refund.getPaymentGroup().applyRefund(refund.getRefundAmount());
-			boolean fullyRefunded = refund.getPaymentGroup().getStatus() == PaymentGroupStatus.REFUNDED;
+			if (receivedPaymentException) {
+				paymentGroup.applyReceivedPaymentExceptionRefund(refund.getRefundAmount(), refund.getReason());
+			} else {
+				paymentGroup.applyRefund(refund.getRefundAmount());
+			}
+			boolean fullyRefunded = paymentGroup.getStatus() == PaymentGroupStatus.REFUNDED;
 			payment.markRefundCompleted(fullyRefunded);
-			refund.getOrder().markRefunded();
-			claimRepository.findByRefund_Id(refund.getId())
-				.ifPresent(claim -> claim.complete(now));
-			actionHistoryRepository.save(new AdminOrderActionHistory(
-				refund.getOrder(),
-				adminUserId,
-				AdminOrderActionType.MANUAL_REFUND_COMPLETED,
-				beforeStatus,
-				refund.getOrder().getStatus(),
-				request.reason()
-			));
-			statusHistoryRepository.save(new OrderStatusHistory(
-				refund.getOrder(),
-				adminUserId,
-				AdminOrderActionType.MANUAL_REFUND_COMPLETED.name(),
-				beforeStatus,
-				refund.getOrder().getStatus(),
-				"ALLOWED",
-				"Manual bank-transfer refund completed",
-				request.reason()
-			));
-			paymentEventRepository.save(new PaymentEvent(
-				payment,
-				refund.getPaymentGroup(),
-				payment.getProviderPaymentKey(),
-				PaymentEventType.MANUAL_REFUND_COMPLETED,
-				"Manual bank-transfer refund completed for order " + refund.getOrder().getOrderNumber(),
-				now
-			));
-			notificationService.transactionalSms(
-				refund.getOrder().getUser(),
-				refund.getOrder(),
-				refund.getPaymentGroup(),
-				null,
-				refund,
-				NotificationType.REFUND_COMPLETED
-			);
-			return toAdminResponse(refund);
+			List<CustomerOrder> appliedOrders = refund.getRefundScope() == RefundScope.PAYMENT_GROUP
+				? groupOrders
+				: List.of(refund.getOrder());
+			for (CustomerOrder order : appliedOrders) {
+				OrderStatus beforeStatus = order.getStatus();
+				order.markRefundRequested();
+				order.markRefunded();
+				actionHistoryRepository.save(new AdminOrderActionHistory(order, adminUserId,
+					AdminOrderActionType.MANUAL_REFUND_COMPLETED, beforeStatus, order.getStatus(), request.reason()));
+				statusHistoryRepository.save(new OrderStatusHistory(order, adminUserId,
+					AdminOrderActionType.MANUAL_REFUND_COMPLETED.name(), beforeStatus, order.getStatus(), "ALLOWED",
+					"Manual bank-transfer refund completed", request.reason()));
+			}
+			if (refund.getOrder() != null) {
+				claimRepository.findByRefund_Id(refund.getId()).ifPresent(claim -> claim.complete(now));
+			}
+			RefundDtos.AdminRefundResponse response = toAdminResponse(refund);
+			if (receivedPaymentException) {
+				paymentEventRepository.save(PaymentEvent.command(payment, paymentGroup, refund.getOrder(),
+					payment.getProviderPaymentKey(), PaymentEventType.MANUAL_REFUND_COMPLETED,
+					PaymentCommandType.COMPLETE_RECEIVED_EXCEPTION_REFUND, key, requestHash,
+					json(RefundCommandResult.from(response)),
+					"Manual received-payment exception refund completed", now));
+			} else {
+				paymentEventRepository.save(new PaymentEvent(payment, paymentGroup, refund.getOrder(),
+					payment.getProviderPaymentKey(),
+					PaymentEventType.MANUAL_REFUND_COMPLETED,
+					"Manual bank-transfer refund completed for order " + refund.getOrder().getOrderNumber(), now));
+				notificationService.transactionalSms(refund.getOrder().getUser(), refund.getOrder(), paymentGroup,
+					null, refund, NotificationType.REFUND_COMPLETED);
+			}
+			return response;
 		} catch (IllegalStateException | IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
 		}
@@ -203,10 +262,11 @@ public class RefundService {
 		Payment payment = refund.getPayment();
 		return new RefundDtos.AdminRefundResponse(
 			refund.getId(),
-			refund.getOrder().getId(),
-			refund.getOrder().getOrderNumber(),
-			refund.getOrder().getStatus(),
+			refund.getOrder() == null ? null : refund.getOrder().getId(),
+			refund.getOrder() == null ? null : refund.getOrder().getOrderNumber(),
+			refund.getOrder() == null ? null : refund.getOrder().getStatus(),
 			refund.getPaymentGroup().getId(),
+			appliedOrderIds(refund),
 			refund.getPaymentGroup().getStatus(),
 			payment == null ? null : payment.getId(),
 			payment == null ? null : payment.getStatus(),
@@ -241,9 +301,11 @@ public class RefundService {
 	private RefundDtos.AdminRefundListItemResponse toAdminListItem(Refund refund) {
 		return new RefundDtos.AdminRefundListItemResponse(
 			refund.getId(),
-			refund.getOrder().getId(),
-			refund.getOrder().getOrderNumber(),
-			refund.getOrder().getStatus(),
+			refund.getOrder() == null ? null : refund.getOrder().getId(),
+			refund.getOrder() == null ? null : refund.getOrder().getOrderNumber(),
+			refund.getOrder() == null ? null : refund.getOrder().getStatus(),
+			refund.getPaymentGroup().getId(),
+			appliedOrderIds(refund),
 			refund.getReason(),
 			refund.getStatus(),
 			refund.getRefundAmount(),
@@ -254,6 +316,64 @@ public class RefundService {
 		);
 	}
 
+	private List<UUID> appliedOrderIds(Refund refund) {
+		if (refund.getRefundScope() == RefundScope.PAYMENT_GROUP) {
+			return orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(refund.getPaymentGroup().getId())
+				.stream().map(CustomerOrder::getId).toList();
+		}
+		return List.of(refund.getOrder().getId());
+	}
+
+	private String refundCommandHash(
+		UUID refundId,
+		UUID adminUserId,
+		RefundDtos.ManualBankTransferRefundCompleteRequest request
+	) {
+		return hasher.hmac(
+			"received-payment-exception-refund",
+			PaymentCommandType.COMPLETE_RECEIVED_EXCEPTION_REFUND.name(),
+			refundId.toString(),
+			adminUserId.toString(),
+			request.transferredAmount() == null ? null : request.transferredAmount().toString(),
+			hasher.normalizeText(request.reason()),
+			hasher.normalizeText(request.bankName()),
+			hasher.normalizeText(request.accountNumber()),
+			hasher.normalizeText(request.accountHolder()),
+			request.transferredAt() == null ? null : request.transferredAt().toString(),
+			hasher.normalizeText(request.transactionReference())
+		);
+	}
+
+	private RefundDtos.AdminRefundResponse refundReplay(UUID paymentGroupId, String key, String requestHash) {
+		if (key == null) {
+			return null;
+		}
+		PaymentEvent event = paymentEventRepository
+			.findByPaymentGroup_IdAndIdempotencyKeyAndCommandTypeIsNotNull(paymentGroupId, key)
+			.orElse(null);
+		if (event == null) {
+			return null;
+		}
+		if (!event.matchesCommand(PaymentCommandType.COMPLETE_RECEIVED_EXCEPTION_REFUND, requestHash)
+			|| event.getResultSnapshot() == null) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.IDEMPOTENCY_CONFLICT,
+				"Idempotency key conflict");
+		}
+		try {
+			return objectMapper.readValue(event.getResultSnapshot(), RefundCommandResult.class).toResponse();
+		} catch (JacksonException exception) {
+			throw new IllegalStateException("Failed to read refund command result");
+		}
+	}
+
+	private String json(Object value) {
+		try {
+			return objectMapper.writeValueAsString(value);
+		} catch (JacksonException exception) {
+			throw new IllegalStateException("Failed to serialize refund command result");
+		}
+	}
+
 	private Refund createRefund(CustomerOrder order, RefundReason reason) {
 		return refundRepository.findByOrder_Id(order.getId())
 			.orElseGet(() -> {
@@ -261,6 +381,7 @@ public class RefundService {
 				paymentEventRepository.save(new PaymentEvent(
 					null,
 					order.getPaymentGroup(),
+					order,
 					null,
 					PaymentEventType.REFUND_REQUESTED,
 					"Refund requested for order " + order.getOrderNumber(),
@@ -270,9 +391,64 @@ public class RefundService {
 			});
 	}
 
-	private Refund findRefund(UUID refundId) {
-		return refundRepository.findById(refundId)
+	private Refund findRefundForUpdate(UUID refundId) {
+		return refundRepository.findByIdForUpdate(refundId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
+	}
+
+	private record RefundCommandResult(
+		UUID refundId,
+		UUID orderId,
+		String orderNumber,
+		OrderStatus orderStatus,
+		UUID paymentGroupId,
+		List<UUID> appliedOrderIds,
+		PaymentGroupStatus paymentGroupStatus,
+		UUID paymentId,
+		com.dropshipshop.api.payment.domain.PaymentStatus paymentStatus,
+		RefundReason reason,
+		RefundStatus status,
+		long refundAmount,
+		RefundScope refundScope,
+		Instant completedAt,
+		Instant createdAt
+	) {
+		static RefundCommandResult from(RefundDtos.AdminRefundResponse response) {
+			return new RefundCommandResult(
+				response.refundId(), response.orderId(), response.orderNumber(), response.orderStatus(),
+				response.paymentGroupId(), response.appliedOrderIds(), response.paymentGroupStatus(),
+				response.paymentId(), response.paymentStatus(), response.reason(), response.status(),
+				response.refundAmount(), response.refundScope(), response.completedAt(), response.createdAt()
+			);
+		}
+
+		RefundDtos.AdminRefundResponse toResponse() {
+			return new RefundDtos.AdminRefundResponse(
+				refundId, orderId, orderNumber, orderStatus, paymentGroupId, appliedOrderIds,
+				paymentGroupStatus, paymentId, paymentStatus, reason, status, refundAmount, refundScope,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				completedAt,
+				null,
+				createdAt
+			);
+		}
 	}
 
 }

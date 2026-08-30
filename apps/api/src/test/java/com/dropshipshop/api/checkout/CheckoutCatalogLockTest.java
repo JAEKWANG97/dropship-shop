@@ -34,7 +34,9 @@ import com.dropshipshop.api.order.repository.OrderPolicyAgreementRepository;
 import com.dropshipshop.api.payment.BankTransferProperties;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
+import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.supplierproduct.ProductSaleability;
+import com.dropshipshop.api.supplierportal.SupplierContractTerminalService;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
 import jakarta.persistence.EntityManager;
@@ -77,6 +79,7 @@ class CheckoutCatalogLockTest {
 			mock(CustomerOrderRepository.class),
 			mock(OrderItemRepository.class),
 			mock(OrderPolicyAgreementRepository.class),
+			mock(RefundRepository.class),
 			mock(UserAccountRepository.class),
 			mock(AccountAgreementService.class),
 			mock(AccountProfileService.class),
@@ -86,6 +89,7 @@ class CheckoutCatalogLockTest {
 			mock(NotificationService.class),
 			mock(StorefrontSalesProperties.class),
 			mock(ProductSaleability.class),
+			mock(SupplierContractTerminalService.class),
 			entityManager
 		);
 

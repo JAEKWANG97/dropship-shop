@@ -88,7 +88,11 @@ class AccountDeletionService {
 		refundRepository.findActiveByUserId(userId, new ArrayList<>(ACTIVE_REFUND_STATUSES))
 			.stream()
 			.limit(5)
-			.forEach(refund -> blockers.add("환불 " + refund.getOrder().getOrderNumber() + "(" + refund.getStatus() + ")"));
+			.forEach(refund -> blockers.add("환불 "
+				+ (refund.getOrder() == null
+					? "결제그룹 " + refund.getPaymentGroup().getCheckoutNumber()
+					: refund.getOrder().getOrderNumber())
+				+ "(" + refund.getStatus() + ")"));
 		claimRepository.findTop5ByUser_IdAndStatusInOrderByCreatedAtDesc(userId, ACTIVE_CLAIM_STATUSES)
 			.forEach(claim -> blockers.add("클레임 " + claim.getOrder().getOrderNumber() + "(" + claim.getStatus() + ")"));
 		if (!blockers.isEmpty()) {

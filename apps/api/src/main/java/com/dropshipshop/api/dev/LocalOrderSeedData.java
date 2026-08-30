@@ -270,6 +270,7 @@ public class LocalOrderSeedData implements ApplicationRunner {
 		paymentEventRepository.save(new PaymentEvent(
 			payment,
 			paymentGroup,
+			order,
 			payment.getProviderPaymentKey(),
 			PaymentEventType.BANK_TRANSFER_DEPOSIT_CONFIRMED,
 			"Local seed bank transfer deposit confirmed",

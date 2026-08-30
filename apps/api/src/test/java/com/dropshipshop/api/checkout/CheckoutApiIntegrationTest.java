@@ -35,11 +35,18 @@ import com.dropshipshop.api.account.domain.UserPolicyAgreement;
 import com.dropshipshop.api.account.repository.UserPolicyAgreementRepository;
 import com.dropshipshop.api.auth.security.TestAuthentication;
 import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.InventoryMode;
+import com.dropshipshop.api.catalog.domain.ProductCategory;
+import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
 import com.dropshipshop.api.catalog.domain.ProductNotice;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
+import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.catalog.domain.SupplierAvailability;
+import com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus;
+import com.dropshipshop.api.catalog.domain.SupplierStatus;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
@@ -49,6 +56,8 @@ import com.dropshipshop.api.notification.domain.NotificationChannel;
 import com.dropshipshop.api.notification.domain.NotificationStatus;
 import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.domain.OrderItemReservationStatus;
+import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderPolicyAgreementRepository;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
@@ -61,6 +70,7 @@ import com.dropshipshop.api.user.repository.UserAccountRepository;
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CheckoutApiIntegrationTest {
+	private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -88,6 +98,9 @@ class CheckoutApiIntegrationTest {
 
 	@Autowired
 	private CustomerOrderRepository orderRepository;
+
+	@Autowired
+	private OrderItemRepository orderItemRepository;
 
 	@Autowired
 	private OrderPolicyAgreementRepository orderPolicyAgreementRepository;
@@ -225,6 +238,94 @@ class CheckoutApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.policyConfirmedAt").exists());
+	}
+
+	@Test
+	void trackedCheckoutAtomicallyReservesAndSnapshotsInventory() throws Exception {
+		UserAccount customer = createCustomer("checkout-tracked-reservation");
+		ProductOption option = createTrackedPortalOption("Tracked Checkout Product", 3);
+		addCartItem(customer.getId(), option.getId(), 2);
+
+		String checkoutNumber = checkoutNumberFrom(mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isCreated())
+			.andReturn());
+
+		ProductOption reserved = productOptionRepository.findById(option.getId()).orElseThrow();
+		assertThat(reserved.getOnHandQuantity()).isEqualTo(3);
+		assertThat(reserved.getReservedQuantity()).isEqualTo(2);
+		assertThat(reserved.getAvailableQuantity()).isEqualTo(1);
+		assertThat(reserved.getInventoryVersion()).isEqualTo(2);
+		var paymentGroup = paymentGroupRepository
+			.findByCheckoutNumberAndUser_Id(checkoutNumber, customer.getId()).orElseThrow();
+		var order = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId()).getFirst();
+		assertThat(orderItemRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()))
+			.singleElement()
+			.satisfies(item -> {
+				assertThat(item.getManagementChannelSnapshot()).isEqualTo(ProductManagementChannel.SUPPLIER_PORTAL);
+				assertThat(item.getInventoryModeSnapshot()).isEqualTo(InventoryMode.TRACKED);
+				assertThat(item.getReservationStatus()).isEqualTo(OrderItemReservationStatus.HELD);
+				assertThat(item.getReservedAt()).isNotNull();
+			});
+	}
+
+	@Test
+	void trackedCheckoutShortageLeavesInventoryAndCheckoutUnchanged() throws Exception {
+		UserAccount customer = createCustomer("checkout-tracked-shortage");
+		ProductOption option = createTrackedPortalOption("Tracked Shortage Product", 2);
+		addCartItem(customer.getId(), option.getId(), 2);
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 1L);
+		productOptionRepository.saveAndFlush(option);
+		long paymentGroupsBefore = paymentGroupRepository.count();
+		long ordersBefore = orderRepository.count();
+
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message", is("Cart contains unavailable item")));
+
+		ProductOption unchanged = productOptionRepository.findById(option.getId()).orElseThrow();
+		assertThat(unchanged.getOnHandQuantity()).isEqualTo(1);
+		assertThat(unchanged.getReservedQuantity()).isZero();
+		assertThat(unchanged.getInventoryVersion()).isEqualTo(2);
+		assertThat(paymentGroupRepository.count()).isEqualTo(paymentGroupsBefore);
+		assertThat(orderRepository.count()).isEqualTo(ordersBefore);
+	}
+
+	@Test
+	void overduePortalContractCommitsTerminalStateButCreatesNoCheckout() throws Exception {
+		UserAccount customer = createCustomer("checkout-expired-contract");
+		ProductOption option = createTrackedPortalOption("Expired Contract Product", 2);
+		addCartItem(customer.getId(), option.getId(), 1);
+		Supplier supplier = option.getProduct().getSupplier();
+		Instant now = Instant.now();
+		supplier.verifyPortalContract(
+			"expired-contract", now.minusSeconds(7200), now.minusSeconds(3600), now.minusSeconds(7200), ADMIN_ID
+		);
+		supplierRepository.saveAndFlush(supplier);
+		long paymentGroupsBefore = paymentGroupRepository.count();
+
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code", is("CONTRACT_NOT_VERIFIED")));
+
+		Supplier expired = supplierRepository.findById(supplier.getId()).orElseThrow();
+		assertThat(expired.getPortalContractStatus()).isEqualTo(SupplierPortalContractStatus.EXPIRED);
+		assertThat(expired.getStatus()).isEqualTo(SupplierStatus.INACTIVE);
+		assertThat(paymentGroupRepository.count()).isEqualTo(paymentGroupsBefore);
+		ProductOption unchanged = productOptionRepository.findById(option.getId()).orElseThrow();
+		assertThat(unchanged.getReservedQuantity()).isZero();
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items", hasSize(1)));
 	}
 
 	@Test
@@ -475,6 +576,32 @@ class CheckoutApiIntegrationTest {
 			"Return exchange info"
 		));
 		return productOptionRepository.saveAndFlush(new ProductOption(product, "Default", additionalPrice, optionStatus));
+	}
+
+	private ProductOption createTrackedPortalOption(String productName, long onHandQuantity) {
+		Instant now = Instant.now();
+		Supplier supplier = new Supplier(
+			productName + " Supplier", "Manager", "010-0000-0000", productName + "@supplier.example", null
+		);
+		supplier.verifyPortalContract(
+			"contract-" + productName, now.minusSeconds(60), now.plusSeconds(3600), now, ADMIN_ID
+		);
+		supplier = supplierRepository.saveAndFlush(supplier);
+		Product product = new Product(
+			supplier,
+			productName,
+			productName + " Summary",
+			10_000,
+			13_000,
+			ProductCategory.PPE_WORK_GLOVES,
+			ProductStatus.ACTIVE,
+			ProductManagementChannel.SUPPLIER_PORTAL
+		);
+		product.updateReview(ProductReviewStatus.APPROVED, null, null);
+		product = productRepository.saveAndFlush(product);
+		ProductOption option = new ProductOption(product, "Default", 0, ProductOptionStatus.ACTIVE);
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, onHandQuantity);
+		return productOptionRepository.saveAndFlush(option);
 	}
 
 	private void addCartItem(UUID userId, UUID productOptionId, int quantity) throws Exception {

@@ -34,10 +34,16 @@ import jakarta.validation.Valid;
 class SupplierProductController {
 
 	private final SupplierProductService supplierProductService;
+	private final SupplierInventoryService supplierInventoryService;
 	private final CurrentUser currentUser;
 
-	SupplierProductController(SupplierProductService supplierProductService, CurrentUser currentUser) {
+	SupplierProductController(
+		SupplierProductService supplierProductService,
+		SupplierInventoryService supplierInventoryService,
+		CurrentUser currentUser
+	) {
 		this.supplierProductService = supplierProductService;
+		this.supplierInventoryService = supplierInventoryService;
 		this.currentUser = currentUser;
 	}
 
@@ -107,6 +113,19 @@ class SupplierProductController {
 		@Valid @RequestBody SupplierProductDtos.OptionRequest request
 	) {
 		return ok(supplierProductService.updateOption(currentUser.id(authentication), productId, optionId, request));
+	}
+
+	@PutMapping("/{productId}/options/{optionId}/inventory")
+	ResponseEntity<SupplierProductDtos.InventoryResponse> updateInventory(
+		Authentication authentication,
+		@PathVariable UUID productId,
+		@PathVariable UUID optionId,
+		@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+		@Valid @RequestBody SupplierProductDtos.InventoryUpdateRequest request
+	) {
+		return ResponseEntity.ok(supplierInventoryService.update(
+			currentUser.id(authentication), productId, optionId, idempotencyKey, request
+		));
 	}
 
 	@DeleteMapping("/{productId}/options/{optionId}")

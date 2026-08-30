@@ -101,6 +101,64 @@ class CatalogDomainFoundationTest {
 		assertThat(policy.getVersion()).isEqualTo(2);
 	}
 
+	@Test
+	void optionInventoryDefaultsFollowManagementChannel() {
+		ProductOption coreable = new ProductOption(
+			product(ProductManagementChannel.COREABLE), "coreable", 0, ProductOptionStatus.ACTIVE
+		);
+		ProductOption portal = new ProductOption(
+			product(ProductManagementChannel.SUPPLIER_PORTAL), "portal", 0, ProductOptionStatus.ACTIVE
+		);
+
+		assertThat(coreable.getInventoryMode()).isEqualTo(InventoryMode.UNTRACKED);
+		assertThat(coreable.getOnHandQuantity()).isNull();
+		assertThat(coreable.getReservedQuantity()).isZero();
+		assertThat(portal.getInventoryMode()).isEqualTo(InventoryMode.TRACKED);
+		assertThat(portal.getOnHandQuantity()).isZero();
+		assertThat(portal.getReservedQuantity()).isZero();
+		assertThat(portal.getSupplierAvailability()).isEqualTo(SupplierAvailability.AVAILABLE);
+	}
+
+	@Test
+	void trackedInventoryPreservesLedgerInvariantsAndVersionsEveryMutation() {
+		ProductOption option = new ProductOption(
+			product(ProductManagementChannel.SUPPLIER_PORTAL), "portal", 0, ProductOptionStatus.ACTIVE
+		);
+
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 10L);
+		option.reserve(4);
+		assertThat(option.getAvailableQuantity()).isEqualTo(6);
+		assertThat(option.getInventoryVersion()).isEqualTo(2);
+		assertThatThrownBy(() -> option.updateInventory(
+			SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 3L
+		)).isInstanceOf(IllegalStateException.class);
+
+		option.consumeReservation(2);
+		option.releaseReservation(2);
+		option.reacquireAndConsume(1);
+
+		assertThat(option.getOnHandQuantity()).isEqualTo(7);
+		assertThat(option.getReservedQuantity()).isZero();
+		assertThat(option.getAvailableQuantity()).isEqualTo(7);
+		assertThat(option.getInventoryVersion()).isEqualTo(5);
+	}
+
+	@Test
+	void untrackedInventoryRejectsQuantitiesAndActiveReservationsBlockModeChange() {
+		ProductOption option = new ProductOption(
+			product(ProductManagementChannel.SUPPLIER_PORTAL), "portal", 0, ProductOptionStatus.ACTIVE
+		);
+		assertThatThrownBy(() -> option.updateInventory(
+			SupplierAvailability.AVAILABLE, InventoryMode.UNTRACKED, 1L
+		)).isInstanceOf(IllegalArgumentException.class);
+
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 2L);
+		option.reserve(1);
+		assertThatThrownBy(() -> option.updateInventory(
+			SupplierAvailability.AVAILABLE, InventoryMode.UNTRACKED, null
+		)).isInstanceOf(IllegalStateException.class);
+	}
+
 	private Product product(ProductManagementChannel channel) {
 		return new Product(
 			new Supplier("supplier", null, null, null, null),

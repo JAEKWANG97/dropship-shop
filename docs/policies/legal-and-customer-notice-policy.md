@@ -105,14 +105,14 @@ Status: Confirmed
 - 실제 결제 오픈 전에는 구매안전서비스 안내를 실제 제공자와 이용 방법으로 교체하고, 홈택스 발급 권한과 의무발행 업종 해당 여부를 확인해야 한다.
 - 출시 차단 항목은 `docs/legal-launch-checklist.md`를 기준으로 확인한다.
 
-## Bank-Receipt Exception Refund Notice — Planned (B-102)
+## Bank-Receipt Exception Refund Notice — Runtime Implemented, Production Notice Pending (B-102)
 
-Status: Planned (B-102). The current public policy and memo-only operation remain implemented until the new payment exception flow ships.
+Status: The B-102 payment-exception runtime and customer `REFUND_PROCESSING` projection are Implemented. A new managed public payment/cancellation-refund policy version and checkout consent snapshot remain a production activation gate. Historical B-068 memo rows remain readable, but memo-only handling is no longer the current workflow for an identified positive amount-mismatched receipt.
 
 - 금액이 다른 실제 계좌입금 또는 미입금 취소 뒤 발견된 입금을 확인하면 주문을 출고하지 않고 실제 수령액 전부를 반환하며, 고객이 구매를 계속하려면 새 주문이 필요하다는 내용을 결제·취소/환불 정책의 별도 텍스트로 고지한다.
 - 처리 중 고객 화면은 `입금 확인 및 환불 처리 중`, 실제 환불 예정액과 문의 경로를 표시한다. 실제 계좌이체 증적이 완료되기 전에는 `환불 완료`로 표시하지 않는다.
 - 입금자명, 은행 거래 식별값, 관리자 사유와 환불 계좌·이체 증적은 고객·공급처·알림 payload에 복제하지 않는다. 공급처에는 해당 주문, 예외와 환불 존재 자체를 노출하지 않는다.
-- B-102 production 전환 전에 managed 공개 정책의 새 시행 버전, checkout/주문 표시와 동의 snapshot을 함께 검증한다.
+- 이 결제 예외를 production에서 열기 전에 managed 공개 정책의 새 시행 버전, checkout/주문 표시와 동의 snapshot을 함께 검증한다.
 
 ## Supplier Portal Privacy And Notice — B-100 Handling Implemented, Later Notices Planned
 

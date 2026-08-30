@@ -28,7 +28,9 @@ class ApiExceptionHandler {
 		ApiErrorException exception,
 		HttpServletRequest request
 	) {
-		return error(exception.getStatus(), exception.getCode(), message(exception.getMessage()), request);
+		return error(
+			exception.getStatus(), exception.getCode(), message(exception.getMessage()), request, exception.getDetails()
+		);
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
@@ -151,9 +153,19 @@ class ApiExceptionHandler {
 		String message,
 		HttpServletRequest request
 	) {
+		return error(status, code, message, request, null);
+	}
+
+	private ResponseEntity<ApiErrorResponse> error(
+		HttpStatus status,
+		ApiErrorCode code,
+		String message,
+		HttpServletRequest request,
+		Object details
+	) {
 		return ResponseEntity
 			.status(status)
-			.body(ApiErrorResponse.of(status.value(), code, message, request.getRequestURI()));
+			.body(ApiErrorResponse.of(status.value(), code, message, request.getRequestURI(), details));
 	}
 
 	private ApiErrorCode codeFor(HttpStatus status) {

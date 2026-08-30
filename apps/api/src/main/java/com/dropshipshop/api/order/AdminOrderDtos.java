@@ -14,6 +14,7 @@ import com.dropshipshop.api.fulfillment.domain.SupplierPurchaseStatus;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
+import com.dropshipshop.api.payment.domain.PaymentExceptionReason;
 import com.dropshipshop.api.payment.domain.PaymentMethod;
 import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
@@ -181,6 +182,46 @@ final class AdminOrderDtos {
 	) {
 	}
 
+	record BankTransferPaymentCommandResponse(
+		UUID orderId,
+		OrderStatus status,
+		AdminFulfillmentResponse fulfillment,
+		AdminShipmentResponse shipment,
+		String outcome,
+		PaymentExceptionReason exceptionReason,
+		long expectedAmount,
+		long actualAmount,
+		PaymentGroupStatus paymentGroupStatus,
+		List<OrderStatus> orderStatuses,
+		PaymentCommandPaymentResponse payment,
+		PaymentCommandRefundResponse refund,
+		List<PaymentCommandRefundResponse> refunds,
+		boolean supplierVisible,
+		String customerDisplayStatus,
+		String nextAction
+	) {
+	}
+
+	record PaymentCommandPaymentResponse(
+		UUID paymentId,
+		PaymentProvider provider,
+		PaymentStatus status,
+		long actualAmount,
+		Instant depositedAt,
+		String transactionReference
+	) {
+	}
+
+	record PaymentCommandRefundResponse(
+		UUID refundId,
+		UUID orderId,
+		RefundScope refundScope,
+		RefundReason reason,
+		RefundStatus status,
+		long refundAmount
+	) {
+	}
+
 	record OrderStatusHistoryListResponse(
 		List<OrderStatusHistoryResponse> histories
 	) {
@@ -234,6 +275,10 @@ final class AdminOrderDtos {
 
 	record AdminRefundResponse(
 		UUID refundId,
+		UUID orderId,
+		String orderNumber,
+		UUID paymentGroupId,
+		List<UUID> appliedOrderIds,
 		RefundReason reason,
 		RefundStatus status,
 		long refundAmount,
@@ -379,8 +424,46 @@ final class AdminOrderDtos {
 
 	record BankTransferDepositMismatchRequest(
 		@NotBlank
-		@Size(max = 2000)
-		String memo
+		@Size(max = 100)
+		String actualDepositorName,
+
+		@NotNull
+		@Positive
+		Long actualAmount,
+
+		@NotNull
+		@PastOrPresent
+		Instant depositedAt,
+
+		@NotBlank
+		@Size(max = 200)
+		String transactionReference,
+
+		@NotBlank
+		@Size(max = 1000)
+		String reason
+	) {
+	}
+
+	record BankTransferLateDepositRequest(
+		@NotBlank
+		@Size(max = 100)
+		String actualDepositorName,
+
+		@Positive
+		long actualAmount,
+
+		@NotNull
+		@PastOrPresent
+		Instant depositedAt,
+
+		@NotBlank
+		@Size(max = 200)
+		String transactionReference,
+
+		@NotBlank
+		@Size(max = 1000)
+		String reason
 	) {
 	}
 

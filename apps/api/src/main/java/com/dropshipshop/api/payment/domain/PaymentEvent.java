@@ -17,6 +17,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 @Entity
 @Table(name = "payment_events")
 public class PaymentEvent {
@@ -47,6 +50,17 @@ public class PaymentEvent {
 	@Column(name = "idempotency_key", length = 200)
 	private String idempotencyKey;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "command_type", length = 60)
+	private PaymentCommandType commandType;
+
+	@Column(name = "request_hash", length = 128)
+	private String requestHash;
+
+	@Column(name = "result_snapshot", columnDefinition = "jsonb")
+	@JdbcTypeCode(SqlTypes.JSON)
+	private String resultSnapshot;
+
 	@Column(name = "raw_payload", columnDefinition = "TEXT")
 	private String rawPayload;
 
@@ -73,7 +87,19 @@ public class PaymentEvent {
 		String resultMessage,
 		Instant now
 	) {
-		this(payment, paymentGroup, providerPaymentKey, eventType, null, null, resultMessage, now);
+		this(payment, paymentGroup, null, providerPaymentKey, eventType, null, null, resultMessage, now);
+	}
+
+	public PaymentEvent(
+		Payment payment,
+		PaymentGroup paymentGroup,
+		CustomerOrder order,
+		String providerPaymentKey,
+		PaymentEventType eventType,
+		String resultMessage,
+		Instant now
+	) {
+		this(payment, paymentGroup, order, providerPaymentKey, eventType, null, null, resultMessage, now);
 	}
 
 	public PaymentEvent(
@@ -86,8 +112,23 @@ public class PaymentEvent {
 		String resultMessage,
 		Instant now
 	) {
+		this(payment, paymentGroup, null, providerPaymentKey, eventType, idempotencyKey, rawPayload, resultMessage, now);
+	}
+
+	private PaymentEvent(
+		Payment payment,
+		PaymentGroup paymentGroup,
+		CustomerOrder order,
+		String providerPaymentKey,
+		PaymentEventType eventType,
+		String idempotencyKey,
+		String rawPayload,
+		String resultMessage,
+		Instant now
+	) {
 		this.payment = payment;
 		this.paymentGroup = paymentGroup;
+		this.order = order;
 		this.providerPaymentKey = providerPaymentKey;
 		this.eventType = eventType;
 		this.idempotencyKey = idempotencyKey;
@@ -97,8 +138,58 @@ public class PaymentEvent {
 		this.processedAt = now;
 	}
 
+	public static PaymentEvent command(
+		Payment payment,
+		PaymentGroup paymentGroup,
+		CustomerOrder order,
+		String providerPaymentKey,
+		PaymentEventType eventType,
+		PaymentCommandType commandType,
+		String idempotencyKey,
+		String requestHash,
+		String resultSnapshot,
+		String resultMessage,
+		Instant now
+	) {
+		PaymentEvent event = new PaymentEvent(
+			payment,
+			paymentGroup,
+			order,
+			providerPaymentKey,
+			eventType,
+			idempotencyKey,
+			null,
+			resultMessage,
+			now
+		);
+		event.commandType = commandType;
+		event.requestHash = requestHash;
+		event.resultSnapshot = resultSnapshot;
+		return event;
+	}
+
 	@PrePersist
 	void prePersist() {
 		createdAt = Instant.now();
+	}
+
+	public boolean matchesCommand(PaymentCommandType commandType, String requestHash) {
+		return this.commandType == commandType && java.util.Objects.equals(this.requestHash, requestHash);
+	}
+
+	public String getResultSnapshot() {
+		return resultSnapshot;
+	}
+
+	public UUID getOrderId() {
+		return order == null ? null : order.getId();
+	}
+
+	public PaymentCommandType getCommandType() {
+		return commandType;
+	}
+
+	public String getRequestHash() {
+		return requestHash;
 	}
 }

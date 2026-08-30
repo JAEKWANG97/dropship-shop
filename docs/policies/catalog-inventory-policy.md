@@ -57,9 +57,9 @@ Status: Confirmed
 - 상품 상세 이미지/HTML 또는 상품 정보 제공 고시가 변경되어도 기존 주문 상품 스냅샷은 변경하지 않는다.
 - 공급처 가격이 결제 이후 변경되더라도 고객에게 추가 청구하지 않는다.
 
-## Supplier Portal Catalog And Inventory — `B-101` Implemented, `B-102` Planned
+## Supplier Portal Catalog And Inventory — `B-101`/`B-102` Implemented
 
-Status: `B-101` catalog/review is Implemented; `B-102` inventory/reservation remains Planned. Existing Coreable/Domeggook catalog behavior remains compatible and the production portal gate remains closed.
+Status: `B-101` catalog/review and `B-102` inventory/reservation are Implemented. Existing Coreable/Domeggook catalog behavior remains compatible and the production portal gate remains closed.
 
 - 공급처 포털 옵션은 `TRACKED`와 `UNTRACKED` 재고 모드를 가진다. 기존 COREABLE 옵션은 `UNTRACKED`, B-101에서 B-102 전에 생성된 portal 옵션은 `TRACKED/onHand=0`, 이후 신규 포털 옵션은 `TRACKED`가 기본이다.
 - `TRACKED` 옵션은 on-hand와 reserved를 저장하고 available을 `onHand - reserved`로 계산한다. `UNTRACKED` 옵션은 on-hand를 저장하지 않으며 reserved는 0이다.
@@ -87,7 +87,7 @@ Status: `B-101` catalog/review is Implemented; `B-102` inventory/reservation rem
 - 해당 상품의 승인된 공급처 담당자는 IMAGE/HTML 상세를 입력할 수 있으며 기존 관리자와 같은 파일 검증·sanitize 규칙을 적용한다.
 - 새 supplier IMAGE 상세 블록은 같은 상품에 서버가 업로드한 `DETAIL` ProductImage만 참조한다. 임의 URL/storage key와 다른 상품 이미지는 거절하고, 참조 중인 DETAIL 이미지는 블록과 함께 제거하기 전 단독 삭제하지 않는다.
 - `TRACKED` 재고는 checkout 생성 시 24시간 결제기한까지 예약하고, 입금확인 시 소비하며, 미입금 취소 또는 만료 시 해제한다.
-- 공급처 재고 수정은 절대값 기반 idempotent update로 처리하고 on-hand를 현재 reserved 아래로 낮출 수 없다.
+- 공급처 재고 수정은 절대값 기반 idempotent update로 처리하고, Product 검토 버전과 분리된 마지막 `inventoryVersion`을 요구하며, on-hand를 현재 reserved 아래로 낮출 수 없다. 공급처 수정과 예약 lifecycle은 이 버전을 증가시키지만 상품 검토 상태는 바꾸지 않는다.
 - 해당 option을 참조하는 open `PAYMENT_PENDING` OrderItem이 하나라도 있으면 `TRACKED <-> UNTRACKED` 양방향 전환을 모두 거절한다. 참조가 모두 끝난 뒤 `UNTRACKED -> TRACKED`로 전환할 때는 on-hand를 함께 입력한다.
 - 결제 후 취소·반품·환불은 실제 실물 반환을 보장하지 않으므로 on-hand를 자동 복구하지 않는다.
 - 고객에게 재고 모드나 `무제한` 표현을 노출하지 않고 구매 가능 또는 품절만 표시한다.
@@ -115,7 +115,7 @@ Status: `B-101` catalog/review is Implemented; `B-102` inventory/reservation rem
 - 로컬 화면 검증용 샘플 상품은 백엔드 `local` profile seed 또는 관리자 등록 스크립트로 실제 DB에 생성한다.
 - 주문 상품에는 가격과 상세 변경의 영향을 받지 않도록 주문 시점의 상품명, 옵션명, 단가, 수량, 금액, 상품 요약, 상품 상세 버전, 상품 정보 제공 고시 버전 참조를 스냅샷으로 저장한다.
 
-### B-101 Implemented / B-102 Planned Impact
+### B-101 / B-102 Implemented Impact
 
 - 기존 `sourceStockQuantity`는 외부 참고값으로 유지하고 portal inventory의 on-hand로 자동 전환하지 않는다.
 - `ProductOption`은 portal inventory용 `inventoryMode`, `onHandQuantity`, `reservedQuantity`를 가지며 available은 저장하지 않는다.

@@ -2,6 +2,17 @@
 
 실행한 검증만 기록한다. 실제 외부 서비스 검증은 자동 테스트 결과와 합치지 않는다.
 
+## 2026-08-30 B-102 Supplier Inventory And Reservation
+
+- 판정: 로컬 구현·문서 동기화·독립 코드/Web/문서 리뷰 완료. P0/P1 잔여 없음. Production 공급처 포털은 계속 비활성이며 외부 입금·이메일·운영 데이터는 변경하지 않음.
+- API 전체: `cd apps/api && ./gradlew cleanTest test --no-daemon` → `303 tests / 0 failures / 0 errors / 0 skipped`.
+- PostgreSQL: 전체 suite의 `PostgresMigrationSmokeTest` `10 passed`. V41 fresh migration, legacy/portal backfill preflight, old-writer defaults, composite FK/partial unique, option row-lock 대기 후 checkout 재검증을 PostgreSQL 17 Testcontainers에서 확인.
+- Web 정적 검증: `npm run lint` → `0 errors / 기존 <img> warnings 3`; `npm run build` → 29 pages production build PASS.
+- Web 계약: `supplier-products-contract.spec.ts` Desktop/Mobile `40 passed`. 재고 표시/비노출, command evidence/replay key, customer/admin refund projection, `REQUESTED → APPROVED → manual-complete`, 재고 conflict canonical recovery·version 동기화·이미지 재업로드 방지를 확인.
+- 로컬 화면: 임시 PostgreSQL 17에 V1~V41과 로컬 seed를 적용하고 전용 API/Web 포트에서 관리자 `REQUESTED` 환불 승인 form 및 `EXPIRED`/`CANCELLED` 주문 필터 smoke `2 passed`. 검증 후 API, Web, 임시 DB container와 port를 모두 종료·제거.
+- 정적 품질: `git diff --check` PASS. B-102 stale Planned/B-068 current/Fulfillment ownership/잘못된 `payment_events.order_id not null` 문구와 Markdown fence parity를 검색해 문서 정합성 PASS.
+- 리뷰 후 회귀: legacy Coreable 주문 자동 만료, supplier reassignment, account deletion group Refund, migration rollback defaults, PaymentEvent order FK, PostgreSQL 잠금 경합, 환불 승인 화면, 재고 409 재시도, 만료/취소 탐색을 추가 검증.
+
 ## 2026-08-06 B-095 Full Operational QA
 
 - 상태: QA `0.87 PASS`. 운영 read-only 점검, 독립 로컬 전체 회귀, 수정 배포와 운영 재검증 완료.

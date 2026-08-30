@@ -24,7 +24,7 @@
 
 ### Supplier Portal Onboarding — Implemented (`B-100`), Production Gated
 
-`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름은 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup과 `B-102`~`B-105`는 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 production flag는 기본 `off`를 유지한다.
+`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름, `B-102`의 옵션 재고·24시간 예약·입금 예외 흐름은 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup과 `B-103`~`B-105`는 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 production flag는 기본 `off`를 유지한다.
 
 - 비로그인 사용자는 필수 공급처명·담당자명·연락 이메일과 선택 전화번호·문의 메모로 공급처 신청을 제출할 수 있어야 한다.
 - 신청 화면은 active `SUPPLIER_APPLICATION_PRIVACY`의 수집 목적, 항목, 보유 기간, 동의 거부 시 신청 불가를 고지해야 한다. 서버는 exact active version을 검증하고 canonical 동의시각을 저장해야 한다.
@@ -138,13 +138,13 @@
 - 계좌입금 안내에는 입금 계좌, 예금주, 결제 그룹 총액, 입금자명, 입금 기한, 현금영수증 안내가 포함되어야 한다.
 - 관리자는 실제 입금 내역과 서버 결제 그룹 총액을 확인한 뒤에만 입금확정할 수 있어야 한다.
 - 입금확정은 `BANK_TRANSFER` 결제를 생성하고 결제 그룹과 포함 주문을 한 번만 승인해야 한다.
-- 현재 B-068 구현에서 입금 불일치는 자동 승인하지 않고 관리자 메모와 함께 입금대기로 유지한다. Planned B-102 이후 식별된 실제 입금액이 결제그룹 총액과 다르면 메모-only 상태로 두지 않고 아래 결제그룹 전액 환불 예외로 처리해야 한다.
+- B-068의 과거 입금 불일치 메모는 읽기 호환을 위해 보존한다. 현재는 식별된 양수 실제 입금액이 결제그룹 총액과 다르면 메모-only 입금대기로 두지 않고 B-102의 결제그룹 전액 환불 예외로 처리해야 한다. 어느 PaymentGroup인지 식별하지 못한 은행 거래는 주문을 추측해 변경하지 않는다.
 - 미입금 주문은 관리자 취소 사유와 함께 종료할 수 있어야 한다.
 - 중복 입금확인과 중복 checkout은 중복 결제 또는 중복 주문을 만들지 않아야 한다.
 - 입금대기와 미입금 취소 주문은 일반 고객 주문 내역에 노출하지 않고 checkout 상태에서 안내해야 한다.
 - 카드, 간편결제, PG 계좌이체·가상계좌는 제공하지 않아야 한다.
 
-### Portal Inventory And Checkout Reservation — Planned (`B-102`)
+### Portal Inventory And Checkout Reservation — Implemented (`B-102`)
 
 - 기존 COREABLE 상품 옵션은 migration에서 `UNTRACKED`로 유지하고, B-101에서 B-102 전에 생성된 portal option은 `TRACKED/onHand=0`으로 안전하게 이관해야 한다. 이후 신규 공급처 포털 옵션은 `TRACKED`를 기본으로 하되 공급처가 명시적으로 `UNTRACKED`를 선택할 수 있어야 한다.
 - Portal/legacy 여부와 무관하게 식별된 양수 실입금액이 PaymentGroup 총액과 다르면 `PAYMENT_AMOUNT_MISMATCH`를 다른 판매불가·기한·재고 reason보다 먼저 선택해야 한다. 실제 입금자·금액·시각·거래 식별값과 관리자 사유를 exactly once 보존하고 Payment/PaymentGroup을 `PAYMENT_EXCEPTION`으로 기록해야 한다.

@@ -266,6 +266,7 @@ final class CatalogDtos {
 		String name,
 		long additionalPrice,
 		ProductOptionStatus status,
+		boolean purchasable,
 		@JsonInclude(JsonInclude.Include.NON_NULL) String sourceOptionCode,
 		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourceAdditionalPrice,
 		@JsonInclude(JsonInclude.Include.NON_NULL) Long sourceStockQuantity,
@@ -359,6 +360,7 @@ final class CatalogDtos {
 		int orderQuantityStep,
 		ProductCategory categoryCode,
 		ProductStatus status,
+		boolean purchasable,
 		String thumbnailImageUrl
 	) {
 	}
@@ -391,6 +393,7 @@ final class CatalogDtos {
 		int orderQuantityStep,
 		ProductCategory categoryCode,
 		ProductStatus status,
+		boolean purchasable,
 		boolean salesEnabled,
 		@JsonInclude(JsonInclude.Include.NON_NULL) String salesNotice,
 		@JsonInclude(JsonInclude.Include.NON_NULL) ProductComplianceStatus complianceStatus,

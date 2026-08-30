@@ -147,29 +147,31 @@ Initial MVP transitions:
 - `EXPIRED` to confirmed order; customer must create a new checkout.
 - Product/option/quantity-level partial refund inside one delivery-group order in MVP.
 
-The memo-only deposit-mismatch row above is the current B-068 implementation. Planned B-102 replaces new memo-only writes after admin-web cutover when an identified nonzero bank receipt has an amount different from the PaymentGroup total. An unattributed transfer remains external bank reconciliation and does not mutate a guessed Order.
+The memo-only deposit-mismatch row above is retained as B-068 history. Implemented B-102 replaces new memo-only writes after admin-web cutover when an identified nonzero bank receipt has an amount different from the PaymentGroup total. An unattributed transfer remains external bank reconciliation and does not mutate a guessed Order.
 
-## Supplier Portal Order Extension — Planned (B-102, B-103, B-104)
+## Supplier Portal Order Extension — B-102 Implemented, B-103/B-104 Planned
 
-Status: Planned (B-102, B-103, B-104). The tables above describe current implemented behavior only.
+Status: B-102 inventory reservation, expiry, deposit revalidation and received-payment exception behavior is Implemented. B-103 portal fulfillment exposure/address locking and B-104 multi-shipment behavior remain Planned.
 
-- `SUPPLIER_PORTAL` 주문은 입금확인과 동시에 공급처 출고 큐에 노출되고 `addressLockedAt`이 기록된다. 공급처 수락 액션과 고객 셀프서비스 취소·배송지 변경은 제공하지 않는다.
-- 현재 셀프서비스 취소 전이는 `fulfillment.channel in (COREABLE_MANUAL, DOMEGGOOK_API)`이고 `addressLockedAt`이 없는 주문에만 이어 적용한다. `SUPPLIER_PORTAL` 주문은 기존 취소 API에서 거절하고 Coreable 클레임으로 처리한다.
-- 만료된 tracked 주문의 실제 입금시각이 원래 기한 이내이고 current saleability/compliance guard와 모든 재고 재확보가 원자적으로 성공한 경우에만 `SUPPLIER_ORDER_PENDING`으로 확정한다.
-- portal-origin 항목이 포함된 PaymentGroup의 actual receipt 뒤 current saleability 실패는 normal/late 모두 `SALE_UNAVAILABLE_AT_DEPOSIT`, 실제 입금시각이 기한을 지났거나 재확보가 실패하면 `LATE_DEPOSIT_EXCEPTION`으로 Payment/PaymentGroup `PAYMENT_EXCEPTION` 증적을 exactly once 저장하고 Order는 같은 transaction에서 `REFUND_REQUESTED`로 끝낸다. 정상 주문으로 재개하거나 공급처 큐에 노출하지 않는다.
-- Portal 입금 예외는 `PAYMENT_EXCEPTION`을 별도 Order 최종 상태로 커밋하지 않고 exception 이력과 reason별 Refund를 같은 transaction에 남긴 뒤 `REFUND_REQUESTED`로 끝낸다. 두 reason 모두 checkout과 주문 내역에서 `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중`으로 표시한다.
-- 포털 송장 등록은 실제 출고와 다르므로 `TRACKING_REGISTERED`를 사용한다. 공급처는 배송완료를 설정할 수 없다.
+- `SUPPLIER_PORTAL` 주문은 입금확인과 동시에 공급처 출고 큐에 노출되고 `addressLockedAt`이 기록된다. 공급처 수락 액션과 고객 셀프서비스 취소·배송지 변경은 제공하지 않는다. Planned in B-103.
+- 셀프서비스 취소 전이는 `fulfillment.channel in (COREABLE_MANUAL, DOMEGGOOK_API)`이고 `addressLockedAt`이 없는 주문에만 이어 적용한다. `SUPPLIER_PORTAL` 주문은 기존 취소 API에서 거절하고 Coreable 클레임으로 처리한다. Planned in B-103.
+- 만료된 tracked 주문의 실제 입금시각이 원래 기한 이내이고 current saleability/compliance guard와 모든 재고 재확보가 원자적으로 성공한 경우에만 `SUPPLIER_ORDER_PENDING`으로 확정한다. Implemented in B-102; Fulfillment 생성과 공급처 노출은 포함하지 않는다.
+- portal-origin 항목이 포함된 PaymentGroup의 actual receipt 뒤 current saleability 실패는 normal/late 모두 `SALE_UNAVAILABLE_AT_DEPOSIT`, 실제 입금시각이 기한을 지났거나 재확보가 실패하면 `LATE_DEPOSIT_EXCEPTION`으로 Payment/PaymentGroup `PAYMENT_EXCEPTION` 증적을 exactly once 저장하고 Order는 같은 transaction에서 `REFUND_REQUESTED`로 끝낸다. 정상 주문으로 재개하거나 공급처 큐에 노출하지 않는다. Implemented in B-102.
+- Portal 입금 예외는 `PAYMENT_EXCEPTION`을 별도 Order 최종 상태로 커밋하지 않고 exception 이력과 reason별 Refund를 같은 transaction에 남긴 뒤 `REFUND_REQUESTED`로 끝낸다. 두 reason 모두 checkout과 주문 내역에서 `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중`으로 표시한다. Implemented in B-102.
+- 포털 송장 등록은 실제 출고와 다르므로 `TRACKING_REGISTERED`를 사용한다. 공급처는 배송완료를 설정할 수 없다. Planned in B-104.
 
-### Planned Payment And Portal Visibility
+### Payment And Portal Visibility — B-102 Implemented, B-103/B-104 Planned
 
-| Surface | Included planned states |
+| Surface | Included states |
 | --- | --- |
-| Customer checkout/status | portal/legacy amount mismatch, portal exact-amount exceptions and portal/legacy qualifying unpaid-cancelled exact receipts expose only `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중` plus the applicable refund amount |
-| Customer order history | `SUPPLIER_ORDER_PENDING`, `TRACKING_REGISTERED` (`송장 등록 · 배송조회 가능`), existing shipped/final states; every planned received-payment exception uses `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중` plus the applicable refund amount, without depositor, transaction reference, admin reason or account evidence |
-| Admin payment exception/refund queue | `PaymentGroup=PAYMENT_EXCEPTION`; either one `PAYMENT_GROUP/PAYMENT_AMOUNT_MISMATCH` Refund or the exact-amount exception's per-Order Refunds, with scope-correct identifiers |
-| Supplier fulfillment queue | Paid orders with `fulfillment.channel = SUPPLIER_PORTAL`; exclude `PAYMENT_EXCEPTION` and refund-only data |
+| Customer checkout/status | Implemented B-102: portal/legacy amount mismatch, portal exact-amount exceptions and portal/legacy qualifying unpaid-cancelled exact receipts expose only `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중` plus the applicable refund amount |
+| Customer order history | Implemented B-102: `SUPPLIER_ORDER_PENDING` and every received-payment exception's `REFUND_PROCESSING` projection without depositor, transaction reference, admin reason or account evidence. Planned B-104: `TRACKING_REGISTERED` (`송장 등록 · 배송조회 가능`) |
+| Admin payment exception/refund queue | Implemented B-102: `PaymentGroup=PAYMENT_EXCEPTION`; either one `PAYMENT_GROUP/PAYMENT_AMOUNT_MISMATCH` Refund or the exact-amount exception's per-Order Refunds, with scope-correct identifiers |
+| Supplier fulfillment queue | Planned B-103: paid orders with `fulfillment.channel = SUPPLIER_PORTAL`; exclude `PAYMENT_EXCEPTION` and refund-only data |
 
-### Planned Portal Transitions
+### Portal Transitions — B-102 Implemented, B-103/B-104 Planned
+
+The reservation, expiry and received-payment rows through qualifying unpaid `CANCELLED` are Implemented in B-102. Supplier queue exposure/address locking belongs to Planned B-103; tracking and delivery rows belong to Planned B-104.
 
 | From status | Actor | Action | Guard | Side effect | To status |
 | --- | --- | --- | --- | --- | --- |
@@ -177,8 +179,8 @@ Status: Planned (B-102, B-103, B-104). The tables above describe current impleme
 | `PAYMENT_PENDING` / `EXPIRED` / qualifying unpaid `CANCELLED` | Admin | Record amount-mismatched bank receipt | Identified positive actual receipt differs from immutable PaymentGroup total; replay checked first; a cancelled group must have only the unpaid-cancel outcome and no prior receipt Payment, Refund or Fulfillment | Preserve full receipt, release remaining HELD once, create one actual-amount `PAYMENT_GROUP` Refund, no fulfillment/supplier exposure | `REFUND_REQUESTED` for every included Order |
 | `PAYMENT_PENDING` | Admin | Record received but now-unsellable portal payment | Exact amount received; any portal snapshot item fails current saleability/compliance | Whole-group Payment/PaymentGroup exception, one `SALE_UNAVAILABLE_AT_DEPOSIT` Refund per Order, no fulfillment | `REFUND_REQUESTED` |
 | `PAYMENT_PENDING` | Admin | Record exact portal payment whose actual timestamp is late before scheduler expiry | Exact amount received; current saleability/contract/mode guards pass; `depositedAt` is after the original deadline | Release every remaining HELD reservation exactly once, record whole-group Payment/PaymentGroup exception, create one `LATE_DEPOSIT_EXCEPTION` Refund per Order, no fulfillment | `REFUND_REQUESTED` |
-| `EXPIRED` | Admin | Record eligible late deposit | Exact amount received within original deadline; saleability guards pass; all tracked stock reacquired atomically | Store Payment and evidence once, consume reservation equivalent, expose fulfillment or KEEP Coreable fallback | `SUPPLIER_ORDER_PENDING` |
-| `EXPIRED` | Admin | Record exceptional exact late deposit | Exact amount received; saleability failure, amount received after deadline, or tracked stock reacquisition failed | In one transaction store Payment/PaymentGroup exception and Order history, create one order-scoped `REQUESTED` Refund with the matching planned reason, notify customer, create no fulfillment | `REFUND_REQUESTED` |
+| `EXPIRED` | Admin | Record eligible late deposit | Exact amount received within original deadline; saleability guards pass; all tracked stock reacquired atomically | Store Payment and evidence once and consume the reacquired reservation; B-102 creates or routes no Fulfillment | `SUPPLIER_ORDER_PENDING` |
+| `EXPIRED` | Admin | Record exceptional exact late deposit | Exact amount received; saleability failure, amount received after deadline, or tracked stock reacquisition failed | In one transaction store Payment/PaymentGroup exception and Order history, create one order-scoped `REQUESTED` Refund with the matching B-102 reason, notify customer, create no fulfillment | `REFUND_REQUESTED` |
 | qualifying unpaid `CANCELLED` | Admin | Record exact receipt found after cancellation | Exact group amount; unpaid cancellation is sole terminal outcome; no received Payment, Refund or Fulfillment exists | Store Payment/PaymentGroup exception, release any stray HELD once, create one immutable-amount `LATE_DEPOSIT_EXCEPTION` Refund per Order; never reacquire, fulfill or expose supplier data | `REFUND_REQUESTED` |
 | `SUPPLIER_ORDER_PENDING` | Supplier/Admin takeover | Register first portal tracking | Portal channel, matching operational owner, positive allocation within remaining quantity | Create registered Shipment and official tracking link | `TRACKING_REGISTERED` |
 | `TRACKING_REGISTERED` | Supplier | Register or correct tracking | Own portal order; positive remaining allocation for new Shipment, or existing undelivered Shipment for carrier/tracking-only correction | Create another Shipment or append correction history; allocation errors require admin void + new registration | unchanged |
@@ -186,7 +188,9 @@ Status: Planned (B-102, B-103, B-104). The tables above describe current impleme
 | `TRACKING_REGISTERED` | Admin | Mark portal shipment delivered | `registeredAt <= deliveredAt <= evidenceObservedAt <= now` and reason recorded | Mark Shipment delivered and recalculate order aggregate | `TRACKING_REGISTERED` or `DELIVERED` |
 | `DELIVERED` | Admin | Correct manual portal delivery | Planned admin-completed portal Shipment, no later Claim/Refund, idempotency key, expected version and reason | Reopen tracking or correct delivered time, preserve original evidence, notify customer on rollback | `TRACKING_REGISTERED` or `DELIVERED` |
 
-### Planned Portal Guards
+### Portal Guards — B-102 Implemented, B-103/B-104 Planned
+
+The first three payment-exception guards are Implemented in B-102. Fulfillment exposure/self-cancel is Planned B-103, and multi-shipment aggregate guards are Planned B-104.
 
 - Late-deposit Refund creation is automatic and idempotent per delivery-group order; retry must not create a second Refund.
 - Amount mismatch has reason priority over saleability, deadline, and stock. It creates one payment-group Refund for the exact received amount, never one Refund per Order, and cannot resume to normal confirmation.

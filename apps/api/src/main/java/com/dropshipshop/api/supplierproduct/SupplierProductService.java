@@ -56,6 +56,7 @@ import com.dropshipshop.api.common.error.ApiErrorException;
 import com.dropshipshop.api.common.storage.FileStorage;
 import com.dropshipshop.api.common.storage.ImageFileValidator;
 import com.dropshipshop.api.common.storage.StoredFile;
+import com.dropshipshop.api.supplierproduct.repository.SupplierInventoryChangeHistoryRepository;
 
 @Service
 public class SupplierProductService {
@@ -77,6 +78,7 @@ public class SupplierProductService {
 	private final ProductDetailBlockRepository detailBlockRepository;
 	private final ProductNoticeRepository noticeRepository;
 	private final ProductChangeHistoryRepository historyRepository;
+	private final SupplierInventoryChangeHistoryRepository inventoryHistoryRepository;
 	private final PricingPolicyRepository pricingPolicyRepository;
 	private final CatalogPriceCalculator priceCalculator;
 	private final SupplierProductClassifier classifier;
@@ -93,6 +95,7 @@ public class SupplierProductService {
 		ProductDetailBlockRepository detailBlockRepository,
 		ProductNoticeRepository noticeRepository,
 		ProductChangeHistoryRepository historyRepository,
+		SupplierInventoryChangeHistoryRepository inventoryHistoryRepository,
 		PricingPolicyRepository pricingPolicyRepository,
 		CatalogPriceCalculator priceCalculator,
 		SupplierProductClassifier classifier,
@@ -107,6 +110,7 @@ public class SupplierProductService {
 		this.detailBlockRepository = detailBlockRepository;
 		this.noticeRepository = noticeRepository;
 		this.historyRepository = historyRepository;
+		this.inventoryHistoryRepository = inventoryHistoryRepository;
 		this.pricingPolicyRepository = pricingPolicyRepository;
 		this.priceCalculator = priceCalculator;
 		this.classifier = classifier;
@@ -341,6 +345,7 @@ public class SupplierProductService {
 			optionSnapshot(option), null, "DRAFT_OPTION_REMOVED");
 		historyRepository.flush();
 		historyRepository.clearLiveOptionReference(optionId);
+		inventoryHistoryRepository.clearLiveOptionReferences(List.of(optionId));
 		optionRepository.deleteById(optionId);
 		return product.getVersion();
 	}
@@ -363,6 +368,9 @@ public class SupplierProductService {
 			productSnapshot(product), null, "DRAFT_ABANDONED");
 		historyRepository.flush();
 		historyRepository.clearLiveProductReferences(productId);
+		inventoryHistoryRepository.clearLiveOptionReferences(
+			locked.options().stream().map(ProductOption::getId).toList()
+		);
 		Instant now = Instant.now(clock);
 		images.stream()
 			.map(ProductImage::getStorageObjectKey)
@@ -755,12 +763,18 @@ public class SupplierProductService {
 				option.getId(),
 				option.getName(),
 				option.getSourceOptionCode(),
-				option.getSourceAdditionalPrice() == null ? 0 : option.getSourceAdditionalPrice(),
-				option.getSortOrder(),
-				draftDeletable && options.size() > 1
-					&& !productRepository.existsCartReferenceByOptionId(option.getId())
-					&& !productRepository.existsOrderReferenceByOptionId(option.getId())
-				)).toList(),
+					option.getSourceAdditionalPrice() == null ? 0 : option.getSourceAdditionalPrice(),
+					option.getSortOrder(),
+					draftDeletable && options.size() > 1
+						&& !productRepository.existsCartReferenceByOptionId(option.getId())
+						&& !productRepository.existsOrderReferenceByOptionId(option.getId()),
+					option.getInventoryVersion(),
+					option.getSupplierAvailability(),
+					option.getInventoryMode(),
+					option.getOnHandQuantity(),
+					option.getReservedQuantity(),
+					option.isTracked() ? option.getAvailableQuantity() : null
+					)).toList(),
 				images.stream().map(image -> new SupplierProductDtos.ImageResponse(
 					image.getId(), image.getType(), image.getImageUrl(), image.getSortOrder(), image.getAltText(),
 					!referencedImageIds.contains(image.getId())

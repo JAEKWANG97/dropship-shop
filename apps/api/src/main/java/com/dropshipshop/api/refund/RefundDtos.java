@@ -14,6 +14,7 @@ import com.dropshipshop.api.refund.domain.RefundStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public final class RefundDtos {
@@ -31,6 +32,8 @@ public final class RefundDtos {
 		UUID orderId,
 		String orderNumber,
 		OrderStatus orderStatus,
+		UUID paymentGroupId,
+		List<UUID> appliedOrderIds,
 		RefundReason reason,
 		RefundStatus status,
 		long refundAmount,
@@ -47,6 +50,7 @@ public final class RefundDtos {
 		String orderNumber,
 		OrderStatus orderStatus,
 		UUID paymentGroupId,
+		List<UUID> appliedOrderIds,
 		PaymentGroupStatus paymentGroupStatus,
 		UUID paymentId,
 		PaymentStatus paymentStatus,
@@ -96,6 +100,9 @@ public final class RefundDtos {
 	}
 
 	public record ManualBankTransferRefundCompleteRequest(
+		@Positive
+		Long transferredAmount,
+
 		@NotBlank
 		@Size(max = 1000)
 		String reason,

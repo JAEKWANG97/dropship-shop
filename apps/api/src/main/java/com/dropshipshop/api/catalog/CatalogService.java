@@ -75,6 +75,7 @@ import com.dropshipshop.api.common.storage.StoredFile;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
 import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
+import com.dropshipshop.api.supplierproduct.ProductSaleability;
 
 @Service
 public class CatalogService {
@@ -119,6 +120,7 @@ public class CatalogService {
 	private final SupplierPortalInputPolicy supplierPortalInputPolicy;
 	private final ProductImageCleanupService productImageCleanupService;
 	private final CatalogPriceCalculator catalogPriceCalculator;
+	private final ProductSaleability productSaleability;
 
 	public CatalogService(
 		SupplierRepository supplierRepository,
@@ -136,7 +138,8 @@ public class CatalogService {
 		SupplierPortalFeatureGate supplierPortalFeatureGate,
 		SupplierPortalInputPolicy supplierPortalInputPolicy,
 		ProductImageCleanupService productImageCleanupService,
-		CatalogPriceCalculator catalogPriceCalculator
+		CatalogPriceCalculator catalogPriceCalculator,
+		ProductSaleability productSaleability
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -154,6 +157,7 @@ public class CatalogService {
 		this.supplierPortalInputPolicy = supplierPortalInputPolicy;
 		this.productImageCleanupService = productImageCleanupService;
 		this.catalogPriceCalculator = catalogPriceCalculator;
+		this.productSaleability = productSaleability;
 	}
 
 	@Transactional(readOnly = true)
@@ -845,8 +849,17 @@ public class CatalogService {
 			keyword, minPrice, maxPrice, supplierPortalFeatureGate.isEnabled(), Instant.now()
 		)
 			.forEach(count -> categoryCounts.put(count.getCategoryCode(), count.getProductCount()));
+		Map<UUID, List<ProductOption>> optionsByProductId = result.isEmpty()
+			? Map.of()
+			: productOptionRepository.findAllByProduct_IdIn(
+				result.getContent().stream().map(Product::getId).toList()
+			).stream().collect(Collectors.groupingBy(option -> option.getProduct().getId()));
 		return new CatalogDtos.PublicProductPageResponse(
-			result.getContent().stream().map(this::toProductSummaryResponse).toList(),
+			result.getContent().stream()
+				.map(product -> toProductSummaryResponse(
+					product, optionsByProductId.getOrDefault(product.getId(), List.of())
+				))
+				.toList(),
 			result.getNumber(),
 			result.getSize(),
 			result.getTotalElements(),
@@ -1365,7 +1378,14 @@ public class CatalogService {
 		);
 	}
 
-	private CatalogDtos.ProductSummaryResponse toProductSummaryResponse(Product product) {
+	private CatalogDtos.ProductSummaryResponse toProductSummaryResponse(
+		Product product,
+		List<ProductOption> options
+	) {
+		boolean purchasable = salesProperties.enabled() && options.stream()
+			.anyMatch(option -> productSaleability.isSellable(
+				product, option, product.getMinimumOrderQuantity()
+			));
 		return new CatalogDtos.ProductSummaryResponse(
 			product.getId(),
 			product.getName(),
@@ -1375,6 +1395,7 @@ public class CatalogService {
 			product.getOrderQuantityStep(),
 			product.getCategoryCode(),
 			product.getStatus(),
+			purchasable,
 			product.getThumbnailImageUrl()
 		);
 	}
@@ -1425,6 +1446,7 @@ public class CatalogService {
 			product.getOrderQuantityStep(),
 			product.getCategoryCode(),
 			product.getStatus(),
+			options.stream().anyMatch(CatalogDtos.ProductOptionResponse::purchasable),
 			salesProperties.enabled(),
 			salesProperties.enabled() ? null : salesProperties.closedNotice(),
 			product.getComplianceStatus(),
@@ -1527,6 +1549,9 @@ public class CatalogService {
 			option.getName(),
 			option.getAdditionalPrice(),
 			option.getStatus(),
+			salesProperties.enabled() && productSaleability.isSellable(
+				option.getProduct(), option, option.getProduct().getMinimumOrderQuantity()
+			),
 			includeSourceMetadata ? option.getSourceOptionCode() : null,
 			includeSourceMetadata ? option.getSourceAdditionalPrice() : null,
 			includeSourceMetadata ? option.getSourceStockQuantity() : null,

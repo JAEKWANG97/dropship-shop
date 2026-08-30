@@ -13,6 +13,7 @@ import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
+import com.dropshipshop.api.catalog.domain.SupplierAvailability;
 import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
 
@@ -50,9 +51,16 @@ public class ProductSaleability {
 	}
 
 	public boolean isSellable(Product product, ProductOption option) {
+		return isSellable(product, option, 1);
+	}
+
+	public boolean isSellable(Product product, ProductOption option, int quantity) {
 		return isProductSellable(product)
 			&& option.getStatus() == ProductOptionStatus.ACTIVE
-			&& hasValidCustomerUnitPrice(product, option);
+			&& hasValidCustomerUnitPrice(product, option)
+			&& option.getSupplierAvailability() == SupplierAvailability.AVAILABLE
+			&& quantity > 0
+			&& (!option.isTracked() || option.getAvailableQuantity() >= quantity);
 	}
 
 	public boolean hasValidCustomerUnitPrice(Product product, ProductOption option) {

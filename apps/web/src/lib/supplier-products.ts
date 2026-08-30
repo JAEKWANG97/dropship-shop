@@ -19,6 +19,19 @@ export type SupplierReviewReasonCode =
   | "SUPPLEMENT_REQUIRED"
   | "REJECTED_POLICY";
 
+export type SupplierInventoryMode = "TRACKED" | "UNTRACKED";
+export type SupplierAvailability = "AVAILABLE" | "UNAVAILABLE";
+
+export type SupplierOptionInventory = {
+  optionId: string;
+  inventoryVersion: number;
+  supplierAvailability: SupplierAvailability;
+  inventoryMode: SupplierInventoryMode;
+  onHandQuantity: number | null;
+  reservedQuantity: number;
+  availableQuantity: number | null;
+};
+
 export type SupplierProductOption = {
   id: string;
   name: string;
@@ -26,7 +39,7 @@ export type SupplierProductOption = {
   sourceAdditionalPrice: number;
   sortOrder: number;
   deletable: boolean;
-};
+} & Omit<SupplierOptionInventory, "optionId">;
 
 export type SupplierProductImage = {
   id: string;
@@ -94,6 +107,11 @@ export type SupplierOptionInput = Pick<
   "name" | "sourceOptionCode" | "sourceAdditionalPrice" | "sortOrder"
 >;
 
+export type SupplierInventoryInput = Pick<
+  SupplierOptionInventory,
+  "inventoryVersion" | "supplierAvailability" | "inventoryMode" | "onHandQuantity"
+>;
+
 export type SupplierStatusView = {
   label: string;
   editable: boolean;
@@ -159,6 +177,7 @@ export class SupplierProductApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
+    public readonly currentInventory: SupplierOptionInventory | null = null,
   ) {
     super(code || `API request failed: ${status}`);
   }
@@ -283,10 +302,31 @@ export async function updateSupplierProduct(productId: string, input: SupplierPr
 
 export async function saveSupplierOption(productId: string, optionId: string | null, input: SupplierOptionInput, expectedVersion: number) {
   const suffix = optionId ? `/options/${encodeURIComponent(optionId)}` : "/options";
-  return mutation(await request(`/api/supplier/products/${encodeURIComponent(productId)}${suffix}`, {
+  return normalizeSupplierProduct(await request(`/api/supplier/products/${encodeURIComponent(productId)}${suffix}`, {
     method: optionId ? "PATCH" : "POST",
     body: JSON.stringify({ ...input, sourceOptionCode: input.sourceOptionCode || null, expectedVersion }),
   }));
+}
+
+export async function saveSupplierInventory(
+  productId: string,
+  optionId: string,
+  input: SupplierInventoryInput,
+  idempotencyKey: string,
+) {
+  return normalizeSupplierInventory(await request(
+    `/api/supplier/products/${encodeURIComponent(productId)}/options/${encodeURIComponent(optionId)}/inventory`,
+    {
+      method: "PUT",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({
+        expectedInventoryVersion: input.inventoryVersion,
+        supplierAvailability: input.supplierAvailability,
+        inventoryMode: input.inventoryMode,
+        onHandQuantity: input.inventoryMode === "TRACKED" ? input.onHandQuantity : null,
+      }),
+    },
+  ));
 }
 
 export async function uploadSupplierImage(productId: string, file: File, type: SupplierProductImage["type"], altText: string, expectedVersion: number) {
@@ -403,6 +443,15 @@ export function productActionError(error: unknown) {
   } as Record<string, string>)[error.code] ?? "요청을 처리하지 못했습니다. 입력 내용을 확인해 주세요.";
 }
 
+export function inventoryActionError(error: unknown) {
+  if (!(error instanceof SupplierProductApiError)) return "재고 저장 결과를 확인하지 못했습니다. 같은 내용으로 다시 시도해 주세요.";
+  if (error.code === "INVENTORY_CONFLICT" && error.currentInventory) {
+    return "재고가 변경되어 최신 값으로 새로고침했습니다. 확인한 뒤 다시 저장해 주세요.";
+  }
+  if (error.status === 404) return "재고를 변경할 옵션을 찾을 수 없습니다.";
+  return "재고를 저장하지 못했습니다. 입력 내용을 확인해 주세요.";
+}
+
 export function isProductVersionError(error: unknown) {
   return error instanceof SupplierProductApiError
     && (error.code === "PRODUCT_VERSION_CONFLICT" || error.status === 412);
@@ -427,6 +476,7 @@ export function normalizeSupplierProduct(value: unknown): SupplierProduct {
     nextAction: text(item.nextAction),
     options: array(item.options).map((optionValue) => {
       const option = record(optionValue);
+      const inventory = normalizeSupplierInventory(option);
       return {
         id: text(option.optionId) || text(option.id),
         name: text(option.name) || "기본",
@@ -434,6 +484,12 @@ export function normalizeSupplierProduct(value: unknown): SupplierProduct {
         sourceAdditionalPrice: integer(option.sourceAdditionalPrice, 0),
         sortOrder: integer(option.sortOrder, 0),
         deletable: option.deletable === true,
+        inventoryVersion: inventory.inventoryVersion,
+        supplierAvailability: inventory.supplierAvailability,
+        inventoryMode: inventory.inventoryMode,
+        onHandQuantity: inventory.onHandQuantity,
+        reservedQuantity: inventory.reservedQuantity,
+        availableQuantity: inventory.availableQuantity,
       };
     }),
     images: array(item.images).map((imageValue) => {
@@ -471,6 +527,24 @@ export function normalizeSupplierProduct(value: unknown): SupplierProduct {
     },
     createdAt: nullableText(item.createdAt),
     updatedAt: nullableText(item.updatedAt),
+  };
+}
+
+export function normalizeSupplierInventory(value: unknown): SupplierOptionInventory {
+  const item = record(value);
+  const mode: SupplierInventoryMode = item.inventoryMode === "UNTRACKED" ? "UNTRACKED" : "TRACKED";
+  const onHand = mode === "TRACKED" ? nonNegativeInteger(item.onHandQuantity, 0) : null;
+  const reserved = mode === "TRACKED" ? nonNegativeInteger(item.reservedQuantity, 0) : 0;
+  return {
+    optionId: text(item.optionId) || text(item.id),
+    inventoryVersion: nonNegativeInteger(item.inventoryVersion, 0),
+    supplierAvailability: item.supplierAvailability === "AVAILABLE" ? "AVAILABLE" : "UNAVAILABLE",
+    inventoryMode: mode,
+    onHandQuantity: onHand,
+    reservedQuantity: reserved,
+    availableQuantity: mode === "TRACKED"
+      ? nonNegativeInteger(item.availableQuantity, Math.max(0, (onHand ?? 0) - reserved))
+      : null,
   };
 }
 
@@ -576,13 +650,19 @@ async function requestResponse(path: string, init: RequestInit = {}) {
 
   if (!response.ok) {
     let code = "";
+    let currentInventory: SupplierOptionInventory | null = null;
     try {
       const body = record(await response.json());
       code = text(body.code);
+      const details = record(body.details);
+      const current = record(details.currentInventory);
+      if (text(current.optionId) || text(current.id)) {
+        currentInventory = normalizeSupplierInventory(current);
+      }
     } catch {
       code = "";
     }
-    throw new SupplierProductApiError(response.status, code);
+    throw new SupplierProductApiError(response.status, code, currentInventory);
   }
   return response;
 }
@@ -643,4 +723,9 @@ function nullableText(value: unknown) {
 
 function integer(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isInteger(value) ? value : fallback;
+}
+
+function nonNegativeInteger(value: unknown, fallback: number) {
+  const result = integer(value, fallback);
+  return result >= 0 ? result : fallback;
 }
