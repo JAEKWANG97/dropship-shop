@@ -146,7 +146,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </span>
                   <span className="product-card-summary">{product.summary}</span>
                 </div>
-                <span className="product-card-cta">상세 보기</span>
+                <span className="product-card-cta">
+                  {product.purchasable === false || product.status === "SOLD_OUT" ? "품절" : "상세 보기"}
+                </span>
               </Link>
             ))}
           </div>

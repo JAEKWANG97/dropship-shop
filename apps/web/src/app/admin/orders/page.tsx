@@ -1,13 +1,16 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   adminStatusLabel,
+  adminRefundProjection,
   getAdminOrder,
   getAdminOrderActions,
   getAdminOrders,
   type AdminOrder,
   type AdminOrderActionHistory,
 } from "@/lib/admin";
+import { adminRefundNextAction, retryCommandKey, type RetryCommand } from "@/lib/admin-payment";
 import { formatPrice } from "@/lib/catalog";
 import {
   claimReasonLabel,
@@ -20,6 +23,7 @@ import {
   shipmentStatusLabel,
 } from "@/lib/orders";
 import {
+  approveRefund,
   cancelUnpaidDeposit,
   cancelSupplierPurchase,
   completeManualRefund,
@@ -29,6 +33,7 @@ import {
   createOrderShipment,
   markOrderOutOfStock,
   recordDepositMismatch,
+  recordLateDeposit,
   recordReturnReceived,
   reconcileSupplierPurchase,
   rejectClaim,
@@ -40,7 +45,17 @@ import {
 } from "./actions";
 
 type AdminOrdersPageProps = {
-  searchParams: Promise<{ from?: string; message?: string; orderId?: string; page?: string; q?: string; status?: string; to?: string }>;
+  searchParams: Promise<{
+    from?: string;
+    idempotencyKey?: string;
+    message?: string;
+    orderId?: string;
+    page?: string;
+    q?: string;
+    retryAction?: string;
+    status?: string;
+    to?: string;
+  }>;
 };
 
 export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
@@ -92,6 +107,8 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
           <select name="status" defaultValue={params.status ?? ""}>
             <option value="">발주대기 기본</option>
             <option value="PAYMENT_PENDING">입금대기</option>
+            <option value="EXPIRED">입금기한 만료</option>
+            <option value="CANCELLED">취소완료</option>
             <option value="SUPPLIER_ORDER_PENDING">발주대기</option>
             <option value="SUPPLIER_ORDERED">발주완료</option>
             <option value="SHIPPED">배송중</option>
@@ -235,7 +252,10 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               <ClaimPanel order={selectedOrder} />
 					<RefundEvidencePanel order={selectedOrder} />
 					<AdminActionHistoryPanel actions={actionHistory.actions} error={actionHistory.error} />
-              <AdminOrderActions order={selectedOrder} />
+              <AdminOrderActions
+                order={selectedOrder}
+                retry={{ action: params.retryAction, key: params.idempotencyKey }}
+              />
             </aside>
           ) : null}
         </div>
@@ -386,20 +406,38 @@ function BankTransferAdminPanel({ order }: { order: AdminOrder }) {
 
 function RefundEvidencePanel({ order }: { order: AdminOrder }) {
   const refund = order.refund;
-  if (!refund?.manualRefundedAt) {
+  if (!refund) {
     return null;
   }
+  const projection = adminRefundProjection(refund);
 
   return (
     <section className="admin-claim-panel">
-      <h3>환불 이체 증적</h3>
+      <h3>{refund.refundScope === "PAYMENT_GROUP" ? "결제그룹 환불" : "환불"}</h3>
       <div className="summary-list compact">
-        <SummaryItem label="환불 은행" value={refund.manualRefundBankName ?? "-"} />
-        <SummaryItem label="환불 계좌번호" value={refund.manualRefundAccountNumber ?? "-"} />
-        <SummaryItem label="예금주" value={refund.manualRefundAccountHolder ?? "-"} />
-        <SummaryItem label="실제 이체시각" value={formatDateTime(refund.manualRefundTransferredAt ?? null)} />
-        <SummaryItem label="거래 식별 메모" value={refund.manualRefundTransactionReference ?? "-"} />
-        <SummaryItem label="처리 사유" value={refund.manualRefundReason ?? "-"} />
+        <SummaryItem
+          label="환불 범위"
+          value={projection.scopeLabel}
+        />
+        <SummaryItem label="환불 금액" value={formatPrice(projection.refundAmount)} />
+        <SummaryItem label="환불 사유" value={refund.reason ?? "-"} />
+        {refund.refundScope === "PAYMENT_GROUP" ? (
+          <SummaryItem label="결제그룹 주문서" value={order.checkoutNumber} />
+        ) : null}
+        {projection.paymentGroupId ? <SummaryItem label="결제그룹" value={projection.paymentGroupId} /> : null}
+        {projection.appliedOrderIds.length > 0 ? (
+          <SummaryItem label="적용 주문 ID" value={projection.appliedOrderIds.join(", ")} />
+        ) : null}
+        {refund.manualRefundedAt ? (
+          <>
+            <SummaryItem label="환불 은행" value={refund.manualRefundBankName ?? "-"} />
+            <SummaryItem label="환불 계좌번호" value={refund.manualRefundAccountNumber ?? "-"} />
+            <SummaryItem label="예금주" value={refund.manualRefundAccountHolder ?? "-"} />
+            <SummaryItem label="실제 이체시각" value={formatDateTime(refund.manualRefundTransferredAt ?? null)} />
+            <SummaryItem label="거래 식별 메모" value={refund.manualRefundTransactionReference ?? "-"} />
+            <SummaryItem label="처리 사유" value={refund.manualRefundReason ?? "-"} />
+          </>
+        ) : null}
       </div>
     </section>
   );
@@ -629,48 +667,26 @@ function formatDateTime(value: string | null) {
   return new Date(value).toLocaleString("ko-KR");
 }
 
-function AdminOrderActions({ order }: { order: AdminOrder }) {
-  if (order.status === "PAYMENT_PENDING") {
+function AdminOrderActions({ order, retry }: { order: AdminOrder; retry: RetryCommand }) {
+  const paymentGroupStatus = order.paymentGroup?.status ?? order.status;
+  if (paymentGroupStatus === "PAYMENT_PENDING") {
     return (
       <div className="admin-order-actions">
         <h3>입금 처리</h3>
+        <div className="notice">
+          <strong>은행 거래내역을 기준으로 입력하세요</strong>
+          <span>응답 결과가 불확실하면 입력한 증적을 바꾸지 말고 같은 요청으로 다시 시도하세요.</span>
+        </div>
         <form action={confirmDeposit} className="admin-inline-form">
           <input name="orderId" type="hidden" value={order.orderId} />
-			<label>
-				실제 입금자명
-				<input name="actualDepositorName" required />
-			</label>
-			<label>
-				실제 입금액
-				<input name="actualAmount" type="number" min="1" step="1" required />
-			</label>
-			<label>
-				입금시각
-				<input name="depositedAt" type="datetime-local" step="60" required />
-			</label>
-			<label>
-				거래 식별 메모
-				<input name="transactionReference" required placeholder="예: 은행 거래번호 또는 이체 메모" />
-			</label>
-          <label className="wide">
-            입금 확인 사유
-            <input name="reason" required placeholder="예: 입금액과 입금자명 확인" />
-          </label>
+          <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, "confirm-deposit")} />
+          <DepositEvidenceFields defaultAmount={order.paymentGroup?.totalAmount ?? order.totalAmount} reasonPlaceholder="예: 입금액과 입금자명 확인" />
           <button className="button primary" type="submit">
             입금 확인
           </button>
         </form>
 
-        <form action={recordDepositMismatch} className="admin-inline-form">
-          <input name="orderId" type="hidden" value={order.orderId} />
-          <label className="wide">
-            입금 불일치 메모
-            <input name="memo" required placeholder="예: 입금자명이 주문서와 다름" />
-          </label>
-          <button className="button" type="submit">
-            메모 저장
-          </button>
-        </form>
+        <DepositMismatchForm order={order} retry={retry} />
 
         <form action={cancelUnpaidDeposit} className="admin-inline-form">
           <input name="orderId" type="hidden" value={order.orderId} />
@@ -686,8 +702,34 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
     );
   }
 
-  if (order.refund?.status === "APPROVED") {
-    return <ManualRefundForm order={order} />;
+  if (paymentGroupStatus === "EXPIRED" || paymentGroupStatus === "CANCELLED") {
+    return (
+      <div className="admin-order-actions">
+        <h3>뒤늦은 입금 처리</h3>
+        <div className="notice">
+          <strong>은행 거래내역을 먼저 확인하세요</strong>
+          <span>정확한 입금이면 뒤늦은 입금으로, 금액이 다르면 입금 불일치로 기록합니다.</span>
+        </div>
+        <form action={recordLateDeposit} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, "late-deposit")} />
+          <DepositEvidenceFields defaultAmount={order.paymentGroup?.totalAmount ?? order.totalAmount} reasonPlaceholder="예: 주문 만료 후 은행 거래내역에서 입금 확인" />
+          <button className="button primary" type="submit">
+            뒤늦은 입금 처리
+          </button>
+        </form>
+        <DepositMismatchForm order={order} retry={retry} />
+      </div>
+    );
+  }
+
+  const refundAction = adminRefundNextAction(order.refund?.status);
+  if (refundAction === "APPROVE") {
+    return <RefundApprovalForm order={order} />;
+  }
+
+  if (refundAction === "MANUAL_COMPLETE") {
+    return <ManualRefundForm order={order} retry={retry} />;
   }
 
   if (order.fulfillment?.purchaseProvider === "DOMEGGOOK") {
@@ -789,15 +831,91 @@ function AdminOrderActions({ order }: { order: AdminOrder }) {
   return null;
 }
 
-function ManualRefundForm({ order }: { order: AdminOrder }) {
+function RefundApprovalForm({ order }: { order: AdminOrder }) {
   if (!order.refund) return null;
 
   return (
     <div className="admin-order-actions">
-      <h3>다음 처리</h3>
+      <h3>{order.refund.refundScope === "PAYMENT_GROUP" ? "결제그룹 전체 환불 승인" : "환불 승인"}</h3>
+      <form action={approveRefund} className="admin-inline-form">
+        <input name="orderId" type="hidden" value={order.orderId} />
+        <input name="refundId" type="hidden" value={order.refund.refundId} />
+        <label className="wide">
+          승인 사유
+          <input name="reason" required maxLength={1000} placeholder="예: 입금 증적과 환불 금액 확인" />
+        </label>
+        <button className="button primary" type="submit">
+          환불 승인
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function DepositMismatchForm({ order, retry }: { order: AdminOrder; retry: RetryCommand }) {
+  return (
+    <form action={recordDepositMismatch} className="admin-inline-form">
+      <input name="orderId" type="hidden" value={order.orderId} />
+      <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, "deposit-mismatch")} />
+      <DepositEvidenceFields reasonPlaceholder="예: 실제 입금액이 주문서 금액과 다름" />
+      <button className="button" type="submit">
+        불일치 입금·환불 기록
+      </button>
+    </form>
+  );
+}
+
+function DepositEvidenceFields({
+  defaultAmount,
+  reasonPlaceholder,
+}: {
+  defaultAmount?: number;
+  reasonPlaceholder: string;
+}) {
+  return (
+    <>
+      <label>
+        실제 입금자명
+        <input name="actualDepositorName" required />
+      </label>
+      <label>
+        실제 입금액
+        <input defaultValue={defaultAmount} min="1" name="actualAmount" required step="1" type="number" />
+      </label>
+      <label>
+        입금시각
+        <input name="depositedAt" required step="60" type="datetime-local" />
+      </label>
+      <label>
+        거래 식별 메모
+        <input name="transactionReference" required placeholder="예: 은행 거래번호 또는 이체 메모" />
+      </label>
+      <label className="wide">
+        처리 사유
+        <input name="reason" required placeholder={reasonPlaceholder} />
+      </label>
+    </>
+  );
+}
+
+function ManualRefundForm({ order, retry }: { order: AdminOrder; retry: RetryCommand }) {
+  if (!order.refund) return null;
+
+  return (
+    <div className="admin-order-actions">
+      <h3>{order.refund.refundScope === "PAYMENT_GROUP" ? "결제그룹 전체 환불" : "다음 처리"}</h3>
+      <div className="notice">
+        <strong>이미 이체했다면 새로 이체하지 마세요</strong>
+        <span>처리 결과가 불확실할 때는 이 화면의 같은 요청으로 다시 시도하거나 거래내역을 대사하세요.</span>
+      </div>
       <form action={completeManualRefund} className="admin-inline-form">
         <input name="orderId" type="hidden" value={order.orderId} />
         <input name="refundId" type="hidden" value={order.refund.refundId} />
+        <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, `manual-refund-${order.refund.refundId}`)} />
+        <label>
+          실제 환불 이체액
+          <input name="transferredAmount" readOnly type="number" value={order.refund.refundAmount} />
+        </label>
         <label>
           환불 은행
           <input name="bankName" required />
@@ -828,6 +946,10 @@ function ManualRefundForm({ order }: { order: AdminOrder }) {
       </form>
     </div>
   );
+}
+
+function stableCommandKey(retry: RetryCommand, action: string) {
+  return retryCommandKey(retry, action) ?? randomUUID();
 }
 
 function SupplierPurchasePanel({ order }: { order: AdminOrder }) {

@@ -1,15 +1,20 @@
 package com.dropshipshop.api.order.domain;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
+import com.dropshipshop.api.catalog.domain.InventoryMode;
 import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.common.money.MoneyMath;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -76,6 +81,30 @@ public class OrderItem {
 	@Column(name = "source_unit_price")
 	private Long sourceUnitPrice;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "management_channel_snapshot", nullable = false, length = 30, updatable = false)
+	private ProductManagementChannel managementChannelSnapshot;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "inventory_mode_snapshot", nullable = false, length = 20, updatable = false)
+	private InventoryMode inventoryModeSnapshot;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "reservation_status", nullable = false, length = 30)
+	private OrderItemReservationStatus reservationStatus;
+
+	@Column(name = "reserved_at", updatable = false)
+	private Instant reservedAt;
+
+	@Column(name = "consumed_at")
+	private Instant consumedAt;
+
+	@Column(name = "released_at")
+	private Instant releasedAt;
+
+	@Column(name = "reacquired_at")
+	private Instant reacquiredAt;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -91,6 +120,17 @@ public class OrderItem {
 		ProductOption productOption,
 		Integer productNoticeVersion,
 		int quantity
+	) {
+		this(order, product, productOption, productNoticeVersion, quantity, Instant.now());
+	}
+
+	public OrderItem(
+		CustomerOrder order,
+		Product product,
+		ProductOption productOption,
+		Integer productNoticeVersion,
+		int quantity,
+		Instant reservationTime
 	) {
 		this.order = order;
 		this.product = product;
@@ -113,6 +153,43 @@ public class OrderItem {
 			product.getSourcePrice(),
 			productOption.getSourceAdditionalPrice() == null ? 0 : productOption.getSourceAdditionalPrice()
 		);
+		this.managementChannelSnapshot = product.getManagementChannel();
+		this.inventoryModeSnapshot = productOption.getInventoryMode();
+		if (inventoryModeSnapshot == InventoryMode.TRACKED) {
+			this.reservationStatus = OrderItemReservationStatus.HELD;
+			this.reservedAt = Objects.requireNonNull(reservationTime, "reservationTime");
+		} else {
+			this.reservationStatus = OrderItemReservationStatus.NOT_APPLICABLE;
+		}
+	}
+
+	public boolean consumeReservation(Instant now) {
+		if (reservationStatus != OrderItemReservationStatus.HELD) {
+			return false;
+		}
+		reservationStatus = OrderItemReservationStatus.CONSUMED;
+		consumedAt = Objects.requireNonNull(now, "now");
+		return true;
+	}
+
+	public boolean releaseReservation(Instant now) {
+		if (reservationStatus != OrderItemReservationStatus.HELD) {
+			return false;
+		}
+		reservationStatus = OrderItemReservationStatus.RELEASED;
+		releasedAt = Objects.requireNonNull(now, "now");
+		return true;
+	}
+
+	public boolean reacquireAndConsumeReservation(Instant now) {
+		if (reservationStatus != OrderItemReservationStatus.RELEASED) {
+			return false;
+		}
+		Instant transitionTime = Objects.requireNonNull(now, "now");
+		reservationStatus = OrderItemReservationStatus.CONSUMED;
+		reacquiredAt = transitionTime;
+		consumedAt = transitionTime;
+		return true;
 	}
 
 	@PrePersist
@@ -141,6 +218,10 @@ public class OrderItem {
 
 	public ProductOption getProductOption() {
 		return productOption;
+	}
+
+	public Supplier getSupplier() {
+		return supplier;
 	}
 
 	public String getProductName() {
@@ -185,5 +266,33 @@ public class OrderItem {
 
 	public Long getSourceUnitPrice() {
 		return sourceUnitPrice;
+	}
+
+	public ProductManagementChannel getManagementChannelSnapshot() {
+		return managementChannelSnapshot;
+	}
+
+	public InventoryMode getInventoryModeSnapshot() {
+		return inventoryModeSnapshot;
+	}
+
+	public OrderItemReservationStatus getReservationStatus() {
+		return reservationStatus;
+	}
+
+	public Instant getReservedAt() {
+		return reservedAt;
+	}
+
+	public Instant getConsumedAt() {
+		return consumedAt;
+	}
+
+	public Instant getReleasedAt() {
+		return releasedAt;
+	}
+
+	public Instant getReacquiredAt() {
+		return reacquiredAt;
 	}
 }

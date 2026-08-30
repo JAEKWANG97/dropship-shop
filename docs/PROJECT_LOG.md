@@ -1137,3 +1137,14 @@
 - 문서: README, 요구사항, 상품·관리자·가격 정책, decision log, API, domain model, ERD, architecture, supplier portal design과 backlog를 Implemented 계약에 맞게 동기화했다.
 - 검증: API 전체 테스트 `267 passed`, PostgreSQL migration smoke `5 passed`, Web lint `0 errors / 기존 3 warnings`, production build `29 pages`, 공급처 상품 Playwright desktop/mobile `18 passed`, `git diff --check`를 통과했다. 병렬 감사 중 동일 Gradle 결과 디렉터리를 사용해 발생한 `EOFException`은 동시 실행을 중단하고 `cleanTest test --no-daemon`으로 직렬 재실행해 코드 실패가 아님을 확인했다.
 - 후속작업: production `SUPPLIER_PORTAL_ENABLED`는 계속 false다. B-098 계약 증적, 실제 이메일·Kakao 운영 검증과 B-102~B-105가 모두 준비되고 사용자가 별도 승인하기 전에는 외부 공급처와 고객 판매 경로를 열지 않는다. 다음 구현 단위는 B-102 재고 모드와 24시간 주문 예약이다.
+
+## 2026-08-30 13:13 KST
+
+- 관련 항목: B-102
+- 작업: 공급처 옵션에 `TRACKED`/`UNTRACKED` 재고와 별도 `inventoryVersion`, 주문 받기/중지, immutable 변경 이력을 추가했다. Checkout은 공급처→상품→옵션 순으로 잠그고 24시간 재고를 예약하며, 미입금 취소·만료에서 해제하고 정상 입금에서 소비한다.
+- 결제·환불: normal/late/mismatch 계좌입금 명령에 key/hash/immutable result replay를 적용했다. 판매 불가·늦은 입금·미입금 취소 후 입금은 Order별 예외 Refund, 금액 불일치는 실제 수령액의 결제그룹 Refund 한 건으로 끝내고 주문을 절대 재개하지 않는다. 관리자 화면에 `REQUESTED → APPROVED → 수동 환불 완료` 경로와 만료/취소 주문 필터를 연결했다.
+- 호환·보호: V41은 기존 Coreable 옵션/주문을 `UNTRACKED`/`NOT_APPLICABLE`로 backfill하고 기존 portal-origin OrderItem은 preflight에서 중단한다. 수량·입금자·거래 증적은 고객/공급처에 노출하지 않고, B-102는 예약 소비와 `SUPPLIER_ORDER_PENDING` 전환까지만 담당한다. Fulfillment 생성·주소 잠금·공급처 PII/알림은 B-103으로 남겼다.
+- 검토 개선: 독립 리뷰에서 tenant authority lock, legacy 주문 만료 오분류, 공급처 재할당 경합, group Refund 회원탈퇴, migration rollback default/FK, PostgreSQL lock 경합, 환불 승인 UI, 재고 409 후 버전·이미지 재시도, 만료/취소 탐색 문제를 찾아 회귀 테스트와 함께 보완했다.
+- 문서: README, requirements, Confirmed Policy, decision log, API, domain model, ERD, order flow, architecture, supplier portal design을 B-102 Implemented/B-103~B-105 Planned 경계와 V41 스키마에 맞게 동기화했다.
+- 검증: API `303 passed`(실제 PostgreSQL 17 migration/concurrency smoke `10 passed` 포함), Web lint `0 errors / 기존 3 warnings`, production build `29 pages`, 공급처/결제 Web 계약 Playwright desktop/mobile `40 passed`, 격리 PostgreSQL 17·로컬 시드의 환불 승인 화면과 만료/취소 필터 smoke `2 passed`, `git diff --check`를 통과했다.
+- 후속작업: production `SUPPLIER_PORTAL_ENABLED`는 계속 false로 두고 운영 데이터·외부 연락·실제 입금을 변경하지 않았다. 다음 구현 단위는 B-103 출고 요청·최소 PII·이메일 알림이며, managed 공개 정책 버전과 checkout 동의는 실제 활성화 전 gate로 남긴다.

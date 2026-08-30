@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
-import { getCheckout, type Checkout, type CheckoutOrder } from "@/lib/checkout";
+import {
+  checkoutCustomerProjection,
+  getCheckout,
+  type Checkout,
+  type CheckoutOrder,
+} from "@/lib/checkout";
 import { formatPrice } from "@/lib/catalog";
 import { policyHref } from "@/lib/legal";
 import { orderStatusLabel, paymentGroupStatusLabel } from "@/lib/orders";
@@ -58,13 +63,15 @@ export default async function CheckoutDetailPage({
     );
   }
 
-  const paymentPending = checkout.status === "PAYMENT_PENDING";
+  const customerDisplay = checkoutCustomerProjection(checkout);
+  const refundProcessing = customerDisplay.status === "REFUND_PROCESSING";
+  const paymentPending = checkout.status === "PAYMENT_PENDING" && !refundProcessing;
   const policyConfirmed = Boolean(checkout.policyConfirmedAt);
 
   return (
     <section className="checkout-page">
       <div className="section-heading">
-        <p className="eyebrow">{paymentGroupStatusLabel(checkout.status)}</p>
+        <p className="eyebrow">{customerDisplay.label || paymentGroupStatusLabel(checkout.status)}</p>
         <h1>주문서 {checkout.checkoutNumber}</h1>
       </div>
 
@@ -72,6 +79,15 @@ export default async function CheckoutDetailPage({
         <div className="notice">
           <strong>알림</strong>
           <span>{query.message}</span>
+        </div>
+      ) : null}
+
+      {refundProcessing ? (
+        <div className="notice">
+          <strong>{customerDisplay.label || "입금 확인 및 환불 처리 중"}</strong>
+          <span>
+            환불 예정 금액 {formatPrice(customerDisplay.refundAmount)}
+          </span>
         </div>
       ) : null}
 
@@ -86,13 +102,14 @@ export default async function CheckoutDetailPage({
 }
 
 function CheckoutSummary({ checkout }: { checkout: Checkout }) {
+  const displayStatus = checkoutCustomerProjection(checkout).label || paymentGroupStatusLabel(checkout.status);
   return (
     <section className="detail-section">
       <h2>결제 그룹</h2>
       <div className="summary-list">
         <div>
           <span>상태</span>
-          <strong>{paymentGroupStatusLabel(checkout.status)}</strong>
+          <strong>{displayStatus}</strong>
         </div>
         <div>
           <span>결제 금액</span>

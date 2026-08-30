@@ -35,6 +35,7 @@ import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
@@ -128,7 +129,10 @@ class AdminOrderQueryService {
 			.orElse(null);
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
-		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
+		Refund refund = refundRepository.findByOrder_Id(order.getId())
+			.orElseGet(() -> refundRepository
+				.findByPaymentGroup_IdAndRefundScope(order.getPaymentGroup().getId(), RefundScope.PAYMENT_GROUP)
+				.orElse(null));
 		Claim claim = claimRepository.findFirstByOrder_IdOrderByCreatedAtDesc(order.getId()).orElse(null);
 		return toDetailResponse(order, payment, fulfillment, shipment, refund, claim, items);
 	}
@@ -323,6 +327,13 @@ class AdminOrderQueryService {
 		}
 		return new AdminOrderDtos.AdminRefundResponse(
 			refund.getId(),
+			refund.getOrder() == null ? null : refund.getOrder().getId(),
+			refund.getOrder() == null ? null : refund.getOrder().getOrderNumber(),
+			refund.getPaymentGroup().getId(),
+			refund.getRefundScope() == RefundScope.PAYMENT_GROUP
+				? orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(refund.getPaymentGroup().getId())
+					.stream().map(CustomerOrder::getId).toList()
+				: List.of(refund.getOrder().getId()),
 			refund.getReason(),
 			refund.getStatus(),
 			refund.getRefundAmount(),

@@ -44,6 +44,9 @@ export type OrderDetail = {
   discountAmount: number;
   totalAmount: number;
   createdAt: string;
+  customerDisplayStatus?: string;
+  customerDisplayLabel?: string;
+  refundAmount?: number | null;
   paymentGroup: {
     paymentGroupId: string;
     checkoutNumber: string;
@@ -51,6 +54,9 @@ export type OrderDetail = {
     totalAmount: number;
     approvedAmount: number | null;
     approvedAt: string | null;
+    customerDisplayStatus?: string;
+    customerDisplayLabel?: string;
+    refundAmount?: number | null;
   };
   payment: {
     paymentId: string | null;
@@ -113,6 +119,17 @@ export async function getCustomerOrder(orderId: string) {
   );
 }
 
+export function customerOrderProjection(order: OrderDetail) {
+  const status = order.customerDisplayStatus || order.paymentGroup.customerDisplayStatus || order.status;
+  return {
+    status,
+    label: order.customerDisplayLabel
+      || order.paymentGroup.customerDisplayLabel
+      || (status === "REFUND_PROCESSING" ? "입금 확인 및 환불 처리 중" : orderStatusLabel(order.status)),
+    refundAmount: order.refundAmount ?? order.paymentGroup.refundAmount ?? order.refund.amount,
+  };
+}
+
 export function orderStatusLabel(status: string) {
   return (
     {
@@ -160,6 +177,7 @@ export function paymentStatusLabel(status: string | null) {
       REFUNDED: "환불 처리 중",
       REFUND_FAILED: "환불 처리 중",
       REVIEW_REQUIRED: "결제 확인 중",
+      PAYMENT_EXCEPTION: "입금 확인 및 환불 처리 중",
     }[status] ?? status
   );
 }

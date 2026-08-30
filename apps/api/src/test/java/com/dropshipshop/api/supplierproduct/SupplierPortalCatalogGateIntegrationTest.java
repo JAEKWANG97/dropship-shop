@@ -32,6 +32,7 @@ import com.dropshipshop.api.cart.domain.CartItem;
 import com.dropshipshop.api.cart.repository.CartItemRepository;
 import com.dropshipshop.api.cart.repository.CartRepository;
 import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.InventoryMode;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
 import com.dropshipshop.api.catalog.domain.ProductOption;
@@ -40,6 +41,7 @@ import com.dropshipshop.api.catalog.domain.ProductReviewReasonCode;
 import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.catalog.domain.SupplierAvailability;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
@@ -169,6 +171,39 @@ class SupplierPortalCatalogGateIntegrationTest {
 		}
 	}
 
+	@Test
+	void trackedZeroStockIsPubliclySoldOutWithoutLeakingInventoryAndRestockRecoversIt() throws Exception {
+		when(featureGate.isEnabled()).thenReturn(true);
+		Instant now = Instant.now();
+		GateFixture fixture = portalFixture(
+			"gate-zero-stock",
+			verifiedSupplier("gate-zero-stock", now.minus(1, ChronoUnit.DAYS), now.plus(1, ChronoUnit.DAYS)),
+			ProductReviewStatus.APPROVED
+		);
+
+		mockMvc.perform(get("/api/products").param("q", fixture.product().getName()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.products[0].purchasable", is(false)));
+		mockMvc.perform(get("/api/products/{productId}", fixture.product().getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchasable", is(false)))
+			.andExpect(jsonPath("$.options[0].purchasable", is(false)))
+			.andExpect(jsonPath("$.options[0].inventoryMode").doesNotExist())
+			.andExpect(jsonPath("$.options[0].onHandQuantity").doesNotExist())
+			.andExpect(jsonPath("$.options[0].reservedQuantity").doesNotExist())
+			.andExpect(jsonPath("$.options[0].availableQuantity").doesNotExist());
+
+		UserAccount customer = createCustomer("gate-zero-stock-customer");
+		addCartItem(customer.getId(), fixture.option().getId()).andExpect(status().isBadRequest());
+
+		fixture.option().updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 10L);
+		productOptionRepository.saveAndFlush(fixture.option());
+		mockMvc.perform(get("/api/products/{productId}", fixture.product().getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchasable", is(true)))
+			.andExpect(jsonPath("$.options[0].purchasable", is(true)));
+	}
+
 	private void assertBlockedAcrossPublicCartAndCheckout(GateFixture fixture) throws Exception {
 		assertPublicVisibility(fixture, false);
 		UserAccount customer = createCustomer(fixture.label() + "-blocked");
@@ -182,6 +217,11 @@ class SupplierPortalCatalogGateIntegrationTest {
 	}
 
 	private void assertAllowedAcrossPublicCartAndCheckout(GateFixture fixture) throws Exception {
+		if (fixture.product().getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL
+			&& fixture.option().getAvailableQuantity() == 0) {
+			fixture.option().updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 10L);
+			productOptionRepository.saveAndFlush(fixture.option());
+		}
 		assertPublicVisibility(fixture, true);
 		UserAccount customer = createCustomer(fixture.label() + "-allowed");
 
@@ -199,11 +239,13 @@ class SupplierPortalCatalogGateIntegrationTest {
 		var list = mockMvc.perform(get("/api/products").param("q", fixture.product().getName()));
 		var detail = mockMvc.perform(get("/api/products/{productId}", fixture.product().getId()));
 		if (visible) {
-			list.andExpect(status().isOk())
-				.andExpect(jsonPath("$.products", hasSize(1)))
-				.andExpect(jsonPath("$.products[0].id", is(fixture.product().getId().toString())));
-			detail.andExpect(status().isOk())
-				.andExpect(jsonPath("$.id", is(fixture.product().getId().toString())));
+				list.andExpect(status().isOk())
+					.andExpect(jsonPath("$.products", hasSize(1)))
+					.andExpect(jsonPath("$.products[0].id", is(fixture.product().getId().toString())))
+					.andExpect(jsonPath("$.products[0].purchasable", is(true)));
+				detail.andExpect(status().isOk())
+					.andExpect(jsonPath("$.id", is(fixture.product().getId().toString())))
+					.andExpect(jsonPath("$.purchasable", is(true)));
 		} else {
 			list.andExpect(status().isOk())
 				.andExpect(jsonPath("$.products", hasSize(0)));

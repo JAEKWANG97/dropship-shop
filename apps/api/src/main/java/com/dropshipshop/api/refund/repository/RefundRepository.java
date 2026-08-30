@@ -6,10 +6,13 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.refund.domain.RefundStatus;
+
+import jakarta.persistence.LockModeType;
 
 public interface RefundRepository extends JpaRepository<Refund, UUID> {
 
@@ -17,11 +20,24 @@ public interface RefundRepository extends JpaRepository<Refund, UUID> {
 
 	Optional<Refund> findByOrder_Id(UUID orderId);
 
+	Optional<Refund> findByPaymentGroup_IdAndRefundScope(UUID paymentGroupId, com.dropshipshop.api.refund.domain.RefundScope refundScope);
+
+	List<Refund> findAllByPaymentGroup_IdOrderByCreatedAtAsc(UUID paymentGroupId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select refund from Refund refund where refund.id = :id")
+	Optional<Refund> findByIdForUpdate(@Param("id") UUID id);
+
+	boolean existsByPaymentGroup_Id(UUID paymentGroupId);
+
+	@Query("select refund.paymentGroup.id from Refund refund where refund.id = :refundId")
+	Optional<UUID> findPaymentGroupIdById(@Param("refundId") UUID refundId);
+
 	@Query("""
 		select refund
 		from Refund refund
-		join refund.order customerOrder
-		where customerOrder.user.id = :userId
+		join refund.paymentGroup paymentGroup
+		where paymentGroup.user.id = :userId
 			and refund.status in :statuses
 		order by refund.createdAt desc
 		""")

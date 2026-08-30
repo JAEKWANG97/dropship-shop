@@ -100,7 +100,7 @@ class OrderOptimisticLockingIntegrationTest {
 			checkoutView.confirmPolicy(Instant.now());
 			firstTx.commit();
 
-			staleAdminView.recordDepositMismatch(TestAuthentication.ADMIN_ID, "Stale mismatch memo", Instant.now());
+			staleAdminView.cancelUnpaidDeposit(TestAuthentication.ADMIN_ID, "Stale unpaid cancellation", Instant.now());
 			assertThatThrownBy(secondTx::commit).isInstanceOf(RollbackException.class);
 		} finally {
 			rollbackIfActive(firstTx);
@@ -111,7 +111,7 @@ class OrderOptimisticLockingIntegrationTest {
 
 		PaymentGroup saved = paymentGroupRepository.findById(paymentGroup.getId()).orElseThrow();
 		assertThat(saved.getPolicyConfirmedAt()).isNotNull();
-		assertThat(saved.getDepositMismatchMemo()).isNull();
+		assertThat(saved.getUnpaidCancelledAt()).isNull();
 	}
 
 	private CustomerOrder createSupplierOrderPendingOrder(String orderNumber, String checkoutNumber, long amount) {

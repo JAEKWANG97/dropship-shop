@@ -47,7 +47,7 @@ Status: Confirmed
   - 주문 상품과 옵션이 입금확인 시점에도 판매 가능하다.
 - 입금확인 성공 후 결제 그룹(PaymentGroup)에 포함된 배송 그룹 주문들은 `SUPPLIER_ORDER_PENDING` 상태로 전환한다.
 - 계좌입금 결제 레코드는 `PaymentProvider.BANK_TRANSFER`, `PaymentMethod.BANK_TRANSFER`, `providerPaymentKey = BANK-{checkoutNumber}`를 사용한다.
-- 현재 B-068 구현은 입금 금액·입금자명·입금 시각이 불일치하거나 확인이 필요한 경우 관리자 메모를 남기고 `PAYMENT_PENDING`을 유지한다. `B-102`가 배포되면 실제 수령액이 확인된 금액 불일치는 아래 Planned 결제예외·전액환불 계약으로 대체한다. 어느 PaymentGroup인지 아직 식별하지 못한 은행 거래는 주문 상태를 추측해 바꾸지 않고 외부 은행 대사 대상으로 남긴다.
+- B-068의 과거 입금 불일치 메모는 읽기 호환을 위해 보존한다. 현재는 실제 수령액이 확인된 금액 불일치를 아래 B-102 결제예외·전액환불 계약으로 처리한다. 어느 PaymentGroup인지 아직 식별하지 못한 은행 거래는 주문 상태를 추측해 바꾸지 않고 외부 은행 대사 대상으로 남긴다.
 - 기한 내 입금이 확인되지 않으면 관리자가 미입금 취소 처리한다.
 - 미입금 취소 주문은 `CANCELLED` 상태가 되며 공급처 발주 대상으로 전환하지 않는다.
 - 입금확인, 미입금 취소, 입금 불일치 처리, 환불 승인과 수동 환불 완료는 관리자 주체, 시각, 사유를 기록한다.
@@ -61,16 +61,16 @@ Status: Confirmed
 - 구매안전서비스 계약과 고객 선택 흐름을 실제로 확인한 뒤에만 `APP_SALES_ENABLED=true`로 전환한다.
 - MVP에서는 배송 그룹 주문 단위 부분 취소/부분 환불을 지원한다.
 - 배송 그룹 주문 단위 부분 환불은 하나의 결제 그룹 중 특정 배송 그룹 주문 금액만 관리자가 계좌로 환불하는 것을 의미한다.
-- 단, 실제 입금액이 결제그룹 총액과 다른 `PAYMENT_AMOUNT_MISMATCH`는 금액을 배송 그룹별로 임의 배분하지 않고 실제 수령액 전부를 `PAYMENT_GROUP` 환불 1건으로 처리한다. Planned in B-102.
+- 단, 실제 입금액이 결제그룹 총액과 다른 `PAYMENT_AMOUNT_MISMATCH`는 금액을 배송 그룹별로 임의 배분하지 않고 실제 수령액 전부를 `PAYMENT_GROUP` 환불 1건으로 처리한다. Implemented in B-102.
 - 배송 그룹 주문 내부의 상품, 옵션, 수량 단위 부분 취소/부분 환불은 MVP에서 지원하지 않는다.
 - 특정 배송 그룹 주문이 공급처 품절이면 해당 배송 그룹 주문 금액만 부분 취소/환불한다.
 - 하나의 배송 그룹 주문 내부에서 일부 상품 또는 일부 수량만 품절이면 MVP에서는 해당 배송 그룹 주문 전체를 취소/환불한다.
 - 입금대기, 미입금 취소 주문은 일반 고객 주문 내역에 노출하지 않고 체크아웃 화면 또는 고객 문의 대상으로 다룬다.
 - 입금확인 완료 주문부터 고객 주문 내역에 노출한다.
 
-## Supplier Portal Payment And Inventory — Planned (B-102)
+## Supplier Portal Payment And Inventory — Implemented (B-102)
 
-Status: Planned (B-102). Existing `UNTRACKED` and legacy payment expiry behavior remains unchanged until this slice ships.
+Status: Implemented (B-102). Existing `UNTRACKED` behavior remains compatible, and the scheduler expires only a pending checkout that still has a portal-origin `TRACKED/HELD` reservation. Legacy-only payment expiry remains on the existing manual reconciliation path.
 
 - `TRACKED` option checkout은 주문 생성과 함께 24시간 `HELD` 재고 예약을 만들고, scheduler가 미입금 만료 주문의 예약을 해제한다. 관리자는 기한 전 미입금 취소를 별도로 처리할 수 있다.
 - `B-102`는 portal/legacy 여부와 무관하게 식별된 계좌입금의 `actualAmount != PaymentGroup.totalAmount`를 최우선 `PAYMENT_AMOUNT_MISMATCH`로 처리한다. 전체 입금 증적, `Payment.status=PAYMENT_EXCEPTION`, `PaymentGroup.status=PAYMENT_EXCEPTION`과 실제 수령액을 exactly once 저장하고, 남은 portal `HELD` 예약은 재확보·소비 없이 정확히 한 번 해제한다.
@@ -87,11 +87,11 @@ Status: Planned (B-102). Existing `UNTRACKED` and legacy payment expiry behavior
 - portal snapshot 항목이 하나라도 있는 PaymentGroup에서 실제 입금은 확인됐지만 현재 판매가능 guard가 실패하면 normal/late 경로 모두 whole-group Payment/PaymentGroup `PAYMENT_EXCEPTION`을 기록하고 배송 그룹마다 `RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT`, `RefundStatus.REQUESTED` Refund를 만든다. Normal pre-expiry HELD 예약은 같은 transaction에서 exactly once RELEASED로 끝내고, late tentative 재확보는 rollback해 기존 RELEASED를 유지한다. Fulfillment/PII/supplier work는 만들지 않으며 portal 항목이 전혀 없는 legacy group의 기존 validation error는 유지한다.
 - 늦은 시각 또는 재고 재확보 실패는 배송 그룹마다 `RefundReason.LATE_DEPOSIT_EXCEPTION`, `RefundStatus.REQUESTED` Refund를 자동 생성한다. 두 reason 모두 order별 unique/idempotency guard로 재시도나 중복 요청이 Refund를 두 번 만들지 않게 한다.
 - Reason priority는 금액 불일치가 첫 번째다. 금액이 정확하지만 qualifying 미입금 `CANCELLED`이면 terminal cancellation을 두 번째로 평가하고 `LATE_DEPOSIT_EXCEPTION` 주문별 환불로 끝낸다. 나머지 pending/expired portal 경로에서만 current saleability/time-valid contract/mode 실패를 `SALE_UNAVAILABLE_AT_DEPOSIT`으로 먼저 분류하고, 그 guard가 모두 통과한 뒤의 늦은 timestamp 또는 재확보 실패를 `LATE_DEPOSIT_EXCEPTION`으로 분류한다.
-- Portal 입금 예외는 Payment와 PaymentGroup에 `PAYMENT_EXCEPTION` 증적을 남기되 같은 transaction에서 Order를 최종 `REFUND_REQUESTED`로 보낸다. 두 planned reason 모두 checkout과 주문 내역에서 `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중`으로 표시한다.
+- Portal 입금 예외는 Payment와 PaymentGroup에 `PAYMENT_EXCEPTION` 증적을 남기되 같은 transaction에서 Order를 최종 `REFUND_REQUESTED`로 보낸다. 두 B-102 reason 모두 checkout과 주문 내역에서 `REFUND_PROCESSING` / `입금 확인 및 환불 처리 중`으로 표시한다.
 - 공급처 주문·알림 API에는 `PAYMENT_EXCEPTION`, 늦은 입금 Payment와 Refund를 노출하지 않는다.
 - 정확한 금액의 late/saleability/qualifying unpaid-cancelled 예외는 Order별 환불 완료 범위에 따라 PaymentGroup이 `PARTIALLY_REFUNDED` 또는 `REFUNDED`가 될 수 있다. 금액 불일치의 단일 결제그룹 Refund는 실제 수령액 전체만 완료하며 PaymentGroup과 모든 포함 Order를 항상 `REFUNDED`로 끝내고 `PARTIALLY_REFUNDED`를 사용하지 않는다.
 
-### Planned System Impact
+### Implemented System Impact
 
 - scheduler 만료, 금액 불일치 그룹 환불, normal/late 판매불가 입금 기록과 자동 Refund 생성은 각각 idempotent해야 하고 중단 후 안전하게 재시도할 수 있어야 한다.
 - 금액 불일치·late/saleability·qualifying unpaid-cancelled 예외 생성과 각 실제 수동 환불 완료는 idempotency key/request hash/immutable result replay를 가져야 한다. DB replay는 실제 은행 송금 중복을 되돌릴 수 없으므로 완료 응답을 잃은 운영자는 새로 송금하지 않고 같은 key로 기록을 재조회·재시도한다.

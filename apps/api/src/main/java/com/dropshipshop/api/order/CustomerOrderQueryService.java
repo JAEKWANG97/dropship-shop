@@ -23,6 +23,9 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.domain.RefundReason;
+import com.dropshipshop.api.refund.domain.RefundScope;
+import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
@@ -112,7 +115,11 @@ public class CustomerOrderQueryService {
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
 		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
-		Refund refund = refundRepository.findByOrder_Id(order.getId()).orElse(null);
+		Refund refund = refundRepository.findByOrder_Id(order.getId())
+			.orElseGet(() -> refundRepository
+				.findByPaymentGroup_IdAndRefundScope(order.getPaymentGroup().getId(), RefundScope.PAYMENT_GROUP)
+				.orElse(null));
+		CustomerRefundProjection customerRefund = customerRefundProjection(refund);
 		Claim claim = claimRepository.findFirstByOrder_IdOrderByCreatedAtDesc(order.getId()).orElse(null);
 		List<OrderDtos.ClaimSummaryResponse> claims = claimRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId())
 			.stream()
@@ -127,13 +134,19 @@ public class CustomerOrderQueryService {
 			order.getDiscountAmount(),
 			order.getTotalAmount(),
 			order.getCreatedAt(),
+			customerRefund.status(),
+			customerRefund.label(),
+			customerRefund.amount(),
 			new OrderDtos.PaymentGroupSummaryResponse(
 				order.getPaymentGroup().getId(),
 				order.getPaymentGroup().getCheckoutNumber(),
 				order.getPaymentGroup().getStatus(),
 				order.getPaymentGroup().getTotalAmount(),
 				order.getPaymentGroup().getApprovedAmount(),
-				order.getPaymentGroup().getApprovedAt()
+				order.getPaymentGroup().getApprovedAt(),
+				customerRefund.status(),
+				customerRefund.label(),
+				customerRefund.amount()
 			),
 			toPaymentSummary(payment),
 			new OrderDtos.ShippingAddressResponse(
@@ -197,6 +210,30 @@ public class CustomerOrderQueryService {
 			refund.getStatus(),
 			refund.getRefundAmount()
 		);
+	}
+
+	private CustomerRefundProjection customerRefundProjection(Refund refund) {
+		if (refund == null || !isReceivedPaymentException(refund)) {
+			return CustomerRefundProjection.none();
+		}
+		boolean completed = refund.getStatus() == RefundStatus.COMPLETED;
+		return new CustomerRefundProjection(
+			completed ? "REFUNDED" : "REFUND_PROCESSING",
+			completed ? "환불 완료" : "입금 확인 및 환불 처리 중",
+			refund.getRefundAmount()
+		);
+	}
+
+	private boolean isReceivedPaymentException(Refund refund) {
+		return refund.getReason() == RefundReason.PAYMENT_AMOUNT_MISMATCH
+			|| refund.getReason() == RefundReason.LATE_DEPOSIT_EXCEPTION
+			|| refund.getReason() == RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT;
+	}
+
+	private record CustomerRefundProjection(String status, String label, Long amount) {
+		static CustomerRefundProjection none() {
+			return new CustomerRefundProjection(null, null, null);
+		}
 	}
 
 	private OrderDtos.ShipmentSummaryResponse toShipmentSummary(Shipment shipment) {

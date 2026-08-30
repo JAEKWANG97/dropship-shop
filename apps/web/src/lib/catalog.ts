@@ -17,6 +17,7 @@ export type ProductSummary = {
   orderQuantityStep: number;
   categoryCode: ProductCategoryCode;
   status: ProductStatus;
+  purchasable?: boolean;
   thumbnailImageUrl: string | null;
 };
 
@@ -53,6 +54,7 @@ export type ProductOption = {
   name: string;
   additionalPrice: number;
   status: ProductOptionStatus;
+  purchasable?: boolean;
   sourceOptionCode?: string;
   sourceAdditionalPrice?: number;
   sourceStockQuantity?: number;
@@ -132,6 +134,20 @@ export function getProducts(query: ProductQuery = {}) {
 
 export function getProduct(productId: string) {
   return apiGet<ProductDetail>(`/api/products/${productId}`);
+}
+
+export function purchasableProductOptions(product: Pick<ProductDetail, "options">) {
+  return product.options.filter((option) => option.purchasable ?? option.status === "ACTIVE");
+}
+
+export function isProductPurchaseAvailable(
+  product: Pick<ProductDetail, "options" | "purchasable" | "salesEnabled" | "status">,
+) {
+  const options = purchasableProductOptions(product);
+  return product.salesEnabled
+    && product.status === "ACTIVE"
+    && (product.purchasable ?? options.length > 0)
+    && options.length > 0;
 }
 
 export function formatPrice(value: number) {

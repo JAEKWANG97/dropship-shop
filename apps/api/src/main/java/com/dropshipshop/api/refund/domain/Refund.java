@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.payment.domain.Payment;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 
@@ -33,8 +34,8 @@ public class Refund {
 	@JoinColumn(name = "payment_group_id", nullable = false)
 	private PaymentGroup paymentGroup;
 
-	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "order_id", nullable = false, unique = true)
+	@OneToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "order_id", unique = true)
 	private CustomerOrder order;
 
 	@ManyToOne(fetch = FetchType.LAZY)
@@ -133,6 +134,38 @@ public class Refund {
 		this.refundScope = RefundScope.DELIVERY_GROUP_ORDER;
 	}
 
+	public static Refund receivedPaymentGroup(
+		PaymentGroup paymentGroup,
+		Payment payment,
+		long refundAmount,
+		Instant requestedAt
+	) {
+		Refund refund = new Refund();
+		refund.paymentGroup = paymentGroup;
+		refund.payment = payment;
+		refund.reason = RefundReason.PAYMENT_AMOUNT_MISMATCH;
+		refund.refundAmount = MoneyMath.requirePositive(refundAmount, "refundAmount");
+		refund.refundScope = RefundScope.PAYMENT_GROUP;
+		refund.requestedAt = requestedAt;
+		return refund;
+	}
+
+	public static Refund receivedPaymentOrder(
+		CustomerOrder order,
+		Payment payment,
+		RefundReason reason,
+		Instant requestedAt
+	) {
+		if (reason != RefundReason.LATE_DEPOSIT_EXCEPTION
+			&& reason != RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT) {
+			throw new IllegalArgumentException("Unsupported received-payment exception refund reason");
+		}
+		Refund refund = new Refund(order, reason);
+		refund.payment = payment;
+		refund.requestedAt = requestedAt;
+		return refund;
+	}
+
 	@PrePersist
 	void prePersist() {
 		Instant now = Instant.now();
@@ -156,6 +189,9 @@ public class Refund {
 	}
 
 	public void reject(UUID adminUserId, String reason, Instant reviewedAt) {
+		if (isReceivedPaymentException()) {
+			throw new IllegalStateException("Received-payment exception refunds cannot be rejected");
+		}
 		if (status != RefundStatus.REQUESTED && status != RefundStatus.MANUAL_REVIEW_REQUIRED) {
 			throw new IllegalStateException("Refund can be rejected only from requested or manual review required");
 		}
@@ -163,6 +199,12 @@ public class Refund {
 		this.reviewedByAdminId = adminUserId;
 		this.adminReviewReason = reason;
 		this.reviewedAt = reviewedAt;
+	}
+
+	public boolean isReceivedPaymentException() {
+		return reason == RefundReason.PAYMENT_AMOUNT_MISMATCH
+			|| reason == RefundReason.LATE_DEPOSIT_EXCEPTION
+			|| reason == RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT;
 	}
 
 	public void completeManualBankTransfer(

@@ -123,6 +123,22 @@ public class Payment {
 		return payment;
 	}
 
+	public static Payment bankTransferException(
+		PaymentGroup paymentGroup,
+		String providerPaymentKey,
+		long requestedAmount,
+		PaymentExceptionReason exceptionReason,
+		Instant receivedAt
+	) {
+		Payment payment = new Payment(paymentGroup, PaymentProvider.BANK_TRANSFER, providerPaymentKey,
+			PaymentMethod.BANK_TRANSFER, PaymentStatus.PAYMENT_EXCEPTION,
+			MoneyMath.requirePositive(requestedAmount, "requestedAmount"));
+		payment.exceptionReason = exceptionReason;
+		payment.rawProviderStatus = "MANUAL_DEPOSIT_EXCEPTION";
+		payment.lastSyncedAt = receivedAt;
+		return payment;
+	}
+
 	public void markRefundCompleted(boolean fullyRefunded) {
 		this.status = fullyRefunded ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED;
 	}

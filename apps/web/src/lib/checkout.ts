@@ -22,6 +22,9 @@ export type CheckoutOrder = {
   shippingFee: number;
   discountAmount: number;
   totalAmount: number;
+  customerDisplayStatus?: string;
+  customerDisplayLabel?: string;
+  refundAmount?: number | null;
   items: CheckoutOrderItem[];
 };
 
@@ -64,6 +67,9 @@ export type Checkout = {
   status: string;
   totalAmount: number;
   refundableAmount: number;
+  customerDisplayStatus?: string;
+  customerDisplayLabel?: string;
+  refundAmount?: number | null;
   expiresAt: string;
   policyConfirmedAt: string | null;
   bankTransferDeposit: BankTransferDeposit;
@@ -78,4 +84,14 @@ export async function getCheckout(checkoutNumber: string) {
     `/api/checkouts/${checkoutNumber}`,
     (await cookies()).toString(),
   );
+}
+
+export function checkoutCustomerProjection(checkout: Checkout) {
+  const status = checkout.customerDisplayStatus || checkout.status;
+  return {
+    status,
+    label: checkout.customerDisplayLabel
+      || (status === "REFUND_PROCESSING" ? "입금 확인 및 환불 처리 중" : null),
+    refundAmount: checkout.refundAmount ?? checkout.refundableAmount,
+  };
 }

@@ -7,9 +7,9 @@ import {
   claimReasonLabel,
   claimStatusLabel,
   claimTypeLabel,
+  customerOrderProjection,
   fulfillmentStatusLabel,
   getCustomerOrder,
-  orderStatusLabel,
   paymentStatusLabel,
   refundStatusLabel,
   shipmentStatusLabel,
@@ -74,7 +74,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
   return (
     <section className="order-detail-page">
       <div className="section-heading">
-        <p className="eyebrow">{orderStatusLabel(order.status)}</p>
+        <p className="eyebrow">{customerOrderProjection(order).label}</p>
         <h1>주문 {order.orderNumber}</h1>
       </div>
 
@@ -117,21 +117,24 @@ function AdminCustomerOrderNotice() {
 }
 
 function OrderSummaryPanel({ order }: { order: OrderDetail }) {
+  const customerDisplay = customerOrderProjection(order);
+  const refundAmount = customerDisplay.refundAmount;
+  const refundProcessing = customerDisplay.status === "REFUND_PROCESSING";
   return (
     <section className="detail-section">
       <h2>상태</h2>
       <div className="summary-list">
         <div>
           <span>주문 상태</span>
-          <strong>{orderStatusLabel(order.status)}</strong>
+          <strong>{customerDisplay.label}</strong>
         </div>
         <div>
           <span>발주</span>
-          <strong>{fulfillmentStatusLabel(order.fulfillment.status)}</strong>
+          <strong>{refundProcessing ? "발주 없음" : fulfillmentStatusLabel(order.fulfillment.status)}</strong>
         </div>
         <div>
           <span>배송</span>
-          <strong>{shipmentStatusLabel(order.shipment.status)}</strong>
+          <strong>{refundProcessing ? "배송 없음" : shipmentStatusLabel(order.shipment.status)}</strong>
         </div>
         <div>
           <span>운송장</span>
@@ -143,14 +146,16 @@ function OrderSummaryPanel({ order }: { order: OrderDetail }) {
         </div>
         <div>
           <span>결제</span>
-          <strong>{paymentStatusLabel(order.payment.status)}</strong>
+          <strong>{refundProcessing ? customerDisplay.label : paymentStatusLabel(order.payment.status)}</strong>
         </div>
         <div>
           <span>환불</span>
           <strong>
-            {order.refund.amount === null
+            {refundProcessing
+              ? `${customerDisplay.label}${refundAmount === null ? "" : ` ${formatPrice(refundAmount)}`}`
+              : refundAmount === null
               ? refundStatusLabel(order.refund.status)
-              : `${refundStatusLabel(order.refund.status)} ${formatPrice(order.refund.amount)}`}
+              : `${refundStatusLabel(order.refund.status)} ${formatPrice(refundAmount)}`}
           </strong>
         </div>
         <div>

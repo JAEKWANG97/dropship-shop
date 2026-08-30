@@ -23,6 +23,7 @@ import com.dropshipshop.api.cart.domain.CartItem;
 import com.dropshipshop.api.cart.repository.CartItemRepository;
 import com.dropshipshop.api.cart.repository.CartRepository;
 import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
 import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
@@ -48,7 +49,12 @@ import com.dropshipshop.api.payment.BankTransferProperties;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
+import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.domain.RefundReason;
+import com.dropshipshop.api.refund.domain.RefundStatus;
+import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.supplierproduct.ProductSaleability;
+import com.dropshipshop.api.supplierportal.SupplierContractTerminalService;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
@@ -69,6 +75,7 @@ public class CheckoutService {
 	private final CustomerOrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
 	private final OrderPolicyAgreementRepository orderPolicyAgreementRepository;
+	private final RefundRepository refundRepository;
 	private final UserAccountRepository userAccountRepository;
 	private final AccountAgreementService accountAgreementService;
 	private final AccountProfileService accountProfileService;
@@ -78,6 +85,7 @@ public class CheckoutService {
 	private final NotificationService notificationService;
 	private final StorefrontSalesProperties salesProperties;
 	private final ProductSaleability productSaleability;
+	private final SupplierContractTerminalService contractTerminalService;
 	private final EntityManager entityManager;
 	private final Clock clock;
 
@@ -92,6 +100,7 @@ public class CheckoutService {
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
 		OrderPolicyAgreementRepository orderPolicyAgreementRepository,
+		RefundRepository refundRepository,
 		UserAccountRepository userAccountRepository,
 		AccountAgreementService accountAgreementService,
 		AccountProfileService accountProfileService,
@@ -101,6 +110,7 @@ public class CheckoutService {
 		NotificationService notificationService,
 		StorefrontSalesProperties salesProperties,
 		ProductSaleability productSaleability,
+		SupplierContractTerminalService contractTerminalService,
 		EntityManager entityManager
 	) {
 		this.cartRepository = cartRepository;
@@ -113,6 +123,7 @@ public class CheckoutService {
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
 		this.orderPolicyAgreementRepository = orderPolicyAgreementRepository;
+		this.refundRepository = refundRepository;
 		this.userAccountRepository = userAccountRepository;
 		this.accountAgreementService = accountAgreementService;
 		this.accountProfileService = accountProfileService;
@@ -122,11 +133,12 @@ public class CheckoutService {
 		this.notificationService = notificationService;
 		this.salesProperties = salesProperties;
 		this.productSaleability = productSaleability;
+		this.contractTerminalService = contractTerminalService;
 		this.entityManager = entityManager;
 		this.clock = Clock.systemUTC();
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = SupplierContractExpiredCheckoutException.class)
 	public CheckoutDtos.CheckoutResponse createCheckout(UUID userId, CheckoutDtos.CreateCheckoutRequest request) {
 		salesProperties.requireEnabled();
 		UserAccount user = findUser(userId);
@@ -141,7 +153,16 @@ public class CheckoutService {
 				"Checkout was already submitted for this cart. Please check your checkout or cart."
 			);
 		}
-		cartItems = lockCatalogAndReloadCart(cart.getId(), cartItems);
+		LockedCatalog lockedCatalog = lockCatalogAndReloadCart(cart.getId(), cartItems);
+		cartItems = lockedCatalog.cartItems();
+		boolean contractExpired = false;
+		Instant lockTime = Instant.now(clock);
+		for (Supplier supplier : lockedCatalog.portalSuppliers()) {
+			contractExpired |= contractTerminalService.expireIfOverdue(supplier, null, null, lockTime);
+		}
+		if (contractExpired) {
+			throw new SupplierContractExpiredCheckoutException();
+		}
 		user = findUser(userId);
 		validateSellability(cartItems);
 
@@ -152,8 +173,10 @@ public class CheckoutService {
 			request.address1(),
 			request.address2()
 		);
-		Instant expiresAt = Instant.now(clock).plus(bankTransferProperties.depositDeadline());
+		Instant checkoutAt = Instant.now(clock);
+		Instant expiresAt = checkoutAt.plus(bankTransferProperties.depositDeadline());
 		long totalAmount = sumLineAmounts(cartItems);
+		reserveInventory(cartItems);
 		PaymentGroup paymentGroup = paymentGroupRepository.save(new PaymentGroup(
 			nextCheckoutNumber(),
 			user,
@@ -180,7 +203,7 @@ public class CheckoutService {
 				expiresAt
 			));
 			createdOrders.add(order);
-			orderItemRepository.saveAll(snapshotItems(order, supplierItems));
+			orderItemRepository.saveAll(snapshotItems(order, supplierItems, checkoutAt));
 		}
 
 		cartItemRepository.deleteAll(cartItems);
@@ -273,7 +296,7 @@ public class CheckoutService {
 		for (CartItem item : cartItems) {
 			Product product = item.getProduct();
 			ProductOption option = item.getProductOption();
-			if (!productSaleability.isSellable(product, option)) {
+			if (!productSaleability.isSellable(product, option, item.getQuantity())) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item");
 			}
 			if (!product.acceptsOrderQuantity(item.getQuantity())) {
@@ -285,21 +308,36 @@ public class CheckoutService {
 		}
 	}
 
-	private List<CartItem> lockCatalogAndReloadCart(UUID cartId, List<CartItem> discoveredItems) {
+	private void reserveInventory(List<CartItem> cartItems) {
+		for (CartItem item : cartItems) {
+			ProductOption option = item.getProductOption();
+			if (option.isTracked()) {
+				option.reserve(item.getQuantity());
+			}
+		}
+	}
+
+	private LockedCatalog lockCatalogAndReloadCart(UUID cartId, List<CartItem> discoveredItems) {
 		Set<UUID> supplierIds = new TreeSet<>();
+		Set<UUID> portalSupplierIds = new TreeSet<>();
 		Set<UUID> productIds = new TreeSet<>();
 		Map<UUID, UUID> discoveredSupplierByProductId = new LinkedHashMap<>();
 		for (CartItem item : discoveredItems) {
 			UUID productId = item.getProduct().getId();
 			UUID supplierId = item.getProduct().getSupplier().getId();
 			supplierIds.add(supplierId);
+			if (item.getProduct().getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL) {
+				portalSupplierIds.add(supplierId);
+			}
 			productIds.add(productId);
 			discoveredSupplierByProductId.put(productId, supplierId);
 		}
 		entityManager.clear();
+		Map<UUID, Supplier> lockedSuppliers = new LinkedHashMap<>();
 		for (UUID supplierId : supplierIds) {
-			supplierRepository.findByIdForUpdate(supplierId)
+			Supplier supplier = supplierRepository.findByIdForUpdate(supplierId)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item"));
+			lockedSuppliers.put(supplierId, supplier);
 		}
 		for (UUID productId : productIds) {
 			Product product = productRepository.findByIdForUpdate(productId)
@@ -311,7 +349,10 @@ public class CheckoutService {
 		for (UUID productId : productIds) {
 			productOptionRepository.findAllByProductIdForUpdate(productId);
 		}
-		return cartItemRepository.findAllByCart_IdOrderByCreatedAtAsc(cartId);
+		return new LockedCatalog(
+			cartItemRepository.findAllByCart_IdOrderByCreatedAtAsc(cartId),
+			portalSupplierIds.stream().map(lockedSuppliers::get).toList()
+		);
 	}
 
 	private Map<UUID, List<CartItem>> groupBySupplier(List<CartItem> cartItems) {
@@ -323,14 +364,18 @@ public class CheckoutService {
 		return grouped;
 	}
 
-	private List<OrderItem> snapshotItems(CustomerOrder order, List<CartItem> cartItems) {
+	private record LockedCatalog(List<CartItem> cartItems, List<Supplier> portalSuppliers) {
+	}
+
+	private List<OrderItem> snapshotItems(CustomerOrder order, List<CartItem> cartItems, Instant reservationTime) {
 		return cartItems.stream()
 			.map(item -> new OrderItem(
 				order,
 				item.getProduct(),
 				item.getProductOption(),
 				activeNoticeVersion(item.getProduct().getId()),
-				item.getQuantity()
+				item.getQuantity(),
+				reservationTime
 			))
 			.toList();
 	}
@@ -360,10 +405,12 @@ public class CheckoutService {
 
 	private CheckoutDtos.CheckoutResponse toCheckoutResponse(PaymentGroup paymentGroup) {
 		List<CustomerOrder> customerOrders = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId());
+		List<Refund> refunds = refundRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId());
+		CustomerRefundProjection checkoutRefund = customerRefundProjection(refunds);
 		CheckoutDtos.ShippingAddressResponse shippingAddress = shippingAddress(customerOrders);
 		List<CheckoutDtos.OrderResponse> orders = customerOrders
 			.stream()
-			.map(this::toOrderResponse)
+			.map(order -> toOrderResponse(order, refunds))
 			.toList();
 		return new CheckoutDtos.CheckoutResponse(
 			paymentGroup.getId(),
@@ -371,6 +418,9 @@ public class CheckoutService {
 			paymentGroup.getStatus(),
 			paymentGroup.getTotalAmount(),
 			paymentGroup.getRefundableAmount(),
+			checkoutRefund.status(),
+			checkoutRefund.label(),
+			checkoutRefund.amount(),
 			paymentGroup.getExpiresAt(),
 			paymentGroup.getPolicyConfirmedAt(),
 			new CheckoutDtos.BankTransferDepositResponse(
@@ -454,7 +504,11 @@ public class CheckoutService {
 			.toList();
 	}
 
-	private CheckoutDtos.OrderResponse toOrderResponse(CustomerOrder order) {
+	private CheckoutDtos.OrderResponse toOrderResponse(CustomerOrder order, List<Refund> refunds) {
+		List<Refund> applicableRefunds = refunds.stream()
+			.filter(refund -> refund.getOrder() == null || refund.getOrder().getId().equals(order.getId()))
+			.toList();
+		CustomerRefundProjection refundProjection = customerRefundProjection(applicableRefunds);
 		List<CheckoutDtos.OrderItemResponse> items = orderItemRepository
 			.findAllByOrder_IdOrderByCreatedAtAsc(order.getId())
 			.stream()
@@ -470,8 +524,37 @@ public class CheckoutService {
 			order.getShippingFee(),
 			order.getDiscountAmount(),
 			order.getTotalAmount(),
+			refundProjection.status(),
+			refundProjection.label(),
+			refundProjection.amount(),
 			items
 		);
+	}
+
+	private CustomerRefundProjection customerRefundProjection(List<Refund> refunds) {
+		List<Refund> received = refunds.stream().filter(this::isReceivedPaymentException).toList();
+		if (received.isEmpty()) {
+			return CustomerRefundProjection.none();
+		}
+		long amount = received.stream().mapToLong(Refund::getRefundAmount).reduce(0, Math::addExact);
+		boolean completed = received.stream().allMatch(refund -> refund.getStatus() == RefundStatus.COMPLETED);
+		return new CustomerRefundProjection(
+			completed ? "REFUNDED" : "REFUND_PROCESSING",
+			completed ? "환불 완료" : "입금 확인 및 환불 처리 중",
+			amount
+		);
+	}
+
+	private boolean isReceivedPaymentException(Refund refund) {
+		return refund.getReason() == RefundReason.PAYMENT_AMOUNT_MISMATCH
+			|| refund.getReason() == RefundReason.LATE_DEPOSIT_EXCEPTION
+			|| refund.getReason() == RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT;
+	}
+
+	private record CustomerRefundProjection(String status, String label, Long amount) {
+		static CustomerRefundProjection none() {
+			return new CustomerRefundProjection(null, null, null);
+		}
 	}
 
 	private CheckoutDtos.OrderItemResponse toOrderItemResponse(OrderItem item) {

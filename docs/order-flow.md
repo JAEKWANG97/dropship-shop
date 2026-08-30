@@ -2,7 +2,7 @@
 
 Current payment path: direct bank transfer with manual admin deposit confirmation.
 
-현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주를 설명한다. 공급처 포털 흐름은 `B-100`~`B-105`의 Planned 기준이며, 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
+현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주를 설명한다. 공급처 포털은 `B-100`~`B-102` 기반까지 구현됐고 `B-103`~`B-105` 출고·송장·품절 흐름은 Planned다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
 
 ## Current Legacy/Domeggook Happy Path — Implemented
 
@@ -51,7 +51,7 @@ B-041 bank-transfer implementation notes:
 - Checkout detail shows bank name, account number, account holder, total amount, depositor name, deposit deadline, and cash receipt notice.
 - Admin deposit confirmation requires the actual depositor name, actual amount, received time, transaction reference, and reason. It creates a `BANK_TRANSFER` payment with `providerPaymentKey = BANK-{checkoutNumber}`, marks the payment group `APPROVED`, and moves included orders to `SUPPLIER_ORDER_PENDING` only when the actual amount exactly equals the checkout total.
 - Admin unpaid cancellation moves pending orders to `CANCELLED`.
-- The current admin deposit-mismatch action keeps the order pending and records a memo for operations. Planned B-102 replaces this disposition for an identified non-equal receipt with a terminal payment-group refund flow while preserving historical rows.
+- B-102 replaced new memo-only mismatch handling: an identified non-equal receipt uses the terminal payment-group refund flow below, while historical memo rows remain readable.
 - Bank-transfer refunds are completed only after an admin records the actual manual refund completion with the recipient bank/account/holder, transferred time, transaction reference, and reason.
 
 B-072 supplier purchase notes:
@@ -69,20 +69,20 @@ DS-10 backend implementation notes:
 - Customer APIs return display statuses instead of raw internal order statuses.
 - Order detail includes implemented payment, shipment, fulfillment, and refund summaries.
 
-## Supplier Portal Slice Map — Planned
+## Supplier Portal Slice Map — B-100~B-102 Implemented, B-103~B-105 Planned
 
 | Slice | Order-flow impact |
 | --- | --- |
 | `B-100` | 공급처 신청, Coreable 승인, 1회용 이메일 초대, Kakao-only 담당자 연결. 주문 상태 변경 없음 |
 | `B-101` | 개별 상품 등록, 기본 옵션, 자동 공개/위험상품 검토, Coreable 고객가 계산. 주문 상태 변경 없음 |
-| `B-102` | `TRACKED` 재고, checkout 24시간 예약·만료, 늦은 입금 재확보 |
+| `B-102` (Implemented) | `TRACKED` 재고, checkout 24시간 예약·만료, 늦은 입금 재확보 |
 | `B-103` | 입금확인 즉시 수락 단계 없는 출고 요청, 주소 잠금, 최소 PII, 이메일 알림 |
 | `B-104` | 복수 Shipment와 수량 allocation, `TRACKING_REGISTERED`, 공식 택배사 링크 |
 | `B-105` | 송장 전 배송 그룹 전체 품절 보고, supplier facts, Coreable 환불 경계 |
 
 `B-102` inventory migration과 checkout guard는 supplier portal release의 필요조건이지만 충분조건은 아니다. B-100~B-105와 privacy, operational email, 외부 공급처 계약, production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
 
-### Tracked Checkout And Late Deposit — Planned (`B-102`)
+### Tracked Checkout And Late Deposit — Implemented (`B-102`)
 
 ```text
 Customer creates checkout
@@ -101,7 +101,8 @@ Deposit confirmed before expiry
 -> Actual amount differs from PaymentGroup total: record PAYMENT_AMOUNT_MISMATCH first, release HELD once, create one actual-amount PaymentGroup Refund, move every Order to REFUND_REQUESTED, stop
 -> If actual deposit time is within the deadline and every guard passes, consume every HELD reservation exactly once
 -> onHandQuantity and reservedQuantity decrease
--> Continue to the portal fulfillment request
+-> Move every Order to SUPPLIER_ORDER_PENDING; B-102 creates or routes no Fulfillment
+-> Planned B-103 later creates the portal fulfillment request or KEEP COREABLE_MANUAL fallback from this paid state
 -> First reason priority: if current saleability/contract or inventory mode changed, release HELD once and use SALE_UNAVAILABLE_AT_DEPOSIT even when the timestamp is also late
 -> Otherwise, if actual deposit time is after the deadline even though scheduler has not expired the group, release HELD once and use LATE_DEPOSIT_EXCEPTION
 
@@ -116,7 +117,7 @@ Admin finds a deposit after expiry
 -> Actual amount differs from PaymentGroup total: do not reacquire stock; create the same single PaymentGroup Refund and stop
 -> If the actual deposit time was within the original deadline, recheck current saleability and immutable mode snapshots, then reacquire every TRACKED quantity atomically
 -> Current saleability or mode mismatch: rollback tentative stock and use SALE_UNAVAILABLE_AT_DEPOSIT
--> Reacquisition succeeds: approve deposit and continue
+-> Reacquisition succeeds: approve deposit and move every Order to SUPPLIER_ORDER_PENDING; B-103 owns later Fulfillment routing
 -> Reacquisition fails after saleability passes: record received BANK_TRANSFER Payment once and LATE_DEPOSIT_EXCEPTION evidence, no supplier exposure
 -> Actual deposit time was after the deadline: record received Payment and PAYMENT_EXCEPTION evidence once without reacquisition
 -> The same command creates one reason-matched SALE_UNAVAILABLE_AT_DEPOSIT or LATE_DEPOSIT_EXCEPTION Refund per delivery-group Order
@@ -130,7 +131,7 @@ Admin finds a deposit after expiry
 
 Supplier inventory PUT은 immutable subject option id, nullable live Option FK, unique `(subjectOptionId, idempotencyKey)`와 product/option path를 묶은 request hash를 사용한다. 동일 retry는 허용된 미제출 DRAFT Option 삭제 뒤에도 최초 canonical inventory projection을 반환하고 다른 path/payload의 key 재사용은 거절한다. 성공은 before/after 수량·모드·availability와 reserved snapshot을 append-only history에 남기며, checkout reservation 변화는 OrderItem 증적을 canonical로 유지한다.
 
-Checkout은 영향받는 Supplier, Product, 모든 ProductOption을 각 id 순서로 잠그며 UNTRACKED-only checkout도 생략하지 않는다. 만료와 정상·늦은 입금은 공유 전역 순서 `PaymentGroup -> Supplier(id) -> Product(id) -> ProductOption(id, UNTRACKED 포함) -> Order/Fulfillment(id)`를 따른다. lifecycle-only 명령은 Supplier 뒤 Fulfillment만 잠그고 Product/Option을 잡지 않는다. Catalog/inventory saleability writer는 필요한 Supplier 뒤 Product -> Option 순서를 사용하고 Product를 잡은 뒤 Supplier를 역순으로 획득하지 않는다. 입금 처리는 잠금 아래 거래 상태, portal-origin item에 한정한 time-valid contract, portal/manager, 상품·옵션·compliance·availability와 immutable mode snapshot을 다시 검사한 뒤 routing 또는 reason별 exception을 결정한다. Duplicate scheduler/admin 요청은 inventory를 두 번 소비·해제하지 않는다.
+Checkout은 영향받는 Supplier, Product, 모든 ProductOption을 각 id 순서로 잠그며 UNTRACKED-only checkout도 생략하지 않는다. 만료와 정상·늦은 입금은 공유 전역 순서 `PaymentGroup -> Supplier(id) -> Product(id) -> ProductOption(id, UNTRACKED 포함) -> Order/Fulfillment(id)`를 따른다. lifecycle-only 명령은 Supplier 뒤 Fulfillment만 잠그고 Product/Option을 잡지 않는다. Catalog/inventory saleability writer는 필요한 Supplier 뒤 Product -> Option 순서를 사용하고 Product를 잡은 뒤 Supplier를 역순으로 획득하지 않는다. 입금 처리는 잠금 아래 거래 상태, portal-origin item에 한정한 time-valid contract, 상품·옵션·compliance·availability, immutable supplier/mode snapshot을 다시 검사한 뒤 reason별 승인 또는 exception을 결정한다. Portal/manager 가용성에 따른 fulfillment routing은 B-103이 맡는다. Duplicate scheduler/admin 요청은 inventory를 두 번 소비·해제하지 않는다.
 
 ### Immediate Portal Fulfillment — Planned (`B-103`)
 
@@ -312,7 +313,7 @@ Order status: PAYMENT_PENDING
 -> Order is not shown in customer order history
 ```
 
-The block above is the current B-068 behavior. After the B-102 admin-web cutover, memo-only order mutations end: no receipt uses unpaid cancellation, an unattributed bank transaction stays outside Order mutation until matched, and an identified positive amount mismatch follows this flow:
+The block above is the historical B-068 behavior. B-102 ended new memo-only order mutations: no receipt uses unpaid cancellation, an unattributed bank transaction stays outside Order mutation until matched, and an identified positive amount mismatch follows this flow:
 
 ```text
 PaymentGroup status: PAYMENT_PENDING, EXPIRED, or qualifying unpaid CANCELLED
@@ -527,8 +528,8 @@ Admin detects wrong operational state or shipment information
 
 - `PAYMENT_PENDING` orders are not real confirmed orders.
 - Current legacy bank-transfer `PAYMENT_PENDING` orders have a 24-hour deposit deadline and require admin unpaid cancellation if not paid.
-- Planned portal `TRACKED` checkout reservations expire automatically after 24 hours and release `HELD` quantities exactly once.
-- Planned B-102 amount mismatch is a portal/legacy PaymentGroup exception: it takes priority over saleability, deadline and stock, returns the exact actual receipt through one group Refund, and never resumes fulfillment.
+- Portal `TRACKED` checkout reservations expire automatically after 24 hours and release `HELD` quantities exactly once. Legacy COREABLE/UNTRACKED checkouts are not auto-expired by this reservation scheduler.
+- B-102 amount mismatch is a portal/legacy PaymentGroup exception: it takes priority over saleability, deadline and stock, returns the exact actual receipt through one group Refund, and never resumes fulfillment.
 - A qualifying unpaid-cancelled exact receipt is also terminal for portal and legacy groups: it uses one `LATE_DEPOSIT_EXCEPTION` Refund per immutable delivery-group Order amount, never reacquires or revives fulfillment, and requires a new checkout after the full receipt is returned.
 - A deposit found after portal expiry is approved only when its actual time was inside the original deadline, every current saleability/contract/mode guard passes, and every tracked quantity is reacquired atomically. If saleability/contract/mode fails it records `SALE_UNAVAILABLE_AT_DEPOSIT` even when another condition also fails; only after those guards pass does a late timestamp or stock failure use `LATE_DEPOSIT_EXCEPTION`. The command records `PAYMENT_EXCEPTION` evidence and one reason-matched Refund per delivery-group Order, which becomes `REFUND_REQUESTED` without supplier exposure or normal-flow resume.
 - Checkout policy confirmation is recorded per payment group with policy versions and confirmation time.
@@ -559,7 +560,7 @@ Admin detects wrong operational state or shipment information
 - Supplier order work should start on the same business day or next business day after payment confirmation.
 - Supplier response or expected ship date should be secured within 1 business day after supplier order.
 - Customer delay notice is required when expected shipment remains unclear for 2 business days after supplier order.
-- Customer direct cancellation is allowed only for `COREABLE_MANUAL`/`DOMEGGOOK_API` orders whose status is `SUPPLIER_ORDER_PENDING` and whose supplier work/address lock has not started. `SUPPLIER_PORTAL` orders are address-locked at deposit confirmation and always use the Claim path.
+- Customer direct cancellation is allowed only for `COREABLE_MANUAL`/`DOMEGGOOK_API` orders whose status is `SUPPLIER_ORDER_PENDING` and whose supplier work/address lock has not started. Planned B-103 `SUPPLIER_PORTAL` orders are address-locked when deposit-confirmed work is exposed to the supplier and then always use the Claim path.
 - After supplier order work starts, cancellation is handled as a claim with admin manual review.
 - After delivery, return and exchange are handled as claims with admin manual review.
 - Simple change-of-mind return/exchange request window is 7 days from delivery completion; portal delivery completion is `max(non-voided Shipment.deliveredAt)`.

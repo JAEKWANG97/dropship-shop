@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -128,12 +129,18 @@ class AdminOrderController {
 
 	@PostMapping("/{orderId}/confirm-deposit")
 	@ResponseStatus(HttpStatus.OK)
-	AdminOrderDtos.AdminOrderActionResponse confirmDeposit(
+	AdminOrderDtos.BankTransferPaymentCommandResponse confirmDeposit(
 		@PathVariable UUID orderId,
 		@Valid @RequestBody AdminOrderDtos.BankTransferDepositConfirmRequest request,
+		@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 		Authentication authentication
 	) {
-		return adminOrderPaymentService.confirmBankTransferDeposit(orderId, currentUser.id(authentication), request);
+		return adminOrderPaymentService.confirmBankTransferDeposit(
+			orderId,
+			currentUser.id(authentication),
+			idempotencyKey,
+			request
+		);
 	}
 
 	@PostMapping("/{orderId}/unpaid-cancel")
@@ -148,12 +155,34 @@ class AdminOrderController {
 
 	@PostMapping("/{orderId}/deposit-mismatch")
 	@ResponseStatus(HttpStatus.OK)
-	AdminOrderDtos.AdminOrderActionResponse recordDepositMismatch(
+	AdminOrderDtos.BankTransferPaymentCommandResponse recordDepositMismatch(
 		@PathVariable UUID orderId,
 		@Valid @RequestBody AdminOrderDtos.BankTransferDepositMismatchRequest request,
+		@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 		Authentication authentication
 	) {
-		return adminOrderPaymentService.recordBankTransferDepositMismatch(orderId, currentUser.id(authentication), request);
+		return adminOrderPaymentService.recordBankTransferDepositMismatch(
+			orderId,
+			currentUser.id(authentication),
+			idempotencyKey,
+			request
+		);
+	}
+
+	@PostMapping("/{orderId}/late-deposit")
+	@ResponseStatus(HttpStatus.OK)
+	AdminOrderDtos.BankTransferPaymentCommandResponse recordLateDeposit(
+		@PathVariable UUID orderId,
+		@Valid @RequestBody AdminOrderDtos.BankTransferLateDepositRequest request,
+		@RequestHeader(name = "Idempotency-Key") String idempotencyKey,
+		Authentication authentication
+	) {
+		return adminOrderPaymentService.recordLateBankTransferDeposit(
+			orderId,
+			currentUser.id(authentication),
+			idempotencyKey,
+			request
+		);
 	}
 
 	@PostMapping("/{orderId}/supplier-order/validate")

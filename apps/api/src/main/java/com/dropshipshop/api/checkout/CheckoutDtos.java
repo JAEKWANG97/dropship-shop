@@ -50,6 +50,9 @@ final class CheckoutDtos {
 		PaymentGroupStatus status,
 		long totalAmount,
 		long refundableAmount,
+		String customerDisplayStatus,
+		String customerDisplayLabel,
+		Long refundAmount,
 		Instant expiresAt,
 		Instant policyConfirmedAt,
 		BankTransferDepositResponse bankTransferDeposit,
@@ -100,6 +103,9 @@ final class CheckoutDtos {
 		long shippingFee,
 		long discountAmount,
 		long totalAmount,
+		String customerDisplayStatus,
+		String customerDisplayLabel,
+		Long refundAmount,
 		List<OrderItemResponse> items
 	) {
 	}

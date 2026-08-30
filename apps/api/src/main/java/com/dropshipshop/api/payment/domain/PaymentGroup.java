@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.user.domain.UserAccount;
+import com.dropshipshop.api.refund.domain.RefundReason;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -177,8 +178,51 @@ public class PaymentGroup {
 		String reason,
 		Instant confirmedAt
 	) {
-		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
-			throw new IllegalStateException("Deposit can be confirmed only while payment is pending");
+		confirmBankTransferDepositFrom(
+			PaymentGroupStatus.PAYMENT_PENDING,
+			adminUserId,
+			actualDepositorName,
+			actualDepositAmount,
+			depositReceivedAt,
+			depositTransactionReference,
+			reason,
+			confirmedAt
+		);
+	}
+
+	public void confirmLateBankTransferDeposit(
+		UUID adminUserId,
+		String actualDepositorName,
+		long actualDepositAmount,
+		Instant depositReceivedAt,
+		String depositTransactionReference,
+		String reason,
+		Instant confirmedAt
+	) {
+		confirmBankTransferDepositFrom(
+			PaymentGroupStatus.EXPIRED,
+			adminUserId,
+			actualDepositorName,
+			actualDepositAmount,
+			depositReceivedAt,
+			depositTransactionReference,
+			reason,
+			confirmedAt
+		);
+	}
+
+	private void confirmBankTransferDepositFrom(
+		PaymentGroupStatus requiredStatus,
+		UUID adminUserId,
+		String actualDepositorName,
+		long actualDepositAmount,
+		Instant depositReceivedAt,
+		String depositTransactionReference,
+		String reason,
+		Instant confirmedAt
+	) {
+		if (status != requiredStatus) {
+			throw new IllegalStateException("Deposit cannot be confirmed from the current payment state");
 		}
 		if (actualDepositAmount != totalAmount) {
 			throw new IllegalArgumentException("Actual deposit amount must match the checkout total");
@@ -198,6 +242,42 @@ public class PaymentGroup {
 		this.depositConfirmationReason = reason.trim();
 	}
 
+	public void recordReceivedPaymentException(
+		UUID adminUserId,
+		String actualDepositorName,
+		long actualDepositAmount,
+		Instant depositReceivedAt,
+		String depositTransactionReference,
+		String reason,
+		Instant recordedAt
+	) {
+		if (status != PaymentGroupStatus.PAYMENT_PENDING
+			&& status != PaymentGroupStatus.EXPIRED
+			&& status != PaymentGroupStatus.CANCELLED) {
+			throw new IllegalStateException("Received payment exception cannot be recorded from the current payment state");
+		}
+		MoneyMath.requirePositive(actualDepositAmount, "actualDepositAmount");
+		if (depositReceivedAt.isAfter(recordedAt)) {
+			throw new IllegalArgumentException("Deposit received time cannot be in the future");
+		}
+		this.status = PaymentGroupStatus.PAYMENT_EXCEPTION;
+		this.approvedAmount = null;
+		this.approvedAt = null;
+		this.refundableAmount = actualDepositAmount;
+		this.actualDepositorName = actualDepositorName.trim();
+		this.actualDepositAmount = actualDepositAmount;
+		this.depositReceivedAt = depositReceivedAt;
+		this.depositTransactionReference = depositTransactionReference.trim();
+		this.depositConfirmedByAdminId = adminUserId;
+		this.depositConfirmedAt = recordedAt;
+		this.depositConfirmationReason = reason.trim();
+		if (actualDepositAmount != totalAmount) {
+			this.depositMismatchMemo = reason.trim();
+			this.depositMismatchRecordedByAdminId = adminUserId;
+			this.depositMismatchRecordedAt = recordedAt;
+		}
+	}
+
 	public void markPaymentException() {
 		this.status = PaymentGroupStatus.PAYMENT_EXCEPTION;
 	}
@@ -211,15 +291,6 @@ public class PaymentGroup {
 		this.unpaidCancelledByAdminId = adminUserId;
 		this.unpaidCancelledAt = cancelledAt;
 		this.unpaidCancelReason = reason;
-	}
-
-	public void recordDepositMismatch(UUID adminUserId, String memo, Instant recordedAt) {
-		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
-			throw new IllegalStateException("Deposit mismatch can be recorded only while payment is pending");
-		}
-		this.depositMismatchMemo = memo;
-		this.depositMismatchRecordedByAdminId = adminUserId;
-		this.depositMismatchRecordedAt = recordedAt;
 	}
 
 	public void markCancelled() {
@@ -248,8 +319,29 @@ public class PaymentGroup {
 		this.status = refundableAmount == 0 ? PaymentGroupStatus.REFUNDED : PaymentGroupStatus.PARTIALLY_REFUNDED;
 	}
 
-	public void expire() {
+	public void applyReceivedPaymentExceptionRefund(long refundAmount, RefundReason reason) {
+		if (reason != RefundReason.PAYMENT_AMOUNT_MISMATCH
+			&& reason != RefundReason.LATE_DEPOSIT_EXCEPTION
+			&& reason != RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT) {
+			throw new IllegalArgumentException("Refund reason is not a received-payment exception");
+		}
+		if (status != PaymentGroupStatus.PAYMENT_EXCEPTION
+			&& status != PaymentGroupStatus.PARTIALLY_REFUNDED) {
+			throw new IllegalStateException("Payment group has no refundable received-payment exception");
+		}
+		if (refundAmount <= 0 || refundAmount > refundableAmount) {
+			throw new IllegalArgumentException("Refund amount exceeds refundable amount");
+		}
+		this.refundableAmount = MoneyMath.subtractNonNegative(refundableAmount, refundAmount);
+		this.status = refundableAmount == 0 ? PaymentGroupStatus.REFUNDED : PaymentGroupStatus.PARTIALLY_REFUNDED;
+	}
+
+	public boolean expire() {
+		if (status != PaymentGroupStatus.PAYMENT_PENDING) {
+			return false;
+		}
 		this.status = PaymentGroupStatus.EXPIRED;
+		return true;
 	}
 
 	public UUID getId() {

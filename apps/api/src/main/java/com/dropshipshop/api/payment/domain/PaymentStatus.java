@@ -3,6 +3,7 @@ package com.dropshipshop.api.payment.domain;
 public enum PaymentStatus {
 	READY,
 	APPROVED,
+	PAYMENT_EXCEPTION,
 	FAILED,
 	CANCEL_REQUIRED,
 	CANCEL_REQUESTED,

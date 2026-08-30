@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.InventoryMode;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
 import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
@@ -21,6 +22,7 @@ import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
+import com.dropshipshop.api.catalog.domain.SupplierAvailability;
 import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
 
 class ProductSaleabilityTest {
@@ -96,10 +98,9 @@ class ProductSaleabilityTest {
 			ProductReviewStatus.APPROVED
 		);
 
-		assertThat(saleability.isSellable(
-			product,
-			new ProductOption(product, "active", 0, ProductOptionStatus.ACTIVE)
-		)).isTrue();
+		ProductOption active = new ProductOption(product, "active", 0, ProductOptionStatus.ACTIVE);
+		active.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 2L);
+		assertThat(saleability.isSellable(product, active)).isTrue();
 		assertThat(saleability.isSellable(
 			product,
 			new ProductOption(product, "sold out", 0, ProductOptionStatus.SOLD_OUT)
@@ -108,6 +109,23 @@ class ProductSaleabilityTest {
 			product,
 			new ProductOption(product, "stopped", 0, ProductOptionStatus.STOPPED)
 		)).isFalse();
+	}
+
+	@Test
+	void trackedSaleabilityUsesRequestedQuantityAndSupplierAvailability() {
+		when(featureGate.isEnabled()).thenReturn(true);
+		Product product = approvedPortalProduct(
+			supplierWithContract(NOW.minusSeconds(60), NOW.plusSeconds(60)),
+			ProductReviewStatus.APPROVED
+		);
+		ProductOption option = new ProductOption(product, "tracked", 0, ProductOptionStatus.ACTIVE);
+		option.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 3L);
+
+		assertThat(saleability.isSellable(product, option, 3)).isTrue();
+		assertThat(saleability.isSellable(product, option, 4)).isFalse();
+
+		option.updateInventory(SupplierAvailability.UNAVAILABLE, InventoryMode.TRACKED, 3L);
+		assertThat(saleability.isSellable(product, option, 1)).isFalse();
 	}
 
 	private Product approvedPortalProduct(Supplier supplier, ProductReviewStatus reviewStatus) {

@@ -4,23 +4,46 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ApiError, apiSendWithCookie } from "@/lib/api";
+import {
+  ADMIN_DEPOSIT_PATHS,
+  ADMIN_REFUND_PATHS,
+  adminDepositCommand,
+  idempotencyHeaders,
+  koreanLocalDateTime,
+  refundApprovalCommand,
+} from "@/lib/admin-payment";
 
 function value(formData: FormData, name: string) {
   const raw = formData.get(name);
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-function done(orderId: string, message: string) {
-  redirect(`/admin/orders?orderId=${encodeURIComponent(orderId)}&message=${encodeURIComponent(message)}`);
+function done(orderId: string, message: string, retryAction?: string, idempotencyKey?: string) {
+  const search = new URLSearchParams({ orderId, message });
+  if (retryAction && idempotencyKey) {
+    search.set("retryAction", retryAction);
+    search.set("idempotencyKey", idempotencyKey);
+  }
+  redirect(`/admin/orders?${search.toString()}`);
 }
 
 function failureMessage(error: unknown, fallback: string) {
   return error instanceof ApiError && error.message.trim() ? error.message : fallback;
 }
 
-async function postOrderAction(orderId: string, path: string, body: Record<string, string | number>) {
+function uncertainCommandKey(error: unknown, idempotencyKey: string) {
+  return !(error instanceof ApiError) || error.status >= 500 ? idempotencyKey : undefined;
+}
+
+async function postOrderAction(
+  orderId: string,
+  path: string,
+  body: Record<string, string | number>,
+  idempotencyKey?: string,
+) {
   await apiSendWithCookie(`/api/admin/orders/${orderId}${path}`, (await cookies()).toString(), {
     method: "POST",
+    headers: idempotencyHeaders(idempotencyKey ?? ""),
     body: JSON.stringify(body),
   });
 }
@@ -32,15 +55,17 @@ async function postShipmentAction(shipmentId: string, path: string, body: Record
   });
 }
 
-async function postRefundAction(refundId: string, path: string, body: Record<string, string | number>) {
+async function postRefundAction(
+  refundId: string,
+  path: string,
+  body: Record<string, string | number>,
+  idempotencyKey?: string,
+) {
   await apiSendWithCookie(`/api/admin/refunds/${refundId}${path}`, (await cookies()).toString(), {
     method: "POST",
+    headers: idempotencyHeaders(idempotencyKey ?? ""),
     body: JSON.stringify(body),
   });
-}
-
-function koreanLocalDateTime(value: string) {
-  return value ? `${value}:00+09:00` : "";
 }
 
 async function postClaimAction(claimId: string, path: string, body: Record<string, string>) {
@@ -145,17 +170,17 @@ export async function correctShipmentDelivered(formData: FormData) {
 
 export async function confirmDeposit(formData: FormData) {
   const orderId = value(formData, "orderId");
+  const idempotencyKey = value(formData, "idempotencyKey");
 
   try {
-    await postOrderAction(orderId, "/confirm-deposit", {
-      actualDepositorName: value(formData, "actualDepositorName"),
-      actualAmount: Number(value(formData, "actualAmount")),
-      depositedAt: koreanLocalDateTime(value(formData, "depositedAt")),
-      transactionReference: value(formData, "transactionReference"),
-      reason: value(formData, "reason"),
-    });
+    await postOrderAction(orderId, ADMIN_DEPOSIT_PATHS.confirm, adminDepositCommand(formData), idempotencyKey);
   } catch (error) {
-    done(orderId, failureMessage(error, "입금 확인 처리에 실패했습니다."));
+    done(
+      orderId,
+      failureMessage(error, "입금 확인 처리에 실패했습니다."),
+      "confirm-deposit",
+      uncertainCommandKey(error, idempotencyKey),
+    );
   }
 
   revalidatePath("/admin/orders");
@@ -177,15 +202,40 @@ export async function cancelUnpaidDeposit(formData: FormData) {
 
 export async function recordDepositMismatch(formData: FormData) {
   const orderId = value(formData, "orderId");
+  const idempotencyKey = value(formData, "idempotencyKey");
 
   try {
-    await postOrderAction(orderId, "/deposit-mismatch", { memo: value(formData, "memo") });
+    await postOrderAction(orderId, ADMIN_DEPOSIT_PATHS.mismatch, adminDepositCommand(formData), idempotencyKey);
   } catch (error) {
-    done(orderId, failureMessage(error, "입금 불일치 메모 저장에 실패했습니다."));
+    done(
+      orderId,
+      failureMessage(error, "입금 불일치 처리에 실패했습니다."),
+      "deposit-mismatch",
+      uncertainCommandKey(error, idempotencyKey),
+    );
   }
 
   revalidatePath("/admin/orders");
-  done(orderId, "입금 불일치 메모를 저장했습니다.");
+  done(orderId, "입금 불일치와 결제그룹 환불 요청을 기록했습니다.");
+}
+
+export async function recordLateDeposit(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+
+  try {
+    await postOrderAction(orderId, ADMIN_DEPOSIT_PATHS.late, adminDepositCommand(formData), idempotencyKey);
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "뒤늦은 입금 처리에 실패했습니다."),
+      "late-deposit",
+      uncertainCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "뒤늦게 확인한 입금을 처리했습니다.");
 }
 
 export async function validateSupplierPurchase(formData: FormData) {
@@ -235,22 +285,43 @@ export async function cancelSupplierPurchase(formData: FormData) {
 export async function completeManualRefund(formData: FormData) {
   const orderId = value(formData, "orderId");
   const refundId = value(formData, "refundId");
+  const idempotencyKey = value(formData, "idempotencyKey");
 
   try {
-    await postRefundAction(refundId, "/manual-complete", {
+    await postRefundAction(refundId, ADMIN_REFUND_PATHS.manualComplete, {
+      transferredAmount: Number(value(formData, "transferredAmount")),
       reason: value(formData, "reason"),
       bankName: value(formData, "bankName"),
       accountNumber: value(formData, "accountNumber"),
       accountHolder: value(formData, "accountHolder"),
 		transferredAt: koreanLocalDateTime(value(formData, "transferredAt")),
 		transactionReference: value(formData, "transactionReference"),
-    });
+    }, idempotencyKey);
   } catch (error) {
-    done(orderId, failureMessage(error, "수동 환불 완료 처리에 실패했습니다."));
+    done(
+      orderId,
+      failureMessage(error, "수동 환불 완료 처리에 실패했습니다."),
+      `manual-refund-${refundId}`,
+      uncertainCommandKey(error, idempotencyKey),
+    );
   }
 
   revalidatePath("/admin/orders");
   done(orderId, "수동 환불 완료를 기록했습니다.");
+}
+
+export async function approveRefund(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const refundId = value(formData, "refundId");
+
+  try {
+    await postRefundAction(refundId, ADMIN_REFUND_PATHS.approve, refundApprovalCommand(formData));
+  } catch (error) {
+    done(orderId, failureMessage(error, "환불 승인 처리에 실패했습니다."));
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "환불 요청을 승인했습니다. 실제 이체 후 수동 환불 완료를 기록하세요.");
 }
 
 export async function recordReturnReceived(formData: FormData) {

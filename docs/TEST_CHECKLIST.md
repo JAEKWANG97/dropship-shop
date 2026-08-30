@@ -18,6 +18,15 @@
 - [x] 정책·404·권한 없음·판매 중단 상태
 - [x] Desktop/Mobile 핵심 snapshot
 
+### B-102 Supplier Inventory And Reservation
+
+- [x] TRACKED/UNTRACKED 재고 불변식, option-local version conflict, idempotent replay와 삭제 후 audit 보존
+- [x] 24시간 예약·소비·해제, 복수 배송그룹, 부족 재고와 checkout/취소 경합
+- [x] normal/late/mismatch 입금 명령 replay와 판매 불가·만료·미입금 취소 후 전액 환불 경계
+- [x] 고객 응답 증적 비노출, 공급처 결제/환불 404·무알림, 관리자 full evidence·scope identifier
+- [x] PostgreSQL V41 fresh/upgrade/preflight/default/FK·lock smoke와 H2 전체 회귀
+- [x] 재고 409 후 입력 보존·이미지 중복 방지, 환불 승인/수동 완료, 만료/취소 주문 탐색 Web 계약
+
 ## Production Read-Only
 
 - [x] 홈페이지·상품 목록·상품 상세·정책·회사·고객문의 접근

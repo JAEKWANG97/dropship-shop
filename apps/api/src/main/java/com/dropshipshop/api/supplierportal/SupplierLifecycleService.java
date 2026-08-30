@@ -48,6 +48,7 @@ public class SupplierLifecycleService {
 	private final SupplierPortalFeatureGate featureGate;
 	private final SupplierPortalHasher hasher;
 	private final SupplierPortalInputPolicy inputPolicy;
+	private final SupplierContractTerminalService contractTerminalService;
 	private final ObjectMapper objectMapper;
 
 	SupplierLifecycleService(
@@ -62,6 +63,7 @@ public class SupplierLifecycleService {
 		SupplierPortalFeatureGate featureGate,
 		SupplierPortalHasher hasher,
 		SupplierPortalInputPolicy inputPolicy,
+		SupplierContractTerminalService contractTerminalService,
 		ObjectMapper objectMapper
 	) {
 		this.supplierRepository = supplierRepository;
@@ -75,6 +77,7 @@ public class SupplierLifecycleService {
 		this.featureGate = featureGate;
 		this.hasher = hasher;
 		this.inputPolicy = inputPolicy;
+		this.contractTerminalService = contractTerminalService;
 		this.objectMapper = objectMapper;
 	}
 
@@ -116,9 +119,7 @@ public class SupplierLifecycleService {
 		}
 		if (request.portalStatus() == SupplierPortalStatus.ACTIVE) {
 			featureGate.requireInvitationMutationReleased();
-			if (supplier.lazilyExpireContract(Instant.now())) {
-				revokeOpenInvite(supplier, adminId, null, Instant.now());
-				handOverOpenWork(supplier, adminId, FulfillmentHandoverReasonCode.CONTRACT_EXPIRED, reason, Instant.now());
+			if (contractTerminalService.expireIfOverdue(supplier, adminId, reason, Instant.now())) {
 				return CommandOutcome.contractMissing();
 			}
 			if (supplier.getManagerUserId() == null || userAccountRepository
@@ -201,9 +202,8 @@ public class SupplierLifecycleService {
 			return CommandOutcome.completed(replay);
 		}
 		Instant now = Instant.now();
-		if (request.status() == SupplierStatus.ACTIVE && supplier.lazilyExpireContract(now)) {
-			revokeOpenInvite(supplier, adminId, null, now);
-			handOverOpenWork(supplier, adminId, FulfillmentHandoverReasonCode.CONTRACT_EXPIRED, reason, now);
+		if (request.status() == SupplierStatus.ACTIVE
+			&& contractTerminalService.expireIfOverdue(supplier, adminId, reason, now)) {
 			return CommandOutcome.contractMissing();
 		}
 		SupplierPortalStatus beforePortal = supplier.getPortalStatus();

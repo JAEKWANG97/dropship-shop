@@ -9,6 +9,7 @@ import {
   isLocalTarget,
   requireAdminCookie,
   requireCustomerCookie,
+  requireSeedOrderByStatus,
 } from "./helpers";
 
 type AdminProductPage = {
@@ -351,25 +352,66 @@ test("admin order detail renders through selected order query", async ({ page, c
   await expectNoHorizontalOverflow(page);
 });
 
-test("admin order action refreshes detail after successful memo update", async ({ page, context }) => {
-  test.skip(!process.env.E2E_ADMIN_COOKIE, "Set E2E_ADMIN_COOKIE to run admin order action smoke.");
+test("admin order filters expose late-deposit terminal states", async ({ page, context }) => {
+  await addCookie(context, await requireAdminCookie());
+  await page.goto("/admin/orders");
 
-  await addCookie(context, process.env.E2E_ADMIN_COOKIE!);
-  await page.goto("/admin/orders?status=PAYMENT_PENDING");
-  const orderLink = await firstAdminOrderLink(page);
-  await orderLink.click();
+  const filterForm = page.locator("form.admin-filters");
+  const statusFilter = filterForm.locator('select[name="status"]');
+  await expect(statusFilter.locator('option[value="EXPIRED"]')).toHaveText("입금기한 만료");
+  await expect(statusFilter.locator('option[value="CANCELLED"]')).toHaveText("취소완료");
 
-  await expect(page.getByLabel("실제 입금자명")).toBeVisible();
-  await expect(page.getByLabel("실제 입금액")).toBeVisible();
-  await expect(page.getByLabel("입금시각")).toBeVisible();
-  await expect(page.getByLabel("거래 식별 메모").first()).toBeVisible();
+  await statusFilter.selectOption("EXPIRED");
+  await filterForm.getByRole("button", { name: "검색", exact: true }).click();
+  await expect(page).toHaveURL(/status=EXPIRED/);
+  await expect(statusFilter).toHaveValue("EXPIRED");
+  await expectNoHorizontalOverflow(page);
+});
 
-  const memo = `E2E 입금 불일치 메모 ${Date.now()}`;
-  await page.getByLabel("입금 불일치 메모").fill(memo);
-  await page.getByRole("button", { name: "메모 저장" }).click();
+test("admin deposit commands collect full evidence and preserve a retry key", async ({ page, context }) => {
+  const [adminCookie, order] = await Promise.all([
+    requireAdminCookie(),
+    requireSeedOrderByStatus("PAYMENT_PENDING"),
+  ]);
+  await addCookie(context, adminCookie);
+  await page.goto(`/admin/orders?orderId=${order.orderId}`);
 
-  await expect(page.locator(".notice").first()).toContainText("입금 불일치 메모를 저장했습니다.");
-  await expect(page.locator("body")).toContainText(memo);
+  const confirmForm = page.getByRole("button", { name: "입금 확인", exact: true }).locator("..");
+  const mismatchForm = page.getByRole("button", { name: "불일치 입금·환불 기록" }).locator("..");
+  for (const form of [confirmForm, mismatchForm]) {
+    await expect(form.locator('input[name="actualDepositorName"]')).toBeVisible();
+    await expect(form.locator('input[name="actualAmount"]')).toBeVisible();
+    await expect(form.locator('input[name="depositedAt"]')).toBeVisible();
+    await expect(form.locator('input[name="transactionReference"]')).toBeVisible();
+    await expect(form.locator('input[name="reason"]')).toBeVisible();
+    await expect(form.locator('input[name="idempotencyKey"]')).toHaveValue(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+  }
+  await expect(mismatchForm.locator('input[name="memo"]')).toHaveCount(0);
+
+  const retryKey = "1b6654c3-cdf2-4c90-bbbf-3f09a0a2183c";
+  await page.goto(`/admin/orders?orderId=${order.orderId}&retryAction=confirm-deposit&idempotencyKey=${retryKey}`);
+  await expect(
+    page.getByRole("button", { name: "입금 확인", exact: true })
+      .locator("..")
+      .locator('input[name="idempotencyKey"]'),
+  ).toHaveValue(retryKey);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("admin requested refunds require approval before manual completion", async ({ page, context }) => {
+  const [adminCookie, order] = await Promise.all([
+    requireAdminCookie(),
+    requireSeedOrderByStatus("OUT_OF_STOCK"),
+  ]);
+  await addCookie(context, adminCookie);
+  await page.goto(`/admin/orders?orderId=${order.orderId}`);
+
+  const approvalForm = page.getByRole("button", { name: "환불 승인", exact: true }).locator("..");
+  await expect(approvalForm.locator('input[name="refundId"]')).toHaveValue(/[0-9a-f-]{36}/i);
+  await expect(approvalForm.locator('input[name="reason"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "수동 환불 완료", exact: true })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 

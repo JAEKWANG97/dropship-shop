@@ -46,4 +46,15 @@ public interface FulfillmentRepository extends JpaRepository<Fulfillment, UUID> 
 		FulfillmentChannel channel,
 		FulfillmentOperationalOwner operationalOwner
 	);
+
+	boolean existsByOrder_PaymentGroup_Id(UUID paymentGroupId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select fulfillment
+		from Fulfillment fulfillment
+		where fulfillment.order.paymentGroup.id = :paymentGroupId
+		order by fulfillment.id
+		""")
+	List<Fulfillment> findAllByPaymentGroupIdForUpdate(@Param("paymentGroupId") UUID paymentGroupId);
 }

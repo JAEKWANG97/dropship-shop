@@ -7,9 +7,11 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import com.dropshipshop.api.catalog.domain.ProductCategory;
+import com.dropshipshop.api.catalog.domain.InventoryMode;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductReviewReasonCode;
+import com.dropshipshop.api.catalog.domain.SupplierAvailability;
 import com.dropshipshop.api.common.money.MoneyMath;
 
 import jakarta.validation.Valid;
@@ -83,6 +85,17 @@ final class SupplierProductDtos {
 		@Null Object onHandQuantity,
 		@Null Object reservedQuantity,
 		@Null Object supplierAvailability
+	) {
+	}
+
+	record InventoryUpdateRequest(
+		@NotNull @Min(0) Long expectedInventoryVersion,
+		@NotNull SupplierAvailability supplierAvailability,
+		@NotNull InventoryMode inventoryMode,
+		@Min(0) Long onHandQuantity,
+		@Null Object reservedQuantity,
+		@Null Object availableQuantity,
+		@Null Object inventoryVersion
 	) {
 	}
 
@@ -164,8 +177,28 @@ final class SupplierProductDtos {
 		@JsonInclude(JsonInclude.Include.NON_NULL) String sourceOptionCode,
 		long sourceAdditionalPrice,
 		int sortOrder,
-		boolean deletable
+		boolean deletable,
+		long inventoryVersion,
+		SupplierAvailability supplierAvailability,
+		InventoryMode inventoryMode,
+		Long onHandQuantity,
+		long reservedQuantity,
+		Long availableQuantity
 	) {
+	}
+
+	record InventoryResponse(
+		UUID optionId,
+		long inventoryVersion,
+		SupplierAvailability supplierAvailability,
+		InventoryMode inventoryMode,
+		Long onHandQuantity,
+		long reservedQuantity,
+		Long availableQuantity
+	) {
+	}
+
+	record InventoryConflictDetails(InventoryResponse currentInventory) {
 	}
 
 	record ImageResponse(

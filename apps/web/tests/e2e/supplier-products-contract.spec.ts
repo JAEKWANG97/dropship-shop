@@ -1,17 +1,43 @@
 import { expect, test } from "@playwright/test";
 import {
+  isProductPurchaseAvailable,
+  purchasableProductOptions,
+  type ProductDetail,
+} from "../../src/lib/catalog";
+import { customerOrderProjection, type OrderDetail } from "../../src/lib/orders";
+import { checkoutCustomerProjection, type Checkout } from "../../src/lib/checkout";
+import {
+  ADMIN_DEPOSIT_PATHS,
+  ADMIN_REFUND_PATHS,
+  adminDepositCommand,
+  adminRefundNextAction,
+  idempotencyHeaders,
+  refundApprovalCommand,
+  retryCommandKey,
+} from "../../src/lib/admin-payment";
+import { adminRefundProjection, type AdminOrder } from "../../src/lib/admin";
+import {
+  selectedFilesAfterInventoryError,
+  supplierProductAfterInventoryError,
+  supplierProductControlState,
+} from "../../src/app/supplier/(portal)/products/product-form";
+import {
   AdminReviewFacts,
   AdminReviewImages,
 } from "../../src/app/admin/product-reviews/[productId]/review-presentation";
 import {
   deleteSupplierImage,
   deleteSupplierOption,
+  inventoryActionError,
   isProductVersionError,
   normalizeAdminProductReview,
+  normalizeSupplierInventory,
   normalizeSupplierProduct,
   orderSupplierImages,
   productActionError,
   replaceSupplierDetailBlocks,
+  saveSupplierInventory,
+  saveSupplierOption,
   supplierDetailBlocksWithoutImage,
   supplierStatusView,
   SupplierProductApiError,
@@ -50,6 +76,160 @@ test("supplier product statuses expose only documented safe actions", () => {
     reviewMessage: "internal hold reason",
   });
   expect(paused).toMatchObject({ editable: false, editWarning: null, message: null });
+});
+
+test("rejected and paused products keep inventory controls independent from product editing", () => {
+  for (const status of ["REJECTED", "PAUSED_BY_COREABLE"] as const) {
+    const view = supplierStatusView({
+      supplierDisplayStatus: status,
+      nextAction: "CONTACT_COREABLE",
+      reviewReasonCode: status === "REJECTED" ? "REJECTED_POLICY" : null,
+      reviewMessage: null,
+    });
+    expect(view.editable).toBe(false);
+    expect(supplierProductControlState(view.editable, false)).toEqual({
+      productDisabled: true,
+      inventoryDisabled: false,
+    });
+  }
+  expect(supplierProductControlState(false, true)).toEqual({
+    productDisabled: true,
+    inventoryDisabled: true,
+  });
+});
+
+test("full save inventory conflict advances the version and does not repeat existing uploads", () => {
+  const product = normalizeSupplierProduct({
+    productId: "product-1",
+    version: 3,
+    name: "server name",
+    summary: "server summary",
+    options: [{ optionId: "option-1", name: "basic", inventoryVersion: 7 }],
+  });
+
+  expect(supplierProductAfterInventoryError(product, 5)).toEqual({ ...product, version: 5 });
+  expect(supplierProductAfterInventoryError(product)).toBe(product);
+  expect(supplierProductAfterInventoryError(null, 5)).toBeNull();
+
+  const selectedFiles = [{ name: "thumbnail.png" }, { name: "detail.png" }];
+  expect(selectedFilesAfterInventoryError(selectedFiles, true)).toEqual([]);
+  expect(selectedFilesAfterInventoryError(selectedFiles, false)).toBe(selectedFiles);
+});
+
+test("public purchase projection honors effective sold-out without inventory internals", () => {
+  const product = {
+    salesEnabled: true,
+    status: "ACTIVE",
+    purchasable: false,
+    options: [
+      { id: "option-1", name: "기본", additionalPrice: 0, status: "ACTIVE", purchasable: false },
+    ],
+  } as Pick<ProductDetail, "options" | "purchasable" | "salesEnabled" | "status">;
+
+  expect(purchasableProductOptions(product)).toEqual([]);
+  expect(isProductPurchaseAvailable(product)).toBe(false);
+  expect(product).not.toHaveProperty("inventoryMode");
+  expect(product.options[0]).not.toHaveProperty("onHandQuantity");
+  expect(product.options[0]).not.toHaveProperty("reservedQuantity");
+  expect(product.options[0]).not.toHaveProperty("availableQuantity");
+});
+
+test("customer payment exception projection exposes only refund-processing label and amount", () => {
+  const projection = customerOrderProjection({
+    status: "REFUND_REQUESTED",
+    customerDisplayStatus: "REFUND_PROCESSING",
+    customerDisplayLabel: "입금 확인 및 환불 처리 중",
+    refundAmount: 31_000,
+    paymentGroup: {},
+    refund: { status: null, amount: null },
+  } as unknown as OrderDetail);
+
+  expect(projection).toEqual({
+    status: "REFUND_PROCESSING",
+    label: "입금 확인 및 환불 처리 중",
+    refundAmount: 31_000,
+  });
+  expect(projection).not.toHaveProperty("actualDepositorName");
+  expect(projection).not.toHaveProperty("transactionReference");
+  expect(projection).not.toHaveProperty("reason");
+
+  const checkoutProjection = checkoutCustomerProjection({
+    status: "PAYMENT_EXCEPTION",
+    refundableAmount: 31_000,
+    customerDisplayStatus: "REFUND_PROCESSING",
+    customerDisplayLabel: "입금 확인 및 환불 처리 중",
+    refundAmount: 31_000,
+  } as Checkout);
+  expect(checkoutProjection).toEqual({
+    status: "REFUND_PROCESSING",
+    label: "입금 확인 및 환불 처리 중",
+    refundAmount: 31_000,
+  });
+});
+
+test("admin payment commands use dedicated paths, full evidence, and the same retry key", () => {
+  const formData = new FormData();
+  formData.set("actualDepositorName", " 입금자 ");
+  formData.set("actualAmount", "31000");
+  formData.set("depositedAt", "2026-08-29T10:30");
+  formData.set("transactionReference", " bank-reference ");
+  formData.set("reason", " 금액 불일치 확인 ");
+  formData.set("memo", "legacy memo must not be sent");
+
+  expect(ADMIN_DEPOSIT_PATHS).toEqual({
+    confirm: "/confirm-deposit",
+    mismatch: "/deposit-mismatch",
+    late: "/late-deposit",
+  });
+  expect(adminDepositCommand(formData)).toEqual({
+    actualDepositorName: "입금자",
+    actualAmount: 31_000,
+    depositedAt: "2026-08-29T10:30:00+09:00",
+    transactionReference: "bank-reference",
+    reason: "금액 불일치 확인",
+  });
+  expect(adminDepositCommand(formData)).not.toHaveProperty("memo");
+
+  const key = "1b6654c3-cdf2-4c90-bbbf-3f09a0a2183c";
+  expect(idempotencyHeaders(key)).toEqual({ "Idempotency-Key": key });
+  expect(retryCommandKey({ action: "late-deposit", key }, "late-deposit")).toBe(key);
+  expect(retryCommandKey({ action: "deposit-mismatch", key }, "late-deposit")).toBeNull();
+  expect(retryCommandKey({ action: "late-deposit", key: "not-a-uuid" }, "late-deposit")).toBeNull();
+});
+
+test("admin group refund projection uses payment-group identifiers without an anchor order", () => {
+  const refund = {
+    refundId: "refund-1",
+    orderId: null,
+    orderNumber: null,
+    paymentGroupId: "payment-group-1",
+    appliedOrderIds: ["order-1", "order-2"],
+    refundScope: "PAYMENT_GROUP",
+    status: "REQUESTED",
+    refundAmount: 31_000,
+    failureMessage: null,
+  } satisfies NonNullable<AdminOrder["refund"]>;
+
+  expect(adminRefundProjection(refund)).toEqual({
+    scopeLabel: "결제그룹 전체",
+    paymentGroupId: "payment-group-1",
+    appliedOrderIds: ["order-1", "order-2"],
+    refundAmount: 31_000,
+  });
+});
+
+test("requested admin refunds require approval before manual completion", () => {
+  const formData = new FormData();
+  formData.set("reason", " 입금 증적과 환불 금액 확인 ");
+
+  expect(ADMIN_REFUND_PATHS).toEqual({
+    approve: "/approve",
+    manualComplete: "/manual-complete",
+  });
+  expect(refundApprovalCommand(formData)).toEqual({ reason: "입금 증적과 환불 금액 확인" });
+  expect(adminRefundNextAction("REQUESTED")).toBe("APPROVE");
+  expect(adminRefundNextAction("APPROVED")).toBe("MANUAL_COMPLETE");
+  expect(adminRefundNextAction("COMPLETED")).toBeNull();
 });
 
 test("unknown or mismatched statuses fail closed without echoing server values", () => {
@@ -105,6 +285,182 @@ test("response normalization never defaults unknown state to editable and keeps 
   expect(supplierStatusView(product).editable).toBe(false);
   expect(product.images.map((image) => image.deletable)).toEqual([false, true]);
   expect(product.options.map((option) => option.deletable)).toEqual([false, true]);
+});
+
+test("supplier inventory keeps option-local versions and canonical tracked or untracked values", () => {
+  expect(normalizeSupplierInventory({
+    optionId: "option-1",
+    inventoryVersion: 4,
+    supplierAvailability: "AVAILABLE",
+    inventoryMode: "TRACKED",
+    onHandQuantity: 12,
+    reservedQuantity: 3,
+    availableQuantity: 9,
+  })).toEqual({
+    optionId: "option-1",
+    inventoryVersion: 4,
+    supplierAvailability: "AVAILABLE",
+    inventoryMode: "TRACKED",
+    onHandQuantity: 12,
+    reservedQuantity: 3,
+    availableQuantity: 9,
+  });
+
+  expect(normalizeSupplierInventory({
+    optionId: "option-2",
+    inventoryVersion: 7,
+    supplierAvailability: "AVAILABLE",
+    inventoryMode: "UNTRACKED",
+    onHandQuantity: 999,
+    reservedQuantity: 999,
+    availableQuantity: 999,
+  })).toEqual({
+    optionId: "option-2",
+    inventoryVersion: 7,
+    supplierAvailability: "AVAILABLE",
+    inventoryMode: "UNTRACKED",
+    onHandQuantity: null,
+    reservedQuantity: 0,
+    availableQuantity: null,
+  });
+});
+
+test("inventory PUT sends only supplier inputs with a stable command key", async () => {
+  const originalFetch = globalThis.fetch;
+  let call: { path: string; init?: RequestInit } | null = null;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    call = { path: String(input), init };
+    return new Response(JSON.stringify({
+      optionId: "option-1",
+      inventoryVersion: 6,
+      supplierAvailability: "AVAILABLE",
+      inventoryMode: "TRACKED",
+      onHandQuantity: 20,
+      reservedQuantity: 4,
+      availableQuantity: 16,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    await expect(saveSupplierInventory("product-1", "option-1", {
+      inventoryVersion: 5,
+      supplierAvailability: "AVAILABLE",
+      inventoryMode: "TRACKED",
+      onHandQuantity: 20,
+    }, "inventory-command-1")).resolves.toMatchObject({ inventoryVersion: 6, availableQuantity: 16 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  expect(call).not.toBeNull();
+  const request = call!;
+  expect(request.path).toBe("/api/supplier/products/product-1/options/option-1/inventory");
+  expect(request.init?.method).toBe("PUT");
+  expect(new Headers(request.init?.headers).get("Idempotency-Key")).toBe("inventory-command-1");
+  expect(JSON.parse(String(request.init?.body))).toEqual({
+    expectedInventoryVersion: 5,
+    supplierAvailability: "AVAILABLE",
+    inventoryMode: "TRACKED",
+    onHandQuantity: 20,
+  });
+  expect(JSON.parse(String(request.init?.body))).not.toHaveProperty("reservedQuantity");
+  expect(JSON.parse(String(request.init?.body))).not.toHaveProperty("availableQuantity");
+});
+
+test("inventory conflict exposes the canonical server projection for recovery", async () => {
+  const originalFetch = globalThis.fetch;
+  let conflict: unknown;
+  globalThis.fetch = (async () => new Response(JSON.stringify({
+    code: "INVENTORY_CONFLICT",
+    details: {
+      currentInventory: {
+        optionId: "option-1",
+        inventoryVersion: 8,
+        supplierAvailability: "UNAVAILABLE",
+        inventoryMode: "UNTRACKED",
+        onHandQuantity: null,
+        reservedQuantity: 0,
+        availableQuantity: null,
+      },
+    },
+  }), { status: 409, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+  try {
+    await saveSupplierInventory("product-1", "option-1", {
+      inventoryVersion: 7,
+      supplierAvailability: "AVAILABLE",
+      inventoryMode: "TRACKED",
+      onHandQuantity: 10,
+    }, "inventory-command-2");
+  } catch (error) {
+    conflict = error;
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  expect(conflict).toMatchObject({
+    status: 409,
+    code: "INVENTORY_CONFLICT",
+    currentInventory: {
+      optionId: "option-1",
+      inventoryVersion: 8,
+      supplierAvailability: "UNAVAILABLE",
+      inventoryMode: "UNTRACKED",
+      onHandQuantity: null,
+      reservedQuantity: 0,
+      availableQuantity: null,
+    },
+  });
+  expect(inventoryActionError(conflict)).toContain("최신 값으로 새로고침");
+});
+
+test("new option mutation returns the created option id before inventory save", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody: unknown;
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBody = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({
+      productId: "product-1",
+      version: 4,
+      supplierDisplayStatus: "EDITING",
+      nextAction: "EDIT_AND_RESUBMIT",
+      options: [{
+        optionId: "new-option-id",
+        name: "대형",
+        sourceOptionCode: "L",
+        sourceAdditionalPrice: 1000,
+        sortOrder: 1,
+        deletable: true,
+        inventoryVersion: 0,
+        supplierAvailability: "UNAVAILABLE",
+        inventoryMode: "TRACKED",
+        onHandQuantity: 0,
+        reservedQuantity: 0,
+        availableQuantity: 0,
+      }],
+    }), { status: 201, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    const product = await saveSupplierOption("product-1", null, {
+      name: "대형",
+      sourceOptionCode: "L",
+      sourceAdditionalPrice: 1000,
+      sortOrder: 1,
+    }, 3);
+    expect(product.options[0].id).toBe("new-option-id");
+    expect(product.options[0].inventoryVersion).toBe(0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  expect(requestBody).toEqual({
+    name: "대형",
+    sourceOptionCode: "L",
+    sourceAdditionalPrice: 1000,
+    sortOrder: 1,
+    expectedVersion: 3,
+  });
 });
 
 test("admin review presentation renders every allowlisted reason family and compliance state", () => {

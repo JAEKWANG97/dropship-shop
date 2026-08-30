@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductImage } from "@/app/products/product-image";
 import { PRODUCT_CATEGORIES, categoryPath } from "@/lib/categories";
 import {
@@ -12,19 +12,23 @@ import {
   deleteSupplierOption,
   deleteSupplierProduct,
   getSupplierProduct,
+  inventoryActionError,
   isProductVersionError,
   orderSupplierImages,
   productActionError,
   replaceSupplierDetailBlocks,
   replaceSupplierNotice,
   saveSupplierOption,
+  saveSupplierInventory,
   submitSupplierProduct,
   supplierDetailBlocksWithoutImage,
   supplierStatusView,
   updateSupplierProduct,
   uploadSupplierImage,
   validateProductImage,
+  SupplierProductApiError,
   type SupplierProduct,
+  type SupplierOptionInventory,
   type SupplierProductNotice,
 } from "@/lib/supplier-products";
 
@@ -35,6 +39,13 @@ type EditableOption = {
   sourceOptionCode: string;
   sourceAdditionalPrice: number;
   deletable: boolean;
+  inventoryVersion: number;
+  supplierAvailability: "AVAILABLE" | "UNAVAILABLE";
+  inventoryMode: "TRACKED" | "UNTRACKED";
+  onHandQuantity: number | null;
+  reservedQuantity: number;
+  availableQuantity: number | null;
+  inventoryDirty: boolean;
 };
 
 const EMPTY_NOTICE: SupplierProductNotice = {
@@ -64,6 +75,7 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
   const [progress, setProgress] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
+  const inventoryCommands = useRef(new Map<string, { signature: string; key: string }>());
 
   useEffect(() => {
     if (!productId) return;
@@ -80,6 +92,7 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
 
   const status = useMemo(() => product ? supplierStatusView(product) : null, [product]);
   const editable = !productId || status?.editable === true;
+  const controls = supplierProductControlState(editable, saving);
 
   function hydrate(value: SupplierProduct) {
     setProduct(value);
@@ -97,6 +110,13 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
         sourceOptionCode: option.sourceOptionCode,
         sourceAdditionalPrice: option.sourceAdditionalPrice,
         deletable: option.deletable,
+        inventoryVersion: option.inventoryVersion,
+        supplierAvailability: option.supplierAvailability,
+        inventoryMode: option.inventoryMode,
+        onHandQuantity: option.onHandQuantity,
+        reservedQuantity: option.reservedQuantity,
+        availableQuantity: option.availableQuantity,
+        inventoryDirty: false,
       }))
       : [emptyOption("option-0")]);
     setDetailHtml(value.detailBlocks.filter((block) => block.type === "HTML").map((block) => block.htmlContent).join("\n"));
@@ -110,6 +130,11 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
     const fileError = [...files, ...detailFiles].map(validateProductImage).find(Boolean);
     if (fileError) {
       setMessage(fileError);
+      return;
+    }
+    const invalidInventory = options.find(inventoryValidation);
+    if (invalidInventory) {
+      setMessage(inventoryValidation(invalidInventory));
       return;
     }
     const publicImageCount = product?.images.filter((image) => image.type !== "DETAIL").length ?? 0;
@@ -127,6 +152,7 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
     setMessage(null);
     let currentId = product?.id || "";
     let version = product?.version ?? -1;
+    let inventoryFailure = false;
     try {
       const input = { name: name.trim(), summary: summary.trim(), sourcePrice, minimumOrderQuantity, orderQuantityStep, categoryCode };
       setProgress(product ? "기본 정보를 저장하고 있습니다." : "등록 초안을 준비하고 있습니다.");
@@ -168,7 +194,9 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
       setProgress("옵션을 저장하고 있습니다.");
       const defaultOption = serverProduct.options[0];
       for (const [index, option] of options.entries()) {
+        const wasNew = !option.id;
         const optionId = option.id || (index === 0 ? defaultOption?.id ?? null : null);
+        const beforeOptionIds = new Set(serverProduct.options.map((candidate) => candidate.id));
         const result = await saveSupplierOption(currentId, optionId, {
           name: option.name.trim() || "기본",
           sourceOptionCode: option.sourceOptionCode.trim(),
@@ -176,6 +204,29 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
           sortOrder: index,
         }, version);
         version = requiredVersion(result.version);
+        const savedOption = optionId
+          ? result.options.find((candidate) => candidate.id === optionId)
+          : result.options.find((candidate) => !beforeOptionIds.has(candidate.id));
+        if (!savedOption) throw new Error("Missing saved option");
+        serverProduct = result;
+        setOptions((current) => current.map((candidate, optionIndex) => optionIndex === index
+          ? { ...candidate, id: savedOption.id, inventoryVersion: wasNew ? savedOption.inventoryVersion : candidate.inventoryVersion }
+          : candidate));
+
+        if (wasNew || option.inventoryDirty) {
+          setProgress(`'${option.name.trim() || "기본"}' 재고를 저장하고 있습니다.`);
+          inventoryFailure = true;
+          const expectedInventoryVersion = wasNew ? savedOption.inventoryVersion : option.inventoryVersion;
+          const inventory = await saveSupplierInventory(currentId, savedOption.id, {
+            inventoryVersion: expectedInventoryVersion,
+            supplierAvailability: option.supplierAvailability,
+            inventoryMode: option.inventoryMode,
+            onHandQuantity: option.inventoryMode === "TRACKED" ? option.onHandQuantity : null,
+          }, inventoryCommandKey(option, currentId, savedOption.id, expectedInventoryVersion));
+          inventoryFailure = false;
+          applyInventory(savedOption.id, inventory);
+          inventoryCommands.current.delete(option.key);
+        }
       }
 
       setProgress("상세 설명을 저장하고 있습니다.");
@@ -226,7 +277,11 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
       if (!productId) router.replace(`/supplier/products/${encodeURIComponent(currentId)}`);
       router.refresh();
     } catch (error) {
-      showActionError(error);
+      if (inventoryFailure) {
+        showInventoryError(error, version);
+        setFiles((current) => selectedFilesAfterInventoryError(current, Boolean(productId)));
+        setDetailFiles((current) => selectedFilesAfterInventoryError(current, Boolean(productId)));
+      } else showActionError(error);
       setProgress(currentId ? "저장된 초안에서 다시 이어갈 수 있습니다." : "");
       if (currentId && !productId) router.replace(`/supplier/products/${encodeURIComponent(currentId)}`);
     } finally {
@@ -264,6 +319,39 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
       await reloadProduct("옵션을 삭제했습니다.");
     } catch (error) {
       showActionError(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveInventoryOnly(index: number) {
+    const option = options[index];
+    if (!product || !option?.id || saving) return;
+    const validationMessage = inventoryValidation(option);
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    setProgress(`'${option.name}' 재고를 저장하고 있습니다.`);
+    try {
+      const inventory = await saveSupplierInventory(product.id, option.id, {
+        inventoryVersion: option.inventoryVersion,
+        supplierAvailability: option.supplierAvailability,
+        inventoryMode: option.inventoryMode,
+        onHandQuantity: option.inventoryMode === "TRACKED" ? option.onHandQuantity : null,
+      }, inventoryCommandKey(option, product.id, option.id));
+      applyInventory(option.id, inventory);
+      inventoryCommands.current.delete(option.key);
+      setMessage("재고를 저장했습니다.");
+      setProgress("");
+    } catch (error) {
+      const canonicalConflict = error instanceof SupplierProductApiError && Boolean(error.currentInventory);
+      showInventoryError(error);
+      setProgress(canonicalConflict
+        ? "최신 재고를 확인하고 필요한 값을 다시 입력해 주세요."
+        : "저장 결과가 불확실하면 같은 내용으로 다시 시도해 주세요.");
     } finally {
       setSaving(false);
     }
@@ -339,6 +427,15 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
     setNeedsRefresh(isProductVersionError(error));
   }
 
+  function showInventoryError(error: unknown, acceptedProductVersion?: number) {
+    if (error instanceof SupplierProductApiError && error.currentInventory) {
+      applyInventory(error.currentInventory.optionId, error.currentInventory);
+    }
+    setProduct((current) => supplierProductAfterInventoryError(current, acceptedProductVersion));
+    setMessage(inventoryActionError(error));
+    setNeedsRefresh(false);
+  }
+
   if (loading) return <div className="supplier-page"><div className="notice">상품 정보를 불러오는 중입니다.</div></div>;
   if (productId && !product) {
     return <div className="supplier-page"><div className="notice danger">{message ?? "상품을 찾을 수 없습니다."}</div></div>;
@@ -365,7 +462,7 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
       {message ? <div className="notice" role="status"><strong>알림</strong><span>{message}</span>{needsRefresh && product ? <button className="button" onClick={() => reloadProduct()} type="button">최신 내용 다시 불러오기</button> : null}</div> : null}
 
       <form aria-busy={saving} className="admin-form" onSubmit={register}>
-        <fieldset disabled={!editable || saving}>
+        <fieldset disabled={controls.productDisabled}>
           <section className="admin-panel">
             <h2>기본 정보</h2>
             <div className="admin-form-grid">
@@ -395,21 +492,34 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
             ) : null}
             <label>대표·갤러리 이미지<input accept={PRODUCT_IMAGE_ACCEPT} multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} type="file" /><span className="field-help">JPG, PNG, WEBP만 허용하며 첫 이미지는 대표 이미지가 됩니다. 파일 서명은 서버가 다시 검사합니다.</span></label>
           </section>
+        </fieldset>
 
-          <section className="admin-panel">
-            <div className="admin-panel-head"><h2>옵션</h2><button className="button" onClick={() => setOptions((current) => [...current, emptyOption(globalThis.crypto.randomUUID())])} type="button">옵션 추가</button></div>
+        <section className="admin-panel">
+            <div className="admin-panel-head"><h2>옵션</h2><button className="button" disabled={controls.productDisabled} onClick={() => setOptions((current) => [...current, emptyOption(globalThis.crypto.randomUUID())])} type="button">옵션 추가</button></div>
+            <p className="field-help">재고만 저장하면 상품 정보와 Coreable 검토 상태는 바뀌지 않습니다.</p>
             <div className="admin-form">
               {options.map((option, index) => (
                 <div className="admin-form-grid admin-option-card" key={option.key}>
-                  <label>옵션명<input maxLength={200} onChange={(event) => updateOption(index, "name", event.target.value)} required value={option.name} /></label>
-                  <label>공급처 옵션코드<input maxLength={200} onChange={(event) => updateOption(index, "sourceOptionCode", event.target.value)} value={option.sourceOptionCode} /></label>
-                  <label>추가 공급가<input min={0} onChange={(event) => updateOption(index, "sourceAdditionalPrice", number(event.target.value, 0))} required type="number" value={option.sourceAdditionalPrice} /></label>
+                  <label>옵션명<input disabled={controls.productDisabled} maxLength={200} onChange={(event) => updateOption(index, "name", event.target.value)} required value={option.name} /></label>
+                  <label>공급처 옵션코드<input disabled={controls.productDisabled} maxLength={200} onChange={(event) => updateOption(index, "sourceOptionCode", event.target.value)} value={option.sourceOptionCode} /></label>
+                  <label>추가 공급가<input disabled={controls.productDisabled} min={0} onChange={(event) => updateOption(index, "sourceAdditionalPrice", number(event.target.value, 0))} required type="number" value={option.sourceAdditionalPrice} /></label>
+                  <label>재고 관리<select disabled={controls.inventoryDisabled} onChange={(event) => updateInventoryOption(index, "inventoryMode", event.target.value)} value={option.inventoryMode}>
+                    <option value="TRACKED">수량 관리 (권장)</option>
+                    <option value="UNTRACKED">재고 수량 관리 안 함</option>
+                  </select><span className="field-help">{option.inventoryMode === "TRACKED" ? "주문서 생성 중 수량이 예약되어 판매 가능 수량이 줄어듭니다." : "수량 대신 주문 받기·중지로 신규 주문을 관리합니다."}</span></label>
+                  {option.inventoryMode === "TRACKED" ? <label>현재 재고 수량<input disabled={controls.inventoryDisabled} min={0} onChange={(event) => updateInventoryOption(index, "onHandQuantity", number(event.target.value, 0))} required step={1} type="number" value={option.onHandQuantity ?? 0} /><span className="field-help">예약 {option.reservedQuantity.toLocaleString("ko-KR")}개 · 판매 가능 {(option.availableQuantity ?? 0).toLocaleString("ko-KR")}개</span></label> : null}
+                  <label>신규 주문<select disabled={controls.inventoryDisabled} onChange={(event) => updateInventoryOption(index, "supplierAvailability", event.target.value)} value={option.supplierAvailability}>
+                    <option value="AVAILABLE">주문 받기</option>
+                    <option value="UNAVAILABLE">주문 중지</option>
+                  </select>{option.supplierAvailability === "UNAVAILABLE" ? <span className="field-help">이미 만들어진 미입금 주문은 입금 시점 상태에 따라 환불될 수 있습니다.</span> : null}</label>
+                  {product && option.id ? <button className="button" disabled={controls.inventoryDisabled || !option.inventoryDirty} onClick={() => saveInventoryOnly(index)} type="button">재고만 저장</button> : null}
                   {editable && (option.id ? option.deletable : options.length > 1) ? <button className="button" disabled={saving} onClick={() => removeOption(index)} type="button">옵션 삭제</button> : null}
                 </div>
               ))}
             </div>
-          </section>
+        </section>
 
+        <fieldset disabled={controls.productDisabled}>
           <section className="admin-panel">
             <h2>상세 설명</h2>
             <label>HTML 상세<textarea maxLength={20000} onChange={(event) => setDetailHtml(event.target.value)} rows={10} value={detailHtml} /><span className="field-help">입력 내용은 여기서 HTML로 실행하지 않습니다. 저장 시 서버 허용 목록으로 정제됩니다.</span></label>
@@ -459,6 +569,68 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
     setOptions((current) => current.map((option, optionIndex) => optionIndex === index ? { ...option, [field]: value } : option));
   }
 
+  function updateInventoryOption(index: number, field: "inventoryMode" | "supplierAvailability" | "onHandQuantity", value: string | number) {
+    setOptions((current) => current.map((option, optionIndex) => {
+      if (optionIndex !== index) return option;
+      if (field === "inventoryMode") {
+        const inventoryMode = value === "UNTRACKED" ? "UNTRACKED" : "TRACKED";
+        return {
+          ...option,
+          inventoryMode,
+          onHandQuantity: inventoryMode === "TRACKED" ? option.onHandQuantity ?? option.reservedQuantity : null,
+          availableQuantity: inventoryMode === "TRACKED"
+            ? Math.max(0, (option.onHandQuantity ?? option.reservedQuantity) - option.reservedQuantity)
+            : null,
+          inventoryDirty: true,
+        };
+      }
+      if (field === "supplierAvailability") {
+        return { ...option, supplierAvailability: value === "AVAILABLE" ? "AVAILABLE" : "UNAVAILABLE", inventoryDirty: true };
+      }
+      const onHandQuantity = typeof value === "number" ? value : 0;
+      return {
+        ...option,
+        onHandQuantity,
+        availableQuantity: Math.max(0, onHandQuantity - option.reservedQuantity),
+        inventoryDirty: true,
+      };
+    }));
+  }
+
+  function applyInventory(optionId: string, inventory: SupplierOptionInventory) {
+    setOptions((current) => current.map((option) => option.id === optionId ? {
+      ...option,
+      inventoryVersion: inventory.inventoryVersion,
+      supplierAvailability: inventory.supplierAvailability,
+      inventoryMode: inventory.inventoryMode,
+      onHandQuantity: inventory.onHandQuantity,
+      reservedQuantity: inventory.reservedQuantity,
+      availableQuantity: inventory.availableQuantity,
+      inventoryDirty: false,
+    } : option));
+  }
+
+  function inventoryCommandKey(
+    option: EditableOption,
+    currentProductId: string,
+    currentOptionId: string,
+    expectedInventoryVersion = option.inventoryVersion,
+  ) {
+    const signature = JSON.stringify([
+      currentProductId,
+      currentOptionId,
+      expectedInventoryVersion,
+      option.supplierAvailability,
+      option.inventoryMode,
+      option.inventoryMode === "TRACKED" ? option.onHandQuantity : null,
+    ]);
+    const existing = inventoryCommands.current.get(option.key);
+    if (existing?.signature === signature) return existing.key;
+    const command = { signature, key: globalThis.crypto.randomUUID() };
+    inventoryCommands.current.set(option.key, command);
+    return command.key;
+  }
+
   function setNoticeField(field: keyof Omit<SupplierProductNotice, "noticeRows">, value: string) {
     setNotice((current) => ({ ...current, [field]: value }));
   }
@@ -472,7 +644,28 @@ export function SupplierProductForm({ productId }: { productId?: string }) {
 }
 
 function emptyOption(key: string): EditableOption {
-  return { key, id: null, name: "기본", sourceOptionCode: "", sourceAdditionalPrice: 0, deletable: false };
+  return {
+    key,
+    id: null,
+    name: "기본",
+    sourceOptionCode: "",
+    sourceAdditionalPrice: 0,
+    deletable: false,
+    inventoryVersion: 0,
+    supplierAvailability: "AVAILABLE",
+    inventoryMode: "TRACKED",
+    onHandQuantity: 0,
+    reservedQuantity: 0,
+    availableQuantity: 0,
+    inventoryDirty: true,
+  };
+}
+
+function inventoryValidation(option: EditableOption) {
+  if (option.inventoryMode !== "TRACKED") return "";
+  if (!Number.isInteger(option.onHandQuantity) || (option.onHandQuantity ?? -1) < 0) return "재고 수량은 0 이상의 정수로 입력해 주세요.";
+  if ((option.onHandQuantity ?? 0) < option.reservedQuantity) return `예약된 ${option.reservedQuantity}개보다 재고를 낮출 수 없습니다.`;
+  return "";
 }
 
 function number(value: string, fallback: number) {
@@ -483,4 +676,24 @@ function number(value: string, fallback: number) {
 function requiredVersion(value: number) {
   if (value < 0) throw new Error("Missing version");
   return value;
+}
+
+export function supplierProductControlState(productEditable: boolean, saving: boolean) {
+  return {
+    productDisabled: !productEditable || saving,
+    inventoryDisabled: saving,
+  };
+}
+
+export function supplierProductAfterInventoryError(
+  product: SupplierProduct | null,
+  acceptedProductVersion?: number,
+) {
+  return product && acceptedProductVersion !== undefined
+    ? { ...product, version: acceptedProductVersion }
+    : product;
+}
+
+export function selectedFilesAfterInventoryError<T>(selectedFiles: T[], existingProduct: boolean) {
+  return existingProduct ? [] : selectedFiles;
 }

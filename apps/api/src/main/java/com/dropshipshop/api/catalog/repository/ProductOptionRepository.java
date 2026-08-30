@@ -32,6 +32,8 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, UU
 
 	List<ProductOption> findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(UUID productId);
 
+	List<ProductOption> findAllByProduct_IdIn(List<UUID> productIds);
+
 	Optional<ProductOption> findByIdAndProduct_Id(UUID id, UUID productId);
 
 	@Query("""

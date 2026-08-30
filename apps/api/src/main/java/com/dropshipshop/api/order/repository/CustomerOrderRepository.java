@@ -9,11 +9,14 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
+
+import jakarta.persistence.LockModeType;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UUID> {
 
@@ -60,4 +63,24 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UU
 	Optional<CustomerOrder> findByIdAndUser_Id(UUID id, UUID userId);
 
 	boolean existsByOrderNumber(String orderNumber);
+
+	@Query("select customerOrder.paymentGroup.id from CustomerOrder customerOrder where customerOrder.id = :orderId")
+	Optional<UUID> findPaymentGroupIdByOrderId(@Param("orderId") UUID orderId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select customerOrder
+		from CustomerOrder customerOrder
+		where customerOrder.paymentGroup.id = :paymentGroupId
+		order by customerOrder.id
+		""")
+	List<CustomerOrder> findAllByPaymentGroupIdForUpdate(@Param("paymentGroupId") UUID paymentGroupId);
+
+	@Query("""
+		select distinct customerOrder.supplier.id
+		from CustomerOrder customerOrder
+		where customerOrder.paymentGroup.id = :paymentGroupId
+		order by customerOrder.supplier.id
+		""")
+	List<UUID> findSupplierIdsByPaymentGroupId(@Param("paymentGroupId") UUID paymentGroupId);
 }
