@@ -2,7 +2,7 @@
 
 Current payment path: direct bank transfer with manual admin deposit confirmation.
 
-현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주에 더해 `B-100`~`B-104` 공급처 포털 신청·상품·재고·출고 요청·복수 송장 흐름을 설명한다. `B-105` 품절·클레임 사실 흐름은 Planned다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
+현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주에 더해 `B-100`~`B-105` 공급처 포털 신청·상품·재고·출고 요청·복수 송장·품절·클레임 사실 흐름을 설명한다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
 
 ## Current Legacy/Domeggook Happy Path — Implemented
 
@@ -69,7 +69,7 @@ DS-10 backend implementation notes:
 - Customer APIs return display statuses instead of raw internal order statuses.
 - Order detail includes implemented payment, shipment, fulfillment, and refund summaries.
 
-## Supplier Portal Slice Map — B-100~B-104 Implemented, B-105 Planned
+## Supplier Portal Slice Map — B-100~B-105 Implemented
 
 | Slice | Order-flow impact |
 | --- | --- |
@@ -78,9 +78,9 @@ DS-10 backend implementation notes:
 | `B-102` (Implemented) | `TRACKED` 재고, checkout 24시간 예약·만료, 늦은 입금 재확보 |
 | `B-103` (Implemented) | 입금확인 즉시 수락 단계 없는 출고 요청, 주소 잠금, 최소 PII, 이메일 알림 기반 |
 | `B-104` (Implemented) | 복수 Shipment와 수량 allocation, `TRACKING_REGISTERED`, 공식 택배사 링크 |
-| `B-105` | 송장 전 배송 그룹 전체 품절 보고, supplier facts, Coreable 환불 경계 |
+| `B-105` (Implemented) | 송장 전 배송 그룹 전체 품절 보고, supplier facts, Coreable 환불 경계 |
 
-Implemented B-102 inventory/checkout guard, B-103 fulfillment/privacy 기반과 B-104 복수 송장은 supplier portal release의 필요조건이지만 충분조건은 아니다. Planned B-105와 privacy notice, 실제 operational email, B-098 외부 공급처 계약, production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
+B-100~B-105 구현은 supplier portal release의 필요조건이지만 충분조건은 아니다. Privacy notice, 실제 operational email, B-098 외부 공급처 계약과 production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
 
 ### Tracked Checkout And Late Deposit — Implemented (`B-102`)
 
@@ -222,10 +222,13 @@ All quantities are allocated to non-voided Shipments and every one has Coreable 
 
 Existing Domeggook tracking sync and existing single-Shipment responses remain compatible. New responses may add `shipments[]` and allocation completion without deleting the legacy `shipment` field during the compatibility window.
 
-### Portal Shortage And Supplier Facts — Planned (`B-105`)
+### Portal Shortage And Supplier Facts — Implemented (`B-105`)
 
 ```text
 No Shipment has ever existed for the supplier-owned portal fulfillment request
+-> Existing supplier shipment-list response derives canReportShortage=true; supplier order-detail DTO does not own this field
+-> Supplier Web shows the whole-order shortage action only while that shipment capability is true
+-> V44 composite ownership requires report.orderId/supplierId to match the same Order row
 -> Supplier submits a whole delivery-group shortage report with idempotency key/request hash
 -> Service looks up duplicate key/hash before checking operationalOwner
 -> First request creates ShortageReport REPORTED and immediately hands ownership to COREABLE
@@ -233,6 +236,7 @@ No Shipment has ever existed for the supplier-owned portal fulfillment request
 -> Identical retry after handover returns the first report; changed payload with the same key returns 409
 
 Any Shipment, including one later VOIDED, already exists
+-> Supplier shipment-list response derives canReportShortage=false
 -> Supplier shortage report is rejected
 
 Coreable approves the REPORTED shortage
@@ -245,11 +249,28 @@ Coreable rejects the REPORTED shortage
 -> Supplier sees nextAction CONTACT_COREABLE and cannot resume shipment/shortage mutations
 
 Coreable creates a safe claim task for the owning supplier
--> Supplier list/detail correlates it only with orderNumber, own item/option summary and a direct supplier-order link; no PII
+-> V44 persists orderId and composite-checks Claim/Order and Order/Supplier ownership
+-> Requested type selects exactly one server instruction:
+   SHIPMENT_STOP_RESULT/CHECK_SHIPMENT_STOP/상품 발송을 멈출 수 있는지 확인해 주세요.
+   RETURN_INSTRUCTIONS/PROVIDE_RETURN_METHOD/반품 수거 방법을 선택해 주세요.
+   RETURN_RECEIVED/CONFIRM_RETURN_RECEIPT/반품 상품 수령 여부를 확인해 주세요.
+   INSPECTION_RESULT/INSPECT_RETURNED_ITEM/반품 상품의 상태를 확인해 주세요.
+-> dueAt must be after requestedAt and no later than requestedAt +30 days
+-> Supplier list/detail correlates it only with orderNumber, orderDetailAvailable and own item/option summary; no PII
+-> orderDetailAvailable is true only when the existing FULL/MASKED order-detail read is currently authorized
 -> Supplier appends only the requested type of shipment-stop result, return instructions, return receipt or inspection result
+-> checkedAt/inspectedAt must be within requestedAt..server now
+-> First fact moves OPEN to ANSWERED; correction must point to the unique current head and appends a new row
+-> PostgreSQL partial unique allows one root per task and one child per predecessor
+-> Detail renders the correction history root to current head
+-> ADMIN may close OPEN or ANSWERED with RESPONSE_ACCEPTED, SUPERSEDED or NO_LONGER_NEEDED
 -> Supplier fact does not directly change Claim, Order or Refund state
 -> Coreable alone approves/rejects claims and completes the actual bank-transfer refund
 ```
+
+Shortage report Web never links back to the supplier order after Coreable handover. Claim-task Web renders the order link only when `orderDetailAvailable=true`. Initial shortage/task lists are unpaged; shortage uses `createdAt DESC, reportId DESC` with `{reports:[...]}`, task uses `requestedAt DESC, taskId DESC` with `{tasks:[...]}` and only the documented status/orderId/claimId filters.
+
+With production supplier portal disabled, supplier routes remain `404`. ADMIN shortage read/review and existing task read/close remain available. A new ADMIN task create first resolves the scoped stored idempotency result, returns an identical replay or rejects a changed replay, then returns `409 SUPPLIER_PORTAL_NOT_RELEASED` for a new command without creating a task or email.
 
 Product-, option- or quantity-level shortage refund inside one delivery-group order remains unsupported.
 
@@ -585,7 +606,7 @@ Admin detects wrong operational state or shipment information
 - Orders can move to `REFUNDED` only after an administrator records actual manual bank-transfer completion.
 - MVP supports partial cancellation/refund only at delivery-group order level within a payment group.
 - Product, option, or quantity-level partial cancellation/refund inside one delivery-group order is excluded from MVP.
-- Planned portal shortage reporting is allowed only before any Shipment has ever been registered, including one later voided, and applies to the whole delivery-group order. Duplicate lookup precedes owner guard; first report only records REPORTED and COREABLE handover, leaving Order/Claim/Refund unchanged. Admin approve invokes the existing out-of-stock/refund service; reject keeps COREABLE owner and exposes CONTACT_COREABLE. Supplier facts require an open Coreable claim task and never approve or complete a refund.
+- Implemented portal shortage reporting is allowed only before any Shipment has ever been registered, including one later voided, and applies to the whole delivery-group order. Duplicate lookup precedes owner guard; first report only records REPORTED and COREABLE handover, leaving Order/Claim/Refund unchanged. Admin approve invokes the existing out-of-stock/refund service; reject keeps COREABLE owner and exposes CONTACT_COREABLE. Supplier facts require an open Coreable claim task and never approve or complete a refund.
 - Customer-facing order status must be mapped from internal order status instead of exposing internal status directly.
 - Admin order state changes must use defined actions, not arbitrary status dropdown changes.
 - Admin can only progress an order when the next operational step is confirmed.
@@ -597,7 +618,7 @@ Admin detects wrong operational state or shipment information
 - Admin deposit confirmation, out-of-stock, shipment started, delivery completed, claim status change, and refund completed create transactional notification logs.
 - Supplier delay notice is a manual admin action before shipment; automatic delay scheduler is deferred.
 - SMS dispatch runs after the main order/payment transaction commits, so provider failure must not roll back the operational action.
-- Supplier operational notifications use email only. Their subject, body and payload snapshot contain no customer name, phone, address, delivery memo, payment or refund information. Every dispatch/retry revalidates the current verified contact, active portal/manager and time-valid VERIFIED contract; recipient/lifecycle/contract mismatch becomes SKIPPED. B-103 produces fulfillment-request and admin product-review-result events; Planned B-105 claim-task creation will produce `SUPPLIER_CLAIM_WORK_REQUESTED`.
+- Supplier operational notifications use email only. Their subject, body and payload snapshot contain no customer name, phone, address, delivery memo, payment or refund information. Every dispatch/retry revalidates the current verified contact, active portal/manager and time-valid VERIFIED contract; recipient/lifecycle/contract mismatch becomes SKIPPED. B-103 produces fulfillment-request and admin product-review-result events; B-105 claim-task creation produces `SUPPLIER_CLAIM_WORK_REQUESTED`.
 
 ## Risk Points
 

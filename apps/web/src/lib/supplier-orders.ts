@@ -72,6 +72,7 @@ export type SupplierShipmentCollection = {
   unallocatedItems: SupplierUnallocatedItem[];
   allocationComplete: boolean | null;
   canRegisterShipment: boolean | null;
+  canReportShortage: boolean | null;
   nextAction: string | null;
 };
 
@@ -113,6 +114,10 @@ export function supplierShipmentRegistrationAllowed(value: SupplierShipmentColle
   return value.canRegisterShipment === true;
 }
 
+export function supplierShortageReportingAllowed(value: SupplierShipmentCollection) {
+  return value.canReportShortage === true;
+}
+
 export async function recoverSupplierShipmentConflict(
   error: unknown,
   refresh: () => Promise<void>,
@@ -144,6 +149,9 @@ export function releaseSupplierShipmentCommandKey(
   if (error instanceof SupplierOrderApiError && error.status < 500) keys.delete(action);
 }
 
+export const supplierCommandKey = supplierShipmentCommandKey;
+export const releaseSupplierCommandKey = releaseSupplierShipmentCommandKey;
+
 export async function loadSupplierShipmentRefresh(orderNumber: string) {
   const [orderResult, shipmentResult] = await Promise.allSettled([
     getSupplierOrder(orderNumber),
@@ -158,19 +166,19 @@ export async function loadSupplierShipmentRefresh(orderNumber: string) {
 }
 
 export async function listSupplierOrders() {
-  return normalizeSupplierOrderList(await request("/api/supplier/orders"));
+  return normalizeSupplierOrderList(await supplierPortalRequest("/api/supplier/orders"));
 }
 
 export async function getSupplierOrder(orderNumber: string) {
-  return normalizeSupplierOrderDetail(await request(`/api/supplier/orders/${encodeURIComponent(orderNumber)}`));
+  return normalizeSupplierOrderDetail(await supplierPortalRequest(`/api/supplier/orders/${encodeURIComponent(orderNumber)}`));
 }
 
 export async function listSupplierCarriers() {
-  return normalizeSupplierCarriers(await request("/api/supplier/carriers"));
+  return normalizeSupplierCarriers(await supplierPortalRequest("/api/supplier/carriers"));
 }
 
 export async function listSupplierShipments(orderNumber: string) {
-  return normalizeSupplierShipments(await request(
+  return normalizeSupplierShipments(await supplierPortalRequest(
     `/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments`,
   ));
 }
@@ -180,7 +188,7 @@ export async function createSupplierShipment(
   input: SupplierShipmentCreateInput,
   idempotencyKey: string,
 ) {
-  return request(`/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments`, {
+  return supplierPortalRequest(`/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments`, {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(input),
@@ -193,7 +201,7 @@ export async function correctSupplierShipment(
   input: SupplierShipmentCorrectionInput,
   idempotencyKey: string,
 ) {
-  return request(
+  return supplierPortalRequest(
     `/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments/${encodeURIComponent(shipmentId)}`,
     {
       method: "PATCH",
@@ -280,6 +288,9 @@ export function normalizeSupplierShipments(value: unknown): SupplierShipmentColl
     canRegisterShipment: typeof wrapper.canRegisterShipment === "boolean"
       ? wrapper.canRegisterShipment
       : null,
+    canReportShortage: typeof wrapper.canReportShortage === "boolean"
+      ? wrapper.canReportShortage
+      : null,
     nextAction: nullableText(wrapper.nextAction),
   };
 }
@@ -329,7 +340,7 @@ function normalizeSupplierOrderItem(value: unknown): SupplierOrderItemSummary {
   };
 }
 
-async function request(path: string, init: RequestInit = {}) {
+export async function supplierPortalRequest(path: string, init: RequestInit = {}) {
   const response = await fetch(path, {
     ...init,
     credentials: "same-origin",

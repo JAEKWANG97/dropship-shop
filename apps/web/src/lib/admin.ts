@@ -2,6 +2,14 @@ import { cookies } from "next/headers";
 import { apiGetWithCookie } from "./api";
 import type { ProductCategoryCode } from "./categories";
 import type { ProductComplianceStatus, ProductDetail, ProductOptionStatus, SaleBlocker } from "./catalog";
+import {
+  normalizeAdminShortageReport,
+  normalizeAdminShortageReportList,
+  normalizeAdminSupplierClaimTask,
+  normalizeAdminSupplierClaimTaskList,
+  type AdminShortageReport,
+  type AdminSupplierClaimTask,
+} from "./supplier-claims";
 
 export type AdminProductStatus = "ACTIVE" | "SOLD_OUT" | "HIDDEN" | "STOPPED";
 
@@ -409,6 +417,37 @@ export async function getAdminOrderActions(orderId: string) {
 
 export async function getAdminCarriers() {
 	return normalizeAdminCarriers(await readAdmin<unknown>("/api/admin/carriers"));
+}
+
+export async function getAdminShortageReports(params: { status?: string; orderId?: string } = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.orderId) query.set("orderId", params.orderId);
+  const suffix = query.size ? `?${query}` : "";
+  return normalizeAdminShortageReportList(await readAdmin<unknown>(`/api/admin/supplier-shortage-reports${suffix}`));
+}
+
+export async function getAdminShortageReport(reportId: string): Promise<AdminShortageReport> {
+  return normalizeAdminShortageReport(await readAdmin<unknown>(
+    `/api/admin/supplier-shortage-reports/${encodeURIComponent(reportId)}`,
+  ));
+}
+
+export async function getAdminSupplierClaimTasks(
+  params: { status?: string; claimId?: string; orderId?: string } = {},
+) {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.claimId) query.set("claimId", params.claimId);
+  if (params.orderId) query.set("orderId", params.orderId);
+  const suffix = query.size ? `?${query}` : "";
+  return normalizeAdminSupplierClaimTaskList(await readAdmin<unknown>(`/api/admin/supplier-claim-tasks${suffix}`));
+}
+
+export async function getAdminSupplierClaimTask(taskId: string): Promise<AdminSupplierClaimTask> {
+  return normalizeAdminSupplierClaimTask(await readAdmin<unknown>(
+    `/api/admin/supplier-claim-tasks/${encodeURIComponent(taskId)}`,
+  ));
 }
 
 export function adminStatusLabel(status: string) {

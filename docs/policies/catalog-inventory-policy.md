@@ -93,7 +93,7 @@ Status: `B-101` catalog/review and `B-102` inventory/reservation are Implemented
 - 고객에게 재고 모드나 `무제한` 표현을 노출하지 않고 구매 가능 또는 품절만 표시한다.
 - 공급처 UI는 `수량 관리 (권장)`을 TRACKED 기본값으로 두고 0 이상의 on-hand와 예약 도움말을 제공한다. `재고 수량 관리 안 함`을 선택하면 on-hand 입력을 제거하고 별도 `주문 받기`/`주문 중지` availability를 안내한다. 공급처 AVAILABLE은 Coreable 판매중지·숨김·안전 상태를 덮어쓰지 못한다.
 - B-101은 기존 상품을 `managementChannel=COREABLE`, portal 생성 상품을 `SUPPLIER_PORTAL`로 고정한다. B-102는 이를 checkout OrderItem에 snapshot하고, B-101에서 미리 생성된 portal option을 `TRACKED/onHand=0`, 기존 COREABLE option을 `UNTRACKED`로 이관한다.
-- B-100~B-104가 구현된 현재도 production supplier portal feature gate는 닫아 portal 상품을 고객에게 구매 가능하게 만들지 않는다. B-102 inventory guard, B-103 fulfillment/privacy 기반과 B-104 plural Shipment는 필요조건일 뿐이며 Planned B-105와 privacy/live-email/contract gate가 모두 준비된 뒤에만 activation gate를 연다.
+- B-100~B-105가 구현된 현재도 production supplier portal feature gate는 닫아 portal 상품을 고객에게 구매 가능하게 만들지 않는다. 이 구현은 필요조건일 뿐이며 privacy/live-email/contract gate가 모두 준비된 뒤에만 activation gate를 연다.
 
 ## System Impact
 

@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -26,6 +27,8 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.dropshipshop.api.auth.security.TestAuthentication;
 import com.dropshipshop.api.catalog.domain.Product;
@@ -36,6 +39,7 @@ import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.claim.domain.Claim;
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
@@ -61,6 +65,12 @@ import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.domain.ShipmentActorType;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
+import com.dropshipshop.api.supplierclaim.domain.SupplierClaimInstructionCode;
+import com.dropshipshop.api.supplierclaim.domain.SupplierClaimRequestedType;
+import com.dropshipshop.api.supplierclaim.domain.SupplierClaimTask;
+import com.dropshipshop.api.supplierclaim.domain.SupplierClaimTaskCloseReasonCode;
+import com.dropshipshop.api.supplierclaim.domain.SupplierClaimTaskStatus;
+import com.dropshipshop.api.supplierclaim.repository.SupplierClaimTaskRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
@@ -111,6 +121,12 @@ class CustomerCancellationApiIntegrationTest {
 
 	@Autowired
 	private ShipmentRepository shipmentRepository;
+
+	@Autowired
+	private SupplierClaimTaskRepository supplierClaimTaskRepository;
+
+	@Autowired
+	private PlatformTransactionManager transactionManager;
 
 	@Autowired
 	private OrderStatusHistoryRepository orderStatusHistoryRepository;
@@ -659,6 +675,21 @@ class CustomerCancellationApiIntegrationTest {
 			.andExpect(jsonPath("$.orderStatus", is("REFUND_REQUESTED")))
 			.andReturn();
 		String refundId = fieldFrom(refundStart, "refundId");
+		Instant taskRequestedAt = Instant.now();
+		UUID pendingSupplierTaskId = new TransactionTemplate(transactionManager).execute(status -> {
+			Claim returnClaim = claimRepository.findById(UUID.fromString(claimId)).orElseThrow();
+			return supplierClaimTaskRepository.saveAndFlush(new SupplierClaimTask(
+				returnClaim,
+				returnClaim.getOrder().getSupplier(),
+				SupplierClaimRequestedType.INSPECTION_RESULT,
+				SupplierClaimInstructionCode.INSPECT_RETURNED_ITEM,
+				TestAuthentication.ADMIN_ID,
+				"return-refund-terminal-task-hash",
+				"return-refund-terminal-task-key",
+				taskRequestedAt,
+				taskRequestedAt.plus(1, ChronoUnit.DAYS)
+			)).getId();
+		});
 
 		assertThat(refundRepository.findById(UUID.fromString(refundId)).orElseThrow().getStatus()).isEqualTo(RefundStatus.REQUESTED);
 
@@ -692,6 +723,11 @@ class CustomerCancellationApiIntegrationTest {
 				assertThat(refund.getManualRefundTransactionReference()).isEqualTo("REFUND-RETURN-1");
 			});
 		assertThat(claimRepository.findById(UUID.fromString(claimId)).orElseThrow().getStatus().name()).isEqualTo("COMPLETED");
+		assertThat(supplierClaimTaskRepository.findById(pendingSupplierTaskId).orElseThrow())
+			.satisfies(task -> {
+				assertThat(task.getStatus()).isEqualTo(SupplierClaimTaskStatus.CLOSED);
+				assertThat(task.getCloseReasonCode()).isEqualTo(SupplierClaimTaskCloseReasonCode.CLAIM_TERMINAL);
+			});
 		assertThat(paymentGroupRepository.findById(order.getPaymentGroup().getId()).orElseThrow().getStatus())
 			.isEqualTo(PaymentGroupStatus.REFUNDED);
 		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId()).orElseThrow().getStatus())

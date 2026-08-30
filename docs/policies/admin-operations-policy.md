@@ -63,9 +63,9 @@ Status: Confirmed
   - 이미지, 상세 블록, 상품 고시 변경
 - 상품 상세 HTML diff, 이미지 교체/정렬 diff, 상품명/요약문 상세 diff처럼 필드별 상세 diff는 MVP 이후로 미룬다.
 
-## Supplier Portal Operations Boundary — B-100~B-104 Implemented, B-105 Planned
+## Supplier Portal Operations Boundary — B-100~B-105 Implemented
 
-Status: B-100 application review, invitation and supplier lifecycle actions, B-101 product review actions, B-102 inventory/payment-exception actions, B-103 fulfillment/privacy/operational-email actions, and B-104 plural Shipment actions are Implemented. B-105 remains Planned, and existing admin actions remain authoritative for legacy and Coreable-managed flows outside that later slice.
+Status: B-100 application review, invitation and supplier lifecycle actions, B-101 product review actions, B-102 inventory/payment-exception actions, B-103 fulfillment/privacy/operational-email actions, B-104 plural Shipment actions, and B-105 shortage/claim-task actions are Implemented. Existing admin actions remain authoritative for legacy and Coreable-managed flows outside those portal slices.
 
 - Coreable 관리자는 공개 공급처 신청을 승인 또는 거절하고, 승인된 연락 이메일에만 1회용 초대를 발급한다. 신청·승인·초대와 중복 신청 방지는 B-100에서 구현됐다.
 - Coreable 상품 검토자는 자신이 조회한 정확한 aggregate version에만 승인·보완·거절을 적용한다. 승인은 현재 판매 준비 조건을 다시 검증하며, 보완·거절의 공급처 문구와 내부 사유는 분리된 500자 이하 single-line PII-free 값으로 기록한다. Implemented in B-101.
@@ -78,13 +78,18 @@ Status: B-100 application review, invitation and supplier lifecycle actions, B-1
 - 주문이 `OUT_OF_STOCK`, `CANCELLED`, `REFUND_REQUESTED` 또는 `REFUNDED`가 되면 non-voided 송장 유무와 관계없이 기본 종료시각을 기다리지 않고 즉시 마스킹한다.
 - 기본 종료시각부터(`now >= cutoff`) 한 글자 이름은 `*`, 두 글자 이상 이름은 첫 Unicode code point와 고정 `**`로 반환한다. 전화번호는 숫자만 정규화한 뒤 4자리 이하면 전부 `*`, 5자리 이상이면 마지막 4자리만 남기고 앞자리를 `*`로 반환한다. 우편번호, 주소1, 주소2와 배송 메모는 `null`로 반환하고 비PII 주문·상품 정보는 계속 제공할 수 있다.
 - 공급처 PII 응답에는 `Cache-Control: no-store`를 적용한다. 공급처 주문 상세 접근 로그는 actor, order, access reason, accessed-at만 저장하고 실제 PII, 응답 본문, 결제·환불 정보는 복제하지 않는다. 로그는 관리자만 조회하고 1년 뒤 삭제한다. Implemented in B-103.
-- Claim PII grant/extension은 각각 요청시점부터 최대 30일이며 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 상태와 time-valid VERIFIED supplier contract가 함께 있을 때만 유효하다. 다른/terminal 상태나 contract expiry/revoke는 별도 revoke 없이 즉시 무효화한다. grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED` reason code만 허용하고 관리자·시각과 함께 append-only로 남기며 공급처는 만들거나 연장할 수 없다. Implemented in B-103; Planned B-105 fact/task input itself never grants PII.
+- Claim PII grant/extension은 각각 요청시점부터 최대 30일이며 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 상태와 time-valid VERIFIED supplier contract가 함께 있을 때만 유효하다. 다른/terminal 상태나 contract expiry/revoke는 별도 revoke 없이 즉시 무효화한다. grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED` reason code만 허용하고 관리자·시각과 함께 append-only로 남기며 공급처는 만들거나 연장할 수 없다. Implemented in B-103; B-105 fact/task input itself never grants PII.
 - Coreable 관리자는 Shipment별 택배사·송장을 정정 또는 무효화하고 배송완료를 수동 확정할 수 있다. 각 액션은 idempotency/version guard, 사유와 필요한 근거시각, 전후값을 남기고 주문의 할당·배송 집계 상태를 다시 계산한다. allocation 오류는 void 후 재등록한다. Implemented in B-104.
 - 잘못된 portal 수동 배송완료는 이후 Claim/Refund가 없을 때만 tracking 재개 또는 완료시각 정정을 허용하고 원래 증적을 보존한다. 후속 처리가 있으면 `409`로 막고 incident/claim 절차를 사용한다. Implemented in B-104.
 - Coreable로 인계된 portal 주문에는 supplier와 같은 plural/allocation 계약의 admin shipment 생성 action을 사용한다. 기존 발주 시작/완료·단일 shipment·tracking-sync/manual-correction은 portal channel에서 차단한다. 배송완료와 시각정정은 등록시각, 완료시각, 증거확인시각, 현재시각 순서를 검증한다. Implemented in B-104.
-- 공급처는 첫 송장 전 배송 그룹 주문 전체 품절과 Coreable이 만든 열린 claim task가 요청한 유형의 append-only fact만 입력할 수 있다. Claim/Refund 최종 판단, 실제 계좌환불, 고객 CS와 주문·배송 관리자 보정은 Coreable 전용이다. Planned in B-105.
-- Supplier task 생성은 idempotency key/request hash로 중복 workflow를 막는다. Coreable admin은 task list/detail에서 Claim/order linkage, 내부 context와 전체 same-task fact history를 읽은 뒤 별도 명시적 Claim/Refund action으로 판단한다. Planned in B-105.
-- 최초 초대의 token-free 저장과 ephemeral 발송 경계는 B-100에서 구현됐다. B-103은 PII-free 출고 요청·관리자 상품 검토 결과 producer와 세 operational email type/template, dispatch/retry 재검증·retention을 구현했다. 실제 `SUPPLIER_CLAIM_WORK_REQUESTED` producer는 Planned B-105 claim-task 생성이 맡는다. 실제 초대·운영 이메일 도착과 신규 개인정보처리방침 시행 버전을 검증하기 전에는 production supplier activation을 허용하지 않는다.
+- 공급처는 첫 송장 전 배송 그룹 주문 전체 품절과 Coreable이 만든 열린 claim task가 요청한 유형의 append-only fact만 입력할 수 있다. 기존 supplier shipment list 응답만 현재 품절 보고 가능 여부를 `canReportShortage`로 제공하고 supplier order-detail DTO와 shortage response에는 추가하지 않는다. Claim/Refund 최종 판단, 실제 계좌환불, 고객 CS와 주문·배송 관리자 보정은 Coreable 전용이다. Implemented in B-105.
+- Supplier task 생성은 idempotency key/request hash로 중복 workflow를 막는다. Supplier/admin task list는 facts 없는 summary이고 detail에서만 same-task fact history를 반환한다. Coreable admin은 detail의 Claim/order linkage와 내부 context를 읽은 뒤 별도 명시적 Claim/Refund action으로 판단하며 admin DTO에는 supplier-only `orderDetailAvailable`이 없다. Implemented in B-105.
+- Supplier task instruction은 requested type과 1:1인 `CHECK_SHIPMENT_STOP|PROVIDE_RETURN_METHOD|CONFIRM_RETURN_RECEIPT|INSPECT_RETURNED_ITEM`만 허용하고 서버 고정 PII-free 한국어 문구로 렌더링한다. `dueAt`은 생성시각보다 미래이고 최대 30일이며, ADMIN은 `OPEN|ANSWERED` task를 `RESPONSE_ACCEPTED|SUPERSEDED|NO_LONGER_NEEDED`로 닫을 수 있다. Implemented in B-105.
+- Production flag가 false인 ADMIN task 생성은 ADMIN/Claim scope와 stored key/hash/result replay를 먼저 확인한다. 동일 완료 replay는 최초 결과를 반환하고 changed replay는 conflict이며, 저장 결과가 없는 새 생성만 `409 SUPPLIER_PORTAL_NOT_RELEASED`로 거절한다. 기존 shortage read/review, task read/close와 system expiry/terminal close는 flag와 무관하게 운영 안전 경로로 유지한다. Implemented in B-105.
+- B-105 ADMIN shortage approve/reject와 claim-task create/close는 browser cookie 기반 unsafe mutation으로 exact allowlist `Origin`, 또는 Origin 부재 시 exact same-origin `Referer`를 요구하며 누락·불일치는 mutation 전에 `403`으로 거절한다.
+- B-105는 supplier/admin shortage와 claim-task의 list/detail/action Web을 제공하고 기존 admin Claim 상세에서 task를 생성·검토·종료할 수 있게 한다. `orderDetailAvailable`은 supplier claim-task projection에만 두며 false는 링크 비활성화이고 별도 권한을 부여하지 않는다. Shortage report에는 주문 링크가 없다.
+- 초기 목록은 pagination 없이 shortage `{reports:[...]}`/`createdAt DESC, reportId DESC`, task `{tasks:[...]}`/`requestedAt DESC, taskId DESC`를 사용한다. Supplier shortage/task는 각각 `status`, ADMIN shortage는 `status|orderId`, ADMIN task는 `status|claimId|orderId` optional filter만 지원하며 이 지원 filter의 유효하지 않은 값은 `400`이다.
+- 최초 초대의 token-free 저장과 ephemeral 발송 경계는 B-100에서 구현됐다. B-103은 PII-free 출고 요청·관리자 상품 검토 결과 producer와 세 operational email type/template, dispatch/retry 재검증·retention을 구현했다. 실제 `SUPPLIER_CLAIM_WORK_REQUESTED` producer는 B-105 claim-task 생성이 맡는다. 실제 초대·운영 이메일 도착과 신규 개인정보처리방침 시행 버전을 검증하기 전에는 production supplier activation을 허용하지 않는다.
 
 ### Mixed Implementation Status
 

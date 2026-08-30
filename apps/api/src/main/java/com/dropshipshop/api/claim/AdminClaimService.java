@@ -26,6 +26,7 @@ import com.dropshipshop.api.refund.RefundService;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.fulfillment.SupplierFulfillmentHandoverService;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
+import com.dropshipshop.api.supplierclaim.SupplierClaimTaskService;
 
 @Service
 class AdminClaimService {
@@ -39,6 +40,7 @@ class AdminClaimService {
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final SupplierFulfillmentHandoverService handoverService;
 	private final ShipmentRepository shipmentRepository;
+	private final SupplierClaimTaskService supplierClaimTaskService;
 
 	AdminClaimService(
 		ClaimRepository claimRepository,
@@ -49,7 +51,8 @@ class AdminClaimService {
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		SupplierFulfillmentHandoverService handoverService,
-		ShipmentRepository shipmentRepository
+		ShipmentRepository shipmentRepository,
+		SupplierClaimTaskService supplierClaimTaskService
 	) {
 		this.claimRepository = claimRepository;
 		this.orderRepository = orderRepository;
@@ -60,6 +63,7 @@ class AdminClaimService {
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.handoverService = handoverService;
 		this.shipmentRepository = shipmentRepository;
+		this.supplierClaimTaskService = supplierClaimTaskService;
 	}
 
 	@Transactional(readOnly = true)
@@ -133,6 +137,7 @@ class AdminClaimService {
 			} else {
 				claim.reject(adminUserId, request.reason(), Instant.now());
 			}
+			supplierClaimTaskService.closeForTerminalClaim(claim, Instant.now());
 			notificationService.transactionalSms(
 				claim.getUser(),
 				claim.getOrder(),

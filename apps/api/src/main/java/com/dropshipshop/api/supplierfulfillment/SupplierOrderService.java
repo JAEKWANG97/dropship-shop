@@ -1,9 +1,11 @@
 package com.dropshipshop.api.supplierfulfillment;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.EnumSet;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -37,7 +39,7 @@ import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
 @Service
-class SupplierOrderService {
+public class SupplierOrderService {
 
 	private static final Set<OrderStatus> TERMINAL_MASK_STATUSES = EnumSet.of(
 		OrderStatus.OUT_OF_STOCK,
@@ -171,13 +173,18 @@ class SupplierOrderService {
 	}
 
 	private void validateActiveTenant(Supplier supplier, UUID actorUserId, Instant now) {
-		if (supplier.getPortalStatus() != SupplierPortalStatus.ACTIVE
-			|| supplier.getManagerUserId() == null
+		if (!isActiveTenant(supplier, now)
 			|| !supplier.getManagerUserId().equals(actorUserId)
-			|| userAccountRepository.findByIdAndStatus(actorUserId, UserStatus.ACTIVE).isEmpty()
-			|| !supplier.hasTimeValidContract(now)) {
+		) {
 			throw forbidden();
 		}
+	}
+
+	private boolean isActiveTenant(Supplier supplier, Instant now) {
+		return supplier.getPortalStatus() == SupplierPortalStatus.ACTIVE
+			&& supplier.getManagerUserId() != null
+			&& userAccountRepository.findByIdAndStatus(supplier.getManagerUserId(), UserStatus.ACTIVE).isPresent()
+			&& supplier.hasTimeValidContract(now);
 	}
 
 	private AccessDecision accessDecision(Fulfillment fulfillment, CustomerOrder order, Instant now) {
@@ -193,7 +200,8 @@ class SupplierOrderService {
 		}
 
 		FulfillmentHandoverHistory latest = handoverHistoryRepository
-			.findFirstByFulfillment_IdOrderByCreatedAtDesc(fulfillment.getId()).orElseThrow(this::notFound);
+			.findFirstByFulfillment_IdOrderByCreatedAtDescIdDesc(fulfillment.getId())
+			.orElseThrow(this::notFound);
 		if (latest.getReasonCode() != FulfillmentHandoverReasonCode.PII_CUTOFF_REACHED
 			&& latest.getReasonCode() != FulfillmentHandoverReasonCode.TERMINAL_STATE) {
 			throw notFound();
@@ -208,6 +216,48 @@ class SupplierOrderService {
 		return latest.getReasonCode() == FulfillmentHandoverReasonCode.TERMINAL_STATE
 			? masked(SupplierPiiAccessReason.TERMINAL_MASKED, "TERMINAL_STATE", fulfillment)
 			: masked(SupplierPiiAccessReason.EXPIRED_MASKED, "PII_CUTOFF", fulfillment);
+	}
+
+	@Transactional(readOnly = true)
+	public boolean isOrderDetailAvailable(UUID supplierId, UUID orderId, Instant now) {
+		return findOrderDetailAvailableOrderIds(supplierId, List.of(orderId), now).contains(orderId);
+	}
+
+	@Transactional(readOnly = true)
+	public Set<UUID> findOrderDetailAvailableOrderIds(
+		UUID supplierId,
+		Collection<UUID> orderIds,
+		Instant now
+	) {
+		if (orderIds.isEmpty()) return Set.of();
+		List<Fulfillment> candidates = fulfillmentRepository
+			.findSupplierDetailCandidates(supplierId, orderIds);
+		if (candidates.isEmpty() || !isActiveTenant(candidates.get(0).getSupplier(), now)) return Set.of();
+
+		Set<UUID> availableOrderIds = new HashSet<>();
+		List<UUID> coreableFulfillmentIds = candidates.stream()
+			.filter(fulfillment -> {
+				if (fulfillment.getOperationalOwner() == FulfillmentOperationalOwner.SUPPLIER) {
+					availableOrderIds.add(fulfillment.getOrder().getId());
+					return false;
+				}
+				return fulfillment.getOperationalOwner() == FulfillmentOperationalOwner.COREABLE;
+			})
+			.map(Fulfillment::getId)
+			.toList();
+		if (!coreableFulfillmentIds.isEmpty()) {
+			Set<UUID> handledFulfillmentIds = new HashSet<>();
+			for (FulfillmentHandoverHistory history
+				: handoverHistoryRepository.findAllLatestFirst(coreableFulfillmentIds)) {
+				UUID fulfillmentId = history.getFulfillment().getId();
+				if (!handledFulfillmentIds.add(fulfillmentId)) continue;
+				if (history.getReasonCode() == FulfillmentHandoverReasonCode.PII_CUTOFF_REACHED
+					|| history.getReasonCode() == FulfillmentHandoverReasonCode.TERMINAL_STATE) {
+					availableOrderIds.add(history.getFulfillment().getOrder().getId());
+				}
+			}
+		}
+		return Set.copyOf(availableOrderIds);
 	}
 
 	private SupplierPiiAccessGrant activeGrant(UUID orderId, Instant now) {

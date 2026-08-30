@@ -149,7 +149,7 @@ class PostgresMigrationSmokeTest {
 			Integer.class
 		);
 
-		assertThat(migrationCount).isNotNull().isGreaterThanOrEqualTo(43);
+		assertThat(migrationCount).isNotNull().isGreaterThanOrEqualTo(44);
 		assertThat(pricingPolicyCount).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForObject(
 			"select version from pricing_policies where active = true",
@@ -255,6 +255,36 @@ class PostgresMigrationSmokeTest {
 			    'trg_shipments_legacy_allocations'
 			  )
 			""", Integer.class)).isEqualTo(4);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from information_schema.tables
+			where table_schema = current_schema()
+			  and table_name in (
+			    'supplier_shortage_reports', 'supplier_claim_tasks', 'supplier_claim_facts'
+			  )
+			""", Integer.class)).isEqualTo(3);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from pg_constraint
+			where conname in (
+			  'uk_orders_id_supplier',
+			  'uk_claims_id_order',
+			  'fk_supplier_shortage_reports_order_supplier',
+			  'fk_supplier_claim_tasks_claim_order',
+			  'fk_supplier_claim_tasks_order_supplier',
+			  'fk_supplier_claim_facts_task_scope',
+			  'fk_supplier_claim_facts_correction_scope'
+			)
+			""", Integer.class)).isEqualTo(7);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from pg_indexes
+			where schemaname = current_schema()
+			  and indexname in (
+			    'uk_supplier_claim_facts_single_root',
+			    'uk_supplier_claim_facts_single_child'
+			  )
+			""", Integer.class)).isEqualTo(2);
 
 		Supplier supplier = supplierRepository.saveAndFlush(new Supplier(
 			"Postgres smoke supplier",
@@ -516,6 +546,100 @@ class PostgresMigrationSmokeTest {
 				.hasStackTraceContaining(
 					"V43 preflight failed: every legacy shipment order must contain at least one order item"
 				);
+		}
+	}
+
+	@Test
+	void enforcesV44SupplierOwnershipSnapshotsAndLinearFactChain() throws Exception {
+		try (PostgreSQLContainer<?> upgrade = new PostgreSQLContainer<>("postgres:17-alpine")) {
+			upgrade.start();
+			migrateTo(upgrade, "43");
+			UUID userId = UUID.randomUUID();
+			UUID firstSupplierId = UUID.randomUUID();
+			UUID secondSupplierId = UUID.randomUUID();
+			UUID firstProductId = UUID.randomUUID();
+			UUID secondProductId = UUID.randomUUID();
+			UUID firstOptionId = UUID.randomUUID();
+			UUID secondOptionId = UUID.randomUUID();
+			UUID claimId = UUID.randomUUID();
+			V40OrderIds firstOrder;
+			V40OrderIds firstSupplierSecondOrder;
+			V40OrderIds secondOrder;
+			try (Connection connection = connection(upgrade)) {
+				insertV40User(connection, userId);
+				insertV40Supplier(connection, firstSupplierId);
+				insertV40Supplier(connection, secondSupplierId);
+				insertV40Product(connection, firstProductId, firstSupplierId, "COREABLE", null);
+				insertV40Product(connection, secondProductId, secondSupplierId, "COREABLE", null);
+				insertV40Option(connection, firstOptionId, firstProductId);
+				insertV40Option(connection, secondOptionId, secondProductId);
+				firstOrder = insertV40PendingOrder(
+					connection, userId, firstSupplierId, firstProductId, firstOptionId);
+				firstSupplierSecondOrder = insertV40PendingOrder(
+					connection, userId, firstSupplierId, firstProductId, firstOptionId);
+				secondOrder = insertV40PendingOrder(
+					connection, userId, secondSupplierId, secondProductId, secondOptionId);
+				insertV44Claim(connection, claimId, firstOrder.orderId(), userId);
+			}
+
+			migrateLatest(upgrade);
+
+			try (Connection connection = connection(upgrade)) {
+				insertV44ReportedShortage(
+					connection, UUID.randomUUID(), firstOrder.orderId(), firstSupplierId, userId,
+					"v44-valid-report");
+				assertThatThrownBy(() -> insertV44ReportedShortage(
+					connection, UUID.randomUUID(), secondOrder.orderId(), firstSupplierId, userId,
+					"v44-mismatched-report"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("fk_supplier_shortage_reports_order_supplier");
+				assertThatThrownBy(() -> insertV44ReportedShortageWithReviewer(
+					connection, UUID.randomUUID(), firstSupplierSecondOrder.orderId(), firstSupplierId,
+					userId, "v44-reported-with-reviewer"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("ck_supplier_shortage_reports_review");
+				assertThatThrownBy(() -> insertV44ReviewedShortageWithoutResult(
+					connection, UUID.randomUUID(), firstSupplierSecondOrder.orderId(), firstSupplierId, userId
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("ck_supplier_shortage_reports_review");
+
+				UUID taskId = UUID.randomUUID();
+				insertV44Task(
+					connection, taskId, claimId, firstOrder.orderId(), firstSupplierId, userId,
+					"v44-valid-task");
+				assertThatThrownBy(() -> insertV44Task(
+					connection, UUID.randomUUID(), claimId, secondOrder.orderId(), secondSupplierId, userId,
+					"v44-claim-order-mismatch"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("fk_supplier_claim_tasks_claim_order");
+				assertThatThrownBy(() -> insertV44Task(
+					connection, UUID.randomUUID(), claimId, firstOrder.orderId(), secondSupplierId, userId,
+					"v44-order-supplier-mismatch"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("fk_supplier_claim_tasks_order_supplier");
+				assertThatThrownBy(() -> insertV44AdminClosedTaskWithoutResult(
+					connection, UUID.randomUUID(), claimId, firstOrder.orderId(), firstSupplierId, userId,
+					"v44-close-without-result"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("ck_supplier_claim_tasks_close_actor");
+
+				UUID rootFactId = UUID.randomUUID();
+				insertV44Fact(
+					connection, rootFactId, taskId, claimId, firstSupplierId, userId, null, "v44-root-fact");
+				assertThatThrownBy(() -> insertV44Fact(
+					connection, UUID.randomUUID(), taskId, claimId, firstSupplierId, userId, null,
+					"v44-second-root"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("uk_supplier_claim_facts_single_root");
+				insertV44Fact(
+					connection, UUID.randomUUID(), taskId, claimId, firstSupplierId, userId, rootFactId,
+					"v44-first-child");
+				assertThatThrownBy(() -> insertV44Fact(
+					connection, UUID.randomUUID(), taskId, claimId, firstSupplierId, userId, rootFactId,
+					"v44-second-child"
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("uk_supplier_claim_facts_single_child");
+			}
 		}
 	}
 
@@ -1171,6 +1295,190 @@ class PostgresMigrationSmokeTest {
 			statement.setObject(2, order.paymentGroupId());
 			statement.setObject(3, order.orderId());
 			statement.setLong(4, amount);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV44Claim(Connection connection, UUID claimId, UUID orderId, UUID userId)
+		throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into claims(
+				id, order_id, user_id, claim_type, claim_reason, status,
+				requested_action, customer_memo, created_at, updated_at
+			) values (?, ?, ?, 'CANCEL', 'SIMPLE_CHANGE_OF_MIND', 'REQUESTED',
+				'REFUND', 'V44 migration fixture', now(), now())
+			""")) {
+			statement.setObject(1, claimId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, userId);
+			assertThat(statement.executeUpdate()).isEqualTo(1);
+		}
+	}
+
+	private void insertV44ReportedShortage(
+		Connection connection,
+		UUID reportId,
+		UUID orderId,
+		UUID supplierId,
+		UUID actorUserId,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into supplier_shortage_reports(
+				id, order_id, supplier_id, actor_user_id, reason_code, status,
+				request_hash, idempotency_key, submit_result_snapshot, created_at
+			) values (?, ?, ?, ?, 'OUT_OF_STOCK', 'REPORTED', ?, ?, '{}'::jsonb, now())
+			""")) {
+			statement.setObject(1, reportId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, supplierId);
+			statement.setObject(4, actorUserId);
+			statement.setString(5, "hash-" + idempotencyKey);
+			statement.setString(6, idempotencyKey);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV44ReviewedShortageWithoutResult(
+		Connection connection,
+		UUID reportId,
+		UUID orderId,
+		UUID supplierId,
+		UUID adminUserId
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into supplier_shortage_reports(
+				id, order_id, supplier_id, actor_user_id, reason_code, status,
+				request_hash, idempotency_key, submit_result_snapshot,
+				reviewed_by_admin_id, reviewed_at, review_reason_code,
+				review_request_hash, review_idempotency_key, review_result_snapshot, created_at
+			) values (?, ?, ?, ?, 'OUT_OF_STOCK', 'APPROVED',
+				'v44-submit-hash', 'v44-submit-key', '{}'::jsonb,
+				?, now(), 'SHORTAGE_CONFIRMED', 'v44-review-hash', 'v44-review-key', null, now())
+			""")) {
+			statement.setObject(1, reportId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, supplierId);
+			statement.setObject(4, adminUserId);
+			statement.setObject(5, adminUserId);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV44ReportedShortageWithReviewer(
+		Connection connection,
+		UUID reportId,
+		UUID orderId,
+		UUID supplierId,
+		UUID adminUserId,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into supplier_shortage_reports(
+				id, order_id, supplier_id, actor_user_id, reason_code, status,
+				request_hash, idempotency_key, submit_result_snapshot,
+				reviewed_by_admin_id, created_at
+			) values (?, ?, ?, ?, 'OUT_OF_STOCK', 'REPORTED', ?, ?, '{}'::jsonb, ?, now())
+			""")) {
+			statement.setObject(1, reportId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, supplierId);
+			statement.setObject(4, adminUserId);
+			statement.setString(5, "hash-" + idempotencyKey);
+			statement.setString(6, idempotencyKey);
+			statement.setObject(7, adminUserId);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV44Task(
+		Connection connection,
+		UUID taskId,
+		UUID claimId,
+		UUID orderId,
+		UUID supplierId,
+		UUID adminUserId,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into supplier_claim_tasks(
+				id, claim_id, order_id, supplier_id, requested_type, status,
+				instruction_code, instructions, requested_by_admin_id,
+				creation_request_hash, creation_idempotency_key, creation_result_snapshot,
+				requested_at, due_at
+			) values (?, ?, ?, ?, 'SHIPMENT_STOP_RESULT', 'OPEN',
+				'CHECK_SHIPMENT_STOP', '상품 발송을 멈출 수 있는지 확인해 주세요.', ?,
+				?, ?, '{}'::jsonb, now(), now() + interval '1 day')
+			""")) {
+			statement.setObject(1, taskId);
+			statement.setObject(2, claimId);
+			statement.setObject(3, orderId);
+			statement.setObject(4, supplierId);
+			statement.setObject(5, adminUserId);
+			statement.setString(6, "hash-" + idempotencyKey);
+			statement.setString(7, idempotencyKey);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV44AdminClosedTaskWithoutResult(
+		Connection connection,
+		UUID taskId,
+		UUID claimId,
+		UUID orderId,
+		UUID supplierId,
+		UUID adminUserId,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into supplier_claim_tasks(
+				id, claim_id, order_id, supplier_id, requested_type, status,
+				instruction_code, instructions, requested_by_admin_id,
+				creation_request_hash, creation_idempotency_key, creation_result_snapshot,
+				requested_at, due_at, closed_by_admin_id, closed_at, close_reason_code,
+				close_request_hash, close_idempotency_key, close_result_snapshot
+			) values (?, ?, ?, ?, 'SHIPMENT_STOP_RESULT', 'CLOSED',
+				'CHECK_SHIPMENT_STOP', '상품 발송을 멈출 수 있는지 확인해 주세요.', ?,
+				?, ?, '{}'::jsonb, now(), now() + interval '1 day', ?, now(), 'RESPONSE_ACCEPTED',
+				'v44-close-hash', 'v44-close-key', null)
+			""")) {
+			statement.setObject(1, taskId);
+			statement.setObject(2, claimId);
+			statement.setObject(3, orderId);
+			statement.setObject(4, supplierId);
+			statement.setObject(5, adminUserId);
+			statement.setString(6, "hash-" + idempotencyKey);
+			statement.setString(7, idempotencyKey);
+			statement.setObject(8, adminUserId);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV44Fact(
+		Connection connection,
+		UUID factId,
+		UUID taskId,
+		UUID claimId,
+		UUID supplierId,
+		UUID actorUserId,
+		UUID correctsFactId,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into supplier_claim_facts(
+				id, task_id, claim_id, supplier_id, actor_user_id, type, payload,
+				corrects_fact_id, request_hash, idempotency_key, result_snapshot, created_at
+			) values (?, ?, ?, ?, ?, 'SHIPMENT_STOP_RESULT', '{}'::jsonb,
+				?, ?, ?, '{}'::jsonb, now())
+			""")) {
+			statement.setObject(1, factId);
+			statement.setObject(2, taskId);
+			statement.setObject(3, claimId);
+			statement.setObject(4, supplierId);
+			statement.setObject(5, actorUserId);
+			statement.setObject(6, correctsFactId);
+			statement.setString(7, "hash-" + idempotencyKey);
+			statement.setString(8, idempotencyKey);
 			statement.executeUpdate();
 		}
 	}

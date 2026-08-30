@@ -107,7 +107,7 @@ Notes:
 - 입금확인 완료 즉시 수락 단계 없이 공급처에 출고 요청을 보여준다.
 - 실제 email 전달 검증 전에는 production supplier activation을 열지 않는다.
 - B-103 구현과 문서 동기화, 전체 API/PostgreSQL/Web 검증 및 독립 구현·테스트 검토를 완료했다. Production supplier activation과 실제 email 검증은 별도 release gate로 남는다.
-- 송장 등록 시 cutoff 단축은 Implemented B-104, `SUPPLIER_CLAIM_WORK_REQUESTED` 실제 producer는 Planned B-105가 소유한다.
+- 송장 등록 시 cutoff 단축은 Implemented B-104, `SUPPLIER_CLAIM_WORK_REQUESTED` 실제 producer는 Implemented B-105가 소유한다.
 
 Tasks:
 - [x] portal fulfillment 생성, 요청시각·배송지 잠금과 portal access가 비활성인 `salesAction=KEEP` 신규 주문의 `COREABLE_MANUAL` fallback을 구현한다.
@@ -143,19 +143,24 @@ Tasks:
 
 ### B-105 공급처 품절 보고와 클레임 사실 입력
 
-Status: Todo
+Status: Review Ready
 
 Notes:
 - 공급처는 사실만 입력하고 Claim/Refund 최종 결정과 실제 계좌환불은 Coreable만 수행한다.
+- V44와 API/Web 구현, 전체 API·PostgreSQL migration smoke·Web 정적/계약 검증을 완료했다. Production 활성화, 실제 로그인 live E2E, 실제 email delivery와 성능 부하는 별도 release gate로 남는다.
+- Production `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지하며 B-105 완료만으로 외부 공급처 route나 portal 상품 판매를 열지 않는다.
 
 Tasks:
-- [ ] 송장 등록 전 배송 그룹 주문 전체 품절을 REPORTED로 기록하고 Order/Refund를 바꾸지 않은 채 Coreable owner로 인계하는 supplier list/detail을 구현한다. Submit hash와 immutable safe result로 동일 key만 replay하고 같은 order의 새 key는 충돌시킨다.
-- [ ] `supplier_shortage_reports` 추가 뒤 supplier/admin Shipment service의 공통 lock을 Order→Fulfillment→report→all Shipment→OrderItems로 확장하고 open REPORTED report가 admin portal-shipment와 경합하지 않게 막는다.
-- [ ] Coreable shortage list/detail과 free-text 없는 allowlisted-code 승인·거절을 구현한다. 승인만 기존 out-of-stock/refund service를 실행하고 거절은 Coreable owner를 유지한다.
-- [ ] Coreable이 만드는 orderNumber·자기 상품 요약 포함 safe claim task, 정정 가능한 same-task fact history projection과 request hash/immutable result를 저장하는 idempotent append-only supplier fact 입력·tenant 경계를 구현한다.
-- [ ] Claim terminal/dueAt에서 열린 task를 닫고 create/fact/close의 allowed status와 idempotency를 구현한다.
-- [ ] 공급처 입력이 Claim/Order/Refund 상태를 직접 변경하지 않는 회귀 테스트를 추가한다.
-- [ ] Coreable 승인·거절·반품입고·환불 기존 흐름과 통합 검증한다.
+- [x] 기존 supplier shipment list 응답에만 `canReportShortage` capability를 추가하고, true일 때만 주문 상세 action을 노출한다. 송장 등록 전 배송 그룹 주문 전체 품절을 REPORTED로 기록하고 Order/Refund를 바꾸지 않은 채 Coreable owner로 인계하는 supplier list/detail을 구현한다. Supplier order-detail DTO와 shortage response에는 capability를 넣지 않으며 submit hash와 immutable safe result로 동일 key만 replay하고 같은 order의 새 key는 충돌시킨다.
+- [x] `supplier_shortage_reports` 추가 뒤 supplier/admin Shipment service의 공통 lock을 Order→Fulfillment→report→all Shipment→OrderItems로 확장하고 open REPORTED report가 admin portal-shipment와 경합하지 않게 막는다.
+- [x] Coreable shortage list/detail과 free-text 없는 allowlisted-code 승인·거절을 구현한다. 승인만 기존 out-of-stock/refund service를 실행하고 거절은 Coreable owner를 유지한다.
+- [x] Coreable이 만드는 orderNumber·자기 상품 요약·claim-task 전용 `orderDetailAvailable` 포함 safe task와 request hash/immutable result를 구현한다. Instruction은 requested type별 `CHECK_SHIPMENT_STOP|PROVIDE_RETURN_METHOD|CONFIRM_RETURN_RECEIPT|INSPECT_RETURNED_ITEM`과 확정 한국어 template을 1:1로 사용한다.
+- [x] `requestedAt < dueAt <= requestedAt+30일`, fact observation time `requestedAt..server now`, current head만 가리키는 root→head append-only correction chain과 create/fact/close idempotency를 구현한다. ADMIN은 OPEN/ANSWERED를 세 admin reason으로 닫고 Claim terminal/dueAt은 system reason으로 닫는다.
+- [x] Initial list를 pagination 없이 shortage `{reports}`/`createdAt DESC,reportId DESC`, task `{tasks}`/`requestedAt DESC,taskId DESC`와 확정 filter만으로 구현한다.
+- [x] supplier 주문 상세 품절 보고, supplier shortage·claim-task list/detail/fact, admin `/admin/shortage-reports?reportId=...` master/detail, admin claim-task list/detail과 기존 Claim 상세 create/read/close Web을 구현한다. Shortage Web에는 주문 링크를 두지 않는다.
+- [x] Feature flag false에서 supplier route `404`, ADMIN task create의 scoped stored replay 우선·신규 `409 SUPPLIER_PORTAL_NOT_RELEASED`, 기존 shortage read/review·task read/close 허용을 구현한다.
+- [x] 공급처 입력이 Claim/Order/Refund 상태를 직접 변경하지 않는 회귀 테스트를 추가한다.
+- [x] Coreable 승인·거절·반품입고·환불 기존 흐름과 통합 검증한다.
 
 ### B-057 관리자 회원 관리와 알림 발송 이력
 

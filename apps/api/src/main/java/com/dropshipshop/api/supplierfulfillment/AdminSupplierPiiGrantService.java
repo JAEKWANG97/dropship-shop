@@ -152,7 +152,7 @@ class AdminSupplierPiiGrantService {
 			|| !fulfillment.getSupplier().getId().equals(supplier.getId())) throw notFound();
 		if (fulfillment.getOperationalOwner() == FulfillmentOperationalOwner.COREABLE) {
 			FulfillmentHandoverReasonCode reasonCode = handoverHistoryRepository
-				.findFirstByFulfillment_IdOrderByCreatedAtDesc(fulfillment.getId())
+				.findFirstByFulfillment_IdOrderByCreatedAtDescIdDesc(fulfillment.getId())
 				.map(history -> history.getReasonCode())
 				.orElseThrow(this::notFound);
 			if (reasonCode != FulfillmentHandoverReasonCode.PII_CUTOFF_REACHED

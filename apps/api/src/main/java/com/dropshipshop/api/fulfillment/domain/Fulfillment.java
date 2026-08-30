@@ -189,7 +189,11 @@ public class Fulfillment {
 	}
 
 	public boolean handOverTerminalToCoreable(Instant handedOverAt) {
-		if (!isPortalSupplierOwned()) {
+		boolean supplierOwned = isPortalSupplierOwned();
+		boolean reportedShortageAwaitingTerminalReview = channel == FulfillmentChannel.SUPPLIER_PORTAL
+			&& operationalOwner == FulfillmentOperationalOwner.COREABLE
+			&& FulfillmentHandoverReasonCode.SUPPLIER_SHORTAGE_REPORTED.name().equals(handedOverReason);
+		if (!supplierOwned && !reportedShortageAwaitingTerminalReview) {
 			return false;
 		}
 		return applyHandover(

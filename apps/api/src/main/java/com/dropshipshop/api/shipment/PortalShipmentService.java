@@ -54,6 +54,9 @@ import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
 import com.dropshipshop.api.supplierportal.SupplierPortalHasher;
 import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
+import com.dropshipshop.api.supplierclaim.domain.SupplierShortageReport;
+import com.dropshipshop.api.supplierclaim.domain.SupplierShortageStatus;
+import com.dropshipshop.api.supplierclaim.repository.SupplierShortageReportRepository;
 import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
@@ -77,6 +80,7 @@ public class PortalShipmentService {
 	private final ShipmentRepository shipmentRepository;
 	private final ShipmentItemRepository shipmentItemRepository;
 	private final ShipmentChangeHistoryRepository historyRepository;
+	private final SupplierShortageReportRepository shortageReportRepository;
 	private final ClaimRepository claimRepository;
 	private final RefundRepository refundRepository;
 	private final CarrierRegistry carrierRegistry;
@@ -98,6 +102,7 @@ public class PortalShipmentService {
 		ShipmentRepository shipmentRepository,
 		ShipmentItemRepository shipmentItemRepository,
 		ShipmentChangeHistoryRepository historyRepository,
+		SupplierShortageReportRepository shortageReportRepository,
 		ClaimRepository claimRepository,
 		RefundRepository refundRepository,
 		CarrierRegistry carrierRegistry,
@@ -118,6 +123,7 @@ public class PortalShipmentService {
 		this.shipmentRepository = shipmentRepository;
 		this.shipmentItemRepository = shipmentItemRepository;
 		this.historyRepository = historyRepository;
+		this.shortageReportRepository = shortageReportRepository;
 		this.claimRepository = claimRepository;
 		this.refundRepository = refundRepository;
 		this.carrierRegistry = carrierRegistry;
@@ -166,7 +172,7 @@ public class PortalShipmentService {
 			throw notFound();
 		}
 		ReadAggregate aggregate = readAggregate(order);
-		boolean mutable = fulfillment.getOperationalOwner() == FulfillmentOperationalOwner.SUPPLIER
+		boolean mutable = fulfillment.isOpenPortalSupplierOwned()
 			&& PORTAL_ACTION_STATUSES.contains(order.getStatus())
 			&& fulfillment.getPiiAccessCutoffAt() != null
 			&& now.isBefore(fulfillment.getPiiAccessCutoffAt());
@@ -175,6 +181,12 @@ public class PortalShipmentService {
 		boolean complete = !aggregate.items().isEmpty() && unallocated.isEmpty()
 			&& aggregate.shipments().stream().anyMatch(shipment -> !shipment.isVoided());
 		boolean canRegister = mutable && !complete;
+		boolean canReportShortage = fulfillment.isOpenPortalSupplierOwned()
+			&& order.getStatus() == OrderStatus.SUPPLIER_ORDER_PENDING
+			&& fulfillment.getPiiAccessCutoffAt() != null
+			&& now.isBefore(fulfillment.getPiiAccessCutoffAt())
+			&& aggregate.shipments().isEmpty()
+			&& shortageReportRepository.findByOrder_Id(order.getId()).isEmpty();
 		return new PortalShipmentDtos.SupplierShipmentListResponse(
 			aggregate.shipments().stream()
 				.map(shipment -> toSupplier(shipment,
@@ -183,6 +195,7 @@ public class PortalShipmentService {
 			unallocated,
 			complete,
 			canRegister,
+			canReportShortage,
 			canRegister ? "REGISTER_SHIPMENT" : complete ? "NONE" : "CONTACT_COREABLE"
 		);
 	}
@@ -374,6 +387,10 @@ public class PortalShipmentService {
 		Shipment replay = creationReplay(aggregate.shipments(), key);
 		if (replay != null) {
 			return readCreationReplay(replay, hash, PortalShipmentDtos.AdminShipmentResponse.class);
+		}
+		if (aggregate.shortageReport() != null
+			&& aggregate.shortageReport().getStatus() == SupplierShortageStatus.REPORTED) {
+			throw conflict("An open supplier shortage report blocks shipment registration");
 		}
 		if (aggregate.fulfillment().getOperationalOwner() != FulfillmentOperationalOwner.COREABLE
 			|| !PORTAL_ACTION_STATUSES.contains(aggregate.order().getStatus())) {
@@ -653,10 +670,11 @@ public class PortalShipmentService {
 	private LockedAggregate lockAggregate(UUID orderId) {
 		CustomerOrder order = orderRepository.findByIdForUpdate(orderId).orElseThrow(this::notFound);
 		Fulfillment fulfillment = fulfillmentRepository.findByOrderIdForUpdate(orderId).orElseThrow(this::notFound);
+		SupplierShortageReport shortageReport = shortageReportRepository.findByOrderIdForUpdate(orderId).orElse(null);
 		List<Shipment> shipments = shipmentRepository.findAllByOrderIdForUpdate(orderId);
 		List<ShipmentItem> allocations = shipmentItemRepository.findAllByOrderIdForUpdate(orderId);
 		List<OrderItem> items = orderItemRepository.findAllByOrderIdForUpdate(orderId);
-		return new LockedAggregate(order, fulfillment, shipments, allocations, items);
+		return new LockedAggregate(order, fulfillment, shortageReport, shipments, allocations, items);
 	}
 
 	private void verifySupplierScope(LockedAggregate aggregate, Supplier supplier, String orderNumber) {
@@ -1057,6 +1075,7 @@ public class PortalShipmentService {
 	private record LockedAggregate(
 		CustomerOrder order,
 		Fulfillment fulfillment,
+		SupplierShortageReport shortageReport,
 		List<Shipment> shipments,
 		List<ShipmentItem> allocations,
 		List<OrderItem> items

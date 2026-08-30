@@ -52,6 +52,9 @@ class SupplierPortalOriginInterceptor implements HandlerInterceptor {
 			|| "/api/supplier-invites/session".equals(path)
 			|| path.startsWith("/api/supplier/")
 			|| path.matches("^/api/admin/supplier-applications/[^/]+/(approve|reject)$")
+			|| path.matches("^/api/admin/supplier-shortage-reports/[^/]+/(approve|reject)$")
+			|| path.matches("^/api/admin/claims/[^/]+/supplier-tasks$")
+			|| path.matches("^/api/admin/supplier-claim-tasks/[^/]+/close$")
 			|| path.matches("^/api/admin/suppliers/[^/]+/(invite/reissue|portal-status|sales-status|manager-disconnect|contact-email|portal-contract-status)$");
 	}
 }

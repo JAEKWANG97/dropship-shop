@@ -6,6 +6,11 @@ import { redirect } from "next/navigation";
 import { ApiError, apiSendWithCookie } from "@/lib/api";
 import { supplierMutationHeaders } from "@/lib/supplier";
 import {
+  adminSupplierClaimTaskCloseCommand,
+  adminSupplierClaimTaskCreateCommand,
+  adminSupplierTaskDueAt,
+} from "@/lib/supplier-claims";
+import {
   ADMIN_DEPOSIT_PATHS,
   ADMIN_REFUND_PATHS,
   adminDepositCommand,
@@ -86,6 +91,109 @@ async function postClaimAction(claimId: string, path: string, body: Record<strin
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+const CLAIM_TASK_CREATE_STATUSES = new Set([
+  "REQUESTED",
+  "UNDER_REVIEW",
+  "EVIDENCE_REQUESTED",
+  "APPROVED",
+  "RETURN_WAITING",
+  "RETURN_RECEIVED",
+  "REFUND_PROCESSING",
+  "EXCHANGE_SHIPPING",
+]);
+
+export async function createSupplierClaimTask(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const claimId = value(formData, "claimId");
+  const claimStatus = value(formData, "claimStatus");
+  const requestedType = value(formData, "requestedType");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const dueAt = adminSupplierTaskDueAt(value(formData, "dueAt"));
+  const command = adminSupplierClaimTaskCreateCommand(requestedType, dueAt ?? "");
+  if (!orderId || !claimId || !command || !idempotencyKey || !CLAIM_TASK_CREATE_STATUSES.has(claimStatus)) {
+    done(orderId, "클레임 상태, 요청 유형과 답변 기한을 다시 확인해 주세요.");
+  }
+
+  const retryAction = `supplier-task-create-${claimId}`;
+  try {
+    await apiSendWithCookie(
+      `/api/admin/claims/${encodeURIComponent(claimId)}/supplier-tasks`,
+      (await cookies()).toString(),
+      {
+        method: "POST",
+        headers: supplierMutationHeaders(idempotencyKey),
+        body: JSON.stringify(command),
+      },
+    );
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "공급처 클레임 작업 생성에 실패했습니다."),
+      retryAction,
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "공급처에 클레임 확인 작업을 요청했습니다.");
+}
+
+export async function closeSupplierClaimTask(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const taskId = value(formData, "taskId");
+  const expectedStatus = value(formData, "expectedStatus");
+  const closeReasonCode = value(formData, "closeReasonCode");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const returnTo = value(formData, "returnTo");
+  const command = adminSupplierClaimTaskCloseCommand(expectedStatus, closeReasonCode);
+  if (!orderId || !taskId || !idempotencyKey || !command) {
+    finishSupplierTaskAction(returnTo, orderId, taskId, "최신 작업 상태와 종료 사유를 다시 확인해 주세요.");
+  }
+
+  const retryAction = `supplier-task-close-${taskId}`;
+  try {
+    await apiSendWithCookie(
+      `/api/admin/supplier-claim-tasks/${encodeURIComponent(taskId)}/close`,
+      (await cookies()).toString(),
+      {
+        method: "POST",
+        headers: supplierMutationHeaders(idempotencyKey),
+        body: JSON.stringify(command),
+      },
+    );
+  } catch (error) {
+    finishSupplierTaskAction(
+      returnTo,
+      orderId,
+      taskId,
+      failureMessage(error, "공급처 클레임 작업 종료에 실패했습니다."),
+      retryAction,
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/supplier-claim-tasks");
+  finishSupplierTaskAction(returnTo, orderId, taskId, "공급처 클레임 작업을 종료했습니다.");
+}
+
+function finishSupplierTaskAction(
+  returnTo: string,
+  orderId: string,
+  taskId: string,
+  message: string,
+  retryAction?: string,
+  idempotencyKey?: string,
+): never {
+  if (returnTo !== "queue") done(orderId, message, retryAction, idempotencyKey);
+  const search = new URLSearchParams({ taskId, message });
+  if (retryAction && idempotencyKey) {
+    search.set("retryAction", retryAction);
+    search.set("idempotencyKey", idempotencyKey);
+  }
+  redirect(`/admin/supplier-claim-tasks?${search}`);
 }
 
 export async function startSupplierWork(formData: FormData) {

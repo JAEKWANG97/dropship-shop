@@ -6,10 +6,31 @@
 - 고객 결제의 현재 기준은 `2026-07-17: Direct Bank Transfer Only, No Toss Payments`와 `2026-07-18: Remove Unused Toss Payments Execution Paths`다. 이전 Toss/PG 항목은 역사 기록이다.
 - 상품 가격의 현재 기준은 `2026-07-28: Supplier Shipping Is Excluded From Product Markup`이다. 공급처 배송비는 수집 가능성 검증에는 사용하지만 판매가 계산에는 더하지 않는다.
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
-- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`, `2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data`, `2026-08-30: Portal Multiple Shipments Preserve Legacy Compatibility`다. `B-100` 신청·인증, `B-101` 개별 상품·검토, `B-102` 옵션 재고·예약·입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반과 `B-104` 복수 송장은 구현됐고 `B-105` 품절·클레임 사실은 Planned다.
+- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`, `2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data`, `2026-08-30: Portal Multiple Shipments Preserve Legacy Compatibility`, `2026-08-30: Supplier Shortage And Claim Tasks Use Closed Operational Contracts`다. `B-100` 신청·인증, `B-101` 개별 상품·검토, `B-102` 옵션 재고·예약·입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반, `B-104` 복수 송장과 `B-105` 품절·클레임 사실은 구현됐다.
 - 계좌입금 금액 불일치의 현재 기준도 같은 2026-08-29 결정과 구현된 B-102다. 식별된 양수 실제 수령액을 메모-only `PAYMENT_PENDING`으로 두지 않고 결제그룹 단위 전액 환불 예외로 처리한다. B-068의 과거 메모는 읽기 호환으로 남기며 어느 PaymentGroup인지 식별하지 못한 은행 거래는 주문을 추측해 변경하지 않는다.
 - Implemented 포털 송장 등록은 실제 배송 시작과 다르다. 고객에게 `송장 등록 · 배송조회 가능`과 공식 택배사 조회 링크만 제공하고, 기존 Domeggook 배송 동기화와 관리자 수동 보정은 호환 경로로 유지한다.
 - 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Implemented`/`Planned` 절을 함께 맞춘다.
+
+## 2026-08-30: Supplier Shortage And Claim Tasks Use Closed Operational Contracts
+
+Decision:
+
+`B-105`는 공급처 품절 보고와 Coreable 요청 클레임 사실을 별도 bounded workflow로 구현한다. 품절은 Shipment가 VOIDED 상태를 포함해 한 번도 생성되지 않은 배송 그룹 주문 전체에만 적용한다. 최초 보고는 `REPORTED`와 Coreable 인계만 만들고 고객·Order·Claim·Payment·Refund를 바꾸지 않는다. Coreable 승인만 기존 out-of-stock/refund service를 실행하고, 거절은 출고 소유권을 Coreable에 남긴다.
+
+Claim task instruction은 자유문이 아니라 요청 유형과 1:1인 네 코드와 고정 한국어 template만 사용한다: `SHIPMENT_STOP_RESULT -> CHECK_SHIPMENT_STOP`/`상품 발송을 멈출 수 있는지 확인해 주세요.`, `RETURN_INSTRUCTIONS -> PROVIDE_RETURN_METHOD`/`반품 수거 방법을 선택해 주세요.`, `RETURN_RECEIVED -> CONFIRM_RETURN_RECEIPT`/`반품 상품 수령 여부를 확인해 주세요.`, `INSPECTION_RESULT -> INSPECT_RETURNED_ITEM`/`반품 상품의 상태를 확인해 주세요.`. Task `dueAt`은 생성 서버시각보다 엄격히 미래이고 그 시각부터 30일 이하여야 한다. `checkedAt`과 `inspectedAt`은 task `requestedAt` 이상 현재 서버시각 이하여야 한다.
+
+첫 fact는 task를 `ANSWERED`로 바꾼다. 정정은 같은 task/type에서 다른 row의 `correctsFactId`로 참조되지 않은 유일한 latest effective fact만 참조해 선형 append-only history를 만들고, detail은 timestamp/id가 아니라 correction chain의 root에서 current head 순으로 반환한다. ADMIN은 `OPEN`과 `ANSWERED` 모두에서 `RESPONSE_ACCEPTED|SUPERSEDED|NO_LONGER_NEEDED`로 닫을 수 있고, `DUE_AT_EXPIRED|CLAIM_TERMINAL`은 server 전용이다.
+
+Consequences:
+
+- B-105는 supplier/admin shortage list/detail/review, supplier/admin claim-task list/detail/create/close와 supplier fact 입력까지 Web surface를 포함한다. 공급처 주문 상세의 전체 품절 보고 진입점은 기존 shipment list 응답에만 추가하는 `canReportShortage`가 true일 때 노출하고, supplier order-detail DTO에는 이 필드를 추가하지 않는다. Coreable Claim 상세에는 task 생성·검토·종료를 연결한다.
+- V44는 `orders(id,supplierId)`·`claims(id,orderId)` composite parent key, shortage의 Order/Supplier composite FK, task의 immutable `orderId`와 Claim/Order·Order/Supplier composite FK로 tenant ownership을 구조적으로 고정한다. Fact는 task별 root 하나와 predecessor별 child 하나만 허용하는 partial unique로 correction 분기를 DB에서도 차단한다.
+- Supplier claim-task projection만 기존 supplier order-detail authorization을 재사용해 `orderDetailAvailable`을 명시한다. 해당 시점에 기존 주문 상세가 FULL 또는 MASKED로 허용될 때만 `true`이고 클라이언트는 `false`일 때 상세 링크를 비활성화한다. Shortage projection에는 이 필드를 넣지 않고 report Web에도 주문 링크를 만들지 않는다.
+- 초기 운영량에는 pagination을 두지 않는다. Shortage list는 `{reports:[...]}`를 `createdAt DESC, reportId DESC`, task list는 facts 없는 summary `{tasks:[...]}`를 `requestedAt DESC, taskId DESC`로 반환하고 supplier/admin detail에서만 fact history를 제공한다. Supplier shortage/task는 각각 optional `status`, ADMIN shortage는 `status|orderId`, ADMIN task는 `status|claimId|orderId` filter만 지원하고 이 지원 filter의 유효하지 않은 값은 `400`이다.
+- Production flag가 false이면 `/api/supplier/**`는 계속 `404`다. 새 ADMIN claim-task 생성은 ADMIN/resource scope와 저장된 command replay를 먼저 확인해 동일 key/hash면 최초 결과를 반환하고, changed replay는 conflict로 거절하며, 새 command만 `409 SUPPLIER_PORTAL_NOT_RELEASED`로 막는다. 기존 shortage read/review와 claim-task read/close, expiry/terminal cleanup은 계속 허용한다.
+- ADMIN shortage approve/reject와 claim-task create/close도 browser cookie를 쓰는 unsafe mutation이므로 exact allowlist `Origin`, 또는 Origin 부재 시 exact same-origin `Referer` 검증을 통과해야 하며 실패는 mutation 전 `403`이다.
+- Task 생성의 최초 성공만 PII-free `SUPPLIER_CLAIM_WORK_REQUESTED` producer를 만든다. Replay, flag-off 거절과 읽기/종료는 새 알림을 만들지 않는다.
+- B-105 완료만으로 production portal을 열지 않는다. B-098 계약, 개인정보 고지, 실제 email 전달과 전체 release 검증은 별도 gate다.
 
 ## 2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data
 

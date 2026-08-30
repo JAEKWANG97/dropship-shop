@@ -1178,3 +1178,24 @@
 - 검증: API 전체 `82 suites / 367 tests`와 PostgreSQL 17 smoke `12 passed`, Portal Shipment API `11 passed`, Web lint `0 errors / 기존 warnings 3`, production build 30 pages, 공급처 출고 계약 Playwright Desktop/Mobile `26 passed`, `git diff --check`와 문서 fence parity를 통과했다.
 - 제한: 실제 택배 배송건, 로그인된 supplier/admin live E2E, PostgreSQL application-level 송장 경합·batch 부하는 별도 검증으로 남겼다. 배포와 production flag 활성화는 하지 않았으며 `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다.
 - 상태·후속작업: B-104는 `Review Ready`다. branch/PR 반영과 main 동기화 뒤 다음 독립 작업 단위는 B-105 공급처 품절 보고·클레임 사실 입력이다.
+
+## 2026-08-30 22:48 KST
+
+- 관련 항목: B-105
+- 작업: 구현 진행 중인 공급처 전체 품절 보고와 Coreable 요청 claim task/fact의 목표 계약을 정책·결정 로그·요구사항·API·도메인·ERD·주문 흐름·Web surface·backlog·테스트 문서에 동기화했다. 실행 코드와 migration은 이 문서 작업에서 변경하지 않았다.
+- 문제·고민: 품절 action capability의 DTO 위치, 안전한 instruction 문구, 시각 범위, append-only 정정 head와 표시 순서, OPEN/ANSWERED 종료 사유, flag-off replay 순서, 목록 shape와 Web 경로가 열려 있으면 구현별로 권한·PII·멱등성 동작이 달라질 수 있었다.
+- 해결방안: `canReportShortage`는 기존 supplier shipment list 응답에만, `orderDetailAvailable`은 supplier claim-task DTO에만 두었다. 네 instruction code/template을 1:1로 고정하고 due/fact 시각 범위, 유일 head를 잇는 root→current-head correction chain, ADMIN/system close reason, unpaged wrapper·stable ordering·filter와 `/admin/shortage-reports?reportId=...` master/detail을 명시했다.
+- 결정: Flag false에서는 supplier route를 `404`로 유지한다. ADMIN task create는 scope와 stored key/hash/result를 먼저 처리한 뒤 새 command만 `409 SUPPLIER_PORTAL_NOT_RELEASED`로 막고, 기존 shortage read/review·task read/close와 system close는 허용한다. B-105 완료만으로 production portal을 열지 않는다.
+- 검증 상태: 구현 검증은 아직 미실행이며 B-105는 `Todo`를 유지한다. `TEST_CHECKLIST`와 `TEST_LOG`에는 API/PostgreSQL/Web/동시성·부하 검증을 planned 상태로 남겼다.
+- 후속작업: backend/Web/V44 구현과 독립 검토 후 실제 전체 API, PostgreSQL fresh/upgrade·경합, Web lint/build와 Desktop/Mobile 계약 결과를 기록하고 모두 통과한 뒤에만 상태 변경을 검토한다.
+
+## 2026-08-30 23:38 KST
+
+- 관련 항목: B-105
+- 작업: 공급처 전체 품절 보고, Coreable 검토, claim task/fact/correction/close, V44 tenant·correction-chain 제약과 supplier/admin Web surface를 구현하고 현행 제품·정책·API·도메인·ERD·흐름 문서를 `Implemented`로 동기화했다.
+- 문제·고민: Supplier task 목록이 detail fact history까지 실어 나르는 비용과 정보 경계, supplier 조회의 Java 사후 tenant 비교, admin DTO의 불필요한 `orderDetailAvailable`, Claim terminal 전이와 fact 입력 경합에서 stale entity를 사용할 위험이 독립 검토에서 확인됐다. 목록 summary로 바꾼 뒤에도 task/report 수에 비례한 query 증가와 결제 예외 주문의 상세 링크 fail-open을 막을 증거가 필요했다.
+- 해결방안: Supplier/admin task list를 facts 없는 summary DTO로 분리하고 detail만 root→head fact history를 반환한다. Supplier task/fact 조회는 resource id와 supplier id를 같은 DB predicate에 포함하고, `orderDetailAvailable`은 supplier claim-task DTO에만 유지했다. Fact writer는 Order→Claim→Task→Fact lock 뒤 최신 scope를 다시 읽도록 보강했다. 1건/다건 task·shortage 목록의 prepared-statement count equality와 `PAYMENT_EXCEPTION`/late-deposit Refund의 `orderDetailAvailable=false` 회귀를 추가했다.
+- 결정: 품절 REPORTED는 Fulfillment만 Coreable에 인계하고 관리자 승인 때만 기존 out-of-stock/refund 흐름을 실행한다. 공급처 fact는 Claim/Order/Refund를 직접 바꾸지 않는다. `APP_SUPPLIER_PORTAL_ENABLED=false`와 replay-first admin 안전 경계를 유지하며 B-105 완료만으로 production을 열지 않는다.
+- 검증: API 전체 `83 suites / 379 tests`, PostgreSQL 17 smoke `13/13`, Web typecheck, lint `0 errors / 기존 warnings 3`, production build 34 pages, B-105 Desktop/Mobile Playwright `24 passed`와 기존 fulfillment `26 passed` 등 `50/50`, `git diff --check`와 Markdown fence parity를 통과했다. 독립 Web 재검토 blocker/major는 0건이다.
+- 제한: 실제 supplier/admin 로그인 live E2E, 실제 claim-work email 도착, PostgreSQL application-level 경합과 unpaged 목록·scheduler 성능 부하는 미검증이다. 배포와 production flag 활성화는 하지 않았다.
+- 상태·후속작업: B-105는 독립 backend/Web/호환성 audit의 blocker/major/minor 0건으로 `Review Ready`다. branch/PR CI를 마친 뒤에도 privacy notice, 실제 email, B-098 계약 증적 등 별도 release gate가 끝날 때까지 외부 포털을 열지 않는다.

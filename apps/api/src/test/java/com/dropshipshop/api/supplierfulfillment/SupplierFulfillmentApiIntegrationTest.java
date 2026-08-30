@@ -203,11 +203,7 @@ class SupplierFulfillmentApiIntegrationTest {
 				.content("{\"carrier\":\"CJ_LOGISTICS\",\"trackingNumber\":\"1234567890\"}"))
 			.andExpect(status().isConflict());
 
-		mockMvc.perform(post("/api/admin/orders/{orderId}/out-of-stock", fixture.order().getId())
-				.with(authentication(admin(fixture.admin().getId())))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"reason\":\"Supplier stock unavailable\"}"))
-			.andExpect(status().isOk());
+		approveSupplierShortage(fixture, "minimum-pii-terminal");
 
 		mockMvc.perform(get("/api/supplier/orders/{orderNumber}", fixture.order().getOrderNumber())
 				.with(authentication(supplier(fixture.manager().getId()))))
@@ -435,11 +431,9 @@ class SupplierFulfillmentApiIntegrationTest {
 			.extracting(SupplierPiiAccessLog::getAccessReason)
 			.containsExactly(SupplierPiiAccessReason.EXPIRED_MASKED);
 
-		mockMvc.perform(post("/api/admin/orders/{orderId}/out-of-stock", fixture.order().getId())
-				.with(authentication(admin(fixture.admin().getId())))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"reason\":\"Supplier stock unavailable\"}"))
-			.andExpect(status().isOk());
+		CustomerOrder terminalOrder = orderRepository.findById(fixture.order().getId()).orElseThrow();
+		terminalOrder.markOutOfStock();
+		orderRepository.saveAndFlush(terminalOrder);
 		mockMvc.perform(get("/api/supplier/orders/{orderNumber}", fixture.order().getOrderNumber())
 				.with(authentication(supplier(fixture.manager().getId()))))
 			.andExpect(status().isOk())
@@ -485,11 +479,7 @@ class SupplierFulfillmentApiIntegrationTest {
 	@Test
 	void grantRejectsDisallowedClaimAndExpiredContractWithoutWritingRowsOrAccessLogs() throws Exception {
 		Fixture disallowed = paidPortalOrder("grant-disallowed-status");
-		mockMvc.perform(post("/api/admin/orders/{orderId}/out-of-stock", disallowed.order().getId())
-				.with(authentication(admin(disallowed.admin().getId())))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"reason\":\"Supplier stock unavailable\"}"))
-			.andExpect(status().isOk());
+		approveSupplierShortage(disallowed, "grant-disallowed-terminal");
 		Claim rejected = claimRepository.saveAndFlush(new Claim(
 			disallowed.order(), disallowed.customer(), ClaimType.CANCEL, ClaimReason.DEFECT,
 			ClaimStatus.REJECTED, RequestedAction.REFUND, "Customer-safe claim memo"
@@ -506,11 +496,7 @@ class SupplierFulfillmentApiIntegrationTest {
 			rejected.getId(), "claim-disallowed-status-1")).isEmpty();
 
 		Fixture expired = paidPortalOrder("grant-expired-contract");
-		mockMvc.perform(post("/api/admin/orders/{orderId}/out-of-stock", expired.order().getId())
-				.with(authentication(admin(expired.admin().getId())))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"reason\":\"Supplier stock unavailable\"}"))
-			.andExpect(status().isOk());
+		approveSupplierShortage(expired, "grant-expired-terminal");
 		Claim approved = claimRepository.saveAndFlush(new Claim(
 			expired.order(), expired.customer(), ClaimType.CANCEL, ClaimReason.DEFECT,
 			ClaimStatus.APPROVED, RequestedAction.REFUND, "Customer-safe claim memo"
@@ -537,11 +523,7 @@ class SupplierFulfillmentApiIntegrationTest {
 	@Test
 	void claimGrantReopensReadOnlyFullAccessAndRevokeMasksAgain() throws Exception {
 		Fixture fixture = paidPortalOrder("claim-grant");
-		mockMvc.perform(post("/api/admin/orders/{orderId}/out-of-stock", fixture.order().getId())
-				.with(authentication(admin(fixture.admin().getId())))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"reason\":\"Supplier stock unavailable\"}"))
-			.andExpect(status().isOk());
+		approveSupplierShortage(fixture, "claim-grant-terminal");
 		Claim claim = claimRepository.saveAndFlush(new Claim(
 			fixture.order(), fixture.customer(), ClaimType.CANCEL, ClaimReason.DEFECT,
 			ClaimStatus.APPROVED, RequestedAction.REFUND, "Customer-safe claim memo"
@@ -679,6 +661,27 @@ class SupplierFulfillmentApiIntegrationTest {
 		assertThat(handoverHistoryRepository.findAllByFulfillment_IdOrderByCreatedAtAsc(fulfillment.getId()))
 			.extracting(history -> history.getReasonCode())
 			.containsExactly(FulfillmentHandoverReasonCode.TERMINAL_STATE);
+	}
+
+	private void approveSupplierShortage(Fixture fixture, String keyPrefix) throws Exception {
+		MvcResult submitted = mockMvc.perform(post(
+				"/api/supplier/orders/{orderNumber}/shortage-reports", fixture.order().getOrderNumber())
+				.header(HttpHeaders.ORIGIN, "http://localhost:3000")
+				.header("Idempotency-Key", keyPrefix + "-submit")
+				.with(authentication(supplier(fixture.manager().getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"reasonCode\":\"OUT_OF_STOCK\"}"))
+			.andExpect(status().isOk())
+			.andReturn();
+		String reportId = com.jayway.jsonpath.JsonPath.read(
+			submitted.getResponse().getContentAsString(), "$.reportId");
+		mockMvc.perform(post("/api/admin/supplier-shortage-reports/{reportId}/approve", reportId)
+				.header(HttpHeaders.ORIGIN, "http://localhost:3000")
+				.header("Idempotency-Key", keyPrefix + "-approve")
+				.with(authentication(admin(fixture.admin().getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"expectedStatus\":\"REPORTED\",\"reviewReasonCode\":\"SHORTAGE_CONFIRMED\"}"))
+			.andExpect(status().isOk());
 	}
 
 	private void assertAdminOnlyClaimMutation(

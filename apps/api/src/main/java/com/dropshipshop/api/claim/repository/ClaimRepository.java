@@ -32,6 +32,9 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 
 	Optional<Claim> findByRefund_Id(UUID refundId);
 
+	@Query("select claim.id from Claim claim where claim.refund.id = :refundId")
+	Optional<UUID> findIdByRefundId(@Param("refundId") UUID refundId);
+
 	boolean existsByOrder_IdAndClaimTypeAndStatusIn(
 		UUID orderId,
 		ClaimType claimType,

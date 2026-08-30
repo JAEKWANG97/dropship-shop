@@ -25,7 +25,7 @@ import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.refund.RefundService;
 
 @Service
-class AdminOrderFulfillmentService {
+public class AdminOrderFulfillmentService {
 
 	private final CustomerOrderRepository orderRepository;
 	private final FulfillmentRepository fulfillmentRepository;
@@ -114,17 +114,48 @@ class AdminOrderFulfillmentService {
 		AdminOrderDtos.OutOfStockRequest request
 	) {
 		CustomerOrder order = findOrder(orderId);
+		fulfillmentRepository.findByOrder_Id(orderId)
+			.filter(fulfillment -> fulfillment.getChannel() == FulfillmentChannel.SUPPLIER_PORTAL)
+			.ifPresent(fulfillment -> {
+				throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Supplier portal shortage requires the dedicated review workflow");
+			});
+		return applyOutOfStock(order, getOrCreateFulfillment(order), adminUserId, request.reason());
+	}
+
+	@Transactional
+	public void applyApprovedSupplierShortage(
+		CustomerOrder order,
+		Fulfillment fulfillment,
+		UUID adminUserId
+	) {
+		if (!order.getId().equals(fulfillment.getOrder().getId())
+			|| fulfillment.getChannel() != FulfillmentChannel.SUPPLIER_PORTAL
+			|| fulfillment.getOperationalOwner()
+				!= com.dropshipshop.api.fulfillment.domain.FulfillmentOperationalOwner.COREABLE) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT,
+				"Approved shortage must use the locked Coreable portal fulfillment");
+		}
+		applyOutOfStock(order, fulfillment, adminUserId, "SUPPLIER_SHORTAGE_CONFIRMED");
+	}
+
+	private AdminOrderDtos.AdminOrderActionResponse applyOutOfStock(
+		CustomerOrder order,
+		Fulfillment fulfillment,
+		UUID adminUserId,
+		String reason
+	) {
 		OrderStatus beforeStatus = order.getStatus();
 		try {
 			Instant now = Instant.now();
 			handoverService.takeOverTerminal(order, now);
 			order.markOutOfStock();
-			Fulfillment fulfillment = getOrCreateFulfillment(order);
-			fulfillment.markOutOfStock(request.reason());
+			fulfillment.markOutOfStock(reason);
 			fulfillmentRepository.save(fulfillment);
 			refundService.createOutOfStockRefund(order);
-			notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.OUT_OF_STOCK);
-			recordHistory(order, adminUserId, AdminOrderActionType.OUT_OF_STOCK, beforeStatus, request.reason());
+			notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null,
+				NotificationType.OUT_OF_STOCK);
+			recordHistory(order, adminUserId, AdminOrderActionType.OUT_OF_STOCK, beforeStatus, reason);
 			return actionResponse(order, fulfillment);
 		} catch (IllegalStateException ex) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());

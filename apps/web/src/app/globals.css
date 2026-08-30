@@ -2462,7 +2462,8 @@ body:has(.admin-shell) > .page-shell {
 }
 
 .admin-status-list > div,
-.admin-list > div {
+.admin-list > div,
+.admin-list > article {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
@@ -2470,8 +2471,13 @@ body:has(.admin-shell) > .page-shell {
   border-bottom: 1px solid var(--line);
 }
 
+.admin-list > article {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin-status-list > div:last-child,
-.admin-list > div:last-child {
+.admin-list > div:last-child,
+.admin-list > article:last-child {
   border-bottom: 0;
 }
 
