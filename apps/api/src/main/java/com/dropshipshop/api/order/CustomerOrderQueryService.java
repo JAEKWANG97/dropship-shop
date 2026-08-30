@@ -27,6 +27,7 @@ import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.refund.repository.RefundRepository;
+import com.dropshipshop.api.shipment.PortalShipmentService;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
@@ -37,6 +38,7 @@ public class CustomerOrderQueryService {
 	private static final EnumSet<OrderStatus> CUSTOMER_HISTORY_STATUSES = EnumSet.of(
 		OrderStatus.PAYMENT_EXCEPTION,
 		OrderStatus.SUPPLIER_ORDER_PENDING,
+		OrderStatus.TRACKING_REGISTERED,
 		OrderStatus.SUPPLIER_ORDERED,
 		OrderStatus.OUT_OF_STOCK,
 		OrderStatus.SHIPPED,
@@ -50,6 +52,7 @@ public class CustomerOrderQueryService {
 	private final OrderItemRepository orderItemRepository;
 	private final PaymentRepository paymentRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final PortalShipmentService portalShipmentService;
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
 	private final ClaimEvidenceRepository claimEvidenceRepository;
@@ -59,6 +62,7 @@ public class CustomerOrderQueryService {
 		OrderItemRepository orderItemRepository,
 		PaymentRepository paymentRepository,
 		ShipmentRepository shipmentRepository,
+		PortalShipmentService portalShipmentService,
 		RefundRepository refundRepository,
 		ClaimRepository claimRepository,
 		ClaimEvidenceRepository claimEvidenceRepository
@@ -67,6 +71,7 @@ public class CustomerOrderQueryService {
 		this.orderItemRepository = orderItemRepository;
 		this.paymentRepository = paymentRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.portalShipmentService = portalShipmentService;
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
 		this.claimEvidenceRepository = claimEvidenceRepository;
@@ -114,7 +119,10 @@ public class CustomerOrderQueryService {
 			.toList();
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
+		List<Shipment> activeShipments = shipmentRepository
+			.findAllByOrder_IdAndStatusNotOrderByRegisteredAtAscIdAsc(order.getId(), ShipmentStatus.VOIDED);
+		Shipment shipment = activeShipments.stream().findFirst().orElse(null);
+		var shipmentList = portalShipmentService.listCustomer(order.getUser().getId(), order.getId());
 		Refund refund = refundRepository.findByOrder_Id(order.getId())
 			.orElseGet(() -> refundRepository
 				.findByPaymentGroup_IdAndRefundScope(order.getPaymentGroup().getId(), RefundScope.PAYMENT_GROUP)
@@ -160,6 +168,9 @@ public class CustomerOrderQueryService {
 			items,
 			new OrderDtos.FulfillmentSummaryResponse(FulfillmentStatus.PENDING),
 			toShipmentSummary(shipment),
+			shipmentList.shipments(),
+			shipmentList.allocationComplete(),
+			activeShipments.size() > 1,
 			toRefundSummary(refund),
 			claims,
 			toClaimSummary(claim)

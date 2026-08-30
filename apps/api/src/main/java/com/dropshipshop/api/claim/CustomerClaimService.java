@@ -29,7 +29,6 @@ import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.refund.RefundService;
-import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
 @Service
@@ -81,7 +80,7 @@ class CustomerClaimService {
 		UUID orderId,
 		ClaimDtos.CustomerCancelRequest request
 	) {
-		CustomerOrder order = findCustomerOrder(userId, orderId);
+		CustomerOrder order = findCustomerOrderForUpdate(userId, orderId);
 		if (!order.isSelfServiceCancellable()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order is not eligible for self-service cancellation");
 		}
@@ -113,7 +112,7 @@ class CustomerClaimService {
 		ClaimDtos.CustomerClaimRequest request,
 		List<MultipartFile> evidenceFiles
 	) {
-		CustomerOrder order = findCustomerOrder(userId, orderId);
+		CustomerOrder order = findCustomerOrderForUpdate(userId, orderId);
 		List<MultipartFile> uploadFiles = nonEmptyFiles(evidenceFiles);
 		validateClaimRequest(request);
 		validateEvidenceRequirement(request, uploadFiles);
@@ -144,8 +143,16 @@ class CustomerClaimService {
 
 	@Transactional
 	ClaimDtos.ClaimResponse addEvidence(UUID userId, UUID orderId, UUID claimId, List<MultipartFile> evidenceFiles) {
-		Claim claim = claimRepository.findByIdAndUser_Id(claimId, userId)
-			.filter(item -> item.getOrder().getId().equals(orderId))
+		UUID claimOrderId = claimRepository.findOrderIdById(claimId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		if (!claimOrderId.equals(orderId)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found");
+		}
+		CustomerOrder order = orderRepository.findByIdForUpdate(orderId)
+			.filter(item -> item.getUser().getId().equals(userId))
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		Claim claim = claimRepository.findByIdForUpdate(claimId)
+			.filter(item -> item.getOrder().getId().equals(order.getId()) && item.getUser().getId().equals(userId))
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
 		List<MultipartFile> uploadFiles = nonEmptyFiles(evidenceFiles);
 		if (uploadFiles.isEmpty()) {
@@ -187,9 +194,9 @@ class CustomerClaimService {
 		if (order.getStatus() != OrderStatus.DELIVERED) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return or exchange claim is allowed only after delivery");
 		}
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId())
+		Instant deliveredAt = shipmentRepository.findMaxNonVoidedDeliveredAt(order.getId())
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Delivered shipment not found"));
-		validateReturnExchangeWindow(request.claimReason(), shipment.getDeliveredAt());
+		validateReturnExchangeWindow(request.claimReason(), deliveredAt);
 		rejectDuplicateClaim(order, request.claimType());
 		Claim claim = claimRepository.saveAndFlush(new Claim(
 			order,
@@ -250,6 +257,13 @@ class CustomerClaimService {
 
 	private CustomerOrder findCustomerOrder(UUID userId, UUID orderId) {
 		return orderRepository.findByIdAndUser_Id(orderId, userId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+	}
+
+	private CustomerOrder findCustomerOrderForUpdate(UUID userId, UUID orderId) {
+		findCustomerOrder(userId, orderId);
+		return orderRepository.findByIdForUpdate(orderId)
+			.filter(order -> order.getUser().getId().equals(userId))
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
 	}
 

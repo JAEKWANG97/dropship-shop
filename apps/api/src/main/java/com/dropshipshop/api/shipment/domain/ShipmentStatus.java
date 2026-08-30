@@ -3,5 +3,7 @@ package com.dropshipshop.api.shipment.domain;
 public enum ShipmentStatus {
 	READY,
 	SHIPPED,
-	DELIVERED
+	TRACKING_REGISTERED,
+	DELIVERED,
+	VOIDED
 }

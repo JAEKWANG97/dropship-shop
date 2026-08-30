@@ -30,6 +30,10 @@ public class SupplierPortalFeatureGate {
 	}
 
 	public void requireInvitationMutationReleased() {
+		requireOperationalMutationReleased();
+	}
+
+	public void requireOperationalMutationReleased() {
 		if (!isEnabled()) {
 			throw new ApiErrorException(
 				HttpStatus.CONFLICT,

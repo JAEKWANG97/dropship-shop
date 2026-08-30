@@ -1167,3 +1167,14 @@
 - CI 개선: PR #55 최초 API run에서 Linux/JDK 21의 DB timestamp 정밀도 때문에 retention test의 나노초 완전일치가 1건 실패했다. 운영 로직은 유지하고 assertion을 1 microsecond 이내 비교로 좁게 수정한 뒤 동일 JDK 21 전체 `342 tests`를 재검증했다.
 - 제한: 실제 supplier 로그인·route/API·CSS를 포함한 live E2E, 실제 email 도착, PostgreSQL 실동시 lock-order, 100건 초과 batch/부하와 provider accept 뒤 commit 실패 시 at-least-once 복구는 별도 운영 검증으로 남긴다.
 - 상태·후속작업: B-103은 `Review Ready`로 올렸다. 배포와 production flag 활성화는 하지 않았고 `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다. branch/PR 반영 뒤 다음 독립 작업 단위는 B-104 복수 송장·공식 배송조회 링크다.
+
+## 2026-08-30 21:52 KST
+
+- 관련 항목: B-104
+- 완료: `SUPPLIER_PORTAL` 주문에 복수 Shipment와 immutable OrderItem 수량 allocation을 추가했다. 첫 송장은 남은 전체 수량을 기본 할당하고 분할·추가 송장은 명시 수량을 받는다. 공급처와 인계받은 Coreable이 같은 aggregate service를 사용하며 고객은 `송장 등록 · 배송조회 가능`과 서버 생성 공식 택배사 링크를 본다.
+- 상태·증적: 송장 등록은 실제 집하가 아닌 `TRACKING_REGISTERED`다. supplier/admin 공유 key의 action·actor·canonical body hash, Shipment version, 정정·void·배송완료·제한된 완료 보정 이력과 마지막 유효 배송완료 Claim 기준을 구현했다. 각 등록은 PII cutoff를 `min(current, registeredAt+30일)`로만 단축한다.
+- 호환·migration: V43은 legacy Shipment를 전체 수량 allocation으로 backfill하고 V42-shaped rolling writer를 Order별 1건과 commit-time allocation으로 보호한다. Cross-order allocation뿐 아니라 allocation 뒤 Shipment/OrderItem의 parent Order 변경도 DB trigger로 막고 actor FK index를 추가했다. Legacy customer/admin singular projection과 Domeggook·Coreable 단일 Shipment writer는 portal channel 밖에서 유지한다.
+- 검토 개선: 독립 검토에서 정확한 cutoff 시각 재판정, nullable expected version, supplier owner read, tracking batch lock order, missing header 400, feature-off admin creation replay 순서, DB parent reassignment 우회, PostgreSQL과 같은 unsigned UUID batch 정렬, supplier-owned 송장의 관리자 운영 UI, 관리자 빈 version `0` 변환, 불확실한 실패의 idempotency key 보존과 route 전환·partial refresh 뒤 stale FULL 개인정보·행동 권한 잔존 위험을 찾아 구현·회귀 테스트·문서를 보강했다. 최종 blocker와 major는 0건이다.
+- 검증: API 전체 `82 suites / 367 tests`와 PostgreSQL 17 smoke `12 passed`, Portal Shipment API `11 passed`, Web lint `0 errors / 기존 warnings 3`, production build 30 pages, 공급처 출고 계약 Playwright Desktop/Mobile `26 passed`, `git diff --check`와 문서 fence parity를 통과했다.
+- 제한: 실제 택배 배송건, 로그인된 supplier/admin live E2E, PostgreSQL application-level 송장 경합·batch 부하는 별도 검증으로 남겼다. 배포와 production flag 활성화는 하지 않았으며 `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다.
+- 상태·후속작업: B-104는 `Review Ready`다. branch/PR 반영과 main 동기화 뒤 다음 독립 작업 단위는 B-105 공급처 품절 보고·클레임 사실 입력이다.

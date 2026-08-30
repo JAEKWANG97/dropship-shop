@@ -43,6 +43,8 @@ import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.RefundService;
 import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentItem;
+import com.dropshipshop.api.shipment.repository.ShipmentItemRepository;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -70,6 +72,7 @@ public class LocalOrderSeedData implements ApplicationRunner {
 	private final OrderItemRepository orderItemRepository;
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final ShipmentItemRepository shipmentItemRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final RefundService refundService;
@@ -86,6 +89,7 @@ public class LocalOrderSeedData implements ApplicationRunner {
 		OrderItemRepository orderItemRepository,
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
+		ShipmentItemRepository shipmentItemRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		RefundService refundService
@@ -101,6 +105,7 @@ public class LocalOrderSeedData implements ApplicationRunner {
 		this.orderItemRepository = orderItemRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.shipmentItemRepository = shipmentItemRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.refundService = refundService;
@@ -307,6 +312,9 @@ public class LocalOrderSeedData implements ApplicationRunner {
 		OrderStatus beforeStatus = order.getStatus();
 		order.markShipped();
 		Shipment shipment = shipmentRepository.save(new Shipment(order, "로컬택배", "LOCAL-" + order.getOrderNumber(), Instant.now()));
+		shipmentItemRepository.saveAll(orderItemRepository.findAllByOrder_IdOrderByCreatedAtAsc(order.getId()).stream()
+			.map(item -> new ShipmentItem(shipment, item, item.getQuantity()))
+			.toList());
 		recordHistory(order, admin, AdminOrderActionType.SHIPMENT_STARTED, beforeStatus, "Local seed shipment entered", reason);
 		return shipment;
 	}

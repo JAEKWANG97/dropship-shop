@@ -1,3 +1,5 @@
+import { ApiError } from "./api";
+
 export type AdminDepositCommand = {
   actualDepositorName: string;
   actualAmount: number;
@@ -45,6 +47,16 @@ export function idempotencyHeaders(key: string) {
 
 export function retryCommandKey(retry: RetryCommand, action: string) {
   return retry.action === action && isUuid(retry.key) ? retry.key : null;
+}
+
+export function uncertainAdminCommandKey(error: unknown, idempotencyKey: string) {
+  return !(error instanceof ApiError) || error.status >= 500 ? idempotencyKey : undefined;
+}
+
+export function parseAdminExpectedVersion(value: string) {
+  if (!/^(0|[1-9]\d*)$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 export function koreanLocalDateTime(value: string) {

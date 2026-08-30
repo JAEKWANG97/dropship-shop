@@ -1,6 +1,7 @@
 package com.dropshipshop.api.order;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -16,12 +17,16 @@ import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.CustomerOrder;
+import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
+import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentItem;
+import com.dropshipshop.api.shipment.repository.ShipmentItemRepository;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
 @Service
@@ -30,6 +35,8 @@ class AdminOrderShipmentService {
 	private final CustomerOrderRepository orderRepository;
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final ShipmentItemRepository shipmentItemRepository;
+	private final OrderItemRepository orderItemRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
@@ -39,6 +46,8 @@ class AdminOrderShipmentService {
 		CustomerOrderRepository orderRepository,
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
+		ShipmentItemRepository shipmentItemRepository,
+		OrderItemRepository orderItemRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
@@ -47,6 +56,8 @@ class AdminOrderShipmentService {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.shipmentItemRepository = shipmentItemRepository;
+		this.orderItemRepository = orderItemRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
@@ -61,15 +72,19 @@ class AdminOrderShipmentService {
 	) {
 		CustomerOrder order = orderRepository.findByIdForUpdate(orderId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
-		fulfillmentRepository.findByOrder_Id(orderId)
-			.filter(fulfillment -> fulfillment.getChannel() == FulfillmentChannel.SUPPLIER_PORTAL)
-			.ifPresent(fulfillment -> {
-				throw new ResponseStatusException(HttpStatus.CONFLICT,
-					"Supplier portal fulfillment requires the portal shipment workflow");
-			});
+		Fulfillment fulfillment = fulfillmentRepository.findByOrderIdForUpdate(orderId).orElse(null);
+		if (fulfillment != null && fulfillment.getChannel() == FulfillmentChannel.SUPPLIER_PORTAL) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT,
+				"Supplier portal fulfillment requires the portal shipment workflow");
+		}
+		List<Shipment> existingShipments = shipmentRepository.findAllByOrderIdForUpdate(order.getId());
+		List<OrderItem> orderItems = orderItemRepository.findAllByOrderIdForUpdate(order.getId());
 		OrderStatus beforeStatus = order.getStatus();
-		if (shipmentRepository.existsByOrder_Id(order.getId())) {
+		if (!existingShipments.isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipment already exists for order");
+		}
+		if (orderItems.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Order items are required for shipment allocation");
 		}
 		try {
 			order.markShipped();
@@ -77,7 +92,12 @@ class AdminOrderShipmentService {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
 		}
 
-		Shipment shipment = shipmentRepository.save(new Shipment(order, request.carrier(), request.trackingNumber(), Instant.now()));
+		Shipment shipment = shipmentRepository.saveAndFlush(
+			new Shipment(order, request.carrier(), request.trackingNumber(), Instant.now())
+		);
+		shipmentItemRepository.saveAll(orderItems.stream()
+			.map(item -> new ShipmentItem(shipment, item, item.getQuantity()))
+			.toList());
 		notificationService.transactionalSms(order.getUser(), order, order.getPaymentGroup(), null, null, NotificationType.SHIPMENT_STARTED);
 		actionHistoryRepository.save(new AdminOrderActionHistory(
 			order,
@@ -97,7 +117,6 @@ class AdminOrderShipmentService {
 			"Shipment tracking entered",
 			"Shipment tracking entered"
 		));
-		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
 		return new AdminOrderDtos.AdminOrderActionResponse(
 			order.getId(),
 			order.getStatus(),

@@ -921,7 +921,18 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(status().isBadRequest());
 
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
-		assertThat(shipmentRepository.findByOrder_Id(order.getId()).orElseThrow().getTrackingNumber()).isEqualTo("1234567890");
+		assertThat(shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId()).getFirst()
+			.getTrackingNumber()).isEqualTo("1234567890");
+
+		mockMvc.perform(get("/api/admin/orders/{orderId}", order.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.shipment.trackingNumber", is("1234567890")))
+			.andExpect(jsonPath("$.shipments", hasSize(1)))
+			.andExpect(jsonPath("$.shipments[0].trackingNumber", is("1234567890")))
+			.andExpect(jsonPath("$.shipments[0].allocations", hasSize(1)))
+			.andExpect(jsonPath("$.shipmentAllocationComplete", is(true)))
+			.andExpect(jsonPath("$.shipmentCompatibilityTruncated", is(false)));
 
 		mockMvc.perform(get("/api/admin/notifications")
 				.with(authentication(TestAuthentication.admin())))
@@ -942,7 +953,12 @@ class AdminOrderApiIntegrationTest {
 				.andExpect(jsonPath("$.displayStatus").doesNotExist())
 				.andExpect(jsonPath("$.shipment.status", is("SHIPPED")))
 				.andExpect(jsonPath("$.shipment.carrier", is("롯데택배")))
-				.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")));
+				.andExpect(jsonPath("$.shipment.trackingNumber", is("9988776655")))
+				.andExpect(jsonPath("$.shipments", hasSize(1)))
+				.andExpect(jsonPath("$.shipments[0].trackingNumber", is("9988776655")))
+				.andExpect(jsonPath("$.shipments[0].allocations", hasSize(1)))
+				.andExpect(jsonPath("$.shipmentAllocationComplete", is(true)))
+				.andExpect(jsonPath("$.shipmentCompatibilityTruncated", is(false)));
 	}
 
 	@Test
@@ -950,7 +966,7 @@ class AdminOrderApiIntegrationTest {
 		UserAccount customer = createCustomer("admin-order-customer-12");
 		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-SYNC-1", "ADM-SHIP-SYNC-CO-1", 36000);
 		createShipment(order, "CJ대한통운", "SYNC-123");
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		Shipment shipment = shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId()).getFirst();
 
 		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
 				.with(authentication(TestAuthentication.admin()))
@@ -1015,7 +1031,7 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.failed", is(1)))
 			.andExpect(jsonPath("$.notFound", is(0)));
 
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		Shipment shipment = shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId()).getFirst();
 		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.SHIPPED);
 		assertThat(shipment.getStatus()).isEqualTo(ShipmentStatus.SHIPPED);
 		assertThat(shipment.getTrackingSyncFailureReason()).isEqualTo("Carrier timeout");
@@ -1051,7 +1067,7 @@ class AdminOrderApiIntegrationTest {
 		UserAccount customer = createCustomer("admin-order-customer-14");
 		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-SYNC-AUTH-1", "ADM-SHIP-SYNC-AUTH-CO-1", 38000);
 		createShipment(order, "CJ대한통운", "SYNC-AUTH-123");
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		Shipment shipment = shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId()).getFirst();
 
 		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/tracking-sync", shipment.getId())
 				.with(authentication(TestAuthentication.customer(customer.getId())))
@@ -1069,7 +1085,7 @@ class AdminOrderApiIntegrationTest {
 		UserAccount customer = createCustomer("admin-order-customer-15");
 		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-MANUAL-1", "ADM-SHIP-MANUAL-CO-1", 39000);
 		createShipment(order, "우체국택배", "MANUAL-123");
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		Shipment shipment = shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId()).getFirst();
 
 		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/manual-correction", shipment.getId())
 				.with(authentication(TestAuthentication.admin()))
@@ -1142,7 +1158,7 @@ class AdminOrderApiIntegrationTest {
 		UserAccount customer = createCustomer("admin-order-customer-16");
 		CustomerOrder order = createSupplierOrderedOrder(customer, "ADM-SHIP-MANUAL-INVALID-1", "ADM-SHIP-MANUAL-INVALID-CO-1", 40000);
 		createShipment(order, "우체국택배", "MANUAL-INVALID-123");
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElseThrow();
+		Shipment shipment = shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId()).getFirst();
 
 		mockMvc.perform(post("/api/admin/shipments/{shipmentId}/manual-correction", shipment.getId())
 				.with(authentication(TestAuthentication.admin()))

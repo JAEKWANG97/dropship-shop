@@ -36,6 +36,23 @@ export type ShippingAddress = {
   deliveryMemo: string | null;
 };
 
+export type CustomerShipmentAllocation = {
+  orderItemId: string;
+  quantity: number;
+};
+
+export type CustomerShipment = {
+  shipmentId: string;
+  carrierCode?: string | null;
+  carrierName?: string;
+  trackingNumber?: string;
+  officialTrackingUrl?: string | null;
+  displayStatus?: string;
+  registeredAt?: string | null;
+  deliveredAt?: string | null;
+  allocations?: CustomerShipmentAllocation[];
+};
+
 export type OrderDetail = {
   orderId: string;
   orderNumber: string;
@@ -73,6 +90,9 @@ export type OrderDetail = {
     carrier: string | null;
     trackingNumber: string | null;
   };
+  shipments?: CustomerShipment[];
+  shipmentCompatibilityTruncated?: boolean;
+  shipmentAllocationComplete?: boolean;
   refund: {
     status: string | null;
     amount: number | null;
@@ -137,6 +157,7 @@ export function orderStatusLabel(status: string) {
       PAYMENT_EXCEPTION: "결제 확인 중",
       SUPPLIER_ORDER_PENDING: "결제 완료",
       SUPPLIER_ORDERED: "상품 준비 중",
+      TRACKING_REGISTERED: "송장 등록 · 배송조회 가능",
       SHIPPED: "배송 중",
       DELIVERED: "배송 완료",
       OUT_OF_STOCK: "품절 안내",
@@ -188,7 +209,18 @@ export function fulfillmentStatusLabel(status: string) {
 }
 
 export function shipmentStatusLabel(status: string) {
-  return ({ READY: "배송 전", IN_TRANSIT: "배송 중", SHIPPED: "배송 중", DELIVERED: "배송 완료" }[status] ?? status);
+  return ({
+    READY: "배송 전",
+    TRACKING_REGISTERED: "송장 등록 · 배송조회 가능",
+    IN_TRANSIT: "배송 중",
+    SHIPPED: "배송 중",
+    DELIVERED: "배송 완료",
+    VOIDED: "무효 처리",
+  }[status] ?? status);
+}
+
+export function customerDirectCancelBlocked(status: string) {
+  return status === "TRACKING_REGISTERED";
 }
 
 export function refundStatusLabel(status: string | null) {

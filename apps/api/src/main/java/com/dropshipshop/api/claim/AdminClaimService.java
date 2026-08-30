@@ -25,6 +25,7 @@ import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.refund.RefundService;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.fulfillment.SupplierFulfillmentHandoverService;
+import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 
 @Service
 class AdminClaimService {
@@ -37,6 +38,7 @@ class AdminClaimService {
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final SupplierFulfillmentHandoverService handoverService;
+	private final ShipmentRepository shipmentRepository;
 
 	AdminClaimService(
 		ClaimRepository claimRepository,
@@ -46,7 +48,8 @@ class AdminClaimService {
 		NotificationService notificationService,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
-		SupplierFulfillmentHandoverService handoverService
+		SupplierFulfillmentHandoverService handoverService,
+		ShipmentRepository shipmentRepository
 	) {
 		this.claimRepository = claimRepository;
 		this.orderRepository = orderRepository;
@@ -56,6 +59,7 @@ class AdminClaimService {
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.handoverService = handoverService;
+		this.shipmentRepository = shipmentRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -76,6 +80,11 @@ class AdminClaimService {
 	) {
 		Claim claim = findReviewableClaim(claimId);
 		try {
+			if (claim.getClaimType() == ClaimType.CANCEL
+				&& shipmentRepository.countNonVoided(claim.getOrder().getId()) > 0) {
+				throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Active tracking must be voided before approving cancellation");
+			}
 			if (claim.getClaimType() == ClaimType.RETURN) {
 				claim.approveReturn(adminUserId, request.reason(), Instant.now());
 			} else {

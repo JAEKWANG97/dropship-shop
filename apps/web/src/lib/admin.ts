@@ -87,6 +87,44 @@ type AdminReferralListResponse = {
   referrals: AdminReferral[];
 };
 
+export type AdminCarrier = {
+  carrierCode: string;
+  carrierName: string;
+  officialTrackingSupported: boolean;
+};
+
+export type AdminShipmentAllocation = {
+  orderItemId: string;
+  quantity: number;
+};
+
+export type AdminShipmentHistory = {
+  historyId: string;
+  actorType: string;
+  action: string;
+  beforeSnapshot: string | null;
+  afterSnapshot: string | null;
+  reason: string;
+  evidenceObservedAt: string | null;
+  createdAt: string;
+};
+
+export type AdminPortalShipment = {
+  shipmentId: string;
+  version?: number;
+  status?: string;
+  carrierCode?: string | null;
+  carrierName?: string;
+  trackingNumber?: string;
+  officialTrackingUrl?: string | null;
+  countsTowardAllocation?: boolean;
+  registeredAt?: string | null;
+  deliveredAt?: string | null;
+  evidenceObservedAt?: string | null;
+  allocations?: AdminShipmentAllocation[];
+  histories?: AdminShipmentHistory[];
+};
+
 export type AdminOrder = {
   orderId: string;
   orderNumber: string;
@@ -162,6 +200,9 @@ export type AdminOrder = {
     manualCorrectedAt: string | null;
     manualCorrectionReason: string | null;
   } | null;
+  shipments?: AdminPortalShipment[];
+  shipmentCompatibilityTruncated?: boolean;
+  shipmentAllocationComplete?: boolean;
   refund?: {
     refundId: string;
     orderId?: string | null;
@@ -206,7 +247,15 @@ export type AdminOrder = {
       uploadedAt: string;
     }[];
   } | null;
-  items?: { productName: string; optionName: string; quantity: number; unitPrice: number }[];
+  items?: {
+    orderItemId?: string;
+    productId?: string;
+    productOptionId?: string;
+    productName: string;
+    optionName: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
   shippingAddress?: string | {
     recipientName: string;
     recipientPhone: string;
@@ -239,6 +288,39 @@ export function adminRefundProjection(refund: NonNullable<AdminOrder["refund"]>)
 export function adminPortalFulfillmentAction(fulfillment: AdminOrder["fulfillment"]) {
   if (fulfillment?.channel !== "SUPPLIER_PORTAL") return null;
   return fulfillment.operationalOwner === "SUPPLIER" ? "TAKEOVER" : "COREABLE";
+}
+
+export function hasCanonicalAdminShipmentAllocations(shipments: AdminOrder["shipments"]) {
+  return Array.isArray(shipments)
+    && shipments.every((shipment) => Array.isArray(shipment.allocations));
+}
+
+export function adminPortalShipmentMutationAllowed(
+  allocationContractAvailable: boolean,
+  operationalOwner: string | null | undefined,
+  version: number | null | undefined,
+) {
+  return allocationContractAvailable
+    && (operationalOwner === "SUPPLIER" || operationalOwner === "COREABLE")
+    && Number.isInteger(version)
+    && (version ?? -1) >= 0;
+}
+
+export function normalizeAdminCarriers(value: unknown): AdminCarrier[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+  const carriers = (value as { carriers?: unknown }).carriers;
+  if (!Array.isArray(carriers)) return [];
+  return carriers.flatMap((value) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+    const carrier = value as Record<string, unknown>;
+    const carrierCode = typeof carrier.carrierCode === "string" ? carrier.carrierCode.trim() : "";
+    const carrierName = typeof carrier.carrierName === "string" ? carrier.carrierName.trim() : "";
+    return carrierCode && carrierName ? [{
+      carrierCode,
+      carrierName,
+      officialTrackingSupported: carrier.officialTrackingSupported === true,
+    }] : [];
+  });
 }
 
 export type AdminOrderActionHistory = {
@@ -325,6 +407,10 @@ export async function getAdminOrderActions(orderId: string) {
 	return data.actions;
 }
 
+export async function getAdminCarriers() {
+	return normalizeAdminCarriers(await readAdmin<unknown>("/api/admin/carriers"));
+}
+
 export function adminStatusLabel(status: string) {
   return (
     {
@@ -336,6 +422,7 @@ export function adminStatusLabel(status: string) {
       EXPIRED: "입금기한 만료",
       SUPPLIER_ORDER_PENDING: "발주대기",
       SUPPLIER_ORDERED: "발주완료",
+      TRACKING_REGISTERED: "송장 등록 · 배송조회 가능",
       SHIPPED: "배송중",
       DELIVERED: "배송완료",
       OUT_OF_STOCK: "품절",

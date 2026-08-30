@@ -205,6 +205,37 @@ public class CustomerOrder {
 		this.status = OrderStatus.SHIPPED;
 	}
 
+	public void markTrackingRegistered() {
+		if (status == OrderStatus.TRACKING_REGISTERED) {
+			return;
+		}
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING) {
+			throw new IllegalStateException("Tracking can be registered only while portal fulfillment is requested");
+		}
+		this.status = OrderStatus.TRACKING_REGISTERED;
+	}
+
+	public void returnToSupplierOrderPendingAfterShipmentVoid() {
+		if (status != OrderStatus.TRACKING_REGISTERED) {
+			throw new IllegalStateException("Portal fulfillment can resume only after tracking registration");
+		}
+		this.status = OrderStatus.SUPPLIER_ORDER_PENDING;
+	}
+
+	public void markDeliveredByPortalAggregate() {
+		if (status != OrderStatus.TRACKING_REGISTERED) {
+			throw new IllegalStateException("Portal order can be delivered only after tracking registration");
+		}
+		this.status = OrderStatus.DELIVERED;
+	}
+
+	public void reopenPortalDelivery() {
+		if (status != OrderStatus.DELIVERED) {
+			throw new IllegalStateException("Portal delivery can be reopened only after delivery");
+		}
+		this.status = OrderStatus.TRACKING_REGISTERED;
+	}
+
 	public void markDeliveredByTracking() {
 		if (status != OrderStatus.SHIPPED) {
 			throw new IllegalStateException("Order can be delivered only after shipment");
@@ -227,7 +258,8 @@ public class CustomerOrder {
 
 	public boolean canRequestCancellationClaim() {
 		return (status == OrderStatus.SUPPLIER_ORDER_PENDING && (supplierOrderStartedAt != null || addressLockedAt != null))
-			|| status == OrderStatus.SUPPLIER_ORDERED;
+			|| status == OrderStatus.SUPPLIER_ORDERED
+			|| status == OrderStatus.TRACKING_REGISTERED;
 	}
 
 	public void markRefundRequested() {

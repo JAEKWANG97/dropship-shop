@@ -24,7 +24,7 @@
 
 ### Supplier Portal Onboarding — Implemented (`B-100`), Production Gated
 
-`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름, `B-102`의 옵션 재고·24시간 예약·입금 예외, `B-103`의 출고 요청·최소 PII·운영 이메일 기반은 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup과 `B-104`~`B-105`는 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 production flag는 기본 `off`를 유지한다.
+`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름, `B-102`의 옵션 재고·24시간 예약·입금 예외, `B-103`의 출고 요청·최소 PII·운영 이메일 기반, `B-104`의 복수 송장·수량 할당·공식 배송조회 링크는 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup과 `B-105`는 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 production `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다.
 
 - 비로그인 사용자는 필수 공급처명·담당자명·연락 이메일과 선택 전화번호·문의 메모로 공급처 신청을 제출할 수 있어야 한다.
 - 신청 화면은 active `SUPPLIER_APPLICATION_PRIVACY`의 수집 목적, 항목, 보유 기간, 동의 거부 시 신청 불가를 고지해야 한다. 서버는 exact active version을 검증하고 canonical 동의시각을 저장해야 한다.
@@ -94,7 +94,7 @@
 - 삭제는 expected Product version, tenant/management-channel guard와 scalar ownership discovery 뒤 `Supplier -> fresh Product -> 모든 Option(id)` 잠금을 사용해야 한다. Cart 추가와 checkout 참조 생성도 같은 잠금 계약과 fresh ownership/saleability·참조 guard를 사용해 stale owner, FK 오류나 유실 참조를 노출하지 않아야 한다.
 - 실제 삭제 뒤에도 immutable subject id, actor, 삭제 전 version과 allowlisted before snapshot 이력은 남아야 한다. Live Product/ProductOption 이력 FK는 nullable이어야 하며, 이미지 metadata 삭제와 unique durable binary-cleanup job enqueue는 원자적으로 commit되어야 한다. Cleanup job이 생긴 key는 admin 재첨부를 거절하고, 반복 enqueue는 멱등이어야 한다. Worker는 삭제 직전 live ProductImage 참조가 있으면 binary를 보존하고 `LIVE_REFERENCE`로 완료하며, 실제 metadata 제거 시 같은 job을 다시 열어야 한다.
 - 최초 등록, 검토, 보완, 재제출과 거절의 허용 상태 전이를 명시해야 한다. 보완 재제출은 자동 공개하지 않고 다시 검토로 보내며 supplier-safe message와 내부 reason을 분리해야 한다.
-- B-100~B-103이 배포된 동안에도 production supplier portal feature gate를 닫아 고객 판매를 시작하지 않아야 한다. B-102 inventory guard와 B-103 fulfillment/privacy 기반은 필요조건이며 B-104~B-105, 개인정보·실 email·계약 gate가 모두 준비된 뒤에만 실제 공개·외부 route를 열어야 한다.
+- B-100~B-104가 배포된 동안에도 production supplier portal feature gate를 닫아 고객 판매를 시작하지 않아야 한다. B-102 inventory guard, B-103 fulfillment/privacy 기반과 B-104 복수 송장은 필요조건이며 B-105, 개인정보·실 email·B-098 계약 gate가 모두 준비된 뒤에만 실제 공개·외부 route를 열어야 한다.
 
 ### Cart
 
@@ -191,7 +191,7 @@
 - 공급처 주문 목록에는 주문번호, 처리 상태, 자기 상품 요약, 수량과 요청시각만 제공하고 고객 개인정보를 포함하지 않아야 한다.
 - 공급처 처리 상태는 raw `SUPPLIER_ORDER_PENDING` 대신 `FULFILLMENT_REQUESTED` 같은 전용 표시값을 사용해 수락 대기 단계처럼 보이지 않아야 한다.
 - 공급처 주문 상세에는 자기 공급처 배송에 필요한 수령인 이름·전화, 우편번호·주소, 배송 메모만 제공하고 고객 계정, 결제, 입금, 환불과 다른 공급처 정보를 제공하지 않아야 한다.
-- 공급처의 전체 개인정보 접근 종료시각은 출고 요청 +60일로 저장해 시작해야 한다. cutoff scheduler/lazy read와 `OUT_OF_STOCK`, `CANCELLED`, `REFUND_REQUESTED`, `REFUNDED` terminal 상태는 즉시 Coreable 인계·마스킹한다. 송장마다 `min(현재 저장 cutoff, 해당 registeredAt+30일)`로 단축하고 void·교체·추가 송장이 늘리지 않게 하는 실제 Shipment writer는 Planned `B-104`가 맡는다.
+- 공급처의 전체 개인정보 접근 종료시각은 출고 요청 +60일로 저장해 시작해야 한다. cutoff scheduler/lazy read와 `OUT_OF_STOCK`, `CANCELLED`, `REFUND_REQUESTED`, `REFUNDED` terminal 상태는 즉시 Coreable 인계·마스킹한다. Implemented `B-104` Shipment writer는 송장마다 `min(현재 저장 cutoff, 해당 registeredAt+30일)`로 단축하고 void·교체·추가 송장이 이를 늘리지 않게 해야 한다.
 - cutoff 시각부터(`now >= cutoff`) 한 글자 이름을 `*`, 두 글자 이상 이름을 첫 Unicode code point와 고정 `**`로 반환해야 한다. 전화번호는 숫자로 정규화해 4자리 이하면 전부 가리고, 5자리 이상이면 마지막 4자리만 남겨야 한다. 우편번호, 주소와 배송 메모는 `null`로 반환하고 응답에 `piiAccessLevel=MASKED`와 `Cache-Control: no-store`를 적용해야 한다.
 - 공급처의 주문 상세 접근은 actor, 주문, 접근 근거와 시각만 기록하고 실제 개인정보 값이나 응답 본문을 로그에 복제하지 않아야 한다.
 - Claim PII grant/extension은 각각 요청시각부터 최대 30일로 제한하고 append-only로 기록해야 한다. Grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED` reason code만 허용하고 자유문을 저장하지 않아야 한다. Claim이 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 중 하나이고 deadline 전이며 이후 revoke가 없고 Supplier contract가 time-valid VERIFIED일 때만 전체 접근을 한시 재개해야 한다. 다른/terminal Claim 상태나 contract expiry/revoke는 즉시 무효화해야 한다.
@@ -216,16 +216,17 @@
 - 도매꾹 외 공급처 주문은 관리자가 택배사와 송장번호를 직접 입력할 수 있어야 한다.
 - 고객은 주문 내역에서 배송 정보를 볼 수 있어야 한다.
 
-### Supplier Portal Shipment — Planned (`B-104`)
+### Supplier Portal Shipment — Implemented (`B-104`)
 
 - 공급처 포털 주문은 주문 1개에 여러 Shipment를 허용하고 각 Shipment에 주문 항목별 양수 수량을 할당할 수 있어야 한다.
 - 첫 송장에서 allocation을 생략하면 아직 미할당된 전 수량을 기본 배정하고, 추가 송장은 명시적 allocation을 요구해야 한다.
 - 같은 주문 항목에 대한 모든 Shipment 누적 할당량은 주문수량을 넘을 수 없으며 동시 등록은 주문과 항목 잠금으로 보호해야 한다.
 - 공급처는 택배사 코드와 송장번호만 등록할 수 있고 실제 집하, 배송중, 배송완료 상태를 직접 입력할 수 없어야 한다.
+- 지원 registry는 `CJ_LOGISTICS`(CJ대한통운), `LOTTE`(롯데택배), `HANJIN`(한진택배), `KOREA_POST`(우체국택배) 4개로 고정하고 공급처와 관리자는 서버 조회 목록에서 선택해야 한다.
 - 서버는 택배사 코드와 송장번호로 공식 택배사 조회 링크를 생성하고 임의 URL을 저장하지 않아야 한다.
 - 공급처 송장 등록은 실제 출고와 분리된 `TRACKING_REGISTERED`로 표현해야 한다.
 - 실시간 택배사 상태 API는 공급처 포털 초기 범위에 포함하지 않고 고객은 공식 조회 링크를 사용하며 Coreable은 기존 수동 배송완료 보정을 유지해야 한다.
-- 공급처는 배송완료 전 자기 송장의 택배사·번호만 version과 사유로 정정할 수 있어야 한다. allocation 오류는 Coreable이 Shipment를 `VOIDED`한 뒤 다시 등록하게 해 과거 할당 행을 수정·삭제하지 않아야 한다.
+- 공급처는 배송완료 전 자기 송장의 택배사·번호만 version과 200자 이하 single-line PII-free 사유로 정정할 수 있어야 한다. 관리자 정정·무효화·배송완료·배송완료 정정 사유도 같은 200자 single-line PII-free 경계를 사용한다. allocation 오류는 Coreable이 Shipment를 `VOIDED`한 뒤 다시 등록하게 해 과거 할당 행을 수정·삭제하지 않아야 한다.
 - Coreable은 배송완료 전 오등록 송장을 `VOIDED` 처리하고, 확인시각·사유를 증적으로 유효 Shipment를 배송완료 처리할 수 있어야 한다. 마지막 유효 송장 void는 주문을 출고 요청 상태로 되돌리고 그 밖에는 유효 송장 집계로 상태를 재계산해야 한다.
 - 배송완료/시각정정은 `registeredAt <= deliveredAt <= evidenceObservedAt <= now` 순서를 만족해야 한다. Coreable은 portal 수동 배송완료 오입력을 후속 Claim/Refund 생성 전까지만 사유·idempotency·version guard로 `REOPEN_TRACKING`하거나 완료시각을 정정할 수 있어야 한다. 원래 증적은 이력에 보존하고 후속 처리가 있으면 `409`로 거절하며 고객에게 보이는 후퇴 정정을 알림으로 남겨야 한다.
 - 모든 주문수량이 void되지 않은 Shipment에 할당되고 각 Shipment가 Coreable 배송완료 증적을 가진 경우에만 주문을 `DELIVERED`로 전환할 수 있어야 한다.
@@ -293,7 +294,7 @@
 - 실제 계좌환불 완료 없는 환불 완료, 송장 없는 배송중, 배송 기록 없는 배송완료, 배송 후 품절 전이는 금지되어야 한다.
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유 입력이 필수여야 한다.
 - 상품 가격, 상품 판매 상태, 상품 옵션 판매 상태, 상품 공급처 변경은 MVP부터 변경 이력을 기록해야 한다.
-- Implemented B-100~B-103 공급처 포털의 신청 승인, 초대 재발급·폐기, 상품 검토, 재고, 출고 요청·PII 접근은 공급처 tenant와 actor를 포함해 감사 기록을 남겨야 한다. Planned B-104 송장과 B-105 공급처 사실 변경도 같은 경계를 유지해야 한다.
+- Implemented B-100~B-104 공급처 포털의 신청 승인, 초대 재발급·폐기, 상품 검토, 재고, 출고 요청·PII 접근·송장 변경은 공급처 tenant와 actor를 포함해 감사 기록을 남겨야 한다. Planned B-105 공급처 사실 변경도 같은 경계를 유지해야 한다.
 - 공급처는 고객 결제, 환불, 클레임 승인·거절과 관리자 수동 보정을 수행할 수 없어야 한다.
 
 ### Legal And Customer Notice

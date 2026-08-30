@@ -2,9 +2,11 @@ package com.dropshipshop.api.supplierfulfillment;
 
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.supplierportal.domain.FulfillmentHandoverHistory;
 import com.dropshipshop.api.supplierportal.repository.FulfillmentHandoverHistoryRepository;
+import com.dropshipshop.api.shipment.domain.ShipmentItem;
+import com.dropshipshop.api.shipment.repository.ShipmentItemRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
@@ -58,6 +62,7 @@ class SupplierOrderService {
 	private final SupplierPiiAccessGrantRepository grantRepository;
 	private final SupplierPiiAccessLogRepository accessLogRepository;
 	private final SupplierFulfillmentHandoverService handoverService;
+	private final ShipmentItemRepository shipmentItemRepository;
 
 	SupplierOrderService(
 		SupplierRepository supplierRepository,
@@ -68,7 +73,8 @@ class SupplierOrderService {
 		FulfillmentHandoverHistoryRepository handoverHistoryRepository,
 		SupplierPiiAccessGrantRepository grantRepository,
 		SupplierPiiAccessLogRepository accessLogRepository,
-		SupplierFulfillmentHandoverService handoverService
+		SupplierFulfillmentHandoverService handoverService,
+		ShipmentItemRepository shipmentItemRepository
 	) {
 		this.supplierRepository = supplierRepository;
 		this.userAccountRepository = userAccountRepository;
@@ -79,6 +85,7 @@ class SupplierOrderService {
 		this.grantRepository = grantRepository;
 		this.accessLogRepository = accessLogRepository;
 		this.handoverService = handoverService;
+		this.shipmentItemRepository = shipmentItemRepository;
 	}
 
 	@Transactional(readOnly = true)
@@ -124,6 +131,15 @@ class SupplierOrderService {
 		UserAccount actor = userAccountRepository.findByIdAndStatus(actorUserId, UserStatus.ACTIVE)
 			.orElseThrow(this::forbidden);
 		accessLogRepository.save(new SupplierPiiAccessLog(actor, order, decision.accessReason(), now));
+		List<OrderItem> orderItems = items(fulfillment);
+		Map<UUID, Integer> allocatedByItem = shipmentItemRepository
+			.findAllByOrder_IdOrderByOrderItem_IdAsc(order.getId()).stream()
+			.filter(allocation -> !allocation.getShipment().isVoided())
+			.collect(Collectors.toMap(
+				allocation -> allocation.getOrderItem().getId(),
+				ShipmentItem::getQuantity,
+				Integer::sum
+			));
 		return new SupplierOrderDtos.OrderDetailResponse(
 			order.getOrderNumber(),
 			status(order),
@@ -132,9 +148,13 @@ class SupplierOrderService {
 			decision.basis(),
 			decision.accessUntil(),
 			recipient(order, decision.full()),
-			items(fulfillment).stream().map(item -> new SupplierOrderDtos.DetailItemResponse(
-				item.getId(), item.getProductName(), item.getOptionName(), item.getQuantity(), 0, item.getQuantity()
-			)).toList()
+			orderItems.stream().map(item -> {
+				int allocated = allocatedByItem.getOrDefault(item.getId(), 0);
+				return new SupplierOrderDtos.DetailItemResponse(
+					item.getId(), item.getProductName(), item.getOptionName(), item.getQuantity(), allocated,
+					Math.max(0, item.getQuantity() - allocated)
+				);
+			}).toList()
 		);
 	}
 
@@ -230,6 +250,7 @@ class SupplierOrderService {
 	private String status(CustomerOrder order) {
 		return switch (order.getStatus()) {
 			case SUPPLIER_ORDER_PENDING, SUPPLIER_ORDERED -> "FULFILLMENT_REQUESTED";
+			case TRACKING_REGISTERED -> "TRACKING_REGISTERED";
 			case SHIPPED -> "TRACKING_REGISTERED";
 			case DELIVERED -> "DELIVERED";
 			default -> "CLOSED";

@@ -1,5 +1,6 @@
 package com.dropshipshop.api.claim.repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,8 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 		ClaimType claimType,
 		Collection<ClaimStatus> statuses
 	);
+
+	boolean existsByOrder_IdAndCreatedAtAfter(UUID orderId, Instant createdAt);
 
 	@Query("select claim.order.id from Claim claim where claim.id = :id")
 	Optional<UUID> findOrderIdById(@Param("id") UUID id);

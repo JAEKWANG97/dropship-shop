@@ -1,5 +1,6 @@
 package com.dropshipshop.api.refund.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 
 import jakarta.persistence.LockModeType;
@@ -30,8 +32,21 @@ public interface RefundRepository extends JpaRepository<Refund, UUID> {
 
 	boolean existsByPaymentGroup_Id(UUID paymentGroupId);
 
+	boolean existsByOrder_IdAndCreatedAtAfter(UUID orderId, Instant createdAt);
+
+	boolean existsByPaymentGroup_IdAndOrderIsNullAndCreatedAtAfter(UUID paymentGroupId, Instant createdAt);
+
 	@Query("select refund.paymentGroup.id from Refund refund where refund.id = :refundId")
 	Optional<UUID> findPaymentGroupIdById(@Param("refundId") UUID refundId);
+
+	@Query("""
+		select refund.order.id as orderId,
+			refund.paymentGroup.id as paymentGroupId,
+			refund.reason as reason
+		from Refund refund
+		where refund.id = :refundId
+		""")
+	Optional<RefundLockTarget> findLockTargetById(@Param("refundId") UUID refundId);
 
 	@Query("""
 		select refund
@@ -45,4 +60,12 @@ public interface RefundRepository extends JpaRepository<Refund, UUID> {
 		@Param("userId") UUID userId,
 		@Param("statuses") List<RefundStatus> statuses
 	);
+
+	interface RefundLockTarget {
+		UUID getOrderId();
+
+		UUID getPaymentGroupId();
+
+		RefundReason getReason();
+	}
 }

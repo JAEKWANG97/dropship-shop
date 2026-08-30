@@ -37,7 +37,10 @@ import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.repository.RefundRepository;
+import com.dropshipshop.api.shipment.PortalShipmentDtos;
+import com.dropshipshop.api.shipment.PortalShipmentService;
 import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentStatus;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
 
@@ -52,6 +55,7 @@ class AdminOrderQueryService {
 	private final PaymentRepository paymentRepository;
 	private final FulfillmentRepository fulfillmentRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final PortalShipmentService portalShipmentService;
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
 	private final ClaimEvidenceRepository claimEvidenceRepository;
@@ -64,6 +68,7 @@ class AdminOrderQueryService {
 		PaymentRepository paymentRepository,
 		FulfillmentRepository fulfillmentRepository,
 		ShipmentRepository shipmentRepository,
+		PortalShipmentService portalShipmentService,
 		RefundRepository refundRepository,
 		ClaimRepository claimRepository,
 		ClaimEvidenceRepository claimEvidenceRepository,
@@ -75,6 +80,7 @@ class AdminOrderQueryService {
 		this.paymentRepository = paymentRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.portalShipmentService = portalShipmentService;
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
 		this.claimEvidenceRepository = claimEvidenceRepository;
@@ -128,13 +134,29 @@ class AdminOrderQueryService {
 		Payment payment = paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(order.getPaymentGroup().getId())
 			.orElse(null);
 		Fulfillment fulfillment = fulfillmentRepository.findByOrder_Id(order.getId()).orElse(null);
-		Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
+		List<Shipment> allShipments = shipmentRepository.findAllByOrder_IdOrderByRegisteredAtAscIdAsc(order.getId());
+		List<Shipment> activeShipments = allShipments.stream()
+			.filter(item -> item.getStatus() != ShipmentStatus.VOIDED)
+			.toList();
+		Shipment shipment = activeShipments.stream().findFirst().orElse(null);
+		PortalShipmentDtos.AdminShipmentListResponse shipmentList = portalShipmentService.listAdmin(order.getId());
 		Refund refund = refundRepository.findByOrder_Id(order.getId())
 			.orElseGet(() -> refundRepository
 				.findByPaymentGroup_IdAndRefundScope(order.getPaymentGroup().getId(), RefundScope.PAYMENT_GROUP)
 				.orElse(null));
 		Claim claim = claimRepository.findFirstByOrder_IdOrderByCreatedAtDesc(order.getId()).orElse(null);
-		return toDetailResponse(order, payment, fulfillment, shipment, refund, claim, items);
+		return toDetailResponse(
+			order,
+			payment,
+			fulfillment,
+			shipment,
+			shipmentList.shipments(),
+			shipmentList.allocationComplete(),
+			allShipments.size() > (shipment == null ? 0 : 1),
+			refund,
+			claim,
+			items
+		);
 	}
 
 	@Transactional(readOnly = true)
@@ -215,6 +237,9 @@ class AdminOrderQueryService {
 		Payment payment,
 		Fulfillment fulfillment,
 		Shipment shipment,
+		List<PortalShipmentDtos.AdminShipmentResponse> shipments,
+		boolean shipmentAllocationComplete,
+		boolean shipmentCompatibilityTruncated,
 		Refund refund,
 		Claim claim,
 		List<AdminOrderDtos.AdminOrderItemResponse> items
@@ -258,6 +283,9 @@ class AdminOrderQueryService {
 			toPaymentResponse(payment),
 			toFulfillmentResponse(order, fulfillment),
 			toShipmentResponse(shipment),
+			shipments,
+			shipmentAllocationComplete,
+			shipmentCompatibilityTruncated,
 			toRefundResponse(refund),
 			toClaimResponse(claim),
 			items

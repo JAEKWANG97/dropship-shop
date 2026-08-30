@@ -24,6 +24,7 @@ import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
+import com.dropshipshop.api.shipment.PortalShipmentDtos;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -72,6 +73,9 @@ final class AdminOrderDtos {
 		AdminPaymentResponse payment,
 		AdminFulfillmentResponse fulfillment,
 		AdminShipmentResponse shipment,
+		List<PortalShipmentDtos.AdminShipmentResponse> shipments,
+		boolean shipmentAllocationComplete,
+		boolean shipmentCompatibilityTruncated,
 		AdminRefundResponse refund,
 		AdminClaimResponse claim,
 		List<AdminOrderItemResponse> items
