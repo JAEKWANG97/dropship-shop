@@ -50,6 +50,20 @@
 - [x] V43 fresh/upgrade, legacy allocation·old-writer commit trigger, partial unique, actor index, cross-order allocation·parent reassignment 차단을 PostgreSQL 17에서 검증한다.
 - [x] Web lint/build와 supplier/customer/admin shipment 계약을 Desktop/Mobile Playwright로 검증한다.
 
+### B-105 Supplier Shortage And Claim Facts
+
+- [x] Shipment가 VOIDED 포함 한 번도 없고 supplier owner인 주문만 `canReportShortage=true`가 되며, 이 필드는 shipment list에만 있고 order detail·shortage 응답에는 없음을 검증한다.
+- [x] 전체 배송 그룹 품절 submit의 tenant/role/state/owner/Shipment guard, 첫 REPORTED와 Coreable 인계, Order/Claim/Payment/Refund 무변경, 동일 replay·changed/new-key conflict를 검증한다.
+- [x] ADMIN shortage read/review의 scope, allowlisted reason, 승인 시 기존 out-of-stock/refund 1회 실행, 거절 시 Coreable owner 유지와 supplier-safe projection을 검증한다.
+- [x] Shortage/task list의 unpaged wrapper, stable ordering, facts 없는 list summary/detail-only fact history, 확정 optional filter와 잘못된 지원 filter 값 `400`을 검증한다.
+- [x] 네 requested type/instruction code/한국어 template의 정확한 1:1 mapping과 `requestedAt < dueAt <= requestedAt+30일` validation을 검증한다.
+- [x] Claim-task/fact의 role·DB tenant predicate·Claim scope, PII allowlist, supplier claim-task 전용 `orderDetailAvailable`, observation time `requestedAt..server now`와 첫 fact `OPEN→ANSWERED`를 검증한다.
+- [x] 동일 key replay와 changed payload conflict, 유일한 latest head만 참조하는 correction, 동시 정정의 분기 방지와 detail root→current-head 순서를 검증한다.
+- [x] ADMIN의 OPEN/ANSWERED close와 세 admin reason, system-only expiry/terminal reason, close 이후 fact 차단을 검증한다.
+- [x] Flag false에서 supplier `404`, task-create scoped stored replay 우선·신규 `409`, 기존 shortage read/review·task read/close와 system close 허용 및 신규 email 부재를 검증한다.
+- [x] Supplier/admin 전체 Web surface, `/admin/shortage-reports?reportId=...` master/detail, shortage 주문 링크 부재와 capability/claim-task 링크의 fail-closed 렌더링을 Desktop/Mobile에서 검증한다.
+- [x] V44 fresh/upgrade, FK·unique·check·index, 공통 lock 순서와 전체 API suite, Web lint/build를 검증한다.
+
 ## Production Read-Only
 
 - [x] 홈페이지·상품 목록·상품 상세·정책·회사·고객문의 접근
@@ -82,4 +96,7 @@
 - [ ] B-103 운영 email retry·retention cleanup batch의 처리량과 재시도 폭주 방지 확인
 - [ ] B-104 실제 PostgreSQL에서 같은 Order의 supplier/admin 송장 등록 경합과 서로 반대 순서의 복수 Order tracking batch deadlock 부재 확인
 - [ ] B-104 다품목·다송장 주문의 supplier/admin 목록 query 수와 lock 대기·응답시간 측정
+- [ ] B-105 같은 Order의 shortage submit·supplier/admin Shipment 생성 경합과 같은 task의 correction·close 경합에서 deadlock·분기·중복 side effect가 없는지 확인
+- [x] B-105 supplier/admin task list와 admin shortage list의 1건/다건 prepared-statement count가 같아 row 수 비례 N+1이 없음을 회귀 테스트로 확인
+- [ ] B-105 unpaged shortage/task 목록의 기준 응답시간과 expiry/terminal close batch 처리량을 측정하고 pagination 도입 필요성을 재평가
 - [ ] EC2 메모리·swap·CPU credit·컨테이너 재시작 상태 확인

@@ -546,6 +546,8 @@ Status set:
 - `REFUND_REQUESTED`
 - `REFUNDED`
 
+Implemented V44 adds unique `(id, supplier_id)` without changing the Order API. `supplier_shortage_reports(order_id, supplier_id)` and claim-task ownership use this pair as a composite parent key so an audit row cannot bind an Order to another Supplier.
+
 ### order_items
 
 - `id`
@@ -848,6 +850,8 @@ Implemented B-102 payment-group refund constraints (V41):
 - `created_at`
 - `updated_at`
 
+Implemented V44 adds unique `(id, order_id)` without changing the Claim API. `supplier_claim_tasks(claim_id, order_id)` references this pair so a task cannot bind a Claim to another Order.
+
 ### claim_evidences
 
 - `id`
@@ -1018,9 +1022,9 @@ Rules:
 - DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
 - Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
-## Supplier Portal ERD (`B-100`~`B-104` Implemented; `B-105` Planned)
+## Supplier Portal ERD (`B-100`~`B-105` Implemented)
 
-Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. V41 implements the `B-102` inventory, reservation, payment-command replay and received-payment exception schema. V42 implements the `B-103` delivery memo, Claim PII grant, access-log and operational-email retention indexes. V43 implements the `B-104` plural Shipment/allocation/history schema under the same expand-contract principle. `B-098` contract history/command/scheduler and `B-105` schema remain Planned. Existing legacy rows remain valid through the expand-contract migrations.
+Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. V41 implements the `B-102` inventory, reservation, payment-command replay and received-payment exception schema. V42 implements the `B-103` delivery memo, Claim PII grant, access-log and operational-email retention indexes. V43 implements the `B-104` plural Shipment/allocation/history schema. V44 implements the `B-105` shortage/task/fact ownership and correction-chain schema under the same expand-contract principle. `B-098` contract history/command/scheduler remains Planned. Existing legacy rows remain valid through the expand-contract migrations.
 
 B-100 also implements `SUPPLIER_APPLICATION_PRIVACY` in `policy_documents.type`. The supplier application service reads the current ACTIVE row and validates the submitted version before persisting canonical consent evidence.
 
@@ -1247,7 +1251,7 @@ Constraints and compatibility:
 - Supplier inventory PUT requires the current `inventory_version`; stale writes return the locked canonical projection. Inventory changes do not increment `products.version` or alter product review state.
 - Checkout locks affected Suppliers -> Products -> every ProductOption including UNTRACKED, each by id. Expiry and normal/late deposit prepend PaymentGroup and append Orders/Fulfillments. Catalog/inventory saleability writers use Product -> Option and never acquire Supplier after Product. All guards are rechecked under locks; reservation status prevents duplicate consume/release.
 - Successful late-deposit reacquisition preserves the prior `released_at`, records `reacquired_at` and `consumed_at`, and sets the current reservation status to CONSUMED. This records release -> reacquire -> immediate consume without deleting the release evidence.
-- Production portal sale activation remains closed after B-104 with `APP_SUPPLIER_PORTAL_ENABLED=false`. Implemented B-102 inventory/checkout guards, B-103 fulfillment/privacy schema and B-104 Shipment schema are necessary but not sufficient; customer purchase/external portal activation waits for Planned B-105 plus privacy, live-email, B-098 contract, and feature-flag gates.
+- Production portal sale activation remains closed after B-105 with `APP_SUPPLIER_PORTAL_ENABLED=false`. B-100~B-105 schema and behavior are necessary but not sufficient; customer purchase/external portal activation waits for privacy, live-email, B-098 contract, and feature-flag gates.
 
 `product_change_histories` expand-contract migration:
 
@@ -1329,7 +1333,7 @@ Rules and compatibility:
 - B-100 owns the additive channel/owner/handover columns, backfill, and lifecycle takeover writer before any external portal work exists. B-103 owns portal Fulfillment creation and KEEP fallback activation. Existing fulfillment rows backfill a channel from their current purchase evidence; ambiguous/manual rows use `COREABLE_MANUAL`, and legacy rows backfill `operational_owner=COREABLE`. Existing order state and admin action evidence do not change.
 - Implemented B-102 deposit confirmation consumes reservations and moves Orders to `SUPPLIER_ORDER_PENDING`; in the same transaction Implemented B-103 creates `SUPPLIER_PORTAL/owner=SUPPLIER` only when every OrderItem has `management_channel_snapshot=SUPPLIER_PORTAL`, portal access is active, and the Supplier contract is time-valid VERIFIED. Any COREABLE/mixed item keeps the existing COREABLE_MANUAL/DOMEGGOOK routing; an all-portal Order under KEEP with unavailable access uses `COREABLE_MANUAL/owner=COREABLE` only while the contract remains valid. Portal TRACKED reservation/payment guards still apply when routing is Coreable-managed.
 - Portal creation initializes `pii_access_cutoff_at=requested_at+60 days`. Implemented B-104 makes each tracking registration shorten it to `least(current,registered_at+30 days)` in the same lock/transaction and proves void or replacement never increases it.
-- At or after cutoff, an idempotent B-103 scheduler/read-lazy guard changes still-open `SUPPLIER_PORTAL/owner=SUPPLIER` to COREABLE and writes handover reason `PII_CUTOFF_REACHED`. Implemented B-104 Shipment mutations enforce the same cutoff under Fulfillment lock; Planned B-105 mutations must preserve it. The implemented admin per-order takeover uses the same guarded transition with request idempotency/reason; ownership is never auto-restored.
+- At or after cutoff, an idempotent B-103 scheduler/read-lazy guard changes still-open `SUPPLIER_PORTAL/owner=SUPPLIER` to COREABLE and writes handover reason `PII_CUTOFF_REACHED`. Implemented B-104 Shipment and B-105 shortage mutations enforce the same cutoff under Fulfillment lock. The implemented admin per-order takeover uses the same guarded transition with request idempotency/reason; ownership is never auto-restored.
 - Suspension or manager disconnect moves open portal fulfillments to `operational_owner=COREABLE` and records handover fields without rewriting the original channel. Supplier list/mutations require owner SUPPLIER; reactivation does not change it back automatically. Detail has only the explicit MASKED/Claim exceptions below.
 - Supplier paid-work list/detail and shipment/shortage mutations require a time-valid VERIFIED contract, channel SUPPLIER_PORTAL, owner SUPPLIER, tenant, and action-eligible Order state. Detail also requires the original supplier's ACTIVE portal/current manager. COREABLE-owner work remains readable without a Claim grant only as `EXPIRED_MASKED` after cutoff or `TERMINAL_MASKED` after the listed terminal states; an active allowed-status Claim grant opens read-only FULL only with a time-valid contract. Contract expiry/revoke is a lifecycle authorization `403`; admin/shortage and other non-readable handover return `404` regardless of an older grant. None of these exceptions grants fulfillment mutation. OUT_OF_STOCK/CANCELLED/REFUND_REQUESTED/REFUNDED or contract terminal transition takes open portal work over to COREABLE.
 - `orders.supplier_id` remains the supplier assignment boundary; no second portal-order assignment table is added.
@@ -1447,11 +1451,11 @@ Indexes and privacy rules:
 - An OUT_OF_STOCK, CANCELLED, REFUND_REQUESTED, or REFUNDED order becomes `TERMINAL_MASKED` immediately regardless of non-voided Shipment presence. An allowed-status active Claim grant may temporarily reopen the field-level FULL projection after Coreable operational takeover only while the Supplier contract remains time-valid VERIFIED, and cannot authorize shipment/shortage mutation.
 - Access logs are ADMIN-only and deleted after one year.
 
-### supplier_shortage_reports (Planned B-105)
+### supplier_shortage_reports (Implemented B-105/V44)
 
 - `id`
-- `order_id`: unique FK to `orders(id)`
-- `supplier_id`: FK to `suppliers(id)`
+- `order_id`: unique FK component
+- `supplier_id`: FK to `suppliers(id)` and Order ownership component
 - `actor_user_id`: nullable FK to `users(id)` after the parent Order legal-retention boundary
 - `reason_code`: `OUT_OF_STOCK` / `OPTION_UNAVAILABLE` / `QUANTITY_UNAVAILABLE`
 - `status`: `REPORTED` / `APPROVED` / `REJECTED`
@@ -1468,19 +1472,20 @@ Indexes and privacy rules:
 
 Rules and indexes:
 
-- Unique `order_id` is the business idempotency/audit boundary; unique `(supplier_id, idempotency_key)` plus request hash protects submit retries. The service checks that command row before the current owner/state guard so an identical retry returns after handover; same-key changed payload conflicts. Because no separate submit-command history binds extra keys, a new key for the same order always returns `SHORTAGE_ALREADY_REPORTED`.
+- Unique `order_id` is the business idempotency/audit boundary; unique `(supplier_id, idempotency_key)` plus request hash protects submit retries. V44 also adds `orders(id,supplier_id)` unique and composite FK `(order_id,supplier_id) -> orders(id,supplier_id)`, in addition to the Supplier FK, so the stored report cannot cross-bind tenants. The service checks that command row before the current owner/state guard so an identical retry returns after handover; same-key changed payload conflicts. Because no separate submit-command history binds extra keys, a new key for the same order always returns `SHORTAGE_ALREADY_REPORTED`.
 - Insert requires the current supplier's paid `SUPPLIER_PORTAL/owner=SUPPLIER` order and no Shipment ever registered, including a later-VOIDED row. It stores no free text, partial quantity, or customer/claim/payment/refund PII.
-- Insert creates REPORTED and atomically hands only Fulfillment ownership to COREABLE with `SUPPLIER_SHORTAGE_REPORTED`; Order and Refund remain unchanged.
+- Insert creates REPORTED and atomically hands only Fulfillment ownership to COREABLE with `SUPPLIER_SHORTAGE_REPORTED`; Order and Refund remain unchanged. Shortage projection has no `order_detail_available` field and its Web detail has no supplier-order link. Initial supplier/admin lists are unpaged `{reports:[...]}` with API order `createdAt DESC, reportId DESC` (SQL `created_at DESC, id DESC`); supplier accepts only status and admin only status/orderId filters.
 - Submit and admin review use the same Order -> Fulfillment -> report/Shipment -> OrderItems lock order as portal shipment creation. New commands recheck that no Shipment has ever existed, and an open report blocks admin portal-shipment. After ADMIN/report scoping, review key/hash/result lookup precedes expected-status, REPORTED, owner, and Shipment guards so identical terminal replay returns the stored result while changed payload conflicts. A new admin review is a single `REPORTED -> APPROVED|REJECTED` transition and accepts only `SHORTAGE_CONFIRMED` for approval or `INSUFFICIENT_EVIDENCE|FULFILLMENT_CAN_CONTINUE` for rejection, with no free text. APPROVED invokes the existing Coreable out-of-stock/refund service in the same transaction; REJECTED creates no Refund and keeps Coreable ownership. Supplier projection contains only report/order identifiers, allowlisted reason/status/timestamps, and derived next action.
 
-### supplier_claim_tasks (Planned B-105)
+### supplier_claim_tasks (Implemented B-105/V44)
 
 - `id`
 - `claim_id`: FK to `claims(id)`
-- `supplier_id`: FK to `suppliers(id)`
+- `order_id`: immutable Claim Order FK component
+- `supplier_id`: FK to `suppliers(id)` and Order ownership component
 - `requested_type`: `SHIPMENT_STOP_RESULT` / `RETURN_INSTRUCTIONS` / `RETURN_RECEIVED` / `INSPECTION_RESULT`
 - `status`: `OPEN` / `ANSWERED` / `CLOSED`
-- `instruction_code`
+- `instruction_code`: `CHECK_SHIPMENT_STOP` / `PROVIDE_RETURN_METHOD` / `CONFIRM_RETURN_RECEIPT` / `INSPECT_RETURNED_ITEM`
 - `instructions`: allowlisted non-PII template text
 - `requested_by_admin_id`: FK to `users(id)`
 - `creation_request_hash`: not null
@@ -1498,13 +1503,14 @@ Rules and indexes:
 
 Rules and indexes:
 
-- Index `(supplier_id, status, due_at)` and `(claim_id, requested_at)` plus unique `(claim_id,creation_idempotency_key)`; task supplier must equal the Claim Order supplier. After ADMIN/Order/Claim scoping, creation key/hash/result lookup precedes mutable Claim-status guards: identical request hash replay returns the same task, changed payload conflicts, and a deliberate later round uses a new key.
-- ADMIN creates/closes tasks. Supplier list derives order number and own item/option names and quantities from the Claim Order, then projects those safe correlation fields with task id/type/status, allowlisted instructions and due/answer timestamps. Detail additionally projects same-task safe fact id/type/payload/correction reference/time for correction UX, never PII, Claim/customer/payment/refund text, actor identity, or another supplier's items. Admin list/detail may include Claim/order linkage, requesting/closing identities, internal context, and the full same-task fact history needed for Coreable review; facts never perform a state transition.
-- OPEN accepts the first fact and sets ANSWERED/answered_at once. ANSWERED accepts only a correction referencing an earlier same-task fact; CLOSED is terminal for supplier input.
+- Index `(supplier_id, requested_at DESC, id DESC)`, `(claim_id, requested_at DESC, id DESC)`, `(status, requested_at DESC, id DESC)` and the OPEN/ANSWERED partial candidate index `(due_at, id)` plus unique `(claim_id,creation_idempotency_key)`. V44 adds `claims(id,order_id)` unique, composite FK `(claim_id,order_id) -> claims(id,order_id)`, and composite FK `(order_id,supplier_id) -> orders(id,supplier_id)`; together with the Supplier FK these make task Claim, Order and Supplier structurally consistent. `due_at` has a database check `requested_at < due_at AND due_at <= requested_at + interval '30 days'`. After ADMIN/Order/Claim scoping, creation key/hash/result lookup precedes mutable Claim-status guards: identical request hash replay returns the same task, changed payload conflicts, and a deliberate later round uses a new key.
+- `requested_type`/`instruction_code` has a 1:1 check: `SHIPMENT_STOP_RESULT/CHECK_SHIPMENT_STOP`, `RETURN_INSTRUCTIONS/PROVIDE_RETURN_METHOD`, `RETURN_RECEIVED/CONFIRM_RETURN_RECEIPT`, `INSPECTION_RESULT/INSPECT_RETURNED_ITEM`. Stored text is respectively `상품 발송을 멈출 수 있는지 확인해 주세요.`, `반품 수거 방법을 선택해 주세요.`, `반품 상품 수령 여부를 확인해 주세요.`, `반품 상품의 상태를 확인해 주세요.`.
+- ADMIN creates/closes tasks. Supplier list derives order number, `order_detail_available` from the existing order-detail authorization, and own item/option names and quantities from the Claim Order, then projects those safe correlation fields with task id/type/status, allowlisted instructions and due/answer timestamps. The boolean is true only when FULL or MASKED detail is currently readable and grants no access. Detail additionally projects same-task safe fact id/type/payload/correction reference/time for correction UX, never PII, Claim/customer/payment/refund text, actor identity, or another supplier's items. Initial supplier/admin lists are unpaged facts-free summaries `{tasks:[...]}` with API order `requestedAt DESC, taskId DESC` (SQL `requested_at DESC, id DESC`); supplier accepts only status and admin only status/claimId/orderId filters. Admin list may include Claim/order linkage, requesting/closing identities and internal context but no facts; admin detail adds the full same-task fact history needed for Coreable review. Admin DTO에는 supplier-only `order_detail_available`이 없고 facts는 상태 전이를 수행하지 않는다.
+- OPEN accepts the first fact and sets ANSWERED/answered_at once. ANSWERED accepts only a correction referencing the unique same-task/type fact not referenced by another row's `corrects_fact_id`. Task/Fact locks recheck that current head to prevent branches, and detail projections serialize each chain root→current head rather than by timestamp/id. CLOSED is terminal for supplier input.
 - New create/fact input uses Order -> Claim -> Task -> Fact and rechecks Claim status in `REQUESTED`, `UNDER_REVIEW`, `EVIDENCE_REQUESTED`, `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, or `EXCHANGE_SHIPPING`. A transition to `REJECTED`, `COMPLETED`, or `WITHDRAWN` uses the same Order -> Claim prefix and atomically closes every OPEN/ANSWERED task with `CLAIM_TERMINAL`; at `now >= due_at`, new input fails and an idempotent scheduler closes it with `DUE_AT_EXPIRED`.
-- ADMIN close reason is `RESPONSE_ACCEPTED`, `SUPERSEDED`, or `NO_LONGER_NEEDED`; `DUE_AT_EXPIRED` and `CLAIM_TERMINAL` are server-derived only under the matching deadline/status guard. After ADMIN/Order/Claim/task scope, stored close key/hash/result lookup precedes mutable task/Claim/deadline guards, giving deterministic replay even after closure; system terminal/expiry closure needs no external key.
+- ADMIN may close either OPEN or ANSWERED with `RESPONSE_ACCEPTED`, `SUPERSEDED`, or `NO_LONGER_NEEDED`; `DUE_AT_EXPIRED` and `CLAIM_TERMINAL` are server-derived only under the matching deadline/status guard. After ADMIN/Order/Claim/task scope, stored close key/hash/result lookup precedes mutable task/Claim/deadline guards, giving deterministic replay even after closure; system terminal/expiry closure needs no external key. With the production flag false, a new ADMIN task create is rejected `SUPPLIER_PORTAL_NOT_RELEASED` only after stored replay lookup; existing reads/closes remain available.
 
-### supplier_claim_facts (Planned B-105)
+### supplier_claim_facts (Implemented B-105/V44)
 
 - `id`
 - `task_id`: FK to `supplier_claim_tasks(id)`
@@ -1516,14 +1522,14 @@ Rules and indexes:
 - `corrects_fact_id`: nullable FK to `supplier_claim_facts(id)`
 - `request_hash`: not null
 - `idempotency_key`: not null
-- `result_snapshot`: immutable supplier-safe JSONB canonical fact response, not null
+- `result_snapshot`: immutable supplier-safe JSONB canonical fact response, not null. Replay keeps this snapshot unchanged but recomputes the current authorization-derived `orderDetailAvailable` response field so a stale stored `true` never preserves an order-detail link.
 - `created_at`
 
 Rules and indexes:
 
-- Index `(task_id, created_at)`, `(claim_id, created_at)`, and `(supplier_id, created_at)`; unique `(task_id, idempotency_key)` protects retries. After current manager tenant and Order/Claim/task scoping, fact key/hash/result lookup precedes task/Claim/deadline/correction guards so identical replay survives later closure and changed payload conflicts.
+- Index `(task_id, created_at, id)` and partial index `corrects_fact_id WHERE corrects_fact_id IS NOT NULL`; unique `(task_id, idempotency_key)` protects retries. V44 additionally enforces one root with partial unique `task_id WHERE corrects_fact_id IS NULL` and one child per predecessor with partial unique `corrects_fact_id WHERE corrects_fact_id IS NOT NULL`. After current manager tenant and Order/Claim/task scoping, fact key/hash/result lookup precedes task/Claim/deadline/correction guards so identical replay survives later closure and changed payload conflicts.
 - Rows are append-only facts. First inserts require an OPEN task; corrections require an ANSWERED task and same-task prior fact. Both require matching task requested type, Claim Order supplier, and current manager tenant.
-- Payload schemas allow only type-specific enum/timestamp/code fields and reject free text and customer PII. A correction inserts a new row whose `corrects_fact_id` belongs to the same task and type.
+- Payload schemas allow only type-specific enum/timestamp/code fields and reject free text and customer PII. `checkedAt`/`inspectedAt` application validation requires `task.requested_at <= fact time <= current server time`. A correction inserts a new row whose `corrects_fact_id` is the unique same-task/type fact not referenced by another row's `corrects_fact_id`; detail follows that correction chain root→current head.
 - Inserting a fact does not mutate Claim, Order, or Refund state.
 
 Supplier-side actor FKs are retention-bounded even when their business rows remain append-only. Invite consumption and catalog/inventory/lifecycle supplier identity are nulled at the configured B-098 relationship deadline. Shipment/shortage/claim supplier identity is retained only through the parent Order/Claim legal-retention boundary, then nulled or removed with the parent; actor type, supplier/business object, action/state/version and timestamp may remain as non-PII evidence. `supplier_pii_access_logs` instead delete the whole row after one year.
@@ -1535,7 +1541,7 @@ Supplier-side actor FKs are retention-bounded even when their business rows rema
 - `supplier_invite_id`: nullable FK to `supplier_invites(id)`
 - `recipient_retention_expires_at`: nullable for non-supplier legacy logs
 - `recipient_anonymized_at`: nullable
-- `SUPPLIER_INVITATION` notification type — Implemented B-100; fulfillment request, product review result and approved claim work request types/templates — Implemented B-103. Fulfillment and admin product-review producers are B-103; claim-work producer remains Planned B-105.
+- `SUPPLIER_INVITATION` notification type — Implemented B-100; fulfillment request, product review result and approved claim work request types/templates — Implemented B-103. Fulfillment and admin product-review producers are B-103; claim-work producer is Implemented B-105.
 
 Rules:
 

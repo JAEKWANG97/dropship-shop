@@ -116,7 +116,7 @@ Status: The B-102 payment-exception runtime and customer `REFUND_PROCESSING` pro
 
 ## Supplier Portal Privacy And Notice — B-100/B-103 Handling Implemented, External Notice Gates Remain
 
-Status: B-100 exact-version consent handling and application/invite retention plus B-103 order minimum-PII, access-grant/log and operational-email retention surfaces are Implemented. The active supplier notice row, external-supplier/carrier disclosure, real email delivery, B-098 relationship cleanup and B-105 claim-task/fact surfaces remain unverified or Planned. The current `2026-08-04` privacy version and Domeggook provision remain the production disclosure until a new effective version is verified.
+Status: B-100 exact-version consent handling and application/invite retention, B-103 order minimum-PII, access-grant/log and operational-email retention surfaces, and B-105 claim-task/fact surfaces are Implemented. The active supplier notice row, external-supplier/carrier disclosure, real email delivery and B-098 relationship cleanup remain unverified or Planned. The current `2026-08-04` privacy version and Domeggook provision remain the production disclosure until a new effective version is verified.
 
 - 공개 공급처 신청은 필수 담당자 이름·연락 이메일과 선택 전화번호 등 신청 심사에 필요한 연락처 PII를 받기 전에 별도 managed `SUPPLIER_APPLICATION_PRIVACY` 필수 동의를 받아야 한다. 서버의 active exact-version 검증과 canonical 동의시각 저장은 B-100에서 구현됐다; production용 active 문서 내용과 시행은 별도 검증 gate다.
 - 정규화 연락 이메일별 non-expired `SUBMITTED` 또는 `APPROVED` 신청은 합쳐서 하나만 허용한다. 새 submit은 같은 이메일의 overdue SUBMITTED를 lock 아래 EXPIRED·비식별화한 뒤 중복을 판단한다. 사업자 식별번호는 이 신청 범위에서 수집하지 않으므로 “동일 사업자”를 자동 판정한다고 주장하지 않는다. 미검토 신청과 거절 신청의 90일 cleanup은 B-100에서 구현됐다. 승인 신청 연락의 Supplier 관계 종료 cleanup은 B-098/privacy notice가 기한을 정한 뒤 구현할 Planned 범위다.
@@ -128,7 +128,7 @@ Status: B-100 exact-version consent handling and application/invite retention pl
 - 기본 종료시각부터(`now >= cutoff`) 한 글자 이름은 `*`, 두 글자 이상 이름은 첫 Unicode code point와 고정 `**`로 반환한다. 전화번호는 숫자만 정규화한 뒤 4자리 이하면 전부 `*`, 5자리 이상이면 마지막 4자리만 남기고 앞자리를 `*`로 반환한다. 우편번호, 주소1, 주소2와 배송 메모는 `null`로 반환하며 전체 상세 응답을 단일 placeholder로 대체하지 않는다.
 - 승인된 진행 중 Claim의 이행에 필요한 경우에만 Coreable 관리자가 allowlisted grant/extension reason code와 요청시점부터 최대 30일인 명시적 만료시각을 기록해 전체 PII 접근을 한시적으로 다시 열 수 있다. Revoke도 전용 `CLAIM_ACCESS_NO_LONGER_REQUIRED` code만 받으며 자유문을 저장하지 않는다. `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 상태에서만 최신 non-revoked grant가 유효하고 다른/terminal 상태가 되면 별도 revoke 없이 즉시 masking한다. grant/extension/revoke append-only 이력은 B-103에서 구현됐다; B-105 claim fact 자체는 접근 재개 근거가 아니다.
 - 공급처 PII 응답에는 `Cache-Control: no-store`를 적용한다. 각 공급처 주문 상세 접근 로그는 actor, order, access reason, accessed-at만 저장하며 실제 PII나 응답 본문을 저장하지 않는다. 로그는 관리자만 조회하고 1년 뒤 삭제한다. Implemented in B-103.
-- 최초 초대는 아직 검증되지 않은 신청 이메일로 보내는 1회성 연락처 검증 메일이며 token과 일반 안내만 포함한다. 그 외 공급처 이메일 알림은 검증된 연락 이메일로만 보내고 제목, 본문과 payload snapshot에 고객 이름, 전화번호, 주소, 배송 메모, 결제 또는 환불 정보를 포함하지 않는다. B-103은 출고 요청과 관리자 상품 검토 결과 producer를 연결했고, `SUPPLIER_CLAIM_WORK_REQUESTED` producer는 Planned B-105 claim-task 생성이 맡는다.
+- 최초 초대는 아직 검증되지 않은 신청 이메일로 보내는 1회성 연락처 검증 메일이며 token과 일반 안내만 포함한다. 그 외 공급처 이메일 알림은 검증된 연락 이메일로만 보내고 제목, 본문과 payload snapshot에 고객 이름, 전화번호, 주소, 배송 메모, 결제 또는 환불 정보를 포함하지 않는다. B-103은 출고 요청과 관리자 상품 검토 결과 producer를 연결했고, `SUPPLIER_CLAIM_WORK_REQUESTED` producer는 B-105 claim-task 생성이 맡는다.
 - 초대 recipient와 issuance key/HMAC, 연결된 notification recipient는 소비·폐기·만료 30일 뒤 null 처리한다. 일반 공급처 운영 email은 최초 7일 동안만 retry할 수 있고 SENT/SKIPPED 또는 retry 종료 30일 뒤 recipient를 null 처리하며 비PII event/template/delivery audit만 보존한다.
 - Invite 소비자와 catalog/inventory/lifecycle의 supplier actor 식별자는 B-098 관계 종료 보관기한까지만, Shipment/shortage/claim supplier actor 식별자는 parent Order/Claim 법정 보존기한까지만 유지한 뒤 FK를 null 처리하거나 parent와 함께 파기한다. 비PII action/state/time 증적은 원장 보존 규칙에 따라 남기고 PII access log는 1년 뒤 row 자체를 삭제한다.
 - 실제 초대·운영 이메일 delivery와 새 개인정보처리방침 시행 버전의 공개·동의·제3자 제공 내용을 검증하기 전에는 production supplier activation을 차단한다. B-100 구현 뒤에도 이 gate는 열지 않는다.
@@ -139,6 +139,7 @@ Status: B-100 exact-version consent handling and application/invite retention pl
 - B-103 공급처 주문 API는 목록과 상세의 PII 범위를 분리하고 tenant, 기간, claim grant, masking, cache와 최소 접근 로그를 서버에서 검증한다. Implemented.
 - B-103 이메일 발송은 검증된 supplier contact만 대상으로 삼고 PII 없는 template과 payload를 사용한다. Implemented; 실제 SES delivery 검증은 production blocker로 남는다.
 - B-105 claim fact는 개인정보 접근 재개 사유가 아니며, 승인된 Claim에 대한 별도 Coreable grant가 있을 때만 접근기간을 연장할 수 있다.
+- B-105 claim-task safe projection은 고객정보 대신 `orderDetailAvailable`을 제공하고 기존 B-103 order-detail authorization이 현재 FULL 또는 MASKED read를 허용할 때만 true다. false인 Web 화면은 주문 상세 링크를 비활성화하며 이 boolean 자체가 PII 접근 grant나 출고 권한이 아니다. Shortage projection에는 이 필드와 주문 링크를 모두 두지 않는다.
 
 ## System Impact
 

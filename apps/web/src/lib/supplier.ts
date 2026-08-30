@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { apiGet, apiGetWithCookie } from "./api";
+export { supplierMutationHeaders } from "./supplier-mutation";
 
 export type SupplierApplicationPolicy = {
   title: string;
@@ -60,15 +61,6 @@ export function supplierPortalEnabled() {
     return ["1", "true", "yes", "on"].includes(configured.trim().toLowerCase());
   }
   return process.env.NODE_ENV !== "production";
-}
-
-export function supplierMutationHeaders(idempotencyKey?: string) {
-  const configuredOrigin = process.env.DROPSHIP_WEB_ORIGIN?.trim()
-    || process.env.APP_PUBLIC_BASE_URL?.trim()
-    || "http://localhost:3000";
-  const headers: Record<string, string> = { Origin: new URL(configuredOrigin).origin };
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  return headers;
 }
 
 export async function getSupplierApplicationPolicy() {

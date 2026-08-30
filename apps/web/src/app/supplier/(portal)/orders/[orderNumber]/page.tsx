@@ -1,8 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import { SupplierOrderDetailView } from "../order-views";
+import {
+  listSupplierShortageReports,
+  reportSupplierShortage,
+  SHORTAGE_REASON_CODES,
+  type ShortageReasonCode,
+} from "@/lib/supplier-claims";
 import {
   correctSupplierShipment,
   createSupplierShipment,
@@ -10,10 +17,13 @@ import {
   loadSupplierShipmentRefresh,
   listSupplierCarriers,
   listSupplierShipments,
+  releaseSupplierCommandKey,
   releaseSupplierShipmentCommandKey,
   recoverSupplierShipmentConflict,
   SupplierOrderApiError,
+  supplierCommandKey,
   supplierOrderStatusView,
+  supplierShortageReportingAllowed,
   supplierShipmentCommandKey,
   supplierShipmentRegistrationAllowed,
   type ShipmentAllocation,
@@ -31,6 +41,7 @@ function unavailableShipmentState(): SupplierShipmentCollection {
     unallocatedItems: [],
     allocationComplete: null,
     canRegisterShipment: false,
+    canReportShortage: false,
     nextAction: "CONTACT_COREABLE",
   };
 }
@@ -41,6 +52,7 @@ export default function SupplierOrderDetailPage({ params }: PageProps) {
 }
 
 function SupplierOrderDetailContent({ orderNumber }: { orderNumber: string }) {
+  const router = useRouter();
   const [order, setOrder] = useState<SupplierOrderDetail | null>(null);
   const [carriers, setCarriers] = useState<SupplierCarrier[]>([]);
   const [shipmentState, setShipmentState] = useState<SupplierShipmentCollection>({
@@ -48,11 +60,13 @@ function SupplierOrderDetailContent({ orderNumber }: { orderNumber: string }) {
     unallocatedItems: [],
     allocationComplete: null,
     canRegisterShipment: null,
+    canReportShortage: null,
     nextAction: null,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [shipmentError, setShipmentError] = useState("");
+  const [shortageError, setShortageError] = useState("");
   const [splitShipment, setSplitShipment] = useState(false);
   const [busy, setBusy] = useState(false);
   const commandKeys = useRef(new Map<string, string>());
@@ -187,8 +201,56 @@ function SupplierOrderDetailContent({ orderNumber }: { orderNumber: string }) {
     }
   }
 
+  async function reportShortage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const reasonCode = field(data, "reasonCode") as ShortageReasonCode;
+    if (!SHORTAGE_REASON_CODES.includes(reasonCode)) {
+      setShortageError("품절 보고 사유를 다시 선택해 주세요.");
+      return;
+    }
+
+    const action = `shortage:${reasonCode}`;
+    setBusy(true);
+    setShortageError("");
+    try {
+      const report = await reportSupplierShortage(
+        orderNumber,
+        reasonCode,
+        supplierCommandKey(commandKeys.current, action),
+      );
+      commandKeys.current.delete(action);
+      router.push(`/supplier/shortage-reports/${encodeURIComponent(report.reportId)}`);
+    } catch (reason) {
+      releaseSupplierCommandKey(commandKeys.current, action, reason);
+      if (reason instanceof SupplierOrderApiError && [403, 404, 409].includes(reason.status)) {
+        try {
+          const existing = (await listSupplierShortageReports())
+            .find((report) => report.orderNumber === orderNumber);
+          if (existing) {
+            router.push(`/supplier/shortage-reports/${encodeURIComponent(existing.reportId)}`);
+            return;
+          }
+          const refreshed = await loadSupplierShipmentRefresh(orderNumber);
+          setShipmentState(refreshed.shipmentState ?? unavailableShipmentState());
+        } catch {
+          setShipmentState(unavailableShipmentState());
+        }
+      }
+      setShortageError(shortageMutationError(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <SupplierOrderDetailView order={order}>
+      <SupplierShortagePanel
+        busy={busy}
+        error={shortageError}
+        onSubmit={reportShortage}
+        shipmentState={shipmentState}
+      />
       <SupplierShipmentPanel
         busy={busy}
         carriers={carriers}
@@ -201,6 +263,44 @@ function SupplierOrderDetailContent({ orderNumber }: { orderNumber: string }) {
         splitShipment={splitShipment}
       />
     </SupplierOrderDetailView>
+  );
+}
+
+function SupplierShortagePanel({
+  busy,
+  error,
+  onSubmit,
+  shipmentState,
+}: {
+  busy: boolean;
+  error: string;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  shipmentState: SupplierShipmentCollection;
+}) {
+  const allowed = supplierShortageReportingAllowed(shipmentState);
+  if (!allowed && !error) return null;
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel-head"><h2>품절 보고</h2><span>배송 그룹 주문 전체</span></div>
+      {error ? <div className="notice danger"><strong>품절 보고를 완료하지 못했습니다</strong><span>{error}</span></div> : null}
+      {allowed ? (
+        <form className="admin-inline-form" onSubmit={onSubmit}>
+          <label className="wide">
+            품절 보고 사유
+            <select defaultValue="OUT_OF_STOCK" name="reasonCode" required>
+              <option value="OUT_OF_STOCK">상품 전체 품절</option>
+              <option value="OPTION_UNAVAILABLE">주문 옵션 품절</option>
+              <option value="QUANTITY_UNAVAILABLE">주문 수량 확보 불가</option>
+            </select>
+            <span className="field-help">보고하면 출고 요청이 Coreable로 인계됩니다. 고객 환불은 Coreable 검토 뒤 별도로 진행됩니다.</span>
+          </label>
+          <button className="button" disabled={busy} type="submit">품절 보고</button>
+        </form>
+      ) : (
+        <div className="notice"><strong>현재 품절을 보고할 수 없습니다</strong><span>최신 상태는 품절 보고 내역에서 확인해 주세요.</span></div>
+      )}
+    </section>
   );
 }
 
@@ -383,6 +483,22 @@ function shipmentMutationError(error: unknown) {
     return "출고 요청이 인계되었거나 더 이상 처리할 수 없습니다.";
   }
   return "잠시 뒤 같은 내용으로 다시 시도해 주세요.";
+}
+
+function shortageMutationError(error: unknown) {
+  if (error instanceof SupplierOrderApiError && error.status === 409) {
+    return "다른 처리와 겹쳤습니다. 품절 보고 내역에서 최신 상태를 확인해 주세요.";
+  }
+  if (error instanceof SupplierOrderApiError && error.status === 403) {
+    return "현재 계약 또는 포털 권한으로 보고할 수 없습니다.";
+  }
+  if (error instanceof SupplierOrderApiError && error.status === 404) {
+    return "출고 요청이 인계되었거나 더 이상 보고할 수 없습니다.";
+  }
+  if (error instanceof SupplierOrderApiError && error.status < 500) {
+    return "품절 보고 사유와 최신 주문 상태를 확인해 주세요.";
+  }
+  return "처리 결과를 확인하지 못했습니다. 같은 사유로 다시 시도하거나 품절 보고 내역을 확인해 주세요.";
 }
 
 function dateTime(value: string | null) {

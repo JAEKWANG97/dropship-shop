@@ -29,9 +29,9 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - 운영 판매는 구매안전서비스와 최종 정책 버전이 준비될 때까지 `APP_SALES_ENABLED=false`로 차단한다.
 - 공개 정책의 `prelaunch-*` 버전, 세금계산서 안내, 상품별 고시·인증 검수는 출시 전 미완료 항목이다.
 
-## Planned Supplier Portal Baseline (`B-100`~`B-105`)
+## Supplier Portal Baseline (`B-100`~`B-105` Implemented)
 
-- [Supplier Portal Design](supplier-portal-design.md)은 Planned 설계 인덱스다. 현재 구현으로 해석하지 않으며 정책 원문과 Decision Log가 우선한다.
+- [Supplier Portal Design](supplier-portal-design.md)은 B-100~B-105 구현 설계 인덱스다. 정책 원문과 Decision Log가 우선한다.
 - Coreable은 단일 판매자이며 고객 판매가, 결제, 환불, CS와 클레임 결정을 유지한다. 공급처 포털에는 판매자 정산이 없다.
 - 공개 공급처 신청은 Coreable 승인, 1회용 이메일 초대, Kakao-only 로그인으로 이어지고 공급처당 활성 담당자는 1명이다.
 - 첫 상품 기능은 개별 등록이다. 무옵션 상품은 내부 `기본` 옵션을 사용하고, 공급처는 공급가를 입력하지만 고객가는 Coreable 가격 정책으로 계산한다. 일반 유효상품은 자동 공개하고 flagged 상품만 검토한다.
@@ -62,5 +62,5 @@ AI agent 작업 규칙은 루트의 [Agent Operating Guide](../AGENTS.md)를 따
 - DS-26: supplier fulfillment SLA, address lock, shipment unit, and tracking correction policy is reflected in fulfillment, order, admin, domain, requirements, and flow docs.
 - DS-27: privacy, business notice, legal disclosure, account deletion, and marketing consent policy is reflected in account, legal notice, domain, requirements, and decision docs.
 - DS-28: order transition table, forbidden transitions, notification log, visibility split, and order snapshot policy is reflected in order, admin, domain, requirements, flow, and decision docs.
-- B-099: 공급처 포털은 Planned 설계이며 구현은 B-100~B-105로 분리한다. 기존 legacy/Domeggook 동작을 보존하고 새 재고·출고·송장 계약만 expand-contract 방식으로 추가한다.
+- B-099: 공급처 포털 설계를 B-100~B-105로 분리했고 각 slice를 구현했다. 기존 legacy/Domeggook 동작을 보존하고 새 재고·출고·송장 계약만 expand-contract 방식으로 추가한다.
 - Next policy work is tracked in [Backlog](BACKLOG.md).

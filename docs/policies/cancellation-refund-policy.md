@@ -68,17 +68,18 @@ Status: Confirmed
 - 환불 실패 건은 관리자 재시도 또는 수동 확인 대상으로 전환한다.
 - 환불 완료 후 고객에게 환불 완료 상태를 노출한다.
 
-## Supplier Portal Cancellation, Shortage, And Claim Boundary — B-102/B-103 Implemented, B-105 Planned
+## Supplier Portal Cancellation, Shortage, And Claim Boundary — B-102/B-103/B-105 Implemented
 
-Status: The B-102 received-payment exception/refund boundary and B-103 portal fulfillment/PII boundary are Implemented. B-105 shortage/claim facts remain Planned. Existing DS-14, DS-15, DS-37, DS-38, B-015, and B-044 behavior remains authoritative for legacy and Coreable-managed flows outside those implemented slices.
+Status: The B-102 received-payment exception/refund boundary, B-103 portal fulfillment/PII boundary, and B-105 shortage/claim facts are Implemented. Existing DS-14, DS-15, DS-37, DS-38, B-015, and B-044 behavior remains authoritative for legacy and Coreable-managed flows outside those implemented slices.
 
 - 공급처 포털 주문은 관리자 입금확인과 동시에 공급처에 노출되고 배송지가 잠기므로, 그 시점부터 고객 셀프서비스 취소를 허용하지 않는다. 고객 취소 요청은 Coreable 클레임 검토로 처리한다. Implemented in B-103.
 - 기존 Coreable 수동 발주와 Domeggook 주문에는 현재의 `SUPPLIER_ORDER_PENDING`, `supplierOrderStartedAt`, `addressLockedAt` 기반 셀프서비스 취소 규칙을 그대로 적용한다.
-- 공급처는 VOIDED 포함 Shipment가 한 번도 등록되지 않은 자기 배송 그룹 주문에 대해서만 품절을 보고할 수 있다. 일부 상품, 옵션 또는 수량만 품절이어도 보고와 환불 검토 단위는 배송 그룹 주문 전체다. Planned in B-105.
+- 공급처는 VOIDED 포함 Shipment가 한 번도 등록되지 않은 자기 배송 그룹 주문에 대해서만 품절을 보고할 수 있다. 일부 상품, 옵션 또는 수량만 품절이어도 보고와 환불 검토 단위는 배송 그룹 주문 전체다. Implemented in B-105.
 - 공급처 품절 제출은 배송 그룹 주문 전체에 REPORTED 사실을 만들고 Fulfillment만 Coreable에 인계하며 Order/Refund는 바꾸지 않는다. Coreable 승인만 기존 `OUT_OF_STOCK`/환불 서비스를 실행하고 거절은 Refund 없이 Coreable owner를 유지한다. 공급처에는 환불 승인·거절·완료 권한이 없다.
 - Claim의 승인·거절·완료, Refund의 생성·승인·거절·실제 계좌환불 완료, 주문·배송 상태의 관리자 보정과 고객 CS 판단은 Coreable만 수행한다.
-- 공급처는 Coreable이 해당 Claim에 열린 supplier task를 만든 경우에만 task requested type과 일치하는 `SHIPMENT_STOP_RESULT`, `RETURN_INSTRUCTIONS`, `RETURN_RECEIVED`, `INSPECTION_RESULT` 사실을 idempotent·append-only로 추가할 수 있다. task detail은 자기 safe fact id/type/payload/correction reference/time만 제공하고, 정정은 같은 task의 앞선 사실을 참조하는 새 사실로 추가한다. Planned in B-105.
-- Coreable의 supplier task 생성은 idempotency key/request hash로 재시도 안전해야 하고, admin list/detail은 Claim/order linkage, 내부 context와 complete same-task fact history를 제공해야 한다. 사실을 읽는 것만으로 Claim/Refund 상태를 바꾸지 않는다.
+- 공급처는 Coreable이 해당 Claim에 열린 supplier task를 만든 경우에만 task requested type과 일치하는 `SHIPMENT_STOP_RESULT`, `RETURN_INSTRUCTIONS`, `RETURN_RECEIVED`, `INSPECTION_RESULT` 사실을 idempotent·append-only로 추가할 수 있다. Instruction은 각각 `CHECK_SHIPMENT_STOP`, `PROVIDE_RETURN_METHOD`, `CONFIRM_RETURN_RECEIPT`, `INSPECT_RETURNED_ITEM`의 고정 PII-free 한국어 template과 1:1로 연결한다. Task `dueAt`은 생성시각보다 엄격히 미래이고 생성시각+30일 이하여야 하며 fact의 `checkedAt`/`inspectedAt`은 task 요청시각 이상 현재 서버시각 이하여야 한다. Implemented in B-105.
+- Task list는 facts 없는 summary이며 detail은 자기 safe fact id/type/payload/correction reference/time만 제공한다. 첫 fact 뒤 정정은 같은 task/type에서 다른 row의 `correctsFactId`로 참조되지 않은 유일한 latest effective fact만 참조하는 새 row로 추가해 history가 분기하지 않게 하며, detail은 correction chain의 root에서 current head 순으로 반환한다. ADMIN은 `OPEN` 또는 `ANSWERED` task를 `RESPONSE_ACCEPTED|SUPERSEDED|NO_LONGER_NEEDED`로 닫을 수 있고 `DUE_AT_EXPIRED|CLAIM_TERMINAL`은 서버만 기록한다. Implemented in B-105.
+- Coreable의 supplier task 생성은 idempotency key/request hash로 재시도 안전해야 하고, admin list는 Claim/order linkage와 내부 context의 facts 없는 summary, detail은 complete same-task fact history를 제공해야 한다. Admin DTO에는 supplier-only `orderDetailAvailable`이 없다. 사실을 읽는 것만으로 Claim/Refund 상태를 바꾸지 않는다.
 - 공급처 claim fact는 Claim, Order, Shipment 또는 Refund 상태를 직접 변경하지 않으며 Coreable 판단의 근거로만 사용한다.
 - 승인된 Claim의 처리를 위해 공급처 PII 접근을 다시 열 때는 Coreable 관리자가 grant/extension용 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED` 또는 revoke용 `CLAIM_ACCESS_NO_LONGER_REQUIRED` reason code와 요청시점부터 최대 30일인 만료시각을 입력해 append-only 이력을 남긴다. 자유문은 받지 않으며 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 외 상태가 되거나 만료되면 즉시 masking한다. Implemented in B-103; B-105 task/fact input은 grant를 만들거나 연장하지 않는다.
 - qualifying 미입금 `CANCELLED`가 아닌 portal-origin PaymentGroup의 exact receipt는 판매/계약/mode guard 실패면 먼저 `SALE_UNAVAILABLE_AT_DEPOSIT`을 선택하고, 그 guard가 모두 통과한 뒤의 늦은 입금시각 또는 재고 재확보 실패만 `LATE_DEPOSIT_EXCEPTION`으로 분류한다. 같은 transaction에서 reason-matched `REQUESTED` Refund를 주문당 한 번만 만들고 Order를 `REFUND_REQUESTED`로 끝낸다. 공급처는 두 예외 결제와 환불을 조회하거나 처리할 수 없다. Implemented in B-102.
@@ -93,6 +94,7 @@ Status: The B-102 received-payment exception/refund boundary and B-103 portal fu
 - B-103은 `fulfillment.channel = SUPPLIER_PORTAL`이거나 `addressLockedAt`이 있는 주문을 기존 셀프서비스 취소 API에서 거절한다. 현재 셀프서비스 취소 규칙은 `COREABLE_MANUAL`과 `DOMEGGOOK_API` channel에만 이어 적용한다. Implemented.
 - B-105 품절 제출·Coreable 검토·portal Shipment는 같은 Order/Fulfillment lock을 사용하고 첫 송장 존재 여부와 supplier tenant를 재검증해야 한다. 중복 제출은 첫 safe report를 반환하며 승인된 경우에만 배송 그룹 주문 전체 환불 처리를 한 번 시작한다.
 - B-105 supplier claim fact 저장소는 append-only actor, claim, fact type, payload, created-at 이력을 보존하되 기존 Claim/Refund 관리자 전이 API를 재사용하거나 우회하지 않아야 한다.
+- B-105 Web은 supplier 주문 상세의 전체 품절 보고, supplier/admin shortage list/detail/review, supplier/admin claim-task list/detail과 Coreable Claim 상세의 task create/close를 제공해야 한다. 전체 품절 보고 action은 기존 supplier shipment list 응답의 `canReportShortage`가 true일 때만 노출하며 supplier order-detail DTO에는 이 필드를 추가하지 않는다. Shortage report 화면에는 주문 링크를 제공하지 않고, supplier claim-task 응답의 `orderDetailAvailable`이 false이면 주문 상세 링크를 비활성화해야 한다.
 
 ## System Impact
 

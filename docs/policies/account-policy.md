@@ -82,6 +82,7 @@ Status: `B-100` onboarding, Kakao activation, dynamic authority, lifecycle and a
 - CREATE_NEW 승인은 Supplier를 `INACTIVE`, portal contract를 `UNVERIFIED`로 만든다. B-098 증적이 VERIFIED이고 effective time이 도래했으며 expiry가 지나지 않은 경우만 sales-status ACTIVE를 허용한다. Global flag 뒤에도 portal 상품 checkout/입금은 Supplier lock 아래 overdue evidence를 lazy EXPIRED로 바꾼 뒤 ACTIVE+time-valid VERIFIED를 검증한다. EXPIRED/REVOKED는 sales INACTIVE, ACTIVE portal SUSPENDED, open invite 폐기와 열린 supplier-owned portal work의 Coreable 인계를 함께 처리하며 재검증이 portal/sales/owner를 자동 복구하지 않는다.
 - REJECTED application 연락 PII는 review+90일에 지우고 APPROVED 연락은 Supplier 운영 기록으로 유지한다. 영구 portal DISABLED, trade INACTIVE, open Fulfillment/Claim/Refund 없음이 모두 성립할 때 B-098/privacy notice의 관계 종료 deadline을 설정하고, scheduler가 Supplier lock 아래 조건을 다시 확인해 새 open work면 clear/defer한다. 계속 적격일 때만 Supplier와 approved application의 중복 연락 PII/replay material을 함께 지우며, invite 수신 이메일·issuance key/HMAC는 소비·폐기·만료 +30일에 정리한다.
 - Production supplier portal flag가 false이면 외부 신청·초대 수락 경로를 숨긴다. Scope와 저장된 idempotency replay를 먼저 확인한 뒤 새 신청 승인/invite 재발급은 mutation 전에 `SUPPLIER_PORTAL_NOT_RELEASED`로 거절하고, 동일 완료 command는 token-free 결과만 반환한다. Dispatch도 발송 직전 flag를 재검사해 닫혔으면 `SKIPPED`로 끝내고 다시 연 뒤 새 key 재발급을 요구하되, 신청 거절·portal 정지/종료·retention cleanup은 계속 허용한다.
+- Implemented B-105 ADMIN claim-task 생성도 flag가 false이면 ADMIN/Claim scope와 저장된 key/hash/result를 먼저 확인해 동일 완료 replay만 반환하고 새 command는 `409 SUPPLIER_PORTAL_NOT_RELEASED`로 거절한다. Changed replay는 release gate보다 먼저 idempotency conflict로 끝낸다. 이미 존재하는 shortage/task의 ADMIN read/review/close와 system expiry/terminal close는 운영 안전 경로로 유지한다.
 - Invite의 consumed user와 catalog/inventory/lifecycle supplier actor FK도 B-098 관계 종료 보관기한 뒤 null 처리하고 비PII action/state/time만 남긴다. 거래 이행 Shipment/shortage/claim actor는 parent Order/Claim 법정 보존 규칙을 따른다.
 - 활성 공급처 담당자는 연결을 먼저 관리자에게 해제받기 전까지 고객 셀프서비스 회원 탈퇴를 할 수 없다.
 
@@ -120,7 +121,7 @@ Status: `B-100` onboarding, Kakao activation, dynamic authority, lifecycle and a
 - `/api/supplier/**`는 인증 principal에서 supplier tenant를 결정하고 요청 payload의 supplier id를 신뢰하지 않는다.
 - 초대 token 원문은 저장하거나 로그에 남기지 않고 unique digest, 수신 이메일, 만료·사용·폐기 시각, 소비 user와 생성 admin만 저장한다. 공급처별 유효한 미사용 초대는 하나다.
 - 초대 token 교환은 초대를 바로 소비하지 않고 5분짜리 HttpOnly/Secure/SameSite=Lax binding cookie와 OAuth state를 만든다. Kakao callback은 invite row를 잠그고 manager 연결, 연락 이메일 검증, portal 활성화와 초대 소비를 한 트랜잭션에서 처리한다.
-- cookie 인증 supplier의 unsafe HTTP method는 설정된 web `Origin`만 허용한다. `Origin`이 없으면 same-origin `Referer`를 요구하며 둘 다 없거나 불일치하면 `403`으로 거절한다.
+- cookie 인증 supplier의 unsafe HTTP method와 B-105 ADMIN shortage approve/reject·claim-task create/close는 설정된 web `Origin`과 정확히 일치할 때만 허용한다. `Origin`이 없으면 exact same-origin `Referer`를 요구하며 둘 다 없거나 불일치하면 `403`으로 거절한다.
 
 ## Open Questions
 

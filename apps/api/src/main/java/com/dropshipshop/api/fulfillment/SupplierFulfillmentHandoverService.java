@@ -80,4 +80,17 @@ public class SupplierFulfillmentHandoverService {
 		));
 		return true;
 	}
+
+	@Transactional
+	public boolean takeOverSupplierShortage(Fulfillment fulfillment, Instant now) {
+		if (!fulfillment.handOverToCoreable(
+			now, FulfillmentHandoverReasonCode.SUPPLIER_SHORTAGE_REPORTED, null
+		)) {
+			return false;
+		}
+		historyRepository.save(FulfillmentHandoverHistory.system(
+			fulfillment, FulfillmentHandoverReasonCode.SUPPLIER_SHORTAGE_REPORTED, now
+		));
+		return true;
+	}
 }

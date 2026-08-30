@@ -7,6 +7,8 @@ import {
   adminPortalFulfillmentAction,
   adminRefundProjection,
   getAdminCarriers,
+  getAdminSupplierClaimTask,
+  getAdminSupplierClaimTasks,
   getAdminOrder,
   getAdminOrderActions,
   getAdminOrders,
@@ -18,6 +20,15 @@ import {
 } from "@/lib/admin";
 import { adminRefundNextAction, retryCommandKey, type RetryCommand } from "@/lib/admin-payment";
 import { formatPrice } from "@/lib/catalog";
+import {
+  adminSupplierClaimTaskCanClose,
+  CLAIM_TASK_INSTRUCTIONS,
+  CLAIM_TASK_TYPES,
+  claimFactSummary,
+  claimTaskStatusLabel,
+  claimTaskTypeLabel,
+  type AdminSupplierClaimTask,
+} from "@/lib/supplier-claims";
 import {
   claimReasonLabel,
   claimStatusLabel,
@@ -39,6 +50,7 @@ import {
   correctShipmentDelivered,
   correctPortalShipmentDelivery,
   correctPortalShipmentTracking,
+  createSupplierClaimTask,
   createOrderShipment,
   createPortalShipment,
   markOrderOutOfStock,
@@ -49,6 +61,7 @@ import {
   rejectClaim,
   startSupplierWork,
   startReturnRefund,
+  closeSupplierClaimTask,
   syncShipmentTracking,
   takeOverPortalFulfillment,
   retrySupplierPurchase,
@@ -96,6 +109,9 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
         { error: false as const, carriers: [] as AdminCarrier[] },
       ];
   const selectedOrder = mergeOrderDetail(selectedSummary, detail.order);
+  const claimTaskState = selectedOrder?.claim?.claimId && !detail.error
+    ? await loadClaimTasks(selectedOrder.claim.claimId)
+    : { error: false as const, loadedAt: 0, tasks: [] as AdminSupplierClaimTask[] };
 
   return (
     <div className={`admin-page${params.orderId ? " has-selected-order" : ""}`}>
@@ -281,7 +297,15 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                   <strong>{selectedOrder.claim ? claimStatusLabel(selectedOrder.claim.status) : "없음"}</strong>
                 </div>
               </div>
-              {!detail.error ? <ClaimPanel order={selectedOrder} /> : null}
+              {!detail.error ? (
+                <ClaimPanel
+                  order={selectedOrder}
+                  retry={{ action: params.retryAction, key: params.idempotencyKey }}
+                  taskError={claimTaskState.error}
+                  taskLoadedAt={claimTaskState.loadedAt}
+                  tasks={claimTaskState.tasks}
+                />
+              ) : null}
 					<RefundEvidencePanel order={selectedOrder} />
 					<AdminActionHistoryPanel actions={actionHistory.actions} error={actionHistory.error} />
               {!detail.error ? (
@@ -339,6 +363,25 @@ async function loadAdminCarriers() {
     return { error: false as const, carriers: await getAdminCarriers() };
   } catch {
     return { error: true as const, carriers: [] as AdminCarrier[] };
+  }
+}
+
+async function loadClaimTasks(claimId: string) {
+  try {
+    const summaries = await getAdminSupplierClaimTasks({ claimId });
+    const details = await Promise.allSettled(
+      summaries.map((task) => getAdminSupplierClaimTask(task.taskId)),
+    );
+    if (details.some((detail) => detail.status === "rejected")) {
+      return { error: true as const, loadedAt: Date.now(), tasks: [] as AdminSupplierClaimTask[] };
+    }
+    return {
+      error: false as const,
+      loadedAt: Date.now(),
+      tasks: details.flatMap((detail) => detail.status === "fulfilled" ? [detail.value] : []),
+    };
+  } catch {
+    return { error: true as const, loadedAt: Date.now(), tasks: [] as AdminSupplierClaimTask[] };
   }
 }
 
@@ -978,7 +1021,19 @@ function officialShipmentHref(value: string | null) {
   }
 }
 
-function ClaimPanel({ order }: { order: AdminOrder }) {
+export function ClaimPanel({
+  order,
+  retry,
+  taskError,
+  taskLoadedAt,
+  tasks,
+}: {
+  order: AdminOrder;
+  retry: RetryCommand;
+  taskError: boolean;
+  taskLoadedAt: number;
+  tasks: AdminSupplierClaimTask[];
+}) {
   const claim = order.claim;
   if (!claim) {
     return null;
@@ -1013,6 +1068,14 @@ function ClaimPanel({ order }: { order: AdminOrder }) {
           <span>단순 변심이 아닌 클레임은 고객 접수 시 사진 증빙이 필요합니다.</span>
         </div>
       )}
+
+      <SupplierClaimTaskPanel
+        error={taskError}
+        loadedAt={taskLoadedAt}
+        order={order}
+        retry={retry}
+        tasks={tasks}
+      />
 
       {claim.status === "RETURN_WAITING" ? (
         <div className="admin-order-actions">
@@ -1071,6 +1134,157 @@ function ClaimPanel({ order }: { order: AdminOrder }) {
       ) : null}
     </section>
   );
+}
+
+const CLAIM_TASK_CREATE_STATUSES = new Set([
+  "REQUESTED",
+  "UNDER_REVIEW",
+  "EVIDENCE_REQUESTED",
+  "APPROVED",
+  "RETURN_WAITING",
+  "RETURN_RECEIVED",
+  "REFUND_PROCESSING",
+  "EXCHANGE_SHIPPING",
+]);
+
+export function SupplierClaimTaskPanel({
+  error,
+  loadedAt,
+  order,
+  retry,
+  tasks,
+}: {
+  error: boolean;
+  loadedAt: number;
+  order: AdminOrder;
+  retry: RetryCommand;
+  tasks: AdminSupplierClaimTask[];
+}) {
+  const claim = order.claim;
+  if (!claim) return null;
+  const canCreate = !error && CLAIM_TASK_CREATE_STATUSES.has(claim.status);
+
+  return (
+    <section className="admin-order-actions">
+      <div className="admin-panel-head">
+        <h3>공급처 확인 작업</h3>
+        <span>{error ? "조회 실패" : `${tasks.length}건`}</span>
+      </div>
+
+      {error ? (
+        <div className="notice danger">
+          <strong>기존 공급처 작업을 확인할 수 없습니다</strong>
+          <span>중복 요청을 막기 위해 새 작업 생성과 종료를 사용할 수 없습니다.</span>
+        </div>
+      ) : null}
+
+      {!error ? (
+        <div className="admin-list compact">
+          {tasks.map((task) => (
+            <article key={task.taskId}>
+              <div className="admin-panel-head">
+                <strong>{claimTaskTypeLabel(task.requestedType)}</strong>
+                <span className={`admin-badge ${task.status === "OPEN" ? "warning" : "neutral"}`}>
+                  {claimTaskStatusLabel(task.status)}
+                </span>
+              </div>
+              <span>{task.instructions}</span>
+              <span>요청 {formatDateTime(task.requestedAt)} · 기한 {formatDateTime(task.dueAt)}</span>
+              {task.facts.length > 0 ? (
+                <details>
+                  <summary>공급처 답변 이력 {task.facts.length}건</summary>
+                  <div className="admin-list compact">
+                    {task.facts.map((fact, index) => (
+                      <div key={fact.factId}>
+                        <strong>{index === 0 ? "최초 답변" : `${index}차 정정`}</strong>
+                        <span>{adminFactDisplay(fact)}</span>
+                        <span>{formatDateTime(fact.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : <span>아직 공급처 답변이 없습니다.</span>}
+
+              {adminSupplierClaimTaskCanClose(task) ? (
+                <form action={closeSupplierClaimTask} className="admin-inline-form">
+                  <input name="orderId" type="hidden" value={order.orderId} />
+                  <input name="taskId" type="hidden" value={task.taskId} />
+                  <input name="expectedStatus" type="hidden" value={task.status} />
+                  <input
+                    name="idempotencyKey"
+                    type="hidden"
+                    value={stableCommandKey(retry, `supplier-task-close-${task.taskId}`)}
+                  />
+                  <label className="wide">
+                    종료 사유
+                    <select defaultValue={task.status === "ANSWERED" ? "RESPONSE_ACCEPTED" : "NO_LONGER_NEEDED"} name="closeReasonCode" required>
+                      <option value="RESPONSE_ACCEPTED">답변 확인 완료</option>
+                      <option value="SUPERSEDED">새 작업으로 대체</option>
+                      <option value="NO_LONGER_NEEDED">추가 확인 불필요</option>
+                    </select>
+                    <span className="field-help">화면에 표시된 상태가 바뀌었다면 종료되지 않고 최신 상태를 다시 확인합니다.</span>
+                  </label>
+                  <button className="button" type="submit">작업 종료</button>
+                </form>
+              ) : task.status === "UNKNOWN" || task.requestedType === "UNKNOWN" || task.instructionCode === null ? (
+                <div className="notice danger"><strong>작업 계약 확인 필요</strong><span>종료 액션을 사용할 수 없습니다.</span></div>
+              ) : null}
+            </article>
+          ))}
+          {tasks.length === 0 ? <div><span>생성된 공급처 확인 작업이 없습니다.</span></div> : null}
+        </div>
+      ) : null}
+
+      {canCreate ? (
+        <form action={createSupplierClaimTask} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="claimId" type="hidden" value={claim.claimId} />
+          <input name="claimStatus" type="hidden" value={claim.status} />
+          <input
+            name="idempotencyKey"
+            type="hidden"
+            value={stableCommandKey(retry, `supplier-task-create-${claim.claimId}`)}
+          />
+          <label className="wide">
+            확인할 사실
+            <select defaultValue="" name="requestedType" required>
+              <option disabled value="">요청 유형을 선택하세요</option>
+              {CLAIM_TASK_TYPES.map((type) => (
+                <option key={type} value={type}>{CLAIM_TASK_INSTRUCTIONS[type].label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            답변 기한
+            <input
+              defaultValue={koreanDateTimeInput(loadedAt + 24 * 60 * 60 * 1000)}
+              max={koreanDateTimeInput(loadedAt + 30 * 24 * 60 * 60 * 1000)}
+              min={koreanDateTimeInput(loadedAt + 60 * 1000)}
+              name="dueAt"
+              required
+              step="60"
+              type="datetime-local"
+            />
+          </label>
+          <span className="field-help wide">기한은 지금보다 미래이고 최대 30일 이내여야 합니다. 요청 문구는 유형별 고정 문구로 전송됩니다.</span>
+          <button className="button primary" type="submit">공급처에 작업 요청</button>
+        </form>
+      ) : !error ? (
+        <div className="notice"><strong>현재 클레임에는 새 작업을 만들 수 없습니다</strong><span>종료된 클레임 상태에서는 공급처 입력을 요청하지 않습니다.</span></div>
+      ) : null}
+    </section>
+  );
+}
+
+function adminFactDisplay(fact: AdminSupplierClaimTask["facts"][number]) {
+  const summary = claimFactSummary(fact);
+  return summary
+    ? `${summary.result}${summary.observedAt ? ` · 확인 ${formatDateTime(summary.observedAt)}` : ""}`
+    : "알 수 없는 답변은 의사결정에 사용하지 마세요.";
+}
+
+function koreanDateTimeInput(time: number) {
+  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16);
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {

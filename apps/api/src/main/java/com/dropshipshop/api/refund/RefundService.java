@@ -41,6 +41,8 @@ import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.supplierportal.SupplierPortalHasher;
 import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
 import com.dropshipshop.api.fulfillment.SupplierFulfillmentHandoverService;
+import com.dropshipshop.api.claim.domain.Claim;
+import com.dropshipshop.api.supplierclaim.SupplierClaimTaskService;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -61,6 +63,7 @@ public class RefundService {
 	private final SupplierPortalInputPolicy inputPolicy;
 	private final ObjectMapper objectMapper;
 	private final SupplierFulfillmentHandoverService handoverService;
+	private final SupplierClaimTaskService supplierClaimTaskService;
 
 	RefundService(
 		RefundRepository refundRepository,
@@ -75,7 +78,8 @@ public class RefundService {
 		SupplierPortalHasher hasher,
 		SupplierPortalInputPolicy inputPolicy,
 		ObjectMapper objectMapper,
-		SupplierFulfillmentHandoverService handoverService
+		SupplierFulfillmentHandoverService handoverService,
+		SupplierClaimTaskService supplierClaimTaskService
 	) {
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
@@ -90,6 +94,7 @@ public class RefundService {
 		this.inputPolicy = inputPolicy;
 		this.objectMapper = objectMapper;
 		this.handoverService = handoverService;
+		this.supplierClaimTaskService = supplierClaimTaskService;
 	}
 
 	@Transactional
@@ -176,6 +181,13 @@ public class RefundService {
 		}
 		List<Payment> payments = paymentRepository.findAllByPaymentGroupIdForUpdate(paymentGroupId);
 		List<CustomerOrder> groupOrders = checkout.orders();
+		UUID linkedClaimId = claimRepository.findIdByRefundId(refundId).orElse(null);
+		Claim linkedClaim = linkedClaimId == null ? null : claimRepository.findByIdForUpdate(linkedClaimId)
+			.orElseThrow(() -> new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT,
+				"Refund-linked claim disappeared while acquiring locks"));
+		if (linkedClaim != null) {
+			supplierClaimTaskService.lockForClaim(linkedClaim.getId());
+		}
 		Refund refund = refundRepository.findByIdForUpdate(refundId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
 		if (!refund.getPaymentGroup().getId().equals(paymentGroup.getId())) {
@@ -238,8 +250,9 @@ public class RefundService {
 					AdminOrderActionType.MANUAL_REFUND_COMPLETED.name(), beforeStatus, order.getStatus(), "ALLOWED",
 					"Manual bank-transfer refund completed", request.reason()));
 			}
-			if (refund.getOrder() != null) {
-				claimRepository.findByRefund_Id(refund.getId()).ifPresent(claim -> claim.complete(now));
+			if (refund.getOrder() != null && linkedClaim != null) {
+				linkedClaim.complete(now);
+				supplierClaimTaskService.closeForTerminalClaim(linkedClaim, now);
 			}
 			RefundDtos.AdminRefundResponse response = toAdminResponse(refund);
 			if (receivedPaymentException) {

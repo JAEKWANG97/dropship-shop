@@ -17,6 +17,18 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
 	List<OrderItem> findAllByOrder_IdOrderByCreatedAtAsc(UUID orderId);
 
+	@Query("""
+		select item
+		from OrderItem item
+		where item.order.id = :orderId
+		  and item.supplier.id = :supplierId
+		order by item.createdAt, item.id
+		""")
+	List<OrderItem> findAllByOrderIdAndSupplierId(
+		@Param("orderId") UUID orderId,
+		@Param("supplierId") UUID supplierId
+	);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""
 		select item

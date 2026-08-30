@@ -26,7 +26,7 @@ Coreable이 재고를 직접 보유하지 않는 단일 판매자 쇼핑몰.
 - 기존 수동/Domeggook 주문을 공급처에 발주하는 운영자
 - 송장번호, 품절, 취소, 환불을 처리하는 운영자
 
-### Supplier Manager — `B-100`~`B-104` Implemented, `B-105` Planned
+### Supplier Manager — `B-100`~`B-105` Implemented
 
 - Coreable 승인을 받고 이메일 초대로 연결된 공급처 담당자
 - 자기 공급처의 상품, 옵션, 재고와 입금확인 완료 출고 요청만 처리하는 담당자
@@ -76,7 +76,7 @@ Coreable이 재고를 직접 보유하지 않는 단일 판매자 쇼핑몰.
 - 관리자는 임의 상태값을 직접 쓰지 않고 허용된 액션과 상태 전이표를 통해서만 주문을 진행한다.
 - 주문 상태 변경, 입금 불일치, 미완료 환불, 배송 수동 보정, 관리자 정정은 사유와 이력을 남긴다.
 
-### Supplier Portal Scope — `B-100`~`B-104` Implemented, `B-105` Planned
+### Supplier Portal Scope — `B-100`~`B-105` Implemented
 
 - Coreable은 고객 계약의 단일 판매자로 남고 결제, 환불, CS, 클레임 결정과 고객 판매가를 통제한다. 공급처 포털에는 판매자 정산이 없다.
 - 비로그인 공급처 신청을 Coreable이 승인한 뒤 신청 연락 이메일로 1회용 초대를 보낸다. 링크 교환으로 이메일 소유를 검증하고 Kakao로만 담당자를 연결하며, 공급처당 활성 담당자는 1명이다.
@@ -109,7 +109,7 @@ Coreable이 재고를 직접 보유하지 않는 단일 판매자 쇼핑몰.
 - 개인정보 처리 위탁처, 제3자 제공 여부, 보존 기간, 마케팅 수신 동의 문구가 실제 운영 기준과 일치해야 한다.
 - 도매꾹 자동 발주 주문의 배송 정보 동기화와 수동 송장 fallback을 실제 주문 1건으로 검증해야 한다.
 - supplier portal production 활성화 전 외부 공급처 계약, 공급처·택배사 개인정보 제공 고지와 실제 초대/운영 이메일 전달을 검증해야 한다.
-- `APP_SUPPLIER_PORTAL_ENABLED`는 Implemented B-100~B-104와 Planned B-105, B-098 계약, privacy/live-email 및 inventory checkout gate가 모두 준비될 때까지 production 기본값 `false`를 유지해야 한다.
+- `APP_SUPPLIER_PORTAL_ENABLED`는 B-100~B-105가 구현된 뒤에도 B-098 계약, privacy/live-email 및 inventory checkout release gate가 모두 준비될 때까지 production 기본값 `false`를 유지해야 한다.
 
 ## Success Criteria
 
@@ -119,4 +119,4 @@ Coreable이 재고를 직접 보유하지 않는 단일 판매자 쇼핑몰.
 - 송장번호 입력 후 고객이 배송 상태를 확인할 수 있다.
 - 주문, 결제, 발주, 배송, 환불 상태가 서로 섞이지 않는다.
 - Implemented B-101 공급처 포털은 일반 상품을 별도 수동 승인 없이 공개하고 위험 상품만 Coreable 검토 대상으로 분리한다. Production feature flag는 나머지 release gate가 끝날 때까지 닫아 둔다.
-- Implemented B-102 예약 재고, B-103 최소 개인정보와 B-104 복수 송장 할당은 기존 주문 흐름과 Coreable 환불 권한을 유지한다. 송장 전 품절·클레임 사실은 Planned B-105다.
+- Implemented B-102 예약 재고, B-103 최소 개인정보, B-104 복수 송장 할당과 B-105 송장 전 품절·클레임 사실 입력은 기존 주문 흐름과 Coreable 환불 권한을 유지한다.

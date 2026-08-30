@@ -45,6 +45,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/suppliers">공급처 포털</Link>
           <Link href="/admin/product-reviews">상품 검토</Link>
           <Link href="/admin/orders">주문 관리</Link>
+          <Link href="/admin/shortage-reports">품절 보고</Link>
+          <Link href="/admin/supplier-claim-tasks">공급처 클레임 작업</Link>
           <Link href="/admin/inquiries">고객 문의</Link>
         </nav>
       </aside>

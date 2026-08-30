@@ -2,6 +2,17 @@
 
 실행한 검증만 기록한다. 실제 외부 서비스 검증은 자동 테스트 결과와 합치지 않는다.
 
+## 2026-08-30 B-105 Supplier Shortage And Claim Facts
+
+- 판정: V44/API/Web 구현과 문서 동기화, 전체 회귀와 독립 backend/Web/호환성 검토를 완료해 `Review Ready`다. 최종 audit은 blocker/major/minor 0건이다. Task list는 facts 없는 summary이고 detail만 fact history를 반환하며, `orderDetailAvailable`은 supplier claim-task DTO에만 존재하고 supplier resource 조회는 resource id와 supplier id를 같은 DB predicate에 포함한다.
+- API 전체: `cd apps/api && ./gradlew cleanTest test --no-daemon` → `83 suites / 379 tests / 0 failures / 0 errors / 0 skipped` (`BUILD SUCCESSFUL`, 1분 14초). 품절 capability·submit/review, 기존 out-of-stock/refund 위임, task/fact/correction/close, idempotency, tenant/role/PII, flag-off replay-first와 기존 Claim/Refund/Shipment 회귀를 확인했다. Supplier/admin task list와 admin shortage list는 1건/다건의 prepared-statement count가 같음을 검증했고, `PAYMENT_EXCEPTION` 또는 late-deposit Refund 주문은 supplier task의 `orderDetailAvailable=false`로 fail closed함을 확인했다.
+- PostgreSQL: 전체 suite의 `PostgresMigrationSmokeTest` `13/13 passed` (13.422초). V44 fresh/latest JPA validate와 V43→V44 upgrade, composite FK·CHECK, task별 single root와 predecessor별 single child 위반 차단을 PostgreSQL 17 Testcontainers에서 확인했다.
+- Web 정적 검증: `npx tsc --noEmit` PASS, `npm run lint` → `0 errors / 기존 <img> warnings 3`, `npm run build` → 34 pages production build PASS.
+- Web 계약: `supplier-shortage-claim-contract.spec.ts` Desktop/Mobile `24 passed`; 기존 `supplier-fulfillment-contract.spec.ts` Desktop/Mobile `26 passed`, 합계 `50/50 passed`. Supplier/admin shortage·claim-task 화면, exact mutation body/Origin/Idempotency-Key, fail-closed capability·reason·instruction, 불확실한 실패의 key 재사용과 기존 fulfillment 회귀를 확인했다. 독립 Web 재검토의 blocker/major는 0건이다.
+- 정적 품질: API 변경 범위와 전체 저장소 `git diff --check`, Markdown fence parity를 통과했다.
+- 미실행·잔여: 실제 supplier/admin 로그인 session과 live API hydration E2E, 실제 `SUPPLIER_CLAIM_WORK_REQUESTED` email 도착, 같은 Order/task에 대한 실제 PostgreSQL application-level 경합·unpaged 목록·scheduler 성능 부하는 검증하지 않았다. 자동 계약 테스트를 실제 외부 서비스 증거로 보지 않는다.
+- 운영 경계: 배포, 운영 데이터, 외부 연락, 실제 email과 production flag를 변경하지 않았다. `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지하며 B-105 완료만으로 외부 supplier route나 portal 상품 판매를 열지 않는다.
+
 ## 2026-08-30 B-104 Supplier Multiple Shipments And Tracking Links
 
 - 판정: 구현·문서 동기화와 독립 backend/migration/test/Web 검토를 완료해 `Review Ready`다. 검토에서 발견한 DB parent reassignment, PostgreSQL UUID 잠금 정렬, Web stale 개인정보·행동 권한과 관리자 version fail-open 위험까지 보강했으며 최종 blocker와 major는 0건이다.

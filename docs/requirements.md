@@ -24,7 +24,7 @@
 
 ### Supplier Portal Onboarding — Implemented (`B-100`), Production Gated
 
-`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름, `B-102`의 옵션 재고·24시간 예약·입금 예외, `B-103`의 출고 요청·최소 PII·운영 이메일 기반, `B-104`의 복수 송장·수량 할당·공식 배송조회 링크는 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup과 `B-105`는 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 production `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다.
+`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름, `B-102`의 옵션 재고·24시간 예약·입금 예외, `B-103`의 출고 요청·최소 PII·운영 이메일 기반, `B-104`의 복수 송장·수량 할당·공식 배송조회 링크와 `B-105`의 품절·클레임 사실 입력은 구현됐다. B-105 구현만으로 production을 열지 않으며, `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup, active 공급처 신청 개인정보 고지, 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다.
 
 - 비로그인 사용자는 필수 공급처명·담당자명·연락 이메일과 선택 전화번호·문의 메모로 공급처 신청을 제출할 수 있어야 한다.
 - 신청 화면은 active `SUPPLIER_APPLICATION_PRIVACY`의 수집 목적, 항목, 보유 기간, 동의 거부 시 신청 불가를 고지해야 한다. 서버는 exact active version을 검증하고 canonical 동의시각을 저장해야 한다.
@@ -94,7 +94,7 @@
 - 삭제는 expected Product version, tenant/management-channel guard와 scalar ownership discovery 뒤 `Supplier -> fresh Product -> 모든 Option(id)` 잠금을 사용해야 한다. Cart 추가와 checkout 참조 생성도 같은 잠금 계약과 fresh ownership/saleability·참조 guard를 사용해 stale owner, FK 오류나 유실 참조를 노출하지 않아야 한다.
 - 실제 삭제 뒤에도 immutable subject id, actor, 삭제 전 version과 allowlisted before snapshot 이력은 남아야 한다. Live Product/ProductOption 이력 FK는 nullable이어야 하며, 이미지 metadata 삭제와 unique durable binary-cleanup job enqueue는 원자적으로 commit되어야 한다. Cleanup job이 생긴 key는 admin 재첨부를 거절하고, 반복 enqueue는 멱등이어야 한다. Worker는 삭제 직전 live ProductImage 참조가 있으면 binary를 보존하고 `LIVE_REFERENCE`로 완료하며, 실제 metadata 제거 시 같은 job을 다시 열어야 한다.
 - 최초 등록, 검토, 보완, 재제출과 거절의 허용 상태 전이를 명시해야 한다. 보완 재제출은 자동 공개하지 않고 다시 검토로 보내며 supplier-safe message와 내부 reason을 분리해야 한다.
-- B-100~B-104가 배포된 동안에도 production supplier portal feature gate를 닫아 고객 판매를 시작하지 않아야 한다. B-102 inventory guard, B-103 fulfillment/privacy 기반과 B-104 복수 송장은 필요조건이며 B-105, 개인정보·실 email·B-098 계약 gate가 모두 준비된 뒤에만 실제 공개·외부 route를 열어야 한다.
+- B-100~B-105가 구현된 뒤에도 production supplier portal feature gate를 닫아 고객 판매를 시작하지 않아야 한다. 이 구현은 필요조건이며 개인정보·실 email·B-098 계약 gate가 모두 준비된 뒤에만 실제 공개·외부 route를 열어야 한다.
 
 ### Cart
 
@@ -196,7 +196,7 @@
 - 공급처의 주문 상세 접근은 actor, 주문, 접근 근거와 시각만 기록하고 실제 개인정보 값이나 응답 본문을 로그에 복제하지 않아야 한다.
 - Claim PII grant/extension은 각각 요청시각부터 최대 30일로 제한하고 append-only로 기록해야 한다. Grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED` reason code만 허용하고 자유문을 저장하지 않아야 한다. Claim이 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING` 중 하나이고 deadline 전이며 이후 revoke가 없고 Supplier contract가 time-valid VERIFIED일 때만 전체 접근을 한시 재개해야 한다. 다른/terminal Claim 상태나 contract expiry/revoke는 즉시 무효화해야 한다.
 - supplier paid-work list/detail와 출고 mutation은 time-valid VERIFIED contract, SUPPLIER_PORTAL+owner SUPPLIER를 요구해야 한다. Detail은 ACTIVE portal/current manager도 요구한다. COREABLE로 인계된 portal 주문은 cutoff/terminal 사유일 때 원래 supplier에게 MASKED로만 남고 active allowed-status Claim grant와 time-valid contract가 함께 있을 때만 read-only FULL로 재개되어야 한다. Contract expiry/revoke와 다른 인계 사유는 과거 grant와 무관하게 order detail을 닫아야 하며, 어떤 조회 예외도 송장·품절 mutation을 허용해서는 안 된다.
-- 신규 출고 요청과 관리자 상품 검토 결과 알림은 time-valid VERIFIED contract와 active portal/manager를 가진 검증된 공급처 연락 이메일로만 보내고 고객 개인정보를 제목, 본문 또는 payload snapshot에 넣지 않아야 한다. 승인 클레임 작업 알림 type/template은 B-103에 포함하되 실제 claim-task 생성 producer는 Planned `B-105`가 연결해야 한다.
+- 신규 출고 요청과 관리자 상품 검토 결과 알림은 time-valid VERIFIED contract와 active portal/manager를 가진 검증된 공급처 연락 이메일로만 보내고 고객 개인정보를 제목, 본문 또는 payload snapshot에 넣지 않아야 한다. 승인 클레임 작업 알림 type/template은 B-103에 포함하고 실제 claim-task 생성 producer는 `B-105`가 연결해야 한다.
 - 공급처 운영 email은 생성+7일까지만 retry하고 raw provider exception 대신 allowlisted/redacted failure code만 저장해야 한다. terminal+30일에 recipient와 legacy/free-text failure reason을 null 처리해야 한다. B-100은 기존 `notification_logs.recipient NOT NULL`을 nullable로 expand하고 entity/reader/writer 호환을 이관해야 한다.
 - 기존 generic notification retry는 invite-linked row를 항상 거절하고, supplier operational row는 FAILED·recipient 존재·생성+7일 전·현재 lifecycle/time-valid contract/email 일치일 때만 허용해야 한다. SKIPPED/SENT/recipient-null/기한 종료 row는 terminal이어야 한다.
 - invite 소비자와 catalog/inventory/lifecycle의 supplier actor FK는 B-098 관계 종료 보관기한 뒤 null 처리하고 비PII 행위 증적만 남겨야 한다. Shipment/shortage/claim의 supplier actor FK는 parent Order/Claim 법정 보존기한까지만 유지한 뒤 null 처리하거나 parent와 함께 파기해야 한다. PII access log는 1년 뒤 삭제해야 한다.
@@ -266,13 +266,22 @@
 - 특정 배송 그룹 주문이 공급처 품절이면 해당 배송 그룹 주문 금액만 부분 취소/환불해야 한다.
 - 배송 그룹 주문 내부에서 일부 상품 또는 일부 수량만 품절이면 MVP에서는 해당 배송 그룹 주문 전체를 취소/환불해야 한다.
 
-### Supplier Portal Shortage And Claim Facts — Planned (`B-105`)
+### Supplier Portal Shortage And Claim Facts — Implemented (`B-105`)
 
 - 공급처는 VOIDED 포함 Shipment가 한 번도 등록되지 않은 자기 출고 요청에만 품절을 보고할 수 있어야 한다.
+- 기존 `GET /api/supplier/orders/{orderNumber}/shipments`의 `SupplierShipmentListResponse`만 현재 전체 품절 보고 가능 여부를 `canReportShortage`로 제공해야 한다. Supplier order-detail DTO와 shortage response에는 추가하지 않고, Web은 true일 때만 action을 보여주며 POST는 권한·상태를 다시 검증해야 한다.
 - 품절 제출은 REPORTED를 만들고 Fulfillment만 Coreable에 인계하며 Order/Refund를 바꾸지 않아야 한다. Submit key/hash와 immutable supplier-safe result를 저장해 동일 submit만 최초 결과를 replay하고 같은 order의 새 key는 충돌해야 한다. Coreable review는 allowlisted code만 받고 free text를 저장하지 않으며, 승인 때만 배송 그룹 주문 전체에 기존 `OUT_OF_STOCK`/환불 서비스를 실행하고 거절하면 Refund 없이 Coreable owner를 유지해야 한다. 상품·옵션·수량 일부만 승인·환불하지 않아야 한다.
+- V44는 `orders(id,supplierId)`/`claims(id,orderId)` unique pair, shortage `(orderId,supplierId)` composite FK, task immutable `orderId`와 `(claimId,orderId)`/`(orderId,supplierId)` composite FK로 Order·Claim·Supplier cross-bind를 DB에서 막아야 한다.
 - 공급처는 환불을 승인, 거절 또는 완료할 수 없고 Coreable만 고객 안내, 클레임 결정과 실제 계좌환불을 수행해야 한다.
-- 공급처는 Coreable이 만든 자기 공급처의 열린 claim task가 있을 때만 출고 중단 결과, 반품 안내, 반품 입고, 검수 결과 같은 요청 유형과 일치하는 구조화 사실을 idempotent·append-only로 기록할 수 있어야 한다. task detail은 자기 safe fact id/type/payload/correction reference/time을 보여줘 기존 사실을 바꾸지 않고 정정 row를 추가할 수 있어야 한다.
-- Coreable task 생성과 supplier fact는 각각 idempotency key/request hash와 immutable actor-safe canonical result를 저장해 status/close/deadline 뒤에도 최초 응답을 replay해야 한다. 관리자는 task list/detail에서 Claim/order linkage, 내부 context와 전체 same-task fact history를 읽을 수 있어야 한다.
+- 공급처는 Coreable이 만든 자기 공급처의 열린 claim task가 있을 때만 출고 중단 결과, 반품 안내, 반품 입고, 검수 결과 같은 요청 유형과 일치하는 구조화 사실을 idempotent·append-only로 기록할 수 있어야 한다. 요청 유형과 instruction은 `SHIPMENT_STOP_RESULT/CHECK_SHIPMENT_STOP/상품 발송을 멈출 수 있는지 확인해 주세요.`, `RETURN_INSTRUCTIONS/PROVIDE_RETURN_METHOD/반품 수거 방법을 선택해 주세요.`, `RETURN_RECEIVED/CONFIRM_RETURN_RECEIPT/반품 상품 수령 여부를 확인해 주세요.`, `INSPECTION_RESULT/INSPECT_RETURNED_ITEM/반품 상품의 상태를 확인해 주세요.`로만 1:1 연결해야 한다.
+- Task `dueAt`은 canonical 생성시각보다 엄격히 미래이고 생성시각+30일 이하여야 한다. Fact의 `checkedAt`/`inspectedAt`은 task requestedAt 이상 현재 서버시각 이하여야 한다. 첫 fact 뒤 정정은 같은 task/type의 current head만 참조해야 하며, current head는 다른 row의 `correctsFactId`로 참조되지 않은 유일한 fact다. Detail history는 timestamp/id가 아니라 root→current head chain 순이어야 한다.
+- Fact는 task별 null-correction root 하나와 predecessor별 child 하나만 허용하는 partial unique로 single-chain을 DB에서도 보장해야 한다.
+- Coreable task 생성과 supplier fact는 각각 idempotency key/request hash와 immutable actor-safe canonical result를 저장해 status/close/deadline 뒤에도 최초 응답을 replay해야 한다. Supplier와 admin task list는 facts 없는 summary만 반환하고 detail에서만 same-task fact history를 읽을 수 있어야 한다. Admin DTO에는 supplier 전용 `orderDetailAvailable`이 없어야 한다.
+- ADMIN은 OPEN과 ANSWERED task 모두를 `RESPONSE_ACCEPTED|SUPERSEDED|NO_LONGER_NEEDED`로 닫을 수 있어야 하고 `DUE_AT_EXPIRED|CLAIM_TERMINAL`은 system만 기록해야 한다.
+- Initial list는 pagination 없이 shortage를 `createdAt DESC, reportId DESC`, task를 `requestedAt DESC, taskId DESC`로 안정 정렬해야 한다. Shortage wrapper는 `{reports:[...]}`, task wrapper는 facts 없는 summary `{tasks:[...]}`이며 supplier list는 각각 optional status, admin shortage는 status/orderId, admin task는 status/claimId/orderId filter만 지원해야 한다. 이 지원 filter의 유효하지 않은 값은 `400`이어야 한다.
+- B-105 Web은 supplier 주문 상세의 전체 품절 보고, supplier shortage list/detail, 단일 master/detail `/admin/shortage-reports?reportId=...`, supplier/admin claim-task list/detail/fact와 기존 admin Claim 상세의 task create/read/close를 모두 제공해야 한다. Shortage report에는 supplier 주문 링크가 없어야 한다. Supplier claim-task DTO의 `orderDetailAvailable`은 기존 B-103 order-detail authorization이 FULL 또는 MASKED를 허용할 때만 true이며 false이면 링크를 비활성화해야 한다.
+- Production flag가 false이면 supplier route는 `404`여야 한다. 새 ADMIN task 생성은 ADMIN/Claim scope와 stored key/hash/result를 먼저 확인해 동일 완료 replay를 반환하고 changed replay를 conflict로 거절한 뒤, 저장 결과가 없는 새 command만 `409 SUPPLIER_PORTAL_NOT_RELEASED`로 막아야 한다. 기존 shortage read/review, task read/close와 system expiry/terminal close는 허용해야 한다.
+- B-105 ADMIN shortage approve/reject와 claim-task create/close는 cookie 기반 unsafe mutation으로서 exact allowlist `Origin`, 또는 Origin이 없을 때 exact same-origin `Referer`를 요구하고 둘 다 없거나 불일치하면 `403`이어야 한다.
 - 공급처 사실 입력 자체는 Claim, Order 또는 Refund 상태를 변경하지 않아야 한다.
 
 ### Admin Operations
@@ -294,7 +303,7 @@
 - 실제 계좌환불 완료 없는 환불 완료, 송장 없는 배송중, 배송 기록 없는 배송완료, 배송 후 품절 전이는 금지되어야 한다.
 - 취소, 환불, 품절, 배송 수동 보정, 관리자 정정 액션은 사유 입력이 필수여야 한다.
 - 상품 가격, 상품 판매 상태, 상품 옵션 판매 상태, 상품 공급처 변경은 MVP부터 변경 이력을 기록해야 한다.
-- Implemented B-100~B-104 공급처 포털의 신청 승인, 초대 재발급·폐기, 상품 검토, 재고, 출고 요청·PII 접근·송장 변경은 공급처 tenant와 actor를 포함해 감사 기록을 남겨야 한다. Planned B-105 공급처 사실 변경도 같은 경계를 유지해야 한다.
+- Implemented B-100~B-105 공급처 포털의 신청 승인, 초대 재발급·폐기, 상품 검토, 재고, 출고 요청·PII 접근·송장·품절·클레임 사실 변경은 공급처 tenant와 actor를 포함해 감사 기록을 남겨야 한다.
 - 공급처는 고객 결제, 환불, 클레임 승인·거절과 관리자 수동 보정을 수행할 수 없어야 한다.
 
 ### Legal And Customer Notice
@@ -311,7 +320,7 @@
 - 상품 상세와 주문서 모두에서 결제 후 공급처 품절 가능성과 품절 시 해당 배송 그룹 주문 금액 환불 정책을 고지해야 한다.
 - 고객 거래 알림은 SMS와 주문 상세 상태 표시로 시작하고, SMS 자격증명이 없으면 발송 로그를 `SKIPPED`로 남겨야 한다.
 - 카카오 알림톡과 앱 푸시는 이후 범위로 둔다.
-- 공급처 운영 알림은 이메일만 사용하고 SMS, 카카오 알림톡과 앱 푸시를 사용하지 않아야 한다. B-103은 출고 요청·상품 검토 결과 producer와 클레임 작업 type/template을 구현했고, 실제 클레임 작업 producer는 Planned B-105가 연결해야 한다.
+- 공급처 운영 알림은 이메일만 사용하고 SMS, 카카오 알림톡과 앱 푸시를 사용하지 않아야 한다. B-103은 출고 요청·상품 검토 결과 producer와 클레임 작업 type/template을 구현했고, 실제 클레임 작업 producer는 B-105가 연결해야 한다.
 - 공급처 이메일에는 고객 이름, 전화번호, 주소, 배송 메모, 결제·환불 정보를 넣지 않고 주문번호 또는 상품 식별자와 포털 링크만 포함해야 한다.
 - 실제 법률 문구는 출시 전 별도 검토 대상이다.
 

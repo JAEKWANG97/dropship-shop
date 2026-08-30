@@ -112,6 +112,7 @@ public final class PortalShipmentDtos {
 		List<UnallocatedItemResponse> unallocatedItems,
 		boolean allocationComplete,
 		boolean canRegisterShipment,
+		boolean canReportShortage,
 		String nextAction
 	) {
 	}
