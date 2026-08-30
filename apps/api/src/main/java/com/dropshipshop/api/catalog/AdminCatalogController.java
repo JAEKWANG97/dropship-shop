@@ -107,6 +107,46 @@ class AdminCatalogController {
 		return catalogService.listProductChanges(productId);
 	}
 
+	@GetMapping("/product-reviews")
+	CatalogDtos.ProductReviewQueueResponse listProductReviews(
+		@RequestParam(defaultValue = "0") @Min(0) int page,
+		@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
+	) {
+		return catalogService.listProductReviews(page, size);
+	}
+
+	@GetMapping("/product-reviews/{productId}")
+	CatalogDtos.ProductReviewDetailResponse getProductReview(@PathVariable UUID productId) {
+		return catalogService.getProductReview(productId);
+	}
+
+	@PostMapping("/product-reviews/{productId}/approve")
+	CatalogDtos.ProductReviewDetailResponse approveProductReview(
+		@PathVariable UUID productId,
+		@Valid @RequestBody CatalogDtos.ProductReviewActionRequest request,
+		Authentication authentication
+	) {
+		return catalogService.approveProductReview(productId, request, currentUser.id(authentication));
+	}
+
+	@PostMapping("/product-reviews/{productId}/supplement")
+	CatalogDtos.ProductReviewDetailResponse requestProductReviewSupplement(
+		@PathVariable UUID productId,
+		@Valid @RequestBody CatalogDtos.ProductReviewFeedbackRequest request,
+		Authentication authentication
+	) {
+		return catalogService.supplementProductReview(productId, request, currentUser.id(authentication));
+	}
+
+	@PostMapping("/product-reviews/{productId}/reject")
+	CatalogDtos.ProductReviewDetailResponse rejectProductReview(
+		@PathVariable UUID productId,
+		@Valid @RequestBody CatalogDtos.ProductReviewFeedbackRequest request,
+		Authentication authentication
+	) {
+		return catalogService.rejectProductReview(productId, request, currentUser.id(authentication));
+	}
+
 	@PatchMapping("/products/{productId}")
 	CatalogDtos.AdminProductResponse updateProduct(
 		@PathVariable UUID productId,
@@ -129,9 +169,10 @@ class AdminCatalogController {
 	@ResponseStatus(HttpStatus.CREATED)
 	CatalogDtos.ProductOptionResponse createOption(
 		@PathVariable UUID productId,
-		@Valid @RequestBody CatalogDtos.ProductOptionRequest request
+		@Valid @RequestBody CatalogDtos.ProductOptionRequest request,
+		Authentication authentication
 	) {
-		return catalogService.createOption(productId, request);
+		return catalogService.createOption(productId, request, currentUser.id(authentication));
 	}
 
 	@PatchMapping("/products/{productId}/options/{optionId}")

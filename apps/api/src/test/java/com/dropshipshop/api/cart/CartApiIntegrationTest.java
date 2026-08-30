@@ -308,6 +308,28 @@ class CartApiIntegrationTest {
 			.andExpect(jsonPath("$.issues[0].code", is("INVALID_ORDER_QUANTITY")));
 	}
 
+	@Test
+	void keepsAnUnsellableZeroPricedSavedItemReadable() throws Exception {
+		UserAccount customer = createCustomer("cart-zero-price");
+		ProductOption option = createOption("Zeroed Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE);
+		addItem(customer.getId(), option.getId(), 1).andExpect(status().isCreated());
+
+		option.getProduct().updateStatus(ProductStatus.HIDDEN);
+		option.getProduct().updateSourcePricing(0, 0);
+		option.update("Default", 0);
+		productRepository.saveAndFlush(option.getProduct());
+		productOptionRepository.saveAndFlush(option);
+
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.subtotalAmount", is(0)))
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)))
+			.andExpect(jsonPath("$.items[0].unitPrice", is(0)))
+			.andExpect(jsonPath("$.items[0].lineAmount", is(0)))
+			.andExpect(jsonPath("$.items[0].sellable", is(false)));
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		return userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,

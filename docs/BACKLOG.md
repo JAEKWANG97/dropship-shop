@@ -63,20 +63,20 @@ Tasks:
 
 ### B-101 공급처 개별 상품 등록과 검토 흐름
 
-Status: Todo
+Status: Review Ready
 
 Notes:
 - CSV 없이 개별 등록부터 제공하고, 일반 상품은 자동 공개하되 안전·필수정보 위험만 Coreable이 검토한다.
 
 Tasks:
-- [ ] 공급처 소유 상품·기본 옵션·이미지·상세·상품 고시 CRUD를 구현한다. 최초 submit 전 DRAFT만 tenant/version/Product->Option lock 아래 hard-delete하고 CartItem/OrderItem 참조, 제출 이력과 마지막 옵션을 막으며, 그 밖의 상품은 숨김·판매중지로 보존한다.
-- [ ] 공급처 화면의 단일 `상품 등록` 동작이 내부 draft submit과 분류를 끝내도록 구현한다.
-- [ ] 공급처가 supplierId, 고객 판매가, 판매/검토 상태를 위조하지 못하게 한다.
-- [ ] option 총공급가에 동일 정책을 적용하는 deterministic Coreable 가격 계산, monotonic policy version/full calculator snapshot과 별도 product review 상태·분류기를 구현한다.
-- [ ] Product managementChannel/version과 pricing-policy version을 backfill하고 모든 legacy admin/source writer를 같은 aggregate version·actor history로 이관한다. 기존 음수 source price/additional price를 사전 스캔해 발견 시 명시적 데이터 정정 승인 전 migration을 막고, 모든 writer 검증 뒤 nonnegative 제약을 추가한다.
-- [ ] 자동 승인, 보완 요청, 승인, 거절과 PII-free review 문구, allowlisted business-field snapshot의 actor 기반 변경 이력을 구현한다. 삭제 이력은 immutable subject id와 nullable live FK로 보존하고 image metadata와 durable binary-cleanup job을 함께 commit한다.
-- [ ] 공급처용 allowlist 검토 상태·사유·안내·다음 행동과 같은 화면 재제출 UX를 구현하고 내부 review 정보 비노출을 검증한다.
-- [ ] 공개/관리자/공급처 응답 노출 차이와 HTML/image 안전 테스트를 추가한다. 미제출 DRAFT 삭제 성공, 제출/CartItem/OrderItem/마지막 옵션/tenant/version 거절, cart·checkout 경합, 삭제 후 404·감사이력·binary cleanup 재시도를 검증한다.
+- [x] 공급처 소유 상품·기본 옵션·이미지·상세·상품 고시 CRUD를 구현한다. 최초 submit 전 DRAFT만 scalar ownership discovery와 `Supplier -> fresh Product -> Option` lock 아래 hard-delete하고 CartItem/OrderItem 참조, stale ownership, 제출 이력과 마지막 옵션을 막으며, 그 밖의 상품은 숨김·판매중지로 보존한다.
+- [x] 공급처 화면의 단일 `상품 등록` 동작이 내부 draft submit과 분류를 끝내도록 구현한다.
+- [x] 공급처가 supplierId, 고객 판매가, 판매/검토 상태를 위조하지 못하게 한다.
+- [x] option 총공급가에 동일 정책을 적용하는 deterministic Coreable 가격 계산, monotonic policy version/full calculator snapshot과 별도 product review 상태·분류기를 구현한다.
+- [x] Product managementChannel/version과 pricing-policy version을 backfill하고 모든 legacy admin/review/cart/checkout/source writer를 scalar supplier/ownership discovery 뒤 `Supplier -> fresh Product -> Option` lock, stale ownership 재검증, 같은 aggregate version·actor history와 Portal active-policy 재계산으로 이관한다. Domeggook success/failure는 locked `sourceItemNo` 일치 때만 적용하고, V40 `sourceAutoSoldOut=false` provenance를 실제 source `ACTIVE -> SOLD_OUT`에만 설정해 marker-backed target/readiness recovery와 admin status clear로 수동 품절을 보호한다. 기존 범위 밖 공급가·고객가와 base+option 10억원 초과를 사전 스캔해 명시적 데이터 정정 승인 전 migration을 막고, exact 금액 연산과 DB snapshot 제약을 추가한다.
+- [x] 자동 승인, 보완 요청, 승인, 거절과 PII-free review 문구, allowlisted business-field snapshot의 actor 기반 변경 이력을 구현한다. `CERTIFICATION_REVIEW` 승인은 compliance를 자동 변경하지 않고 기존 `PENDING` 판매 호환성을 유지한다. 삭제 이력은 immutable subject id와 nullable live FK로 보존하고 image metadata와 unique durable binary-cleanup job을 함께 commit하며 tombstone 재첨부 거절, live-reference 방어와 같은 job reopen을 적용한다.
+- [x] 공급처용 allowlist 검토 상태·사유·안내·다음 행동과 같은 화면 재제출 UX를 구현하고 내부 review 정보 비노출을 검증한다.
+- [x] 공개/관리자/공급처 응답 노출 차이와 HTML/image 안전 테스트를 추가한다. 미제출 DRAFT 삭제 성공, 제출/CartItem/OrderItem/마지막 옵션/tenant/version 거절, cart·checkout의 동일 lock contract 단위 검증과 기존 참조·stale ownership 통합 guard, 삭제 후 404·감사이력을 검증한다. 삭제 가능한 미제출 DRAFT는 정상 구매 API에서 판매불가이므로 인위적인 동시 구매 성공 경로를 만들지 않는다. 실제 multipart upload부터 DETAIL/notice/submit/public까지의 등록 lifecycle, PostgreSQL partial-unique thumbnail swap smoke, cleanup tombstone 거절·`LIVE_REFERENCE`·동일 job reopen/retry 증거를 추가한다.
 
 ### B-102 공급처 옵션 재고와 24시간 주문 예약
 

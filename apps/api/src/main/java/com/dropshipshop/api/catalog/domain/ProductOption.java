@@ -3,6 +3,8 @@ package com.dropshipshop.api.catalog.domain;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.dropshipshop.api.common.money.MoneyMath;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -73,6 +75,7 @@ public class ProductOption {
 		Long sourceStockQuantity,
 		int sortOrder
 	) {
+		validatePrices(product, additionalPrice, sourceAdditionalPrice);
 		this.product = product;
 		this.name = name;
 		this.additionalPrice = additionalPrice;
@@ -107,6 +110,7 @@ public class ProductOption {
 		Long sourceStockQuantity,
 		int sortOrder
 	) {
+		validatePrices(product, additionalPrice, sourceAdditionalPrice);
 		this.name = name;
 		this.additionalPrice = additionalPrice;
 		this.sourceOptionCode = sourceOptionCode;
@@ -153,5 +157,16 @@ public class ProductOption {
 
 	public int getSortOrder() {
 		return sortOrder;
+	}
+
+	private static void validatePrices(Product product, long additionalPrice, Long sourceAdditionalPrice) {
+		MoneyMath.requireCustomerUnitPrice(additionalPrice, "additionalPrice");
+		MoneyMath.requireCustomerUnitPrice(
+			MoneyMath.addNonNegative(product.getBasePrice(), additionalPrice),
+			"unitPrice"
+		);
+		if (sourceAdditionalPrice != null) {
+			MoneyMath.requireSupplierUnitCost(sourceAdditionalPrice, "sourceAdditionalPrice");
+		}
 	}
 }

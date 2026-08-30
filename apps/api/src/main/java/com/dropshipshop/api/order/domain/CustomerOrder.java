@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.user.domain.UserAccount;
 
@@ -118,10 +119,10 @@ public class CustomerOrder {
 		this.postalCode = address.postalCode();
 		this.address1 = address.address1();
 		this.address2 = address.address2();
-		this.subtotalAmount = subtotalAmount;
+		this.subtotalAmount = MoneyMath.requirePositive(subtotalAmount, "subtotalAmount");
 		this.shippingFee = 0;
 		this.discountAmount = 0;
-		this.totalAmount = subtotalAmount;
+		this.totalAmount = this.subtotalAmount;
 		this.expiresAt = expiresAt;
 	}
 

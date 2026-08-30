@@ -23,11 +23,7 @@ class LocalFileStorage implements FileStorage {
 
 	@Override
 	public StoredFile store(String objectKey, MultipartFile file) {
-		Path root = uploadDir.toAbsolutePath().normalize();
-		Path target = root.resolve(objectKey).normalize();
-		if (!target.startsWith(root)) {
-			throw new IllegalArgumentException("Invalid storage object key");
-		}
+		Path target = resolveObjectKey(objectKey);
 		try {
 			Files.createDirectories(target.getParent());
 			file.transferTo(target);
@@ -35,6 +31,41 @@ class LocalFileStorage implements FileStorage {
 			throw new IllegalStateException("File upload failed", exception);
 		}
 		return new StoredFile(publicBaseUrl + "/" + objectKey, objectKey, file.getSize(), file.getContentType());
+	}
+
+	@Override
+	public boolean matchesStoredFile(String objectKey, String publicUrl) {
+		if (publicUrl == null || publicUrl.isBlank()) {
+			return false;
+		}
+		try {
+			return publicUrl.equals(publicBaseUrl + "/" + objectKey)
+				&& Files.isRegularFile(resolveObjectKey(objectKey));
+		} catch (IllegalArgumentException exception) {
+			return false;
+		}
+	}
+
+	@Override
+	public void delete(String objectKey) {
+		Path target = resolveObjectKey(objectKey);
+		try {
+			Files.deleteIfExists(target);
+		} catch (Exception exception) {
+			throw new IllegalStateException("File deletion failed", exception);
+		}
+	}
+
+	private Path resolveObjectKey(String objectKey) {
+		if (objectKey == null || objectKey.isBlank()) {
+			throw new IllegalArgumentException("Invalid storage object key");
+		}
+		Path root = uploadDir.toAbsolutePath().normalize();
+		Path target = root.resolve(objectKey).normalize();
+		if (target.equals(root) || !target.startsWith(root)) {
+			throw new IllegalArgumentException("Invalid storage object key");
+		}
+		return target;
 	}
 
 	private static String stripTrailingSlash(String value) {

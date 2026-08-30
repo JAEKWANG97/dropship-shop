@@ -63,11 +63,12 @@ Status: Confirmed
   - 이미지, 상세 블록, 상품 고시 변경
 - 상품 상세 HTML diff, 이미지 교체/정렬 diff, 상품명/요약문 상세 diff처럼 필드별 상세 diff는 MVP 이후로 미룬다.
 
-## Supplier Portal Operations Boundary — B-100 Implemented, B-102~B-105 Planned
+## Supplier Portal Operations Boundary — B-100/B-101 Implemented, B-102~B-105 Planned
 
-Status: B-100 application review, invitation and supplier lifecycle admin actions are Implemented. B-102 through B-105 remain Planned, and existing admin actions remain authoritative for legacy and Coreable-managed flows until each later slice ships.
+Status: B-100 application review, invitation and supplier lifecycle actions plus B-101 product review actions are Implemented. B-102 through B-105 remain Planned, and existing admin actions remain authoritative for legacy and Coreable-managed flows until each later slice ships.
 
 - Coreable 관리자는 공개 공급처 신청을 승인 또는 거절하고, 승인된 연락 이메일에만 1회용 초대를 발급한다. 신청·승인·초대와 중복 신청 방지는 B-100에서 구현됐다.
+- Coreable 상품 검토자는 자신이 조회한 정확한 aggregate version에만 승인·보완·거절을 적용한다. 승인은 현재 판매 준비 조건을 다시 검증하며, 보완·거절의 공급처 문구와 내부 사유는 분리된 500자 이하 single-line PII-free 값으로 기록한다. Implemented in B-101.
 - B-102 이후 확인된 금액 불일치는 단순 메모가 아니다. 관리자는 실제 입금자·금액·시각·거래 식별값과 사유를 결제그룹 전체 명령으로 기록하고, 시스템은 실제 수령액의 `PAYMENT_GROUP` Refund 한 건과 모든 포함 Order의 `REFUND_REQUESTED`를 원자적으로 만든다. `PAYMENT_PENDING`, `EXPIRED`뿐 아니라 수령 Payment/Refund/Fulfillment 없이 미입금 취소만 된 `CANCELLED` 그룹도 이 경로로 반환한다. Coreable만 승인·실제 계좌이체 완료를 기록할 수 있고 공급처에는 노출하지 않는다.
 - 신청/초대와 portal/contact/manager/sales lifecycle 명령은 idempotency key, actor, reason과 전후 상태를 append-only 감사 이력에 남긴다. LINK_EXISTING은 신청 email을 기존 Supplier 연락처에 동기화하고 재검증한다. Implemented in B-100.
 - 포털 주문은 입금확인과 동시에 공급처에 노출되고 배송지가 잠기며 별도 공급처 수락 액션을 두지 않는다. 기존 Coreable 수동 발주와 Domeggook 주문의 관리자 발주 시작·완료 액션은 유지한다. Planned in B-103.

@@ -47,6 +47,7 @@ export default async function SupplierLayout({ children }: { children: React.Rea
         </Link>
         <nav aria-label="공급처 메뉴">
           <Link href="/supplier">홈</Link>
+          <Link href="/supplier/products">상품</Link>
         </nav>
         <form action="/auth/logout" method="post">
           <button className="button" type="submit">로그아웃</button>

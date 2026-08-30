@@ -2,7 +2,9 @@ package com.dropshipshop.api.supplierportal;
 
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -136,6 +138,20 @@ class SupplierPortalSecurityApiIntegrationTest {
 				.content(requestBody))
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code", is("ORIGIN_NOT_ALLOWED")));
+	}
+
+	@Test
+	void allowsIfMatchAndExposesEtagForSupplierProductRequests() throws Exception {
+		mockMvc.perform(options("/api/supplier/products/00000000-0000-0000-0000-000000000001")
+				.header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "DELETE")
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "if-match"))
+			.andExpect(status().isOk())
+			.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "if-match"));
+
+		mockMvc.perform(get("/api/products/00000000-0000-0000-0000-000000000001")
+				.header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN))
+			.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Location, ETag"));
 	}
 
 	private ManagerFixture activeManager(String suffix) {

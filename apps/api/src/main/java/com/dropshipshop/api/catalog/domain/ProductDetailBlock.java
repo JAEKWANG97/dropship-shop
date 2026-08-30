@@ -35,6 +35,10 @@ public class ProductDetailBlock {
 	@Column(name = "image_url", length = 1000)
 	private String imageUrl;
 
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "product_image_id")
+	private ProductImage productImage;
+
 	@Column(name = "html_content", columnDefinition = "TEXT")
 	private String htmlContent;
 
@@ -69,6 +73,19 @@ public class ProductDetailBlock {
 		this.altText = altText;
 	}
 
+	public ProductDetailBlock(Product product, ProductImage productImage, int sortOrder, String altText) {
+		if (productImage == null || productImage.getType() != ProductImageType.DETAIL
+			|| !sameProduct(product, productImage.getProduct())) {
+			throw new IllegalArgumentException("A DETAIL image owned by the same product is required");
+		}
+		this.product = product;
+		this.type = ProductDetailBlockType.IMAGE;
+		this.imageUrl = productImage.getImageUrl();
+		this.productImage = productImage;
+		this.sortOrder = sortOrder;
+		this.altText = altText;
+	}
+
 	@PrePersist
 	void prePersist() {
 		Instant now = Instant.now();
@@ -85,12 +102,20 @@ public class ProductDetailBlock {
 		return id;
 	}
 
+	public Product getProduct() {
+		return product;
+	}
+
 	public ProductDetailBlockType getType() {
 		return type;
 	}
 
 	public String getImageUrl() {
 		return imageUrl;
+	}
+
+	public ProductImage getProductImage() {
+		return productImage;
 	}
 
 	public String getHtmlContent() {
@@ -103,5 +128,12 @@ public class ProductDetailBlock {
 
 	public String getAltText() {
 		return altText;
+	}
+
+	private static boolean sameProduct(Product left, Product right) {
+		if (left == right) {
+			return true;
+		}
+		return left != null && right != null && left.getId() != null && left.getId().equals(right.getId());
 	}
 }

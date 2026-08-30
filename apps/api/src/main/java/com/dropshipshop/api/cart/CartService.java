@@ -18,7 +18,11 @@ import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
+import com.dropshipshop.api.catalog.repository.ProductRepository;
+import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.common.StorefrontSalesProperties;
+import com.dropshipshop.api.common.money.MoneyMath;
+import com.dropshipshop.api.supplierproduct.ProductSaleability;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
@@ -30,21 +34,30 @@ public class CartService {
 	private final CartRepository cartRepository;
 	private final CartItemRepository cartItemRepository;
 	private final ProductOptionRepository productOptionRepository;
+	private final ProductRepository productRepository;
+	private final SupplierRepository supplierRepository;
 	private final UserAccountRepository userAccountRepository;
 	private final StorefrontSalesProperties salesProperties;
+	private final ProductSaleability productSaleability;
 
 	public CartService(
 		CartRepository cartRepository,
 		CartItemRepository cartItemRepository,
 		ProductOptionRepository productOptionRepository,
+		ProductRepository productRepository,
+		SupplierRepository supplierRepository,
 		UserAccountRepository userAccountRepository,
-		StorefrontSalesProperties salesProperties
+		StorefrontSalesProperties salesProperties,
+		ProductSaleability productSaleability
 	) {
 		this.cartRepository = cartRepository;
 		this.cartItemRepository = cartItemRepository;
 		this.productOptionRepository = productOptionRepository;
+		this.productRepository = productRepository;
+		this.supplierRepository = supplierRepository;
 		this.userAccountRepository = userAccountRepository;
 		this.salesProperties = salesProperties;
+		this.productSaleability = productSaleability;
 	}
 
 	@Transactional
@@ -56,9 +69,21 @@ public class CartService {
 	@Transactional
 	public CartDtos.CartResponse addItem(UUID userId, CartDtos.AddCartItemRequest request) {
 		salesProperties.requireEnabled();
-		Cart cart = getOrCreateCart(userId);
-		ProductOption option = findOption(request.productOptionId());
-		Product product = option.getProduct();
+		Cart cart = getOrCreateCartForUpdate(userId);
+		ProductOptionRepository.OptionOwnership ownership = findOptionOwnership(request.productOptionId());
+		UUID productId = ownership.getProductId();
+		UUID supplierId = ownership.getSupplierId();
+		supplierRepository.findByIdForUpdate(supplierId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
+		Product product = productRepository.findByIdForUpdate(productId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
+		if (!supplierId.equals(product.getSupplier().getId())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product option is not sellable");
+		}
+		ProductOption option = productOptionRepository.findAllByProductIdForUpdate(productId).stream()
+			.filter(current -> current.getId().equals(request.productOptionId()))
+			.findFirst()
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
 		requireSellable(product, option);
 
 		CartItem item = cartItemRepository.findByCart_IdAndProductOption_Id(cart.getId(), option.getId())
@@ -75,6 +100,7 @@ public class CartService {
 
 	@Transactional
 	public CartDtos.CartResponse updateItem(UUID userId, UUID cartItemId, CartDtos.UpdateCartItemRequest request) {
+		lockCart(userId);
 		CartItem item = findUserCartItem(userId, cartItemId);
 		requireOrderQuantity(item.getProduct(), request.quantity());
 		item.updateQuantity(request.quantity());
@@ -83,6 +109,7 @@ public class CartService {
 
 	@Transactional
 	public void removeItem(UUID userId, UUID cartItemId) {
+		lockCart(userId);
 		CartItem item = findUserCartItem(userId, cartItemId);
 		cartItemRepository.delete(item);
 	}
@@ -99,13 +126,27 @@ public class CartService {
 			.orElseGet(() -> cartRepository.save(new Cart(findUser(userId))));
 	}
 
+	private Cart getOrCreateCartForUpdate(UUID userId) {
+		return cartRepository.findByUserIdForUpdate(userId).orElseGet(() -> {
+			UserAccount user = userAccountRepository.findByIdForUpdate(userId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+			return cartRepository.findByUserIdForUpdate(userId)
+				.orElseGet(() -> cartRepository.save(new Cart(user)));
+		});
+	}
+
+	private void lockCart(UUID userId) {
+		cartRepository.findByUserIdForUpdate(userId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cart item not found"));
+	}
+
 	private UserAccount findUser(UUID userId) {
 		return userAccountRepository.findById(userId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 	}
 
-	private ProductOption findOption(UUID productOptionId) {
-		return productOptionRepository.findById(productOptionId)
+	private ProductOptionRepository.OptionOwnership findOptionOwnership(UUID productOptionId) {
+		return productOptionRepository.findOwnershipById(productOptionId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
 	}
 
@@ -115,7 +156,7 @@ public class CartService {
 	}
 
 	private void requireSellable(Product product, ProductOption option) {
-		if (product.getStatus() != ProductStatus.ACTIVE || option.getStatus() != ProductOptionStatus.ACTIVE) {
+		if (!productSaleability.isSellable(product, option)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product option is not sellable");
 		}
 	}
@@ -126,9 +167,10 @@ public class CartService {
 			.map(this::toItemResponse)
 			.toList();
 		List<CartDtos.CartValidationIssueResponse> issues = validationIssues(items);
-		long subtotalAmount = itemResponses.stream()
-			.mapToLong(CartDtos.CartItemResponse::lineAmount)
-			.sum();
+		long subtotalAmount = 0;
+		for (CartDtos.CartItemResponse item : itemResponses) {
+			subtotalAmount = MoneyMath.addNonNegative(subtotalAmount, item.lineAmount());
+		}
 		return new CartDtos.CartResponse(
 			cart.getId(),
 			itemResponses,
@@ -160,8 +202,7 @@ public class CartService {
 		for (CartItem item : items) {
 			String reason = unavailableReason(item);
 			if (reason != null) {
-				String code = item.getProduct().getStatus() == ProductStatus.ACTIVE
-					&& item.getProductOption().getStatus() == ProductOptionStatus.ACTIVE
+				String code = productSaleability.isSellable(item.getProduct(), item.getProductOption())
 					? "INVALID_ORDER_QUANTITY"
 					: "UNSELLABLE_ITEM";
 				issues.add(new CartDtos.CartValidationIssueResponse(item.getId(), code, reason));
@@ -173,7 +214,8 @@ public class CartService {
 	private CartDtos.CartItemResponse toItemResponse(CartItem item) {
 		Product product = item.getProduct();
 		ProductOption option = item.getProductOption();
-		long unitPrice = product.getBasePrice() + option.getAdditionalPrice();
+		long unitPrice = MoneyMath.addNonNegative(product.getBasePrice(), option.getAdditionalPrice());
+		long lineAmount = MoneyMath.multiplyNonNegative(unitPrice, item.getQuantity());
 		String unavailableReason = unavailableReason(item);
 		return new CartDtos.CartItemResponse(
 			item.getId(),
@@ -185,7 +227,7 @@ public class CartService {
 			product.getMinimumOrderQuantity(),
 			product.getOrderQuantityStep(),
 			unitPrice,
-			unitPrice * item.getQuantity(),
+			lineAmount,
 			product.getStatus(),
 			option.getStatus(),
 			product.getThumbnailImageUrl(),
@@ -197,11 +239,14 @@ public class CartService {
 	private String unavailableReason(CartItem item) {
 		Product product = item.getProduct();
 		ProductOption option = item.getProductOption();
-		if (product.getStatus() != ProductStatus.ACTIVE) {
+		if (!productSaleability.isProductSellable(product)) {
 			return "판매가 중지된 상품입니다. 삭제 후 주문해 주세요.";
 		}
 		if (option.getStatus() != ProductOptionStatus.ACTIVE) {
 			return "현재 선택한 옵션은 판매가 중지되었습니다. 삭제 후 다른 옵션을 선택해 주세요.";
+		}
+		if (!productSaleability.hasValidCustomerUnitPrice(product, option)) {
+			return "현재 가격을 확인 중인 상품입니다. 삭제 후 다시 선택해 주세요.";
 		}
 		return orderQuantityReason(product, item.getQuantity());
 	}

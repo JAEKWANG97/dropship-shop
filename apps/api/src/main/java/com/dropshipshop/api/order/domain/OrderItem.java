@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.common.money.MoneyMath;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -100,13 +101,18 @@ public class OrderItem {
 		this.productDetailVersion = product.getDetailVersion();
 		this.productNoticeVersion = productNoticeVersion;
 		this.optionName = productOption.getName();
-		this.unitPrice = product.getBasePrice() + productOption.getAdditionalPrice();
+		this.unitPrice = MoneyMath.requireCustomerUnitPrice(
+			MoneyMath.addNonNegative(product.getBasePrice(), productOption.getAdditionalPrice()),
+			"unitPrice"
+		);
 		this.quantity = quantity;
-		this.lineAmount = unitPrice * quantity;
+		this.lineAmount = MoneyMath.multiplyPositive(unitPrice, quantity);
 		this.sourceItemNo = product.getSourceItemNo();
 		this.sourceOptionCode = productOption.getSourceOptionCode();
-		this.sourceUnitPrice = product.getSourcePrice()
-			+ (productOption.getSourceAdditionalPrice() == null ? 0 : productOption.getSourceAdditionalPrice());
+		this.sourceUnitPrice = MoneyMath.addNonNegative(
+			product.getSourcePrice(),
+			productOption.getSourceAdditionalPrice() == null ? 0 : productOption.getSourceAdditionalPrice()
+		);
 	}
 
 	@PrePersist

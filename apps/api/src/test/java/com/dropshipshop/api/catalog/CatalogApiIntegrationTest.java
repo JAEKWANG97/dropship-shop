@@ -6,6 +6,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -20,6 +23,7 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +46,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.dropshipshop.api.auth.security.TestAuthentication;
+import com.dropshipshop.api.catalog.cleanup.ProductImageCleanupService;
+import com.dropshipshop.api.catalog.domain.ProductImage;
+import com.dropshipshop.api.catalog.domain.ProductImageCleanupStatus;
+import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.repository.ProductChangeHistoryRepository;
+import com.dropshipshop.api.catalog.repository.ProductImageCleanupJobRepository;
+import com.dropshipshop.api.catalog.repository.ProductImageRepository;
+import com.dropshipshop.api.catalog.repository.ProductRepository;
+import com.dropshipshop.api.common.storage.FileStorage;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,6 +67,103 @@ class CatalogApiIntegrationTest {
 
 	@Autowired
 	private ProductChangeHistoryRepository productChangeHistoryRepository;
+
+	@Autowired
+	private ProductImageRepository productImageRepository;
+
+	@Autowired
+	private ProductImageCleanupJobRepository productImageCleanupJobRepository;
+
+	@Autowired
+	private ProductRepository productRepository;
+
+	@Autowired
+	private ProductImageCleanupService productImageCleanupService;
+
+	@Autowired
+	private FileStorage fileStorage;
+
+	@Test
+	void adminSameSoldOutCommandProtectsAFormerSourceSoldOutFromAutomaticRecovery() throws Exception {
+		UUID productId = createProduct(
+			createSupplier("Manual sold-out supplier"),
+			"Manual sold-out product",
+			"Manual sold-out summary",
+			"PPE_WORK_GLOVES",
+			"SOLD_OUT"
+		);
+		var product = productRepository.findById(productId).orElseThrow();
+		product.markSourceSynced(false, Instant.now());
+		product.markSourceAutoSoldOut();
+		productRepository.saveAndFlush(product);
+
+		mockMvc.perform(patch("/api/admin/products/{productId}/status", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"status":"SOLD_OUT","reason":"Keep this product manually sold out"}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status", is("SOLD_OUT")));
+
+		var manuallyProtected = productRepository.findById(productId).orElseThrow();
+		assertFalse(manuallyProtected.isSourceAutoSoldOut());
+		assertFalse(manuallyProtected.getSourceAvailable());
+		org.assertj.core.api.Assertions.assertThat(productRepository.findSourceSyncTargets(
+			org.springframework.data.domain.PageRequest.of(0, 100)
+		)).noneMatch(candidate -> candidate.getId().equals(productId));
+	}
+
+	@Test
+	void rejectsAdminMutationsThatExceedTheAggregateCustomerUnitPriceCap() throws Exception {
+		UUID supplierId = createSupplier("Price cap supplier");
+		MvcResult created = mockMvc.perform(post("/api/admin/products")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId":"%s",
+					  "name":"Price cap product",
+					  "summary":"Price cap summary",
+					  "sourcePrice":100000000,
+					  "basePrice":900000000,
+					  "categoryCode":"PPE_SAFETY_HELMET",
+					  "status":"HIDDEN"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isCreated())
+			.andReturn();
+		UUID productId = idFrom(created);
+
+		mockMvc.perform(post("/api/admin/products/{productId}/options", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"name":"Maximum option","additionalPrice":100000000,"status":"ACTIVE"}
+					"""))
+			.andExpect(status().isCreated());
+
+		mockMvc.perform(patch("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "supplierId":"%s",
+					  "name":"Price cap product",
+					  "summary":"Price cap summary",
+					  "sourcePrice":100000000,
+					  "basePrice":900000001,
+					  "categoryCode":"PPE_SAFETY_HELMET",
+					  "reason":"cap regression"
+					}
+					""".formatted(supplierId)))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(get("/api/admin/products/{productId}", productId)
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.basePrice", is(900000000)));
+	}
 
 	@Test
 	void managesCatalogAndExposesPublicProducts() throws Exception {
@@ -399,13 +508,15 @@ class CatalogApiIntegrationTest {
 		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
 				.with(authentication(TestAuthentication.admin())))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.changes", hasSize(8)))
+			.andExpect(jsonPath("$.changes", hasSize(17)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'IMAGES')]", hasSize(1)))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'ORDER_QUANTITY')].beforeValue", hasItem("1/1")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'ORDER_QUANTITY')].afterValue", hasItem("6/6")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeValue", hasItem("ACTIVE")))
 			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].afterValue", hasItem("HIDDEN")))
-			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].adminUserId", hasItem(TestAuthentication.ADMIN_ID.toString())));
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].adminUserId", hasItem(TestAuthentication.ADMIN_ID.toString())))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].actorType", hasItem("ADMIN")))
+			.andExpect(jsonPath("$.changes[?(@.changeType == 'PRODUCT_STATUS')].beforeVersion", hasItem(5)));
 
 		mockMvc.perform(get("/api/admin/products/{productId}/changes", productId)
 				.with(authentication(TestAuthentication.customer())))
@@ -776,6 +887,142 @@ class CatalogApiIntegrationTest {
 			.andExpect(header().string("X-Content-Type-Options", "nosniff"));
 	}
 
+	@Test
+	void registersOwnedUploadKeysAndCleansOnlyReplacedImages() throws Exception {
+		UUID supplierId = createSupplier("Image ownership supplier");
+		UUID productId = createProduct(
+			supplierId, "Image ownership A", "Summary", "PPE_SAFETY_HELMET", "HIDDEN"
+		);
+		UUID otherProductId = createProduct(
+			supplierId, "Image ownership B", "Summary", "PPE_SAFETY_HELMET", "HIDDEN"
+		);
+		MvcResult firstUpload = uploadPng(productId, "first.png");
+		String firstUrl = fieldFrom(firstUpload, "imageUrl");
+		String firstKey = fieldFrom(firstUpload, "objectKey");
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Register uploaded image","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","storageObjectKey":"%s","sortOrder":0}
+					]}
+					""".formatted(firstUrl, firstKey)))
+			.andExpect(status().isOk());
+		assertEquals(
+			List.of(firstKey),
+			productImageRepository.findAllByProduct_IdOrderBySortOrderAsc(productId).stream()
+				.map(image -> image.getStorageObjectKey()).toList()
+		);
+		assertTrue(productImageCleanupJobRepository.findByStorageObjectKey(firstKey).isEmpty());
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Retain uploaded image","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","sortOrder":0}
+					]}
+					""".formatted(firstUrl)))
+			.andExpect(status().isOk());
+		assertEquals(
+			List.of(firstKey),
+			productImageRepository.findAllByProduct_IdOrderBySortOrderAsc(productId).stream()
+				.map(image -> image.getStorageObjectKey()).toList()
+		);
+		assertTrue(productImageCleanupJobRepository.findByStorageObjectKey(firstKey).isEmpty());
+
+		MvcResult replacementUpload = uploadPng(productId, "replacement.png");
+		String replacementUrl = fieldFrom(replacementUpload, "imageUrl");
+		String replacementKey = fieldFrom(replacementUpload, "objectKey");
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Replace uploaded image","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","storageObjectKey":"%s","sortOrder":0}
+					]}
+					""".formatted(replacementUrl, replacementKey)))
+			.andExpect(status().isOk());
+		assertTrue(productImageCleanupJobRepository.findByStorageObjectKey(firstKey).isPresent());
+		assertTrue(productImageCleanupJobRepository.findByStorageObjectKey(replacementKey).isEmpty());
+
+		MvcResult otherUpload = uploadPng(otherProductId, "other.png");
+		String otherUrl = fieldFrom(otherUpload, "imageUrl");
+		String otherKey = fieldFrom(otherUpload, "objectKey");
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Reject cross-product image","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","storageObjectKey":"%s","sortOrder":0}
+					]}
+					""".formatted(otherUrl, otherKey)))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Reject mismatched image reference","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","storageObjectKey":"%s","sortOrder":0}
+					]}
+					""".formatted(firstUrl, replacementKey)))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Reject pending cleanup key","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","storageObjectKey":"%s","sortOrder":0}
+					]}
+					""".formatted(firstUrl, firstKey)))
+			.andExpect(status().isBadRequest());
+
+		ProductImage legacyLiveReference = productImageRepository.saveAndFlush(new ProductImage(
+			productRepository.findById(productId).orElseThrow(),
+			ProductImageType.GALLERY,
+			firstUrl,
+			1,
+			"Legacy cleanup race",
+			firstKey
+		));
+		Instant liveGuardAt = Instant.now().plusSeconds(5);
+		assertEquals(1, productImageCleanupService.processDueJobs(liveGuardAt));
+		assertTrue(fileStorage.matchesStoredFile(firstKey, firstUrl));
+		assertEquals(
+			ProductImageCleanupStatus.COMPLETED,
+			productImageCleanupJobRepository.findByStorageObjectKey(firstKey).orElseThrow().getStatus()
+		);
+		assertEquals(
+			"LIVE_REFERENCE",
+			productImageCleanupJobRepository.findByStorageObjectKey(firstKey).orElseThrow().getLastErrorCode()
+		);
+
+		mockMvc.perform(put("/api/admin/products/{productId}/images", productId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"reason":"Reject terminal cleanup key","images":[
+					  {"type":"THUMBNAIL","imageUrl":"%s","storageObjectKey":"%s","sortOrder":0}
+					]}
+					""".formatted(firstUrl, firstKey)))
+			.andExpect(status().isBadRequest());
+
+		productImageRepository.delete(legacyLiveReference);
+		productImageRepository.flush();
+		var requeued = productImageCleanupService.enqueueCleanup(firstKey, productId, liveGuardAt.plusSeconds(1));
+		var repeated = productImageCleanupService.enqueueCleanup(firstKey, productId, liveGuardAt.plusSeconds(1));
+		assertEquals(requeued.getId(), repeated.getId());
+		assertEquals(ProductImageCleanupStatus.PENDING, repeated.getStatus());
+		assertEquals(1, productImageCleanupService.processDueJobs(liveGuardAt.plusSeconds(2)));
+		assertFalse(fileStorage.matchesStoredFile(firstKey, firstUrl));
+		var completed = productImageCleanupJobRepository.findByStorageObjectKey(firstKey).orElseThrow();
+		assertEquals(ProductImageCleanupStatus.COMPLETED, completed.getStatus());
+		assertNull(completed.getLastErrorCode());
+	}
+
 	private UUID createSupplier() throws Exception {
 		return createSupplier("Supplier A");
 	}
@@ -973,5 +1220,13 @@ class CatalogApiIntegrationTest {
 
 	private byte[] webpImageBytes() {
 		return Base64.getDecoder().decode("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAgA0JaQAA3AA/vuUAAA=");
+	}
+
+	private MvcResult uploadPng(UUID productId, String filename) throws Exception {
+		return mockMvc.perform(multipart("/api/admin/products/{productId}/images/upload", productId)
+				.file(new MockMultipartFile("file", filename, "image/png", imageBytes("png")))
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk())
+			.andReturn();
 	}
 }

@@ -42,7 +42,13 @@ async function uploadThumbnail(productId: string, formData: FormData, cookieHead
   await apiSendWithCookie(`/api/admin/products/${productId}/images`, cookieHeader, {
     method: "PUT",
     body: JSON.stringify({
-      images: [{ type: "THUMBNAIL", imageUrl: uploaded.imageUrl, sortOrder: 0, altText }],
+		images: [{
+		  type: "THUMBNAIL",
+		  imageUrl: uploaded.imageUrl,
+		  storageObjectKey: uploaded.objectKey,
+		  sortOrder: 0,
+		  altText,
+		}],
       reason: "관리자 상품 등록 이미지 설정",
     }),
   });

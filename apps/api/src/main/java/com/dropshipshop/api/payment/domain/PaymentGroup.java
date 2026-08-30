@@ -3,6 +3,7 @@ package com.dropshipshop.api.payment.domain;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.user.domain.UserAccount;
 
 import jakarta.persistence.Column;
@@ -126,8 +127,8 @@ public class PaymentGroup {
 	public PaymentGroup(String checkoutNumber, UserAccount user, long totalAmount, Instant expiresAt) {
 		this.checkoutNumber = checkoutNumber;
 		this.user = user;
-		this.totalAmount = totalAmount;
-		this.refundableAmount = totalAmount;
+		this.totalAmount = MoneyMath.requirePositive(totalAmount, "totalAmount");
+		this.refundableAmount = this.totalAmount;
 		this.expiresAt = expiresAt;
 	}
 
@@ -163,7 +164,7 @@ public class PaymentGroup {
 
 	public void approve(long approvedAmount, Instant approvedAt) {
 		this.status = PaymentGroupStatus.APPROVED;
-		this.approvedAmount = approvedAmount;
+		this.approvedAmount = MoneyMath.requirePositive(approvedAmount, "approvedAmount");
 		this.approvedAt = approvedAt;
 	}
 
@@ -243,7 +244,7 @@ public class PaymentGroup {
 		if (refundAmount <= 0 || refundAmount > refundableAmount) {
 			throw new IllegalArgumentException("Refund amount exceeds refundable amount");
 		}
-		this.refundableAmount -= refundAmount;
+		this.refundableAmount = MoneyMath.subtractNonNegative(refundableAmount, refundAmount);
 		this.status = refundableAmount == 0 ? PaymentGroupStatus.REFUNDED : PaymentGroupStatus.PARTIALLY_REFUNDED;
 	}
 

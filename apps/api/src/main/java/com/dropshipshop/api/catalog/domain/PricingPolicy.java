@@ -39,6 +39,9 @@ public class PricingPolicy {
 	private int roundingUnit;
 
 	@Column(nullable = false)
+	private long version;
+
+	@Column(nullable = false)
 	private boolean active = true;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
@@ -81,6 +84,13 @@ public class PricingPolicy {
 		BigDecimal safetyMarginRate,
 		int roundingUnit
 	) {
+		if (roundingUnit <= 0) {
+			throw new IllegalArgumentException("roundingUnit must be positive");
+		}
+		requireNonNegative(commissionRate, "commissionRate");
+		requireNonNegative(taxBufferRate, "taxBufferRate");
+		requireNonNegative(overheadRate, "overheadRate");
+		requireNonNegative(safetyMarginRate, "safetyMarginRate");
 		this.name = name;
 		this.commissionRate = commissionRate;
 		this.taxBufferRate = taxBufferRate;
@@ -88,6 +98,7 @@ public class PricingPolicy {
 		this.safetyMarginRate = safetyMarginRate;
 		this.roundingUnit = roundingUnit;
 		this.active = true;
+		this.version = Math.addExact(version, 1);
 	}
 
 	public UUID getId() {
@@ -120,5 +131,15 @@ public class PricingPolicy {
 
 	public boolean isActive() {
 		return active;
+	}
+
+	public long getVersion() {
+		return version;
+	}
+
+	private static void requireNonNegative(BigDecimal value, String name) {
+		if (value == null || value.signum() < 0) {
+			throw new IllegalArgumentException(name + " must be non-negative");
+		}
 	}
 }

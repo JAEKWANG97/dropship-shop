@@ -64,8 +64,8 @@ async function uploadDetailImage(productId: string, file: File, cookieHeader: st
     throw new Error(`Image upload failed: ${uploadResponse.status}`);
   }
 
-  const uploaded = (await uploadResponse.json()) as ProductImageUploadResponse;
-  return uploaded.imageUrl;
+	const uploaded = (await uploadResponse.json()) as ProductImageUploadResponse;
+	return uploaded;
 }
 
 export async function updateAdminProductStatus(formData: FormData) {
@@ -132,15 +132,21 @@ export async function updateAdminProductThumbnail(formData: FormData) {
 
   try {
     if (!(file instanceof File) || file.size === 0) throw new Error("Thumbnail file is required");
-    const [product, imageUrl] = await Promise.all([
-      getAdminProduct(productId),
-      uploadDetailImage(productId, file, cookieHeader),
-    ]);
+		const [product, uploaded] = await Promise.all([
+			getAdminProduct(productId),
+			uploadDetailImage(productId, file, cookieHeader),
+		]);
     await apiSendWithCookie(`/api/admin/products/${productId}/images`, cookieHeader, {
       method: "PUT",
       body: JSON.stringify({
         images: [
-          { type: "THUMBNAIL", imageUrl, sortOrder: 0, altText: product.name },
+				  {
+					type: "THUMBNAIL",
+					imageUrl: uploaded.imageUrl,
+					storageObjectKey: uploaded.objectKey,
+					sortOrder: 0,
+					altText: product.name,
+				  },
           ...product.images
             .filter((image) => image.type === "GALLERY")
             .map((image) => ({
@@ -179,8 +185,8 @@ export async function updateAdminProductDetailBlocks(formData: FormData) {
       const type = text(formData, `blockType-${index}`) as ProductDetailBlockType;
       if (type === "IMAGE") {
         const file = formData.get(`blockImageFile-${index}`);
-        const imageUrl = file instanceof File && file.size > 0
-          ? await uploadDetailImage(productId, file, cookieHeader)
+			const imageUrl = file instanceof File && file.size > 0
+			  ? (await uploadDetailImage(productId, file, cookieHeader)).imageUrl
           : text(formData, `blockImageUrl-${index}`);
         detailBlocks.push({
           type,
@@ -204,7 +210,7 @@ export async function updateAdminProductDetailBlocks(formData: FormData) {
     if (newImageFile instanceof File && newImageFile.size > 0) {
       detailBlocks.push({
         type: "IMAGE",
-        imageUrl: await uploadDetailImage(productId, newImageFile, cookieHeader),
+		imageUrl: (await uploadDetailImage(productId, newImageFile, cookieHeader)).imageUrl,
         htmlContent: null,
         sortOrder: numberValue(formData, "newImageSortOrder"),
         altText: text(formData, "newImageAltText") || null,

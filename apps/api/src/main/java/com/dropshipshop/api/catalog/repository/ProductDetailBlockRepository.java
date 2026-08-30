@@ -15,6 +15,8 @@ public interface ProductDetailBlockRepository extends JpaRepository<ProductDetai
 
 	void deleteAllByProduct_Id(UUID productId);
 
+	boolean existsByProductImage_Id(UUID productImageId);
+
 	@Query("select distinct block.product.id from ProductDetailBlock block where block.product.id in :productIds")
 	List<UUID> findProductIdsWithDetailContent(@Param("productIds") List<UUID> productIds);
 }

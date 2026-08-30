@@ -1,7 +1,10 @@
 package com.dropshipshop.api.catalog.domain;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
+
+import com.dropshipshop.api.common.money.MoneyMath;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -49,6 +52,9 @@ public class Product {
 	@Column(name = "source_available")
 	private Boolean sourceAvailable;
 
+	@Column(name = "source_auto_sold_out", nullable = false)
+	private boolean sourceAutoSoldOut;
+
 	@Column(name = "source_synced_at")
 	private Instant sourceSyncedAt;
 
@@ -78,6 +84,34 @@ public class Product {
 
 	@Column(name = "detail_version", nullable = false)
 	private int detailVersion = 1;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "management_channel", nullable = false, length = 30, updatable = false)
+	private ProductManagementChannel managementChannel = ProductManagementChannel.COREABLE;
+
+	@Column(name = "version", nullable = false)
+	private long aggregateVersion;
+
+	@Column(name = "first_submitted_at")
+	private Instant firstSubmittedAt;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "pricing_policy_id_applied")
+	private PricingPolicy pricingPolicyApplied;
+
+	@Column(name = "pricing_policy_version_applied")
+	private Long pricingPolicyVersionApplied;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "review_status", length = 30)
+	private ProductReviewStatus reviewStatus;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "review_reason_code", length = 50)
+	private ProductReviewReasonCode reviewReasonCode;
+
+	@Column(name = "supplier_review_message", length = 500)
+	private String supplierReviewMessage;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
@@ -112,6 +146,21 @@ public class Product {
 		ProductCategory categoryCode,
 		ProductStatus status
 	) {
+		this(supplier, name, summary, sourcePrice, basePrice, categoryCode, status, ProductManagementChannel.COREABLE);
+	}
+
+	public Product(
+		Supplier supplier,
+		String name,
+		String summary,
+		long sourcePrice,
+		long basePrice,
+		ProductCategory categoryCode,
+		ProductStatus status,
+		ProductManagementChannel managementChannel
+	) {
+		MoneyMath.requireSupplierUnitCost(sourcePrice, "sourcePrice");
+		MoneyMath.requireCustomerUnitPrice(basePrice, "basePrice");
 		this.supplier = supplier;
 		this.name = name;
 		this.summary = summary;
@@ -119,6 +168,10 @@ public class Product {
 		this.basePrice = basePrice;
 		this.categoryCode = categoryCode;
 		this.status = status;
+		this.managementChannel = Objects.requireNonNull(managementChannel, "managementChannel");
+		if (managementChannel == ProductManagementChannel.SUPPLIER_PORTAL) {
+			this.reviewStatus = ProductReviewStatus.DRAFT;
+		}
 	}
 
 	@PrePersist
@@ -134,6 +187,8 @@ public class Product {
 	}
 
 	public void updateBase(Supplier supplier, String name, String summary, long sourcePrice, long basePrice, ProductCategory categoryCode) {
+		MoneyMath.requireSupplierUnitCost(sourcePrice, "sourcePrice");
+		MoneyMath.requireCustomerUnitPrice(basePrice, "basePrice");
 		this.supplier = supplier;
 		this.name = name;
 		this.summary = summary;
@@ -159,8 +214,57 @@ public class Product {
 	}
 
 	public void updateSourcePricing(long sourcePrice, long basePrice) {
+		MoneyMath.requireSupplierUnitCost(sourcePrice, "sourcePrice");
+		MoneyMath.requireCustomerUnitPrice(basePrice, "basePrice");
 		this.sourcePrice = sourcePrice;
 		this.basePrice = basePrice;
+	}
+
+	public void applyPricing(PricingPolicy pricingPolicy, long basePrice) {
+		MoneyMath.requireCustomerUnitPrice(basePrice, "basePrice");
+		this.pricingPolicyApplied = Objects.requireNonNull(pricingPolicy, "pricingPolicy");
+		this.pricingPolicyVersionApplied = pricingPolicy.getVersion();
+		this.basePrice = basePrice;
+	}
+
+	public void incrementVersion() {
+		aggregateVersion = Math.addExact(aggregateVersion, 1);
+	}
+
+	public boolean hasVersion(long expectedVersion) {
+		return aggregateVersion == expectedVersion;
+	}
+
+	public void markFirstSubmitted(Instant submittedAt) {
+		if (firstSubmittedAt == null) {
+			firstSubmittedAt = Objects.requireNonNull(submittedAt, "submittedAt");
+		}
+	}
+
+	public void updateReview(
+		ProductReviewStatus reviewStatus,
+		ProductReviewReasonCode reviewReasonCode,
+		String supplierReviewMessage
+	) {
+		Objects.requireNonNull(reviewStatus, "reviewStatus");
+		boolean reasonRequired = reviewStatus == ProductReviewStatus.REVIEW_REQUIRED
+			|| reviewStatus == ProductReviewStatus.SUPPLEMENT_REQUESTED
+			|| reviewStatus == ProductReviewStatus.REJECTED;
+		boolean messageRequired = reviewStatus == ProductReviewStatus.SUPPLEMENT_REQUESTED
+			|| reviewStatus == ProductReviewStatus.REJECTED;
+		if (reasonRequired && reviewReasonCode == null) {
+			throw new IllegalArgumentException("reviewReasonCode is required");
+		}
+		if (messageRequired && (supplierReviewMessage == null || supplierReviewMessage.isBlank())) {
+			throw new IllegalArgumentException("supplierReviewMessage is required");
+		}
+		if (supplierReviewMessage != null && (supplierReviewMessage.length() > 500
+			|| supplierReviewMessage.indexOf('\n') >= 0 || supplierReviewMessage.indexOf('\r') >= 0)) {
+			throw new IllegalArgumentException("supplierReviewMessage must be single-line and at most 500 characters");
+		}
+		this.reviewStatus = reviewStatus;
+		this.reviewReasonCode = reviewReasonCode;
+		this.supplierReviewMessage = supplierReviewMessage;
 	}
 
 	public void updateOrderQuantityRules(int minimumOrderQuantity, int orderQuantityStep) {
@@ -176,6 +280,14 @@ public class Product {
 		this.sourceAvailable = available;
 		this.sourceSyncedAt = syncedAt;
 		this.sourceSyncError = null;
+	}
+
+	public void markSourceAutoSoldOut() {
+		this.sourceAutoSoldOut = true;
+	}
+
+	public void clearSourceAutoSoldOut() {
+		this.sourceAutoSoldOut = false;
 	}
 
 	public void markSourceSyncFailed(String error, Instant syncedAt) {
@@ -227,6 +339,10 @@ public class Product {
 		return sourceAvailable;
 	}
 
+	public boolean isSourceAutoSoldOut() {
+		return sourceAutoSoldOut;
+	}
+
 	public Instant getSourceSyncedAt() {
 		return sourceSyncedAt;
 	}
@@ -262,4 +378,45 @@ public class Product {
 	public int getDetailVersion() {
 		return detailVersion;
 	}
+
+	public ProductManagementChannel getManagementChannel() {
+		return managementChannel;
+	}
+
+	public long getVersion() {
+		return aggregateVersion;
+	}
+
+	public long getAggregateVersion() {
+		return aggregateVersion;
+	}
+
+	public Instant getFirstSubmittedAt() {
+		return firstSubmittedAt;
+	}
+
+	public PricingPolicy getPricingPolicyApplied() {
+		return pricingPolicyApplied;
+	}
+
+	public UUID getPricingPolicyIdApplied() {
+		return pricingPolicyApplied == null ? null : pricingPolicyApplied.getId();
+	}
+
+	public Long getPricingPolicyVersionApplied() {
+		return pricingPolicyVersionApplied;
+	}
+
+	public ProductReviewStatus getReviewStatus() {
+		return reviewStatus;
+	}
+
+	public ProductReviewReasonCode getReviewReasonCode() {
+		return reviewReasonCode;
+	}
+
+	public String getSupplierReviewMessage() {
+		return supplierReviewMessage;
+	}
+
 }
