@@ -40,6 +40,7 @@ import com.dropshipshop.api.refund.domain.RefundScope;
 import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.supplierportal.SupplierPortalHasher;
 import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
+import com.dropshipshop.api.fulfillment.SupplierFulfillmentHandoverService;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -59,6 +60,7 @@ public class RefundService {
 	private final SupplierPortalHasher hasher;
 	private final SupplierPortalInputPolicy inputPolicy;
 	private final ObjectMapper objectMapper;
+	private final SupplierFulfillmentHandoverService handoverService;
 
 	RefundService(
 		RefundRepository refundRepository,
@@ -72,7 +74,8 @@ public class RefundService {
 		NotificationService notificationService,
 		SupplierPortalHasher hasher,
 		SupplierPortalInputPolicy inputPolicy,
-		ObjectMapper objectMapper
+		ObjectMapper objectMapper,
+		SupplierFulfillmentHandoverService handoverService
 	) {
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
@@ -86,6 +89,7 @@ public class RefundService {
 		this.hasher = hasher;
 		this.inputPolicy = inputPolicy;
 		this.objectMapper = objectMapper;
+		this.handoverService = handoverService;
 	}
 
 	@Transactional
@@ -225,6 +229,7 @@ public class RefundService {
 				: List.of(refund.getOrder());
 			for (CustomerOrder order : appliedOrders) {
 				OrderStatus beforeStatus = order.getStatus();
+				handoverService.takeOverTerminal(order, now);
 				order.markRefundRequested();
 				order.markRefunded();
 				actionHistoryRepository.save(new AdminOrderActionHistory(order, adminUserId,

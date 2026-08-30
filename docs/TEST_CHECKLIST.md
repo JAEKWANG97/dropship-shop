@@ -27,6 +27,18 @@
 - [x] PostgreSQL V41 fresh/upgrade/preflight/default/FK·lock smoke와 H2 전체 회귀
 - [x] 재고 409 후 입력 보존·이미지 중복 방지, 환불 승인/수동 완료, 만료/취소 주문 탐색 Web 계약
 
+### B-103 Supplier Fulfillment And Minimum PII
+
+- [x] portal-eligible, KEEP fallback, mixed/legacy, 결제 예외 routing matrix와 입금확인·Fulfillment·주소 잠금의 원자 rollback을 검증한다.
+- [x] 비로그인·일반 회원·ADMIN·supplier 권한, active tenant/time-valid contract, 타 공급처·결제 예외 `404`를 검증한다.
+- [x] 목록 PII 부재, 상세 allowlist·자기 item만·stable order-item id·초기 allocation 0/remaining ordered, exact masking과 `Cache-Control: no-store`를 검증한다.
+- [x] 요청 +60일 직전/동일/직후, scheduler/read-lazy/terminal takeover, 중복 실행과 admin takeover 동일·변경 replay를 검증한다.
+- [x] Claim grant/extension/revoke의 허용 상태·expected latest id·각 요청 최대 30일·contract guard·동일/변경 replay와 MASKED/read-only FULL 전환을 검증한다.
+- [x] 배송 메모의 null·blank-to-null·trim·300자 경계와 customer/admin/supplier snapshot 응답을 검증한다.
+- [x] 출고 요청·상품 검토 email의 PII-free payload, dispatch/retry 재검증, raw exception 비저장, invite retry 차단, 7일 retry·30일 cleanup과 B-105 전 claim-work producer 미호출을 검증한다.
+- [x] V42 fresh/upgrade의 delivery memo 길이, grant/access-log FK·unique·index와 기존 null/backfill 호환을 PostgreSQL에서 검증한다.
+- [x] 전체 API suite, Web lint/build와 공급처 출고 목록·상세 desktop/mobile 계약 Playwright를 검증한다.
+
 ## Production Read-Only
 
 - [x] 홈페이지·상품 목록·상품 상세·정책·회사·고객문의 접근
@@ -54,4 +66,7 @@
 - [ ] 공개 상품 목록과 상세의 기준 응답시간 측정
 - [ ] 관리자 상품 300개 이상 목록의 필터·페이지 응답 측정
 - [ ] 주문 생성 중복 요청의 멱등성과 동시 요청 확인
+- [ ] B-103 공급처 상세 동시 접근에서 owner takeover·접근 로그가 유실 또는 중복 상태 전이를 만들지 않는지 확인
+- [ ] B-103 cutoff scheduler 100건 batch와 공급처 주문 목록의 query 수·응답시간 측정
+- [ ] B-103 운영 email retry·retention cleanup batch의 처리량과 재시도 폭주 방지 확인
 - [ ] EC2 메모리·swap·CPU credit·컨테이너 재시작 상태 확인

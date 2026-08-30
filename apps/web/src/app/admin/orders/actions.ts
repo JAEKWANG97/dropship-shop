@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ApiError, apiSendWithCookie } from "@/lib/api";
+import { supplierMutationHeaders } from "@/lib/supplier";
 import {
   ADMIN_DEPOSIT_PATHS,
   ADMIN_REFUND_PATHS,
@@ -280,6 +281,29 @@ export async function cancelSupplierPurchase(formData: FormData) {
   }
   revalidatePath("/admin/orders");
   done(orderId, "공급처 주문 취소를 요청했습니다.");
+}
+
+export async function takeOverPortalFulfillment(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+
+  try {
+    await apiSendWithCookie(`/api/admin/orders/${orderId}/portal-takeover`, (await cookies()).toString(), {
+      method: "POST",
+      headers: supplierMutationHeaders(idempotencyKey),
+      body: JSON.stringify({ reason: value(formData, "reason") }),
+    });
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "Coreable 인계 처리에 실패했습니다."),
+      "portal-takeover",
+      uncertainCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "출고 요청을 Coreable 처리로 인계했습니다.");
 }
 
 export async function completeManualRefund(formData: FormData) {

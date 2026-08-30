@@ -123,6 +123,7 @@ class CustomerOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.paymentGroup.displayStatus").doesNotExist())
 			.andExpect(jsonPath("$.payment.status", is("APPROVED")))
 			.andExpect(jsonPath("$.shippingAddress.recipientName", is("Receiver")))
+			.andExpect(jsonPath("$.shippingAddress.deliveryMemo", is("Leave at the door")))
 			.andExpect(jsonPath("$.items", hasSize(1)))
 			.andExpect(jsonPath("$.items[0].productName", is("Order Product ORD-DETAIL-1")))
 			.andExpect(jsonPath("$.fulfillment.status", is("PENDING")))
@@ -203,7 +204,9 @@ class CustomerOrderApiIntegrationTest {
 			customer,
 			supplier,
 			paymentGroup,
-			new ShippingAddressSnapshot("Receiver", "010-1111-2222", "12345", "Seoul test road", "101"),
+			new ShippingAddressSnapshot(
+				"Receiver", "010-1111-2222", "12345", "Seoul test road", "101", "Leave at the door"
+			),
 			amount,
 			paymentGroup.getExpiresAt()
 		));

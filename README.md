@@ -41,15 +41,15 @@
 - 송장번호 입력
 - 취소/환불 처리
 
-### Supplier Portal — `B-100`~`B-102` Implemented, `B-103`~`B-105` Planned
+### Supplier Portal — `B-100`~`B-103` Implemented, `B-104`~`B-105` Planned
 
 - 공개 신청, Coreable 승인/거절, 1회용 이메일 초대, Kakao 담당자 연결과 포털 기본 화면은 `B-100`에서 구현했다.
 - 공급처 개별 상품·옵션·이미지·상세·고시 등록과 Coreable 검토는 `B-101`에서 구현했다. 공급처는 공급가를 입력하지만 고객 판매가와 최종 판매 통제는 Coreable이 유지한다.
 - 일반 유효상품은 자동 공개하고 인증·카테고리·법정 필수정보 위험만 Coreable이 검토한다. `B-102`는 `TRACKED`/`UNTRACKED` 옵션 재고와 24시간 예약을 구현한다.
-- `B-103` Planned: 입금확인 완료 주문은 공급처 수락 단계 없이 즉시 출고 요청으로 보이며, 공급처는 기한이 제한된 최소 배송정보만 조회한다.
+- `B-103`은 입금확인 완료 주문을 공급처 수락 단계 없이 즉시 출고 요청으로 만들고, 공급처에는 기한이 제한된 최소 배송정보만 노출한다. 개인정보 cutoff·Coreable 인계·운영 이메일 기반도 함께 구현했다.
 - `B-104`/`B-105` Planned: 공급처는 복수 송장과 수량 할당, 송장 전 주문 전체 품절, Coreable이 요청한 클레임 사실만 입력한다. 결제·환불·CS·클레임 결정과 정산은 제공하지 않는다.
 
-`B-101`/`B-102` 구현 계약과 `B-103`~`B-105` 상세 Planned 계약, 기존 동작의 호환 경계는 [Supplier Portal Design](docs/supplier-portal-design.md)을 기준으로 한다. Production 포털은 active 공급처 신청 개인정보 고지, 실제 이메일 delivery, `B-098` 계약 증적과 `B-100`~`B-105` gate를 모두 검증할 때까지 기본 `off`다.
+`B-101`~`B-103` 구현 계약과 `B-104`~`B-105` 상세 Planned 계약, 기존 동작의 호환 경계는 [Supplier Portal Design](docs/supplier-portal-design.md)을 기준으로 한다. Production 포털은 active 공급처 신청 개인정보 고지, 실제 이메일 delivery, `B-098` 계약 증적과 `B-100`~`B-105` gate를 모두 검증할 때까지 기본 `off`다.
 
 ## Non-Goals For MVP
 

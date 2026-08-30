@@ -142,6 +142,44 @@ public class NotificationLog {
 		return log;
 	}
 
+	public static NotificationLog supplierOperational(
+		UUID supplierId,
+		UUID orderId,
+		UUID claimId,
+		NotificationType type,
+		String recipient,
+		String templateKey,
+		String payloadSnapshot
+	) {
+		if (type != NotificationType.SUPPLIER_FULFILLMENT_REQUESTED
+			&& type != NotificationType.SUPPLIER_PRODUCT_REVIEW_RESULT
+			&& type != NotificationType.SUPPLIER_CLAIM_WORK_REQUESTED) {
+			throw new IllegalArgumentException("Supplier operational notification type is required");
+		}
+		NotificationLog log = new NotificationLog(
+			null,
+			orderId,
+			null,
+			claimId,
+			null,
+			null,
+			type,
+			NotificationChannel.EMAIL,
+			recipient,
+			templateKey,
+			payloadSnapshot
+		);
+		log.supplierId = supplierId;
+		return log;
+	}
+
+	public boolean isSupplierOperational() {
+		return supplierId != null && supplierInviteId == null
+			&& (type == NotificationType.SUPPLIER_FULFILLMENT_REQUESTED
+				|| type == NotificationType.SUPPLIER_PRODUCT_REVIEW_RESULT
+				|| type == NotificationType.SUPPLIER_CLAIM_WORK_REQUESTED);
+	}
+
 	@PrePersist
 	void prePersist() {
 		Instant now = Instant.now();
@@ -264,6 +302,7 @@ public class NotificationLog {
 		this.status = NotificationStatus.PENDING;
 		this.failureReason = null;
 		this.sentAt = null;
+		this.recipientRetentionExpiresAt = null;
 	}
 
 	public void scheduleRecipientCleanup(Instant expiresAt) {
@@ -274,5 +313,14 @@ public class NotificationLog {
 		this.recipient = null;
 		this.failureReason = null;
 		this.recipientAnonymizedAt = now;
+	}
+
+	public void scheduleOperationalCleanup(Instant terminalAt) {
+		if (!isSupplierOperational()) {
+			return;
+		}
+		this.recipientRetentionExpiresAt = status == NotificationStatus.FAILED
+			? createdAt.plus(java.time.Duration.ofDays(37))
+			: terminalAt.plus(java.time.Duration.ofDays(30));
 	}
 }

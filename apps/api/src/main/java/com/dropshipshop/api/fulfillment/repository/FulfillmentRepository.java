@@ -3,6 +3,7 @@ package com.dropshipshop.api.fulfillment.repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -19,6 +20,12 @@ import jakarta.persistence.LockModeType;
 public interface FulfillmentRepository extends JpaRepository<Fulfillment, UUID> {
 
 	Optional<Fulfillment> findByOrder_Id(UUID orderId);
+
+	@Query("select fulfillment.channel from Fulfillment fulfillment where fulfillment.order.id = :orderId")
+	Optional<FulfillmentChannel> findChannelByOrderId(@Param("orderId") UUID orderId);
+
+	@Query("select fulfillment.id from Fulfillment fulfillment where fulfillment.order.id = :orderId")
+	Optional<UUID> findIdByOrderId(@Param("orderId") UUID orderId);
 
 	List<Fulfillment> findTop20ByPurchaseStatusOrderByCreatedAtAsc(SupplierPurchaseStatus status);
 
@@ -57,4 +64,96 @@ public interface FulfillmentRepository extends JpaRepository<Fulfillment, UUID> 
 		order by fulfillment.id
 		""")
 	List<Fulfillment> findAllByPaymentGroupIdForUpdate(@Param("paymentGroupId") UUID paymentGroupId);
+
+	@Query("""
+		select fulfillment.id
+		from Fulfillment fulfillment
+		where fulfillment.channel = com.dropshipshop.api.fulfillment.domain.FulfillmentChannel.SUPPLIER_PORTAL
+			and fulfillment.operationalOwner = com.dropshipshop.api.fulfillment.domain.FulfillmentOperationalOwner.SUPPLIER
+			and fulfillment.status in (
+				com.dropshipshop.api.fulfillment.domain.FulfillmentStatus.PENDING,
+				com.dropshipshop.api.fulfillment.domain.FulfillmentStatus.ORDERED
+			)
+			and fulfillment.piiAccessCutoffAt <= :now
+		order by fulfillment.piiAccessCutoffAt, fulfillment.id
+		""")
+	List<UUID> findTopExpiredPortalCandidateIds(@Param("now") Instant now, org.springframework.data.domain.Pageable pageable);
+
+	@Query("""
+		select fulfillment
+		from Fulfillment fulfillment
+		join fetch fulfillment.order customerOrder
+		where fulfillment.supplier.id = :supplierId
+			and customerOrder.supplier.id = :supplierId
+			and fulfillment.channel = com.dropshipshop.api.fulfillment.domain.FulfillmentChannel.SUPPLIER_PORTAL
+			and fulfillment.operationalOwner = com.dropshipshop.api.fulfillment.domain.FulfillmentOperationalOwner.SUPPLIER
+			and fulfillment.status in (
+				com.dropshipshop.api.fulfillment.domain.FulfillmentStatus.PENDING,
+				com.dropshipshop.api.fulfillment.domain.FulfillmentStatus.ORDERED
+			)
+			and customerOrder.paymentGroup.status <> com.dropshipshop.api.payment.domain.PaymentGroupStatus.PAYMENT_EXCEPTION
+			and not exists (
+				select refund.id from Refund refund
+				where (refund.order = customerOrder or refund.paymentGroup = customerOrder.paymentGroup)
+					and refund.reason in (
+						com.dropshipshop.api.refund.domain.RefundReason.LATE_DEPOSIT_EXCEPTION,
+						com.dropshipshop.api.refund.domain.RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT,
+						com.dropshipshop.api.refund.domain.RefundReason.PAYMENT_AMOUNT_MISMATCH
+					)
+			)
+		order by fulfillment.requestedAt, fulfillment.id
+		""")
+	List<Fulfillment> findSupplierQueue(@Param("supplierId") UUID supplierId);
+
+	@Query("""
+		select fulfillment
+		from Fulfillment fulfillment
+		join fetch fulfillment.order customerOrder
+		where fulfillment.supplier.id = :supplierId
+			and customerOrder.supplier.id = :supplierId
+			and customerOrder.orderNumber = :orderNumber
+			and fulfillment.channel = com.dropshipshop.api.fulfillment.domain.FulfillmentChannel.SUPPLIER_PORTAL
+			and customerOrder.paymentGroup.status <> com.dropshipshop.api.payment.domain.PaymentGroupStatus.PAYMENT_EXCEPTION
+			and not exists (
+				select refund.id from Refund refund
+				where (refund.order = customerOrder or refund.paymentGroup = customerOrder.paymentGroup)
+					and refund.reason in (
+						com.dropshipshop.api.refund.domain.RefundReason.LATE_DEPOSIT_EXCEPTION,
+						com.dropshipshop.api.refund.domain.RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT,
+						com.dropshipshop.api.refund.domain.RefundReason.PAYMENT_AMOUNT_MISMATCH
+					)
+			)
+		""")
+	Optional<Fulfillment> findSupplierDetail(
+		@Param("supplierId") UUID supplierId,
+		@Param("orderNumber") String orderNumber
+	);
+
+	@Query("""
+		select customerOrder.id
+		from Fulfillment fulfillment
+		join fulfillment.order customerOrder
+		where fulfillment.supplier.id = :supplierId
+			and customerOrder.supplier.id = :supplierId
+			and customerOrder.orderNumber = :orderNumber
+			and fulfillment.channel = com.dropshipshop.api.fulfillment.domain.FulfillmentChannel.SUPPLIER_PORTAL
+			and customerOrder.paymentGroup.status <> com.dropshipshop.api.payment.domain.PaymentGroupStatus.PAYMENT_EXCEPTION
+			and not exists (
+				select refund.id from Refund refund
+				where (refund.order = customerOrder or refund.paymentGroup = customerOrder.paymentGroup)
+					and refund.reason in (
+						com.dropshipshop.api.refund.domain.RefundReason.LATE_DEPOSIT_EXCEPTION,
+						com.dropshipshop.api.refund.domain.RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT,
+						com.dropshipshop.api.refund.domain.RefundReason.PAYMENT_AMOUNT_MISMATCH
+					)
+			)
+		""")
+	Optional<UUID> findSupplierDetailOrderId(
+		@Param("supplierId") UUID supplierId,
+		@Param("orderNumber") String orderNumber
+	);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select fulfillment from Fulfillment fulfillment where fulfillment.order.id = :orderId")
+	Optional<Fulfillment> findByOrderIdForUpdate(@Param("orderId") UUID orderId);
 }

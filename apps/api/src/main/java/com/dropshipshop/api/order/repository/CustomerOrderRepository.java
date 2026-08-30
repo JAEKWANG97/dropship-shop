@@ -76,6 +76,10 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, UU
 		""")
 	List<CustomerOrder> findAllByPaymentGroupIdForUpdate(@Param("paymentGroupId") UUID paymentGroupId);
 
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select customerOrder from CustomerOrder customerOrder where customerOrder.id = :id")
+	Optional<CustomerOrder> findByIdForUpdate(@Param("id") UUID id);
+
 	@Query("""
 		select distinct customerOrder.supplier.id
 		from CustomerOrder customerOrder

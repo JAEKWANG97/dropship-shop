@@ -26,6 +26,7 @@ function shippingAddress(formData: FormData) {
     postalCode: value(formData, "postalCode"),
     address1: value(formData, "address1"),
     address2: value(formData, "address2"),
+    deliveryMemo: value(formData, "deliveryMemo"),
   };
 }
 

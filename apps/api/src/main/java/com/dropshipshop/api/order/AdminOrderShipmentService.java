@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentChannel;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.notification.domain.NotificationType;
@@ -58,8 +59,14 @@ class AdminOrderShipmentService {
 		UUID adminUserId,
 		AdminOrderDtos.ShipmentCreateRequest request
 	) {
-		CustomerOrder order = orderRepository.findById(orderId)
+		CustomerOrder order = orderRepository.findByIdForUpdate(orderId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		fulfillmentRepository.findByOrder_Id(orderId)
+			.filter(fulfillment -> fulfillment.getChannel() == FulfillmentChannel.SUPPLIER_PORTAL)
+			.ifPresent(fulfillment -> {
+				throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Supplier portal fulfillment requires the portal shipment workflow");
+			});
 		OrderStatus beforeStatus = order.getStatus();
 		if (shipmentRepository.existsByOrder_Id(order.getId())) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipment already exists for order");

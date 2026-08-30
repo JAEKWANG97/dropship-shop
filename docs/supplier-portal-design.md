@@ -1,6 +1,6 @@
 # Supplier Portal Design
 
-Status: `B-100`~`B-102` Implemented, `B-103`~`B-105` Planned; design owned by `B-099`
+Status: `B-100`~`B-103` Implemented, `B-104`~`B-105` Planned; design owned by `B-099`
 
 이 문서는 외부 공급처가 Coreable 안에서 상품과 출고 업무를 직접 처리하는 포털의 구현 기준을 정리한다. 정책의 원문 기준은 `docs/policies/*`와 `docs/decision-log.md`이며, 이 문서는 도메인·API·마이그레이션·구현 순서를 한곳에서 연결하는 설계 인덱스다.
 
@@ -80,14 +80,14 @@ Approved supplier manager
 - `portalStatus=SUSPENDED`는 기존 manager 연결과 감사 이력을 보존하되 모든 supplier API 권한을 즉시 막는다. 재개는 Coreable 관리자만 할 수 있다.
 - 파생 권한은 active user, `portalStatus=ACTIVE`, manager 연결을 요구하고 terminal 또는 overdue VERIFIED contract면 즉시 제거한다. 최초 UNVERIFIED onboarding은 비PII catalog 작업만 허용한다. `Supplier.status`는 신규 catalog 판매·checkout gate이며, 거래 상태가 `INACTIVE`여도 time-valid contract가 있는 담당자만 이미 입금확인된 주문을 계속 출고할 수 있다.
 - 포털 정지는 `portalStatus=SUSPENDED`만 바꾸고, 담당자 연결 해제·교체는 manager를 비운 뒤 `portalStatus=PENDING_ACTIVATION`으로 바꾼다. 두 경우 기존 결제완료 portal 주문은 원래 channel과 증적을 보존하고 `Fulfillment.operationalOwner=COREABLE`, 인계시각·사유를 기록해 관리자 인계 큐에서 처리한다. 포털 재개 후에도 자동으로 공급처에 재배정하지 않는다.
-- 정지·연결 해제 화면은 신규 판매 중지도 별도 선택하게 하고 안전한 UI 기본값은 `판매 중지`다. 요청에는 `salesAction=KEEP|PAUSE`를 명시하며 서버가 `Supplier.status`를 숨겨서 바꾸지 않는다. `PAUSE`이면 신규 checkout을 막는다. Planned B-103은 `KEEP`이면 portal 접근이 돌아올 때까지 신규 입금확인 주문을 `COREABLE_MANUAL`로 생성해 Coreable이 처리한다. 포털 재개도 판매 상태나 인계된 주문을 자동 복구하지 않는다.
-- 연락 이메일 변경도 `salesAction=KEEP|PAUSE`를 필수로 받는다. 검증시각과 manager 연결을 지우고 미사용 초대를 폐기한 뒤 `PENDING_ACTIVATION` 상태에서 새 이메일 재초대를 요구한다. Planned B-103은 `KEEP` 중 신규 입금확인 주문에 같은 Coreable fallback을 사용한다.
+- 정지·연결 해제 화면은 신규 판매 중지도 별도 선택하게 하고 안전한 UI 기본값은 `판매 중지`다. 요청에는 `salesAction=KEEP|PAUSE`를 명시하며 서버가 `Supplier.status`를 숨겨서 바꾸지 않는다. `PAUSE`이면 신규 checkout을 막는다. Implemented B-103은 `KEEP`이면 portal 접근이 돌아올 때까지 신규 입금확인 주문을 `COREABLE_MANUAL`로 생성해 Coreable이 처리한다. 포털 재개도 판매 상태나 인계된 주문을 자동 복구하지 않는다.
+- 연락 이메일 변경도 `salesAction=KEEP|PAUSE`를 필수로 받는다. 검증시각과 manager 연결을 지우고 미사용 초대를 폐기한 뒤 `PENDING_ACTIVATION` 상태에서 새 이메일 재초대를 요구한다. Implemented B-103은 `KEEP` 중 신규 입금확인 주문에 같은 Coreable fallback을 사용한다.
 - 영구 포털 종료는 `portalStatus=DISABLED`를 사용한다. 판매 종료는 별도 명시적 `Supplier.status=INACTIVE` 선택이며, 재개·교체·종료는 Coreable 관리자만 수행한다.
 - 판매 재개/중지는 portal 재개와 별도인 idempotent `sales-status` 관리자 명령으로 ACTIVE/INACTIVE를 명시한다. portal/contact/manager/sales lifecycle 명령은 actor, 전후 portal·판매 상태, salesAction, PII-free reason, request HMAC와 결과/시각을 이력에 남긴다. Reason은 연락처·고객식별자 입력을 거절하고 관계 종료 cleanup에서 reason/key/hash/result를 null 처리하되 비PII action/state/time은 남긴다.
 - `SUSPENDED -> ACTIVE` portal 재개는 retained active manager, verified contact email과 time-valid VERIFIED contract를 요구하며, contract 재검증만으로 portal/sales/handed-over owner를 복구하지 않는다.
 - 영구 `portalStatus=DISABLED`, 거래 `INACTIVE`, open Fulfillment/Claim/Refund 없음이 모두 성립할 때만 관계 종료 연락 PII deadline을 설정한다. Scheduler는 그 시각에 Supplier를 잠그고 조건을 다시 확인하며, 새 open work가 있으면 deadline을 clear/defer하고 계속 적격일 때만 Supplier와 approved application의 중복 연락 PII/replay material을 함께 정리한다.
 - B-100은 Supplier의 denormalized contract status/version/effective/expiry columns, `UNVERIFIED` default와 fail-closed sales guard를 소유한다. B-098은 idempotent contract-status 명령, supplier-unique verified version, version당 terminal event 하나, 비밀이 아닌 evidence reference, history, expiry index/scheduler를 소유한다. 모든 명령은 expected current version을 비교하고, scheduler도 Supplier lock 뒤 status/version/expiry를 재검사해 오래된 expiry가 재검증 version을 덮지 못하게 한다. `VERIFIED`는 `effectiveAt <= now`이고 expiry가 없거나 `now < expiresAt`일 때만 current다. EXPIRED/REVOKED와 sales/checkout/deposit의 lazy expiry는 sales INACTIVE, ACTIVE portal SUSPENDED, open invite 폐기와 모든 열린 supplier-owned portal Fulfillment의 Coreable 인계를 한 routine으로 처리한다. Re-verification은 portal/sales/ownership을 자동 복구하지 않는다.
-- portal/contact/manager/sales lifecycle 명령과 정상·늦은 입금 처리는 같은 Supplier에 대해 직렬화한다. 공유 전역 잠금 순서는 `PaymentGroup -> 영향받는 Supplier(id) -> Product(id) -> 모든 ProductOption(id, UNTRACKED 포함) -> Order/Fulfillment(id)`이다. Implemented B-102 입금 처리는 portal-origin item의 contract를 Supplier lock 아래 lazy expiry하고 거래·상품·옵션·compliance·availability를 다시 검사한다. Planned B-103 Fulfillment routing이 그 뒤 portal·manager 가용성을 검사한다. lifecycle-only 명령은 Supplier 뒤 Fulfillment를 잠그며 Product/Option을 잡지 않고, catalog/inventory writer는 필요한 Supplier 뒤 Product -> Option을 따르며 Product 뒤 Supplier를 역순으로 잡지 않는다.
+- portal/contact/manager/sales lifecycle 명령과 정상·늦은 입금 처리는 같은 Supplier에 대해 직렬화한다. 공유 전역 잠금 순서는 `PaymentGroup -> 영향받는 Supplier(id) -> Product(id) -> 모든 ProductOption(id, UNTRACKED 포함) -> Order/Fulfillment(id)`이다. Implemented B-102 입금 처리는 portal-origin item의 contract를 Supplier lock 아래 lazy expiry하고 거래·상품·옵션·compliance·availability를 다시 검사한다. Implemented B-103 Fulfillment routing이 그 뒤 portal·manager 가용성을 검사한다. lifecycle-only 명령은 Supplier 뒤 Fulfillment를 잠그며 Product/Option을 잡지 않고, catalog/inventory writer는 필요한 Supplier 뒤 Product -> Option을 따르며 Product 뒤 Supplier를 역순으로 잡지 않는다.
 - 모든 `/api/supplier/**` 쿼리는 현재 사용자에서 활성 공급처를 먼저 결정하고 `resource id + supplier id`로 조회한다. 다른 공급처 리소스는 존재 여부를 노출하지 않도록 `404`로 처리한다.
 
 ## Product Registration And Review
@@ -184,7 +184,7 @@ unpaid cancel or 24-hour expiry:
 - 같은 예외 명령은 배송 그룹 Order마다 unique `order_id`를 idempotency 경계로 원인에 맞는 `Refund(status=REQUESTED, reason=LATE_DEPOSIT_EXCEPTION|SALE_UNAVAILABLE_AT_DEPOSIT)`를 정확히 하나씩 자동 생성하고 Order를 `REFUND_REQUESTED`로 보낸다. Coreable은 기존 수동 계좌환불 증적 흐름으로 실제 환불만 완료한다.
 - 고객 checkout 결과와 주문 내역에는 raw 예외나 입금 증적 대신 `입금 확인 및 환불 처리 중`을 표시한다. 실제 계좌환불 증적 완료 후 Order는 `REFUNDED`가 된다. PaymentGroup은 배송 그룹 환불액을 차감해 `PARTIALLY_REFUNDED` 또는 `REFUNDED`로 끝나며, 공급처에는 예외와 환불 존재를 모두 노출하지 않는다.
 
-## Fulfillment Request — Planned (`B-103`)
+## Fulfillment Request — Implemented (`B-103`)
 
 - 입금확인이 성공하면 immutable OrderItem management-channel snapshot으로 배송 그룹별 routing을 결정한다.
 - 모든 항목이 portal-origin이고 해당 Supplier의 거래 상태, time-valid VERIFIED contract, `portalStatus=ACTIVE`, manager 연결이 모두 유효할 때만 `fulfillmentChannel=SUPPLIER_PORTAL`, `operationalOwner=SUPPLIER`로 만들고 `requestedAt`·PII cutoff·주소 잠금을 저장해 공급처 queue/email에 즉시 노출한다.
@@ -195,12 +195,13 @@ unpaid cancel or 24-hour expiry:
 - 공급처에 노출된 뒤에는 고객 셀프서비스 취소와 주소 변경을 허용하지 않는다. 취소는 Coreable 클레임 검토로 진행한다.
 - 기존 `COREABLE_MANUAL`과 `DOMEGGOOK_API` 흐름, 관리자 발주 시작/완료 API는 호환을 위해 유지한다.
 - supplier paid-work list/detail와 shipment/shortage mutation은 time-valid VERIFIED contract, `SUPPLIER_PORTAL + operationalOwner=SUPPLIER` 및 허용 상태를 요구한다. Detail은 original supplier의 ACTIVE portal/current manager도 요구한다. cutoff/terminal 경계로 COREABLE에 인계된 work는 원래 supplier에게 MASKED detail만 남기고, active allowed-status Claim grant와 time-valid contract가 함께 있을 때만 read-only FULL을 한시 재개한다. Contract expiry/revoke는 lifecycle authorization 실패 `403`, admin takeover/shortage 등 다른 비공개 인계는 grant와 무관한 `404`로 닫고 별도 safe queue를 사용한다. 어느 예외도 출고 mutation을 허용하지 않는다.
-- 관리자 `portal-takeover`는 idempotency key/request hash로 동일 replay에 최초 결과를 반환하고 다른 payload 재사용은 거절한다. 200자 이하이며 연락처·주소·고객식별자 입력을 거절하는 PII-free reason, actor, owner before/after, 인계시각을 append-only command history에 남기며 재개 뒤에도 자동으로 SUPPLIER owner로 되돌리지 않는다.
+- 관리자 `portal-takeover`는 idempotency key/request hash로 동일 replay에 최초 결과를 반환하고 다른 payload 재사용은 거절한다. 자유문 대신 `COREABLE_FULFILLMENT_TAKEOVER|SUPPLIER_SUPPORT_REQUIRED|OPERATIONAL_RISK` reason code만 받아 고객 PII가 append-only history에 들어갈 경로를 닫고, actor, owner before/after, 인계시각을 남기며 재개 뒤에도 자동으로 SUPPLIER owner로 되돌리지 않는다.
 
 ## Supplier Order Data And PII
 
 - 주문 목록에는 주문번호, 처리 상태, 상품 요약, 수량, 요청시각만 보여주고 고객 PII는 넣지 않는다.
 - 주문 상세에는 자기 공급처 배송에 필요한 최소 정보만 보여준다.
+- 배송 메모는 checkout 생성·배송지 수정에서 선택값, 최대 300자로 검증하고 trim 뒤 공백-only이면 `null` 주문 snapshot으로 저장한다.
 
 | 허용 | 금지 |
 | --- | --- |
@@ -210,13 +211,13 @@ unpaid cancel or 24-hour expiry:
 | 배송 메모 | 다른 공급처와 그 상품 |
 | 자기 상품명·옵션명·수량 | 관리자 메모와 내부 감사정보 |
 
-- 전체 PII는 time-valid VERIFIED contract가 있는 담당자의 입금확인된 자기 포털 주문에만 제공한다. Fulfillment의 stored monotonic `piiAccessCutoffAt`은 생성 때 `requestedAt+60일`로 저장하고 송장을 등록할 때마다 같은 트랜잭션에서 `min(현재 저장값, registeredAt+30일)`로만 짧아진다. Shipment void/replacement는 cutoff를 다시 계산하거나 늘리지 않아 이미 마스킹된 PII가 grant 없이 부활하지 않게 한다.
+- 전체 PII는 time-valid VERIFIED contract가 있는 담당자의 입금확인된 자기 포털 주문에만 제공한다. Implemented B-103은 Fulfillment 생성 때 stored `piiAccessCutoffAt=requestedAt+60일`을 저장하고 read/scheduler/lazy takeover에서 사용한다. 송장 등록마다 같은 트랜잭션에서 `min(현재 저장값, registeredAt+30일)`로 단축하고 Shipment void/replacement가 늘리지 않게 하는 실제 writer는 Planned B-104가 구현한다.
 - 주문이 `OUT_OF_STOCK`, `CANCELLED`, `REFUND_REQUESTED` 또는 `REFUNDED`가 되면 non-voided 송장 유무와 관계없이 기본 종료시각을 기다리지 않고 즉시 마스킹하고 COREABLE owner로 인계한다. Original supplier의 active manager에게는 `TERMINAL_MASKED`만 허용하며 유효 Claim grant와 time-valid contract가 함께 있을 때만 FULL을 한시 다시 연다.
 - 기본 종료시각부터(`now >= cutoff`) 한 글자 이름은 `*`, 두 글자 이상 이름은 첫 Unicode code point와 고정 `**`로 반환한다. 전화번호는 숫자로 정규화한 뒤 4자리 이하면 전부 `*`, 5자리 이상이면 앞자리를 모두 `*`로 바꾸고 마지막 4자리만 남긴다. 우편번호·주소1·주소2·배송 메모는 `null`이며 응답에는 `piiAccessLevel=MASKED`와 종료시각을 포함한다.
 - Coreable이 승인한 진행 중 클레임은 각 grant/extension 요청시점부터 최대 30일인 명시적 `supplierPiiAccessUntil`까지만 전체 PII 접근을 다시 허용한다.
-- 클레임 상태가 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING`이고 Supplier contract가 time-valid VERIFIED일 때만 최신 non-revoked grant가 유효하다. 그 밖의 Claim 상태나 contract expiry/revoke는 revoke row가 없어도 즉시 접근을 닫는다. grant/extension/revoke는 승인 관리자, PII 입력을 거절하는 200자 이하 운영 사유, 시각을 append-only로 남긴다.
+- 클레임 상태가 `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, `EXCHANGE_SHIPPING`이고 Supplier contract가 time-valid VERIFIED일 때만 최신 non-revoked grant가 유효하다. 그 밖의 Claim 상태나 contract expiry/revoke는 revoke row가 없어도 즉시 접근을 닫는다. grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED` reason code만 허용하고 승인 관리자·시각과 함께 append-only로 남긴다.
 - monotonic cutoff에 도달한 open supplier work는 B-103 scheduler가 `PII_CUTOFF_REACHED` 증적으로 COREABLE에 exactly once 인계한다. 이때 active manager의 조회는 `EXPIRED_MASKED`로 남고 terminal 인계는 `TERMINAL_MASKED`다. 관리자는 개별 주문을 더 일찍 idempotent takeover할 수 있으며, Coreable은 B-104 admin portal-shipment로 이어 처리한다. Claim grant는 time-valid contract가 있을 때만 인계 뒤 read-only FULL을 열고 출고 권한을 되돌리지 않는다.
-- Contract EXPIRED/REVOKED는 `CONTRACT_EXPIRED|CONTRACT_REVOKED` 증적으로 모든 열린 supplier-owned portal work를 COREABLE에 인계하고 과거 Claim grant와 무관하게 공급처 detail을 `404`로 닫는다. 재검증·portal 재개도 인계된 owner를 자동 복구하지 않는다.
+- Contract EXPIRED/REVOKED는 `CONTRACT_EXPIRED|CONTRACT_REVOKED` 증적으로 모든 열린 supplier-owned portal work를 COREABLE에 인계하고 과거 Claim grant와 무관하게 공급처 detail을 lifecycle authorization 실패 `403`으로 닫는다. 재검증·portal 재개도 인계된 owner를 자동 복구하지 않는다.
 - 공급처 주문 상세 응답에는 `Cache-Control: no-store`를 적용한다.
 - 공급처 주문 상세 조회마다 actor, 주문, 접근 근거와 시각만 기록한다. 로그에는 실제 PII 값이나 응답 본문을 복제하지 않는다.
 - PII 접근 로그는 관리자만 조회하고 1년 뒤 삭제한다.
@@ -265,7 +266,7 @@ unpaid cancel or 24-hour expiry:
 
 - 공급처 운영 알림은 검증된 연락 이메일로만 보낸다. SMS, 카카오 알림톡, 앱 푸시는 만들지 않는다.
 - 최초 초대 메일만 아직 검증되지 않은 신청 이메일로 보낼 수 있다. 초대 링크 교환 완료를 이메일 소유 검증으로 기록한 뒤에만 다른 운영 알림을 보낸다.
-- 알림 유형은 초대, 신규 출고 요청, 상품 검토 결과, Coreable 승인 클레임 작업 요청으로 제한한다.
+- 알림 유형은 초대, 신규 출고 요청, 상품 검토 결과, Coreable 승인 클레임 작업 요청으로 제한한다. B-103은 운영 type/template과 신규 출고 요청·관리자 상품 검토 결과 producer를 구현하고, 실제 `SUPPLIER_CLAIM_WORK_REQUESTED` producer는 Planned B-105의 Coreable claim-task 생성에 연결한다.
 - 제목·본문·payload snapshot에는 고객 이름, 전화, 주소, 배송 메모, 결제·환불 정보를 넣지 않는다. 주문번호/상품 식별자와 포털 링크만 사용한다.
 - 운영 email의 최초 dispatch와 모든 retry는 현재 Supplier를 다시 읽어 time-valid VERIFIED contract, 검증된 연락 이메일, active portal, 현재 manager 연결과 저장 recipient가 모두 일치하는지 확인한다. 하나라도 불일치하거나 lifecycle/contract에서 권한이 철회됐으면 보내지 않고 `SKIPPED`로 끝낸다.
 - 실제 email 발송은 발송 결과와 재시도 이력을 남긴다. 현재 SES 실발송이 비활성인 환경에서는 production 공급처 활성화를 허용하지 않는다.
@@ -275,7 +276,7 @@ unpaid cancel or 24-hour expiry:
 
 ## Data Changes Status
 
-V39 implements the `B-100` access, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. V41 implements the `B-102` inventory, reservation and received-payment exception schema. `B-098` contract history/command/scheduler and `B-103`~`B-105` changes remain Planned.
+V39 implements the `B-100` access, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. V41 implements the `B-102` inventory, reservation and received-payment exception schema. V42 implements the `B-103` delivery memo, Claim PII grant, access-log and operational-email retention indexes. `B-098` contract history/command/scheduler and `B-104`~`B-105` changes remain Planned.
 
 | Area | Change |
 | --- | --- |
@@ -283,13 +284,13 @@ V39 implements the `B-100` access, invitation, lifecycle, fulfillment-handover b
 | Product | `products.management_channel`, optimistic `version`, immutable nullable `first_submitted_at`, `review_status`, allowlisted `review_reason_code`, supplier-safe `supplier_review_message`; product change history immutable subject id/nullable live FK/actor/version expand-contract; unique server-owned image key와 durable cleanup job |
 | Inventory | `product_options.supplier_availability`, `inventory_mode`, `on_hand_quantity`, `reserved_quantity`, `inventory_version`; order item management-channel/inventory reservation snapshot/status/timestamps; inventory history immutable subject option id, nullable live FK와 before/after inventory version |
 | Fulfillment | B-100-owned `fulfillments.channel`, `operational_owner`, 인계시각·사유·관리자; B-103-owned portal `requested_at`와 monotonic `pii_access_cutoff_at` creation/use |
-| Shipment | Shipment 1:N, creation idempotency key와 optimistic version, `carrier_code`, `registered_at`, `registered_by_user_id`, nullable `shipped_at`, `VOIDED`, immutable `shipment_items`, idempotent append-only correction history |
-| Order/privacy | `orders.delivery_memo` checkout snapshot, 최소 `supplier_pii_access_logs`, append-only claim PII grant history |
+| Shipment | Planned B-104: Shipment 1:N, creation idempotency key와 optimistic version, `carrier_code`, `registered_at`, `registered_by_user_id`, nullable `shipped_at`, `VOIDED`, immutable `shipment_items`, idempotent append-only correction history |
+| Order/privacy | Implemented B-103: `orders.delivery_memo` checkout snapshot, 최소 `supplier_pii_access_logs`, append-only claim PII grant history |
 | Payment/refund | Implemented B-102 Payment `PAYMENT_EXCEPTION`; amount mismatch용 actual-amount `PAYMENT_GROUP` Refund 1건과 `PAYMENT_AMOUNT_MISMATCH`; exact-amount late/saleability 및 qualifying unpaid-cancelled용 `LATE_DEPOSIT_EXCEPTION` / `SALE_UNAVAILABLE_AT_DEPOSIT` Order별 Refund |
-| Claim | `supplier_shortage_reports`, Coreable-owned `supplier_claim_tasks`, idempotent append-only `supplier_claim_facts`와 supplier-safe fact history projection |
-| Notification | 기존 `notification_logs.recipient` nullable expand; token-free invitation log와 ephemeral raw link; supplier recipient linkage, dispatch-time lifecycle revalidation, 7일 retry와 terminal+30일 recipient cleanup, PII-free payload |
+| Claim | Planned B-105: `supplier_shortage_reports`, Coreable-owned `supplier_claim_tasks`, idempotent append-only `supplier_claim_facts`와 supplier-safe fact history projection |
+| Notification | Implemented B-103 operational 기반: supplier recipient linkage, dispatch-time lifecycle revalidation, 7일 retry와 terminal+30일 recipient cleanup, PII-free payload. Claim-work producer는 Planned B-105 |
 
-`B-100` uses V39. Later implementation branches must recheck the latest migration number; B-099 itself created no migration or runtime code.
+`B-100` uses V39, `B-101` V40, `B-102` V41, and `B-103` V42. Later implementation branches must recheck the latest migration number; B-099 itself created no migration or runtime code.
 
 ## API Surface
 
@@ -346,6 +347,8 @@ POST /api/admin/product-reviews/{productId}/reject
 
 ### Supplier fulfillment
 
+The first six routes below are Implemented by B-103. Shortage and claim-task routes remain Planned B-105; carrier, Shipment and shipment-correction routes remain Planned B-104.
+
 ```text
 GET  /api/supplier/orders
 GET  /api/supplier/orders/{orderNumber}
@@ -390,11 +393,11 @@ Supplier shortage와 claim-task list/detail은 현재 tenant의 supplier-safe pr
 - 기존 `READY`, `SHIPPED`, `DELIVERED`, `SUPPLIER_ORDERED` enum을 삭제하지 않는다.
 - 기존 `ProductComplianceStatus.PENDING` 공개 동작을 바꾸지 않는다.
 - 기존 `CUSTOMER`/`ADMIN` 저장 role을 바꾸지 않고 supplier authority를 추가로 파생한다.
-- `B-101`은 분류와 검토를 구현하되 production feature flag를 계속 닫아 portal 상품을 고객 구매 가능하게 만들지 않는다. `B-102` inventory migration과 checkout guard는 release의 필요조건이지만 충분조건은 아니며, 전체 supplier portal activation은 B-100~B-105와 privacy/email/contract gate가 모두 준비된 뒤에만 가능하다.
+- B-103까지 구현된 뒤에도 production feature flag를 계속 닫아 portal 상품을 고객 구매 가능하게 만들지 않는다. Implemented B-102 inventory/checkout guard와 B-103 fulfillment/privacy 기반은 release의 필요조건이지만 충분조건은 아니며, 전체 supplier portal activation은 Planned B-104~B-105와 privacy/live-email/contract gate가 모두 준비된 뒤에만 가능하다.
 
 ## Security And Release Gates
 
-- production은 `APP_SUPPLIER_PORTAL_ENABLED=false`를 기본으로 두고, false일 때 외부 신청·초대 수락·supplier route와 portal 상품 고객 구매를 열지 않는다. ADMIN/resource scope와 저장된 idempotency replay 뒤 새 신청 승인·invite 재발급·연락 이메일 후속 초대 발급은 mutation 전에 `SUPPLIER_PORTAL_NOT_RELEASED`로 거절한다. 동일 완료 command는 token-free 결과만 반환하고 재발송하지 않는다. Dispatch도 발송 직전 flag를 재검사해 stale job을 `SKIPPED/PORTAL_NOT_RELEASED`로 끝내고, 다시 연 뒤에는 새 key 재발급으로 복구한다. 신청 거절, portal 정지/종료, retention cleanup, 관리자 문서 검토와 기존 Coreable 주문 운영은 계속 가능하다. Planned B-098 contract evidence도 구현 뒤에는 이 release gate 밖에서 관리한다. B-102 완료만으로 이 flag를 열지 않는다.
+- production은 `APP_SUPPLIER_PORTAL_ENABLED=false`를 기본으로 두고, false일 때 외부 신청·초대 수락·supplier route와 portal 상품 고객 구매를 열지 않는다. ADMIN/resource scope와 저장된 idempotency replay 뒤 새 신청 승인·invite 재발급·연락 이메일 후속 초대 발급은 mutation 전에 `SUPPLIER_PORTAL_NOT_RELEASED`로 거절한다. 동일 완료 command는 token-free 결과만 반환하고 재발송하지 않는다. Dispatch도 발송 직전 flag를 재검사해 stale job을 `SKIPPED/PORTAL_NOT_RELEASED`로 끝내고, 다시 연 뒤에는 새 key 재발급으로 복구한다. 신청 거절, portal 정지/종료, retention cleanup, 관리자 문서 검토와 기존 Coreable 주문 운영은 계속 가능하다. Planned B-098 contract evidence도 구현 뒤에는 이 release gate 밖에서 관리한다. B-103 완료만으로도 이 flag를 열지 않는다.
 - B-100은 cookie 인증 supplier `POST`/`PUT`/`PATCH`/`DELETE` 요청의 `Origin`을 설정된 web origin allowlist와 비교한다. `Origin`이 없는 요청은 같은 origin의 `Referer`가 있을 때만 허용하고 둘 다 없거나 불일치하면 `403`으로 거절한다.
 - 인증 cookie는 production에서 `HttpOnly`, `Secure`, `SameSite=Lax`를 강제하며 Origin/Referer 성공·실패 경계를 통합 테스트한다.
 - 모든 supplier query가 supplier predicate를 포함하는지 통합 테스트로 검증한다.
@@ -409,7 +412,7 @@ Supplier shortage와 claim-task list/detail은 현재 tenant의 supplier-safe pr
 1. `B-100` — Implemented: 신청, 관리자 승인, 이메일 초대, Kakao 연결, supplier tenant guard, denormalized contract fail-closed columns, fulfillment channel/owner/handover additive schema와 lifecycle audit
 2. `B-101` — Implemented: 개별 상품·옵션·이미지·고시 등록, 미제출 DRAFT 삭제와 감사/asset cleanup, 자동/수동 검토, Coreable 가격 계산
 3. `B-102` — Implemented: TRACKED/UNTRACKED 재고, 24시간 예약·만료, 금액 불일치 결제그룹 전액 환불, 늦은 입금 재확보
-4. `B-103` — Planned: 공급처 출고 요청 생성·목록/상세, KEEP `COREABLE_MANUAL` fallback, 배송 메모 snapshot, `requestedAt + 60일` PII fallback, 접근 로그, 이메일 알림
+4. `B-103` — Implemented: 공급처 출고 요청 생성·목록/상세, KEEP `COREABLE_MANUAL` fallback, 배송 메모 snapshot, `requestedAt + 60일` PII fallback, 접근 로그, 이메일 기반. 송장 기반 cutoff 단축은 B-104, claim-work producer는 B-105
 5. `B-104` — Planned: report table에 의존하지 않는 복수 Shipment 공통 lock/service, 수량 할당, 공식 택배사 링크, 송장마다 monotonic PII cutoff 단축, 고객/admin 호환
 6. `B-105` — Planned: REPORTED 품절 인계와 Coreable 승인/거절, 기존 Shipment service에 report lock/open guard 확장, supplier claim facts, 환불 경계
 

@@ -687,6 +687,7 @@ class AdminOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.customer.email", is("admin-order-customer-2@example.com")))
 			.andExpect(jsonPath("$.shippingAddress.recipientName", is("Receiver")))
 			.andExpect(jsonPath("$.shippingAddress.address1", is("Seoul test road")))
+			.andExpect(jsonPath("$.shippingAddress.deliveryMemo", is("Leave at the door")))
 			.andExpect(jsonPath("$.paymentGroup.checkoutNumber", is("ADM-CO-DETAIL-1")))
 			.andExpect(jsonPath("$.paymentGroup.status", is("APPROVED")))
 			.andExpect(jsonPath("$.payment.status", is("APPROVED")))
@@ -1218,7 +1219,9 @@ class AdminOrderApiIntegrationTest {
 			customer,
 			supplier,
 			paymentGroup,
-			new ShippingAddressSnapshot("Receiver", "010-1111-2222", "12345", "Seoul test road", "101"),
+			new ShippingAddressSnapshot(
+				"Receiver", "010-1111-2222", "12345", "Seoul test road", "101", "Leave at the door"
+			),
 			amount,
 			paymentGroup.getExpiresAt()
 		));

@@ -304,6 +304,10 @@ function OrderShippingAddressPanel({ order }: { order: OrderDetail }) {
             ({address.postalCode}) {address.address1} {address.address2 ?? ""}
           </strong>
         </div>
+        <div>
+          <span>배송 메모</span>
+          <strong>{address.deliveryMemo ?? "없음"}</strong>
+        </div>
       </div>
       <div className="notice">
         <strong>주문 정책 확인이 완료된 배송지입니다</strong>

@@ -50,6 +50,7 @@ export type CheckoutShippingAddress = {
   postalCode: string;
   address1: string;
   address2: string | null;
+  deliveryMemo: string | null;
 };
 
 export type CheckoutPolicyEvidence = {

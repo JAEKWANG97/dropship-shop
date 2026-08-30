@@ -200,6 +200,10 @@ function ShippingAddressSection({ checkout, editable }: { checkout: Checkout; ed
             ({address.postalCode}) {address.address1} {address.address2 ?? ""}
           </strong>
         </div>
+        <div>
+          <span>배송 메모</span>
+          <strong>{address.deliveryMemo ?? "없음"}</strong>
+        </div>
       </div>
       {editable ? (
         <form action={updateCheckoutShippingAddress} className="form-stack">
@@ -217,6 +221,10 @@ function ShippingAddressSection({ checkout, editable }: { checkout: Checkout; ed
             address1={address.address1}
             address2={address.address2 ?? undefined}
           />
+          <label>
+            배송 메모
+            <textarea defaultValue={address.deliveryMemo ?? ""} maxLength={300} name="deliveryMemo" placeholder="예: 문 앞에 놓아 주세요" rows={3} />
+          </label>
           <SubmitButton className="button" pendingLabel="변경 중...">
             배송지 변경
           </SubmitButton>

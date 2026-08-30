@@ -1018,9 +1018,9 @@ Rules:
 - DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
 - Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
-## Supplier Portal ERD (`B-100`~`B-102` Implemented; Later Slices Planned)
+## Supplier Portal ERD (`B-100`~`B-103` Implemented; Later Slices Planned)
 
-Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. V41 implements the `B-102` inventory, reservation, payment-command replay and received-payment exception schema. `B-098` contract history/command/scheduler and `B-103` through `B-105` schema remain Planned. Existing legacy rows remain valid through the expand-contract migrations.
+Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. V41 implements the `B-102` inventory, reservation, payment-command replay and received-payment exception schema. V42 implements the `B-103` delivery memo, Claim PII grant, access-log and operational-email retention indexes. `B-098` contract history/command/scheduler and `B-104` through `B-105` schema remain Planned. Existing legacy rows remain valid through the expand-contract migrations.
 
 B-100 also implements `SUPPLIER_APPLICATION_PRIVACY` in `policy_documents.type`. The supplier application service reads the current ACTIVE row and validates the submitted version before persisting canonical consent evidence.
 
@@ -1082,8 +1082,8 @@ Rules and compatibility:
 - Existing supplier rows backfill `portal_contract_status=UNVERIFIED`. B-100 owns these denormalized columns/default and fail-closed sales guard; B-098 depends on them and owns history/command/evidence/expiry index/scheduler. A portal-enrolled supplier cannot move sales to ACTIVE or expose portal products unless status is VERIFIED, effective time has arrived, and expiry has not passed.
 - One supplier has at most one manager and one user manages at most one supplier. No `supplier_memberships` or team table is planned for B-100.
 - Dynamic `ROLE_SUPPLIER` requires an ACTIVE user, `portal_status=ACTIVE`, the manager FK, and the matching supplier tenant at request time. A terminal or already-overdue VERIFIED contract suppresses this authority immediately; initial UNVERIFIED onboarding may still use non-PII catalog surfaces. Existing `status` independently gates new catalog sales/checkouts, so an INACTIVE supplier manager may finish already-paid work only while the contract remains time-valid.
-- Portal suspension writes only `portal_status=SUSPENDED`; manager disconnection clears `manager_user_id` and writes `portal_status=PENDING_ACTIVATION`. Both keep existing paid portal evidence but put unfinished work in a Coreable takeover queue that reactivation does not silently hand back. Required `sales_action=KEEP|PAUSE` changes existing `status` only when PAUSE is explicit. Planned B-103 creates `COREABLE_MANUAL` fulfillment for new paid work while KEEP leaves sales active but portal access unavailable.
-- Changing `email` clears `manager_user_id` and `contact_email_verified_at`, sets `portal_status=PENDING_ACTIVATION`, revokes open invites, and requires a new invite before operational email or portal activation. This command also requires an explicit `sales_action`; Planned B-103 uses the same KEEP fallback.
+- Portal suspension writes only `portal_status=SUSPENDED`; manager disconnection clears `manager_user_id` and writes `portal_status=PENDING_ACTIVATION`. Both keep existing paid portal evidence but put unfinished work in a Coreable takeover queue that reactivation does not silently hand back. Required `sales_action=KEEP|PAUSE` changes existing `status` only when PAUSE is explicit. Implemented B-103 creates `COREABLE_MANUAL` fulfillment for new paid work while KEEP leaves sales active but portal access unavailable.
+- Changing `email` clears `manager_user_id` and `contact_email_verified_at`, sets `portal_status=PENDING_ACTIVATION`, revokes open invites, and requires a new invite before operational email or portal activation. This command also requires an explicit `sales_action`; Implemented B-103 uses the same KEEP fallback.
 - Explicit `sales-status` changes existing `status` independently of portal state and never restores handed-over work. When LINK_EXISTING approves an application, it sets the selected disabled Supplier contact email to the application's normalized contact email and keeps `contact_email_verified_at=null` until that exact invite recipient completes callback.
 - `SUSPENDED -> ACTIVE` portal reactivation requires the retained active manager, verified contact email, and time-valid VERIFIED contract. Contract re-verification alone changes none of portal status, sales status, or handed-over ownership.
 - Production activation first configures a concrete B-098/privacy-notice post-relationship duration. Permanent `portal_status=DISABLED`, trade `status=INACTIVE`, and no open Fulfillment/Claim/Refund set `contact_retention_expires_at`. At the deadline a scheduler locks Supplier and rechecks all lifecycle/open-work predicates; new open work clears/defers the deadline, and only continuing eligibility permits contact name/phone/email/memo plus approved-application duplicate PII/replay cleanup. Order/contract legal records follow their separate retention rules.
@@ -1247,7 +1247,7 @@ Constraints and compatibility:
 - Supplier inventory PUT requires the current `inventory_version`; stale writes return the locked canonical projection. Inventory changes do not increment `products.version` or alter product review state.
 - Checkout locks affected Suppliers -> Products -> every ProductOption including UNTRACKED, each by id. Expiry and normal/late deposit prepend PaymentGroup and append Orders/Fulfillments. Catalog/inventory saleability writers use Product -> Option and never acquire Supplier after Product. All guards are rechecked under locks; reservation status prevents duplicate consume/release.
 - Successful late-deposit reacquisition preserves the prior `released_at`, records `reacquired_at` and `consumed_at`, and sets the current reservation status to CONSUMED. This records release -> reacquire -> immediate consume without deleting the release evidence.
-- B-101 keeps production portal sale activation closed. B-102 inventory migration and checkout guards are necessary but not sufficient; customer purchase/external portal activation waits for B-100 through B-105 plus privacy, email, contract, and feature-flag gates.
+- Production portal sale activation remains closed after B-103. Implemented B-102 inventory/checkout guards and B-103 fulfillment/privacy schema are necessary but not sufficient; customer purchase/external portal activation waits for Planned B-104/B-105 plus privacy, live-email, contract, and feature-flag gates.
 
 `product_change_histories` expand-contract migration:
 
@@ -1299,7 +1299,7 @@ Constraints and compatibility:
 - After the actual amount is confirmed equal to `total_amount`, a qualifying unpaid `CANCELLED` group has terminal priority when unpaid cancellation is the sole terminal outcome, all Orders are unpaid-cancelled, and no received Payment, Refund or Fulfillment exists. The exception transaction leaves `total_amount` immutable and approved amount/time null, restores `refundable_amount=total_amount=actual_deposit_amount` from the cancelled zero, and stores the received Payment as `PAYMENT_EXCEPTION`. Portal and legacy groups skip saleability/reacquisition, create one immutable-amount `LATE_DEPOSIT_EXCEPTION` Refund per Order whose amounts sum to `total_amount`, and never resume. Only the remaining pending/expired portal paths evaluate Supplier/product/option/compliance/supplier-availability/contract/mode guards under the shared locks. Any such failure rolls back tentative reacquisition and uses `SALE_UNAVAILABLE_AT_DEPOSIT`, even when the receipt timestamp is also late. Only when those guards pass may `deposit_received_at <= expires_at` plus all TRACKED reacquisitions approve; a later timestamp or stock failure then uses `LATE_DEPOSIT_EXCEPTION`.
 - Every B-102 received-payment exception Refund is immutable and non-rejectable. Order-scoped manual completion uses the same command stream with a distinct key per Refund, locks PaymentGroup/Payment/target Order/Refund, and atomically applies the exact Order amount plus the resulting `PARTIALLY_REFUNDED|REFUNDED` aggregate state.
 - The implemented domain refund transition extends the PaymentGroup refund guard from `APPROVED|PARTIALLY_REFUNDED` to `PAYMENT_EXCEPTION` only when the locked approved Refund has a B-102 received-payment exception reason and its immutable positive amount does not exceed `refundable_amount`. No generic `PAYMENT_EXCEPTION` refund transition is opened.
-- Exception rows have no `SUPPLIER_PORTAL` Fulfillment and no supplier PII window. Planned B-103 supplier queries require an existing portal fulfillment and must explicitly exclude a `PaymentGroup=PAYMENT_EXCEPTION` or `LATE_DEPOSIT_EXCEPTION` Refund even if inconsistent historical data exists.
+- Exception rows have no `SUPPLIER_PORTAL` Fulfillment and no supplier PII window. Implemented B-103 supplier queries require an existing portal fulfillment and explicitly exclude a `PaymentGroup=PAYMENT_EXCEPTION` or `LATE_DEPOSIT_EXCEPTION` Refund even if inconsistent historical data exists.
 - B-102 adds `RefundReason.LATE_DEPOSIT_EXCEPTION` and `SALE_UNAVAILABLE_AT_DEPOSIT`. Existing `refunds.order_id` uniqueness is the per-delivery-group idempotency boundary for those exact-amount exceptions, including the qualifying unpaid-cancelled branch; no new schema is needed for it. Amount mismatch instead uses the payment-group partial unique boundary and one actual-receipt Refund. Exception handling creates `REQUESTED` rows and leaves Orders at `REFUND_REQUESTED` for Coreable's manual bank-refund completion path. Exact normal deposit confirmation for a group with any `management_channel_snapshot=SUPPLIER_PORTAL` item uses the sale-unavailable whole-group Payment outcome when current saleability fails; legacy-only exact-amount groups retain their current validation response.
 - Normal pre-expiry `SALE_UNAVAILABLE_AT_DEPOSIT` moves every portal TRACKED HELD OrderItem reservation to RELEASED and decrements reserved quantity exactly once in the exception transaction. Late-path tentative reacquisition rollback leaves the existing RELEASED evidence unchanged.
 - Normal confirmation compares actual deposit time to the original locked deadline regardless of scheduler status. After saleability/contract/mode guards pass, a post-deadline timestamp uses `LATE_DEPOSIT_EXCEPTION` and releases any still-HELD reservation exactly once instead of consuming it.
@@ -1307,11 +1307,11 @@ Constraints and compatibility:
 - Existing legacy `PAYMENT_EXCEPTION` rows and current admin/customer compatibility remain readable. Detailed deposit, exception and refund-next-action fields are ADMIN-only.
 - Amount-mismatch manual completion locks PaymentGroup, its Payment, every included Order, then the group Refund. It accepts only the exact outstanding actual receipt, stores bank-transfer evidence once under its own key/hash/result replay, and atomically sets Refund/Payment/PaymentGroup/all Orders to `REFUNDED`; this path never uses `PARTIALLY_REFUNDED`.
 
-### order and fulfillment additions (B-100 Base Schema Implemented; B-103/B-104 Planned)
+### order and fulfillment additions (B-100/B-103 Implemented; B-104 Planned)
 
 `orders`:
 
-- `delivery_memo`: nullable shipping-address snapshot
+- `delivery_memo`: Implemented V42 nullable shipping-address snapshot, max 300; application trim and blank-to-null normalization
 - B-104 planned portal-only status value `TRACKING_REGISTERED`; all existing values remain valid
 
 `fulfillments`:
@@ -1327,14 +1327,14 @@ Constraints and compatibility:
 Rules and compatibility:
 
 - B-100 owns the additive channel/owner/handover columns, backfill, and lifecycle takeover writer before any external portal work exists. B-103 owns portal Fulfillment creation and KEEP fallback activation. Existing fulfillment rows backfill a channel from their current purchase evidence; ambiguous/manual rows use `COREABLE_MANUAL`, and legacy rows backfill `operational_owner=COREABLE`. Existing order state and admin action evidence do not change.
-- Implemented B-102 deposit confirmation consumes reservations and moves Orders to `SUPPLIER_ORDER_PENDING` without creating or routing Fulfillment. Planned B-103 creates `SUPPLIER_PORTAL/owner=SUPPLIER` only when every OrderItem has `management_channel_snapshot=SUPPLIER_PORTAL`, portal access is active, and the Supplier contract is time-valid VERIFIED. Any COREABLE/mixed item keeps the existing COREABLE_MANUAL/DOMEGGOOK routing; an all-portal Order under KEEP with unavailable access uses `COREABLE_MANUAL/owner=COREABLE` only while the contract remains valid. Portal TRACKED reservation/payment guards still apply when routing is Coreable-managed.
-- Portal creation initializes `pii_access_cutoff_at=requested_at+60 days`. Each tracking registration shortens it to `least(current,registered_at+30 days)` in the same lock/transaction; void or replacement never increases it.
-- At or after cutoff, an idempotent B-103 scheduler changes still-open `SUPPLIER_PORTAL/owner=SUPPLIER` to COREABLE and writes handover reason `PII_CUTOFF_REACHED`. Supplier mutation guards enforce the same cutoff lazily under Fulfillment lock, perform the takeover, and reject the write if the scheduler has not run. The admin per-order takeover uses the same guarded transition with request idempotency/reason; ownership is never auto-restored.
+- Implemented B-102 deposit confirmation consumes reservations and moves Orders to `SUPPLIER_ORDER_PENDING`; in the same transaction Implemented B-103 creates `SUPPLIER_PORTAL/owner=SUPPLIER` only when every OrderItem has `management_channel_snapshot=SUPPLIER_PORTAL`, portal access is active, and the Supplier contract is time-valid VERIFIED. Any COREABLE/mixed item keeps the existing COREABLE_MANUAL/DOMEGGOOK routing; an all-portal Order under KEEP with unavailable access uses `COREABLE_MANUAL/owner=COREABLE` only while the contract remains valid. Portal TRACKED reservation/payment guards still apply when routing is Coreable-managed.
+- Portal creation initializes `pii_access_cutoff_at=requested_at+60 days`. Planned B-104 makes each tracking registration shorten it to `least(current,registered_at+30 days)` in the same lock/transaction and proves void or replacement never increases it.
+- At or after cutoff, an idempotent B-103 scheduler/read-lazy guard changes still-open `SUPPLIER_PORTAL/owner=SUPPLIER` to COREABLE and writes handover reason `PII_CUTOFF_REACHED`. Planned B-104/B-105 mutation guards must enforce the same cutoff under Fulfillment lock. The implemented admin per-order takeover uses the same guarded transition with request idempotency/reason; ownership is never auto-restored.
 - Suspension or manager disconnect moves open portal fulfillments to `operational_owner=COREABLE` and records handover fields without rewriting the original channel. Supplier list/mutations require owner SUPPLIER; reactivation does not change it back automatically. Detail has only the explicit MASKED/Claim exceptions below.
 - Supplier paid-work list/detail and shipment/shortage mutations require a time-valid VERIFIED contract, channel SUPPLIER_PORTAL, owner SUPPLIER, tenant, and action-eligible Order state. Detail also requires the original supplier's ACTIVE portal/current manager. COREABLE-owner work remains readable without a Claim grant only as `EXPIRED_MASKED` after cutoff or `TERMINAL_MASKED` after the listed terminal states; an active allowed-status Claim grant opens read-only FULL only with a time-valid contract. Contract expiry/revoke is a lifecycle authorization `403`; admin/shortage and other non-readable handover return `404` regardless of an older grant. None of these exceptions grants fulfillment mutation. OUT_OF_STOCK/CANCELLED/REFUND_REQUESTED/REFUNDED or contract terminal transition takes open portal work over to COREABLE.
 - `orders.supplier_id` remains the supplier assignment boundary; no second portal-order assignment table is added.
 
-### fulfillment_handover_histories (B-100 Schema/Lifecycle Implemented; B-103 Commands Planned)
+### fulfillment_handover_histories (B-100 Schema/Lifecycle And B-103 Commands Implemented)
 
 - `id`
 - `fulfillment_id`: FK to `fulfillments(id)`
@@ -1347,7 +1347,7 @@ Rules and compatibility:
 - `result_snapshot`: nullable ADMIN-safe JSONB command result
 - `created_at`
 
-B-100 lifecycle owner mutation and immutable history insert commit together. Planned B-103 ADMIN takeover validates the bounded PII-free reason and uses V39's partial unique `(fulfillment_id,idempotency_key)` for replay safety; its cutoff scheduler uses an owner compare-and-set under the locked transition.
+B-100 lifecycle owner mutation and immutable history insert commit together. Implemented B-103 ADMIN takeover accepts only `COREABLE_FULFILLMENT_TAKEOVER|SUPPLIER_SUPPORT_REQUIRED|OPERATIONAL_RISK` and uses V39's partial unique `(fulfillment_id,idempotency_key)` for replay safety; its cutoff scheduler/read-lazy guard uses an owner compare-and-set under the locked transition.
 
 ### shipments and shipment_items (Planned B-104)
 
@@ -1403,7 +1403,7 @@ Constraints and compatibility:
 
 Unique `(shipment_id, idempotency_key)` makes each correction/void/delivery command replay-safe across supplier/admin action routes. After authorization, action key/hash lookup precedes mutable version/state guards. The canonical hash includes exact action, actor type, and canonical body, so only the same actor/action/payload returns its stored result; another actor/action or changed payload conflicts and never replays another actor's response. Only a new command applies Shipment `version`. Carrier/tracking corrections, voids, delivery completion, and delivery correction append history and never delete Shipment or ShipmentItem evidence. Allocation cannot be corrected in place. Delivery evidence enforces `registered_at <= delivered_at <= evidence_observed_at <= now`; corrected delivery time uses the same ordering. A VOIDED Shipment releases its allocation from the active sum; no remaining non-voided Shipment returns Order to `SUPPLIER_ORDER_PENDING`, otherwise it recalculates to `TRACKING_REGISTERED` unless fully delivered. Erroneous planned admin delivery completion may be reopened or have its delivered time corrected only before a later Claim/Refund exists; original evidence remains in history and dependent cases return `409`.
 
-### supplier_pii_access_grants (Planned B-103)
+### supplier_pii_access_grants (Implemented B-103, V42)
 
 - `id`
 - `claim_id`: FK to `claims(id)`
@@ -1426,10 +1426,10 @@ Rules and indexes:
 - Each GRANTED/EXTENDED deadline must be future and no later than its request time plus 30 days; extension appends a newly bounded deadline rather than adding duration to the old one.
 - After ADMIN and Order/Claim scoping, the command checks its key/hash replay first, then a new command locks Order -> Claim -> latest grant, requires `expected_latest_grant_id`, and appends the next sequence. Different-key actions are serialized; stale expected id conflicts. Same key/hash returns stored result and changed payload conflicts.
 - The active deadline comes from the highest-sequence GRANTED/EXTENDED row only when `access_until > now`, current Claim status is `APPROVED`, `RETURN_WAITING`, `RETURN_RECEIVED`, `REFUND_PROCESSING`, or `EXCHANGE_SHIPPING`, and the Supplier contract is time-valid VERIFIED. EXTENDED requires the latest row to be active GRANTED/EXTENDED; a REVOKED stream can reopen only through explicit fresh GRANTED. Any other/terminal Claim status or contract expiry/revoke invalidates access immediately without requiring a revoke row.
-- `supplier_id` must equal the Claim Order supplier and is server-derived. Only ADMIN may append a row and reason is required. Reason validation rejects email, phone, address, delivery memo, customer identifiers, and line breaks so append-only grant audit cannot retain copied customer PII.
+- `supplier_id` must equal the Claim Order supplier and is server-derived. Only ADMIN may append a row and reason is required. GRANTED/EXTENDED accepts only `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`; REVOKED accepts only `CLAIM_ACCESS_NO_LONGER_REQUIRED`, so append-only grant audit cannot retain copied customer PII.
 - The effective grant never exposes claim, payment, refund, or customer account data to the supplier.
 
-### supplier_pii_access_logs (Planned B-103)
+### supplier_pii_access_logs (Implemented B-103, V42)
 
 - `id`
 - `actor_user_id`: FK to `users(id)`
@@ -1443,7 +1443,7 @@ Indexes and privacy rules:
 - One append-only row is written for every supplier order-detail response, including masked responses.
 - No recipient name, phone, postcode, address, delivery memo, email, payment, or refund value is copied into this table.
 - Supplier and claim grant validity are checked from the Order and grant history but are not duplicated in this minimal access log.
-- Normal access uses stored monotonic `fulfillments.pii_access_cutoff_at`: initialized at request +60 days and shortened at each tracking registration to at most registration +30 days. Voiding a Shipment never recomputes a later cutoff.
+- Normal access uses stored `fulfillments.pii_access_cutoff_at`: B-103 initializes it at request +60 days. Planned B-104 shortens it at each tracking registration to at most registration +30 days and must not recompute a later cutoff when voiding a Shipment.
 - An OUT_OF_STOCK, CANCELLED, REFUND_REQUESTED, or REFUNDED order becomes `TERMINAL_MASKED` immediately regardless of non-voided Shipment presence. An allowed-status active Claim grant may temporarily reopen the field-level FULL projection after Coreable operational takeover only while the Supplier contract remains time-valid VERIFIED, and cannot authorize shipment/shortage mutation.
 - Access logs are ADMIN-only and deleted after one year.
 
@@ -1528,14 +1528,14 @@ Rules and indexes:
 
 Supplier-side actor FKs are retention-bounded even when their business rows remain append-only. Invite consumption and catalog/inventory/lifecycle supplier identity are nulled at the configured B-098 relationship deadline. Shipment/shortage/claim supplier identity is retained only through the parent Order/Claim legal-retention boundary, then nulled or removed with the parent; actor type, supplier/business object, action/state/version and timestamp may remain as non-PII evidence. `supplier_pii_access_logs` instead delete the whole row after one year.
 
-### notification_logs supplier linkage (B-100 Invite Linkage Implemented; B-103 Operational Use Planned)
+### notification_logs supplier linkage (B-100 Invite Linkage And B-103 Operational Use Implemented)
 
 - V39 changes existing `recipient` from NOT NULL to nullable and adds compatible entity/writer/reader handling before B-100 cleanup writes null; legacy notification behavior otherwise remains unchanged.
 - `supplier_id`: nullable FK to `suppliers(id)`
 - `supplier_invite_id`: nullable FK to `supplier_invites(id)`
 - `recipient_retention_expires_at`: nullable for non-supplier legacy logs
 - `recipient_anonymized_at`: nullable
-- `SUPPLIER_INVITATION` notification type — Implemented B-100; fulfillment request, product review result and approved claim work request types — Planned in their later slices
+- `SUPPLIER_INVITATION` notification type — Implemented B-100; fulfillment request, product review result and approved claim work request types/templates — Implemented B-103. Fulfillment and admin product-review producers are B-103; claim-work producer remains Planned B-105.
 
 Rules:
 

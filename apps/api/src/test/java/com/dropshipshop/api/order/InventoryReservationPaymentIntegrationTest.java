@@ -3,6 +3,9 @@ package com.dropshipshop.api.order;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +23,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -35,11 +40,14 @@ import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.domain.SupplierAvailability;
 import com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
+import com.dropshipshop.api.catalog.domain.SupplierSalesAction;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.checkout.CheckoutExpiryService;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentChannel;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentOperationalOwner;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
 import com.dropshipshop.api.order.domain.OrderItemReservationStatus;
@@ -48,6 +56,9 @@ import com.dropshipshop.api.order.domain.ShippingAddressSnapshot;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.notification.NotificationLogRepository;
+import com.dropshipshop.api.notification.NotificationService;
+import com.dropshipshop.api.notification.domain.NotificationType;
+import com.dropshipshop.api.supplierfulfillment.SupplierPiiAccessLogRepository;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
@@ -63,7 +74,7 @@ import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.supplier-portal.enabled=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -95,8 +106,17 @@ class InventoryReservationPaymentIntegrationTest {
 	private FulfillmentRepository fulfillmentRepository;
 	@Autowired
 	private NotificationLogRepository notificationLogRepository;
+	@MockitoSpyBean
+	private NotificationService notificationService;
+	@Autowired
+	private SupplierPiiAccessLogRepository supplierPiiAccessLogRepository;
 	@Autowired
 	private CheckoutExpiryService checkoutExpiryService;
+
+	@AfterEach
+	void resetNotificationServiceSpy() {
+		reset(notificationService);
+	}
 
 	@Test
 	void normalPortalDepositConsumesHeldInventoryExactlyOnce() throws Exception {
@@ -117,7 +137,22 @@ class InventoryReservationPaymentIntegrationTest {
 		assertThat(option.getReservedQuantity()).isZero();
 		assertThat(item.getReservationStatus()).isEqualTo(OrderItemReservationStatus.CONSUMED);
 		assertThat(item.getConsumedAt()).isNotNull();
-		assertThat(fulfillmentRepository.findByOrder_Id(checkout.orderId())).isEmpty();
+		var fulfillment = fulfillmentRepository.findByOrder_Id(checkout.orderId()).orElseThrow();
+		assertThat(fulfillment.getChannel().name()).isEqualTo("SUPPLIER_PORTAL");
+		assertThat(fulfillment.getOperationalOwner().name()).isEqualTo("SUPPLIER");
+		assertThat(fulfillment.getRequestedAt()).isNotNull();
+		assertThat(fulfillment.getPiiAccessCutoffAt()).isEqualTo(fulfillment.getRequestedAt().plusSeconds(60L * 24 * 60 * 60));
+		CustomerOrder savedOrder = orderRepository.findById(checkout.orderId()).orElseThrow();
+		assertThat(savedOrder.getAddressLockedAt()).isNotNull();
+		var fulfillmentRequests = notificationLogRepository.findAllByOrderByCreatedAtAsc().stream()
+			.filter(log -> checkout.orderId().equals(log.getOrderId()))
+			.filter(log -> log.getType() == NotificationType.SUPPLIER_FULFILLMENT_REQUESTED)
+			.toList();
+		assertThat(fulfillmentRequests).singleElement().satisfies(request -> {
+			assertThat(request.getPayloadSnapshot())
+				.contains("orderNumber=" + savedOrder.getOrderNumber(), "portalPath=/supplier/orders/")
+				.doesNotContain("Receiver", "010-1111-2222", "12345", "Seoul", "payment", "refund");
+		});
 
 		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", checkout.orderId())
 				.header("Idempotency-Key", "portal-normal-confirm-1")
@@ -126,6 +161,127 @@ class InventoryReservationPaymentIntegrationTest {
 				.content(receipt(12000, checkout.depositedAt(), "PORTAL-NORMAL-1")))
 			.andExpect(status().isOk());
 		assertThat(optionRepository.findById(checkout.optionId()).orElseThrow().getOnHandQuantity()).isEqualTo(4);
+		assertThat(paymentEventRepository.countByIdempotencyKey("portal-normal-confirm-1")).isEqualTo(1);
+		assertThat(notificationLogRepository.findAllByOrderByCreatedAtAsc().stream()
+			.filter(log -> checkout.orderId().equals(log.getOrderId()))
+			.filter(log -> log.getType() == NotificationType.SUPPLIER_FULFILLMENT_REQUESTED))
+			.hasSize(1);
+	}
+
+	@Test
+	void supplierFulfillmentOutboxFailureRollsBackPaymentRoutingInventoryAndAddressLock() throws Exception {
+		PortalCheckout checkout = createPortalCheckout("outbox-rollback", 5, Instant.now().plusSeconds(1800));
+		doThrow(new org.springframework.dao.DataIntegrityViolationException("simulated supplier outbox failure"))
+			.when(notificationService).supplierFulfillmentRequested(any(Supplier.class), any(CustomerOrder.class));
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", checkout.orderId())
+				.header("Idempotency-Key", "portal-outbox-rollback-1")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(receipt(12000, checkout.depositedAt(), "PORTAL-OUTBOX-ROLLBACK-1")))
+			.andExpect(status().isConflict());
+
+		CustomerOrder order = orderRepository.findById(checkout.orderId()).orElseThrow();
+		ProductOption option = optionRepository.findById(checkout.optionId()).orElseThrow();
+		OrderItem item = orderItemRepository.findAllByOrder_IdOrderByCreatedAtAsc(checkout.orderId()).getFirst();
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+		assertThat(order.getAddressLockedAt()).isNull();
+		assertThat(paymentGroupRepository.findById(checkout.paymentGroupId()).orElseThrow().getStatus())
+			.isEqualTo(PaymentGroupStatus.PAYMENT_PENDING);
+		assertThat(paymentRepository.findFirstByPaymentGroup_IdOrderByCreatedAtDesc(checkout.paymentGroupId()))
+			.isEmpty();
+		assertThat(paymentEventRepository.countByIdempotencyKey("portal-outbox-rollback-1")).isZero();
+		assertThat(fulfillmentRepository.findByOrder_Id(checkout.orderId())).isEmpty();
+		assertThat(option.getOnHandQuantity()).isEqualTo(5);
+		assertThat(option.getReservedQuantity()).isEqualTo(1);
+		assertThat(item.getReservationStatus()).isEqualTo(OrderItemReservationStatus.HELD);
+		assertThat(notificationLogRepository.existsByOrderIdAndType(
+			checkout.orderId(), NotificationType.SUPPLIER_FULFILLMENT_REQUESTED)).isFalse();
+		assertThat(supplierPiiAccessLogRepository.findAllByOrder_IdOrderByAccessedAtDesc(checkout.orderId()))
+			.isEmpty();
+	}
+
+	@Test
+	void unavailablePortalWithKeepFallsBackToCoreableWithoutAddressLockOrSupplierEmail() throws Exception {
+		PortalCheckout checkout = createPortalCheckout("keep-fallback", 5, Instant.now().plusSeconds(1800));
+		Supplier supplier = supplierRepository.findById(checkout.supplierId()).orElseThrow();
+		supplier.suspendPortal(SupplierSalesAction.KEEP);
+		supplierRepository.saveAndFlush(supplier);
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", checkout.orderId())
+				.header("Idempotency-Key", "portal-keep-fallback-1")
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(receipt(12000, checkout.depositedAt(), "PORTAL-KEEP-FALLBACK-1")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.fulfillment.channel", is("COREABLE_MANUAL")))
+			.andExpect(jsonPath("$.fulfillment.operationalOwner", is("COREABLE")));
+
+		var fulfillment = fulfillmentRepository.findByOrder_Id(checkout.orderId()).orElseThrow();
+		assertThat(fulfillment.getChannel()).isEqualTo(FulfillmentChannel.COREABLE_MANUAL);
+		assertThat(fulfillment.getOperationalOwner()).isEqualTo(FulfillmentOperationalOwner.COREABLE);
+		assertThat(orderRepository.findById(checkout.orderId()).orElseThrow().getAddressLockedAt()).isNull();
+		assertThat(notificationLogRepository.existsByOrderIdAndType(
+			checkout.orderId(), NotificationType.SUPPLIER_FULFILLMENT_REQUESTED)).isFalse();
+	}
+
+	@Test
+	void mixedPortalAndCoreableOrderKeepsLegacyFulfillmentRouting() throws Exception {
+		String suffix = UUID.randomUUID().toString().substring(0, 8);
+		Instant now = Instant.now();
+		UserAccount customer = userRepository.save(new UserAccount(
+			SocialProvider.GOOGLE, "mixed-customer-" + suffix,
+			"mixed-customer-" + suffix + "@example.com", "Customer", UserRole.CUSTOMER));
+		UserAccount manager = userRepository.save(new UserAccount(
+			SocialProvider.KAKAO, "mixed-manager-" + suffix,
+			"mixed-manager-" + suffix + "@example.com", "Manager", UserRole.CUSTOMER));
+		Supplier supplier = Supplier.portalApplicant(
+			"Mixed supplier " + suffix, "Manager", "010-2222-3333", manager.getEmail(), null);
+		supplier.verifyPortalContract("mixed-contract-" + suffix, now.minusSeconds(3600), now.plusSeconds(3600),
+			now.minusSeconds(3600), TestAuthentication.ADMIN_ID);
+		supplier.bindManager(manager.getId(), now.minusSeconds(3500));
+		supplier.changeSalesStatus(SupplierStatus.ACTIVE, now);
+		supplier = supplierRepository.save(supplier);
+
+		Product portalProduct = new Product(supplier, "Portal line " + suffix, "Portal line", 5000, 12000,
+			ProductCategory.PPE_SAFETY_HELMET, ProductStatus.ACTIVE, ProductManagementChannel.SUPPLIER_PORTAL);
+		portalProduct.updateReview(ProductReviewStatus.APPROVED, null, null);
+		portalProduct = productRepository.save(portalProduct);
+		ProductOption portalOption = new ProductOption(portalProduct, "Default", 0, ProductOptionStatus.ACTIVE);
+		portalOption.updateInventory(SupplierAvailability.AVAILABLE, InventoryMode.TRACKED, 2L);
+		portalOption.reserve(1);
+		portalOption = optionRepository.save(portalOption);
+
+		Product coreableProduct = productRepository.save(new Product(
+			supplier, "Coreable line " + suffix, "Coreable line", 6000, ProductStatus.ACTIVE));
+		ProductOption coreableOption = optionRepository.save(new ProductOption(
+			coreableProduct, "Default", 0, ProductOptionStatus.ACTIVE));
+		PaymentGroup paymentGroup = new PaymentGroup("P-" + UUID.randomUUID(), customer, 18000,
+			now.plusSeconds(1800));
+		paymentGroup.confirmPolicy(now);
+		paymentGroup = paymentGroupRepository.save(paymentGroup);
+		CustomerOrder order = orderRepository.save(new CustomerOrder(
+			"O-" + UUID.randomUUID(), customer, supplier, paymentGroup,
+			new ShippingAddressSnapshot("Receiver", "010-1111-2222", "12345", "Seoul", "101"),
+			18000, paymentGroup.getExpiresAt()));
+		orderItemRepository.save(new OrderItem(order, portalProduct, portalOption, 1, 1, now));
+		orderItemRepository.save(new OrderItem(order, coreableProduct, coreableOption, 1, 1, now));
+
+		mockMvc.perform(post("/api/admin/orders/{orderId}/confirm-deposit", order.getId())
+				.header("Idempotency-Key", "mixed-routing-" + suffix)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(receipt(18000, now.minusSeconds(30), "MIXED-" + suffix)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.outcome", is("APPROVED")))
+			.andExpect(jsonPath("$.status", is("SUPPLIER_ORDER_PENDING")))
+			.andExpect(jsonPath("$.fulfillment.fulfillmentId").doesNotExist());
+
+		assertThat(fulfillmentRepository.findByOrder_Id(order.getId())).isEmpty();
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getAddressLockedAt()).isNull();
+		assertThat(notificationLogRepository.existsByOrderIdAndType(
+			order.getId(), NotificationType.SUPPLIER_FULFILLMENT_REQUESTED)).isFalse();
+		assertThat(optionRepository.findById(portalOption.getId()).orElseThrow().getOnHandQuantity()).isEqualTo(1);
 	}
 
 	@Test
@@ -162,6 +318,10 @@ class InventoryReservationPaymentIntegrationTest {
 		assertThat(consumedItem.getReacquiredAt()).isNotNull();
 		assertThat(paymentGroupRepository.findById(checkout.paymentGroupId()).orElseThrow().getStatus())
 			.isEqualTo(PaymentGroupStatus.APPROVED);
+		var fulfillment = fulfillmentRepository.findByOrder_Id(checkout.orderId()).orElseThrow();
+		assertThat(fulfillment.getChannel()).isEqualTo(FulfillmentChannel.SUPPLIER_PORTAL);
+		assertThat(fulfillment.getOperationalOwner()).isEqualTo(FulfillmentOperationalOwner.SUPPLIER);
+		assertThat(orderRepository.findById(checkout.orderId()).orElseThrow().getAddressLockedAt()).isNotNull();
 	}
 
 	@Test
@@ -485,6 +645,7 @@ class InventoryReservationPaymentIntegrationTest {
 			options.add(option);
 		}
 		long notificationCount = notificationLogRepository.count();
+		long accessLogCount = supplierPiiAccessLogRepository.count();
 
 		mockMvc.perform(post("/api/admin/orders/{orderId}/deposit-mismatch", orders.getFirst().getId())
 				.header("Idempotency-Key", "portal-multi-mismatch-key-1")
@@ -517,6 +678,7 @@ class InventoryReservationPaymentIntegrationTest {
 			assertThat(current.getReservedQuantity()).isZero();
 		});
 		assertThat(notificationLogRepository.count()).isEqualTo(notificationCount);
+		assertThat(supplierPiiAccessLogRepository.count()).isEqualTo(accessLogCount);
 		assertThat(paymentEventRepository.findByPaymentGroup_IdAndIdempotencyKeyAndCommandTypeIsNotNull(
 			paymentGroup.getId(), "portal-multi-mismatch-key-1").orElseThrow().getOrderId()).isNull();
 	}

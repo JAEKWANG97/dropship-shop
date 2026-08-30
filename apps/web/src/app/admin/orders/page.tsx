@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   adminStatusLabel,
+  adminPortalFulfillmentAction,
   adminRefundProjection,
   getAdminOrder,
   getAdminOrderActions,
@@ -40,6 +41,7 @@ import {
   startSupplierWork,
   startReturnRefund,
   syncShipmentTracking,
+  takeOverPortalFulfillment,
   retrySupplierPurchase,
   validateSupplierPurchase,
 } from "./actions";
@@ -216,7 +218,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               </div>
               <h3>배송 정보</h3>
               <p>{shippingAddressText(selectedOrder.shippingAddress)}</p>
-              <ShipmentPanel order={selectedOrder} />
+              {!detail.error ? <ShipmentPanel order={selectedOrder} /> : null}
               <h3>결제 정보</h3>
               <div className="summary-list compact">
                 <div>
@@ -229,7 +231,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 </div>
               </div>
               <BankTransferAdminPanel order={selectedOrder} />
-              <SupplierPurchasePanel order={selectedOrder} />
+              {!detail.error ? <SupplierPurchasePanel order={selectedOrder} /> : null}
               <h3>운영 상태</h3>
               <div className="summary-list compact">
                 <div>
@@ -249,13 +251,15 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                   <strong>{selectedOrder.claim ? claimStatusLabel(selectedOrder.claim.status) : "없음"}</strong>
                 </div>
               </div>
-              <ClaimPanel order={selectedOrder} />
+              {!detail.error ? <ClaimPanel order={selectedOrder} /> : null}
 					<RefundEvidencePanel order={selectedOrder} />
 					<AdminActionHistoryPanel actions={actionHistory.actions} error={actionHistory.error} />
-              <AdminOrderActions
-                order={selectedOrder}
-                retry={{ action: params.retryAction, key: params.idempotencyKey }}
-              />
+              {!detail.error ? (
+                <AdminOrderActions
+                  order={selectedOrder}
+                  retry={{ action: params.retryAction, key: params.idempotencyKey }}
+                />
+              ) : null}
             </aside>
           ) : null}
         </div>
@@ -368,7 +372,8 @@ function shippingAddressText(address: AdminOrder["shippingAddress"]) {
   if (typeof address === "string") {
     return address;
   }
-  return `${address.recipientName} / ${address.recipientPhone} / ${address.postalCode} ${address.address1} ${address.address2 ?? ""}`;
+  const deliveryMemo = address.deliveryMemo ? ` / 배송 메모: ${address.deliveryMemo}` : "";
+  return `${address.recipientName} / ${address.recipientPhone} / ${address.postalCode} ${address.address1} ${address.address2 ?? ""}${deliveryMemo}`;
 }
 
 function adminPaymentLabel(order: AdminOrder) {
@@ -730,6 +735,42 @@ function AdminOrderActions({ order, retry }: { order: AdminOrder; retry: RetryCo
 
   if (refundAction === "MANUAL_COMPLETE") {
     return <ManualRefundForm order={order} retry={retry} />;
+  }
+
+  const portalAction = adminPortalFulfillmentAction(order.fulfillment);
+  if (portalAction === "TAKEOVER") {
+    return (
+      <div className="admin-order-actions">
+        <h3>공급처 포털 출고</h3>
+        <div className="notice">
+          <strong>현재 공급처가 처리 중입니다</strong>
+          <span>Coreable이 직접 이어서 처리할 때만 인계하세요. 인계 후 공급처에 자동 재배정되지 않습니다.</span>
+        </div>
+        <form action={takeOverPortalFulfillment} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, "portal-takeover")} />
+          <label className="wide">
+            인계 사유
+            <select defaultValue="COREABLE_FULFILLMENT_TAKEOVER" name="reason" required>
+              <option value="COREABLE_FULFILLMENT_TAKEOVER">Coreable 직접 출고 처리</option>
+              <option value="SUPPLIER_SUPPORT_REQUIRED">공급처 지원 요청</option>
+              <option value="OPERATIONAL_RISK">운영 위험 대응</option>
+            </select>
+            <span className="field-help">고객 정보가 남지 않도록 정해진 운영 사유만 기록합니다.</span>
+          </label>
+          <button className="button" type="submit">Coreable 처리로 인계</button>
+        </form>
+      </div>
+    );
+  }
+
+  if (portalAction === "COREABLE") {
+    return (
+      <div className="notice">
+        <strong>Coreable 처리로 인계된 포털 주문입니다</strong>
+        <span>기존 수동 발주 액션은 사용할 수 없습니다. 송장 처리는 복수 송장 기능에서 이어집니다.</span>
+      </div>
+    );
   }
 
   if (order.fulfillment?.purchaseProvider === "DOMEGGOOK") {

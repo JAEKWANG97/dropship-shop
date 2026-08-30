@@ -16,8 +16,8 @@ export default function SupplierHomePage() {
         </div>
         <div className="supplier-home-list">
           <div><strong>로그인</strong><span>초대에 연결한 카카오 계정을 사용합니다.</span></div>
-          <div><strong>상품</strong><span>개별 상품 등록 기능이 준비되면 이 포털에서 바로 등록합니다.</span></div>
-          <div><strong>출고</strong><span>입금 확인이 끝난 주문만 최소 배송정보와 함께 표시됩니다.</span></div>
+          <div><strong>상품</strong><span>상품을 개별 등록하고 옵션별 재고와 판매 여부를 관리합니다.</span></div>
+          <div><strong>출고</strong><span>입금 확인이 끝난 주문은 출고 요청에서 확인합니다.</span></div>
         </div>
       </section>
     </div>

@@ -20,34 +20,42 @@ import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.domain.OrderStatusHistory;
 import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
+import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.refund.RefundService;
 import com.dropshipshop.api.refund.domain.Refund;
+import com.dropshipshop.api.fulfillment.SupplierFulfillmentHandoverService;
 
 @Service
 class AdminClaimService {
 
 	private final ClaimRepository claimRepository;
+	private final CustomerOrderRepository orderRepository;
 	private final CustomerClaimService customerClaimService;
 	private final RefundService refundService;
 	private final NotificationService notificationService;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
+	private final SupplierFulfillmentHandoverService handoverService;
 
 	AdminClaimService(
 		ClaimRepository claimRepository,
+		CustomerOrderRepository orderRepository,
 		CustomerClaimService customerClaimService,
 		RefundService refundService,
 		NotificationService notificationService,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
-		OrderStatusHistoryRepository statusHistoryRepository
+		OrderStatusHistoryRepository statusHistoryRepository,
+		SupplierFulfillmentHandoverService handoverService
 	) {
 		this.claimRepository = claimRepository;
+		this.orderRepository = orderRepository;
 		this.customerClaimService = customerClaimService;
 		this.refundService = refundService;
 		this.notificationService = notificationService;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
+		this.handoverService = handoverService;
 	}
 
 	@Transactional(readOnly = true)
@@ -74,6 +82,7 @@ class AdminClaimService {
 				claim.approve(adminUserId, request.reason(), Instant.now());
 			}
 			if (claim.getClaimType() == ClaimType.CANCEL) {
+				handoverService.takeOverTerminal(claim.getOrder(), Instant.now());
 				claim.getOrder().markRefundRequested();
 				refundService.createCustomerCancelRefund(claim.getOrder());
 			}
@@ -168,6 +177,7 @@ class AdminClaimService {
 			}
 			CustomerOrder order = claim.getOrder();
 			OrderStatus beforeStatus = order.getStatus();
+			handoverService.takeOverTerminal(order, Instant.now());
 			order.markRefundRequested();
 			Refund refund = refundService.createReturnRefund(order);
 			claim.markRefundProcessing(refund, adminUserId, request.reason(), Instant.now());
@@ -196,8 +206,15 @@ class AdminClaimService {
 	}
 
 	private Claim findClaim(UUID claimId) {
-		Claim claim = claimRepository.findById(claimId)
+		UUID orderId = claimRepository.findOrderIdById(claimId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		CustomerOrder order = orderRepository.findByIdForUpdate(orderId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		Claim claim = claimRepository.findByIdForUpdate(claimId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found"));
+		if (!claim.getOrder().getId().equals(order.getId())) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found");
+		}
 		return claim;
 	}
 

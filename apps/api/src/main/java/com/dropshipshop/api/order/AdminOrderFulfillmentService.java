@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
+import com.dropshipshop.api.fulfillment.SupplierFulfillmentHandoverService;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentChannel;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.notification.domain.NotificationType;
@@ -32,6 +34,7 @@ class AdminOrderFulfillmentService {
 	private final AdminOrderQueryService adminOrderQueryService;
 	private final RefundService refundService;
 	private final NotificationService notificationService;
+	private final SupplierFulfillmentHandoverService handoverService;
 
 	AdminOrderFulfillmentService(
 		CustomerOrderRepository orderRepository,
@@ -40,7 +43,8 @@ class AdminOrderFulfillmentService {
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
 		RefundService refundService,
-		NotificationService notificationService
+		NotificationService notificationService,
+		SupplierFulfillmentHandoverService handoverService
 	) {
 		this.orderRepository = orderRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
@@ -49,6 +53,7 @@ class AdminOrderFulfillmentService {
 		this.adminOrderQueryService = adminOrderQueryService;
 		this.refundService = refundService;
 		this.notificationService = notificationService;
+		this.handoverService = handoverService;
 	}
 
 	@Transactional
@@ -58,6 +63,7 @@ class AdminOrderFulfillmentService {
 		AdminOrderDtos.SupplierWorkStartRequest request
 	) {
 		CustomerOrder order = findOrder(orderId);
+		requireLegacyFulfillmentChannel(order);
 		OrderStatus beforeStatus = order.getStatus();
 		Instant now = Instant.now();
 		try {
@@ -79,6 +85,7 @@ class AdminOrderFulfillmentService {
 		AdminOrderDtos.SupplierOrderCompletedRequest request
 	) {
 		CustomerOrder order = findOrder(orderId);
+		requireLegacyFulfillmentChannel(order);
 		OrderStatus beforeStatus = order.getStatus();
 		Instant now = Instant.now();
 		try {
@@ -109,6 +116,8 @@ class AdminOrderFulfillmentService {
 		CustomerOrder order = findOrder(orderId);
 		OrderStatus beforeStatus = order.getStatus();
 		try {
+			Instant now = Instant.now();
+			handoverService.takeOverTerminal(order, now);
 			order.markOutOfStock();
 			Fulfillment fulfillment = getOrCreateFulfillment(order);
 			fulfillment.markOutOfStock(request.reason());
@@ -146,13 +155,22 @@ class AdminOrderFulfillmentService {
 	}
 
 	private CustomerOrder findOrder(UUID orderId) {
-		return orderRepository.findById(orderId)
+		return orderRepository.findByIdForUpdate(orderId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
 	}
 
 	private Fulfillment getOrCreateFulfillment(CustomerOrder order) {
 		return fulfillmentRepository.findByOrder_Id(order.getId())
 			.orElseGet(() -> new Fulfillment(order));
+	}
+
+	private void requireLegacyFulfillmentChannel(CustomerOrder order) {
+		fulfillmentRepository.findByOrder_Id(order.getId())
+			.filter(fulfillment -> fulfillment.getChannel() == FulfillmentChannel.SUPPLIER_PORTAL)
+			.ifPresent(fulfillment -> {
+				throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Supplier portal fulfillment requires the dedicated portal workflow");
+			});
 	}
 
 	private void recordHistory(
