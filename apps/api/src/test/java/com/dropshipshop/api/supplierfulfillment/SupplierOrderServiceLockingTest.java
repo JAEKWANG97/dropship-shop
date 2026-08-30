@@ -26,6 +26,7 @@ import com.dropshipshop.api.order.domain.OrderStatus;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.supplierportal.repository.FulfillmentHandoverHistoryRepository;
+import com.dropshipshop.api.shipment.repository.ShipmentItemRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserStatus;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
@@ -74,7 +75,8 @@ class SupplierOrderServiceLockingTest {
 		when(itemRepository.findAllByOrder_IdOrderByCreatedAtAsc(orderId)).thenReturn(List.of());
 		SupplierOrderService service = new SupplierOrderService(
 			supplierRepository, userRepository, fulfillmentRepository, orderRepository, itemRepository,
-			historyRepository, grantRepository, logRepository, handoverService
+			historyRepository, grantRepository, logRepository, handoverService,
+			mock(ShipmentItemRepository.class)
 		);
 
 		SupplierOrderDtos.OrderDetailResponse response = service.detail(actorId, "ORDER-1");

@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   supplierOrderStatusView,
   type SupplierOrderDetail,
@@ -51,7 +52,13 @@ export function SupplierOrdersView({
   );
 }
 
-export function SupplierOrderDetailView({ order }: { order: SupplierOrderDetail }) {
+export function SupplierOrderDetailView({
+  order,
+  children,
+}: {
+  order: SupplierOrderDetail;
+  children?: ReactNode;
+}) {
   const status = supplierOrderStatusView(order.status);
   const masked = order.piiAccessLevel !== "FULL";
 
@@ -108,6 +115,8 @@ export function SupplierOrderDetailView({ order }: { order: SupplierOrderDetail 
           ))}
         </div>
       </section>
+
+      {children}
     </div>
   );
 }

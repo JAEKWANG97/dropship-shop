@@ -11,7 +11,9 @@ import {
   adminDepositCommand,
   idempotencyHeaders,
   koreanLocalDateTime,
+  parseAdminExpectedVersion,
   refundApprovalCommand,
+  uncertainAdminCommandKey,
 } from "@/lib/admin-payment";
 
 function value(formData: FormData, name: string) {
@@ -19,7 +21,7 @@ function value(formData: FormData, name: string) {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-function done(orderId: string, message: string, retryAction?: string, idempotencyKey?: string) {
+function done(orderId: string, message: string, retryAction?: string, idempotencyKey?: string): never {
   const search = new URLSearchParams({ orderId, message });
   if (retryAction && idempotencyKey) {
     search.set("retryAction", retryAction);
@@ -32,14 +34,10 @@ function failureMessage(error: unknown, fallback: string) {
   return error instanceof ApiError && error.message.trim() ? error.message : fallback;
 }
 
-function uncertainCommandKey(error: unknown, idempotencyKey: string) {
-  return !(error instanceof ApiError) || error.status >= 500 ? idempotencyKey : undefined;
-}
-
 async function postOrderAction(
   orderId: string,
   path: string,
-  body: Record<string, string | number>,
+  body: Record<string, unknown>,
   idempotencyKey?: string,
 ) {
   await apiSendWithCookie(`/api/admin/orders/${orderId}${path}`, (await cookies()).toString(), {
@@ -52,6 +50,20 @@ async function postOrderAction(
 async function postShipmentAction(shipmentId: string, path: string, body: Record<string, string>) {
   await apiSendWithCookie(`/api/admin/shipments/${shipmentId}${path}`, (await cookies()).toString(), {
     method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+async function mutatePortalShipment(
+  shipmentId: string,
+  path: string,
+  method: "POST" | "PATCH",
+  body: Record<string, unknown>,
+  idempotencyKey: string,
+) {
+  await apiSendWithCookie(`/api/admin/shipments/${shipmentId}${path}`, (await cookies()).toString(), {
+    method,
+    headers: idempotencyHeaders(idempotencyKey),
     body: JSON.stringify(body),
   });
 }
@@ -136,6 +148,161 @@ export async function createOrderShipment(formData: FormData) {
   done(orderId, "송장을 입력했습니다.");
 }
 
+export async function createPortalShipment(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const allocations = shipmentAllocations(formData);
+
+  try {
+    await apiSendWithCookie(`/api/admin/orders/${orderId}/portal-shipments`, (await cookies()).toString(), {
+      method: "POST",
+      headers: idempotencyHeaders(idempotencyKey),
+      body: JSON.stringify({
+        carrierCode: value(formData, "carrierCode"),
+        trackingNumber: value(formData, "trackingNumber"),
+        ...(allocations.length > 0 ? { allocations } : {}),
+      }),
+    });
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "포털 송장 등록에 실패했습니다."),
+      "portal-shipment-create",
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "포털 송장을 등록했습니다.");
+}
+
+export async function correctPortalShipmentTracking(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const shipmentId = value(formData, "shipmentId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const retryAction = `portal-shipment-tracking-${shipmentId}`;
+  const expectedVersion = parseAdminExpectedVersion(value(formData, "expectedVersion"));
+  if (expectedVersion === null) done(orderId, "송장 버전 정보를 확인할 수 없습니다. 주문을 새로고침해 주세요.");
+
+  try {
+    await mutatePortalShipment(shipmentId, "/tracking-correction", "PATCH", {
+      expectedVersion,
+      carrierCode: value(formData, "carrierCode"),
+      trackingNumber: value(formData, "trackingNumber"),
+      reason: value(formData, "reason"),
+    }, idempotencyKey);
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "포털 송장 정정에 실패했습니다."),
+      retryAction,
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "택배사와 송장번호를 정정했습니다.");
+}
+
+export async function voidPortalShipment(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const shipmentId = value(formData, "shipmentId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const retryAction = `portal-shipment-void-${shipmentId}`;
+  const expectedVersion = parseAdminExpectedVersion(value(formData, "expectedVersion"));
+  if (expectedVersion === null) done(orderId, "송장 버전 정보를 확인할 수 없습니다. 주문을 새로고침해 주세요.");
+
+  try {
+    await mutatePortalShipment(shipmentId, "/void", "POST", {
+      expectedVersion,
+      reason: value(formData, "reason"),
+    }, idempotencyKey);
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "포털 송장 무효 처리에 실패했습니다."),
+      retryAction,
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "송장을 무효 처리하고 할당 수량을 되돌렸습니다.");
+}
+
+export async function completePortalShipmentDelivery(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const shipmentId = value(formData, "shipmentId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const retryAction = `portal-shipment-delivery-${shipmentId}`;
+  const expectedVersion = parseAdminExpectedVersion(value(formData, "expectedVersion"));
+  if (expectedVersion === null) done(orderId, "송장 버전 정보를 확인할 수 없습니다. 주문을 새로고침해 주세요.");
+
+  try {
+    await mutatePortalShipment(shipmentId, "/delivery-complete", "POST", {
+      expectedVersion,
+      deliveredAt: koreanLocalDateTime(value(formData, "deliveredAt")),
+      evidenceObservedAt: koreanLocalDateTime(value(formData, "evidenceObservedAt")),
+      reason: value(formData, "reason"),
+    }, idempotencyKey);
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "배송완료 증적 반영에 실패했습니다."),
+      retryAction,
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, "배송완료 증적을 반영했습니다.");
+}
+
+export async function correctPortalShipmentDelivery(formData: FormData) {
+  const orderId = value(formData, "orderId");
+  const shipmentId = value(formData, "shipmentId");
+  const idempotencyKey = value(formData, "idempotencyKey");
+  const correctionType = value(formData, "correctionType");
+  const retryAction = correctionType === "REOPEN_TRACKING"
+    ? `portal-shipment-reopen-${shipmentId}`
+    : `portal-shipment-delivery-time-${shipmentId}`;
+  const timeCorrection = correctionType === "CORRECT_DELIVERED_AT";
+  const expectedVersion = parseAdminExpectedVersion(value(formData, "expectedVersion"));
+  if (expectedVersion === null) done(orderId, "송장 버전 정보를 확인할 수 없습니다. 주문을 새로고침해 주세요.");
+
+  try {
+    await mutatePortalShipment(shipmentId, "/delivery-correction", "POST", {
+      expectedVersion,
+      correctionType,
+      ...(timeCorrection ? {
+        correctedDeliveredAt: koreanLocalDateTime(value(formData, "correctedDeliveredAt")),
+        evidenceObservedAt: koreanLocalDateTime(value(formData, "evidenceObservedAt")),
+      } : {}),
+      reason: value(formData, "reason"),
+    }, idempotencyKey);
+  } catch (error) {
+    done(
+      orderId,
+      failureMessage(error, "배송완료 보정에 실패했습니다."),
+      retryAction,
+      uncertainAdminCommandKey(error, idempotencyKey),
+    );
+  }
+
+  revalidatePath("/admin/orders");
+  done(orderId, timeCorrection ? "배송완료 시각을 정정했습니다." : "배송완료 처리를 취소하고 배송조회 상태로 되돌렸습니다.");
+}
+
+function shipmentAllocations(formData: FormData) {
+  return Array.from(formData.entries()).flatMap(([name, raw]) => {
+    if (!name.startsWith("allocation:") || typeof raw !== "string") return [];
+    const quantity = Number(raw);
+    return Number.isInteger(quantity) && quantity > 0
+      ? [{ orderItemId: name.slice("allocation:".length), quantity }]
+      : [];
+  });
+}
+
 export async function syncShipmentTracking(formData: FormData) {
   const orderId = value(formData, "orderId");
   const shipmentId = value(formData, "shipmentId");
@@ -180,7 +347,7 @@ export async function confirmDeposit(formData: FormData) {
       orderId,
       failureMessage(error, "입금 확인 처리에 실패했습니다."),
       "confirm-deposit",
-      uncertainCommandKey(error, idempotencyKey),
+      uncertainAdminCommandKey(error, idempotencyKey),
     );
   }
 
@@ -212,7 +379,7 @@ export async function recordDepositMismatch(formData: FormData) {
       orderId,
       failureMessage(error, "입금 불일치 처리에 실패했습니다."),
       "deposit-mismatch",
-      uncertainCommandKey(error, idempotencyKey),
+      uncertainAdminCommandKey(error, idempotencyKey),
     );
   }
 
@@ -231,7 +398,7 @@ export async function recordLateDeposit(formData: FormData) {
       orderId,
       failureMessage(error, "뒤늦은 입금 처리에 실패했습니다."),
       "late-deposit",
-      uncertainCommandKey(error, idempotencyKey),
+      uncertainAdminCommandKey(error, idempotencyKey),
     );
   }
 
@@ -298,7 +465,7 @@ export async function takeOverPortalFulfillment(formData: FormData) {
       orderId,
       failureMessage(error, "Coreable 인계 처리에 실패했습니다."),
       "portal-takeover",
-      uncertainCommandKey(error, idempotencyKey),
+      uncertainAdminCommandKey(error, idempotencyKey),
     );
   }
 
@@ -326,7 +493,7 @@ export async function completeManualRefund(formData: FormData) {
       orderId,
       failureMessage(error, "수동 환불 완료 처리에 실패했습니다."),
       `manual-refund-${refundId}`,
-      uncertainCommandKey(error, idempotencyKey),
+      uncertainAdminCommandKey(error, idempotencyKey),
     );
   }
 

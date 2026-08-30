@@ -2,13 +2,36 @@ import { expect, test } from "@playwright/test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SupplierOrderDetailView, SupplierOrdersView } from "../../src/app/supplier/(portal)/orders/order-views";
-import { adminPortalFulfillmentAction, type AdminOrder } from "../../src/lib/admin";
+import { ApiError } from "../../src/lib/api";
 import {
+  adminPortalShipmentMutationAllowed,
+  adminPortalFulfillmentAction,
+  adminStatusLabel,
+  hasCanonicalAdminShipmentAllocations,
+  normalizeAdminCarriers,
+  type AdminOrder,
+} from "../../src/lib/admin";
+import { parseAdminExpectedVersion, uncertainAdminCommandKey } from "../../src/lib/admin-payment";
+import { customerDirectCancelBlocked, orderStatusLabel, shipmentStatusLabel } from "../../src/lib/orders";
+import {
+  correctSupplierShipment,
+  createSupplierShipment,
   getSupplierOrder,
+  listSupplierCarriers,
   listSupplierOrders,
+  listSupplierShipments,
+  loadSupplierShipmentRefresh,
+  normalizeSupplierCarriers,
   normalizeSupplierOrderDetail,
   normalizeSupplierOrderList,
+  normalizeSupplierShipments,
+  releaseSupplierShipmentCommandKey,
+  recoverSupplierShipmentConflict,
+  safeOfficialTrackingUrl,
+  SupplierOrderApiError,
   supplierOrderStatusView,
+  supplierShipmentCommandKey,
+  supplierShipmentRegistrationAllowed,
 } from "../../src/lib/supplier-orders";
 
 test("supplier order list keeps only the PII-free fulfillment allowlist", () => {
@@ -258,8 +281,275 @@ test("supplier fulfillment reads are same-origin and never cached", async () => 
   }
 });
 
+test("B-104 carrier and shipment normalizers keep the canonical allowlist", () => {
+  expect(normalizeSupplierCarriers({
+    carriers: [{
+      carrierCode: "CJ_LOGISTICS",
+      carrierName: "CJ대한통운",
+      officialTrackingSupported: true,
+      trackingTemplate: "must-not-survive",
+    }],
+  })).toEqual([{
+    carrierCode: "CJ_LOGISTICS",
+    carrierName: "CJ대한통운",
+    officialTrackingSupported: true,
+  }]);
+
+  const collection = normalizeSupplierShipments({
+    shipments: [
+      {
+        shipmentId: "shipment-1",
+        version: 2,
+        status: "TRACKING_REGISTERED",
+        carrierCode: "CJ_LOGISTICS",
+        carrierName: "CJ대한통운",
+        trackingNumber: "1234567890",
+        officialTrackingUrl: "https://carrier.example/track/1234567890",
+        editable: true,
+        countsTowardAllocation: true,
+        registeredAt: "2026-08-29T01:00:00Z",
+        allocations: [{ orderItemId: "item-1", quantity: 2, unitPrice: 99_000 }],
+        customerEmail: "must-not-survive@example.com",
+      },
+      {
+        shipmentId: "shipment-void",
+        version: 3,
+        status: "VOIDED",
+        carrierName: "알 수 없음",
+        trackingNumber: "unsafe",
+        officialTrackingUrl: "javascript:alert(1)",
+        editable: true,
+        countsTowardAllocation: true,
+        allocations: [{ orderItemId: "item-1", quantity: 2 }],
+      },
+      {
+        shipmentId: "shipment-malformed-version",
+        status: "TRACKING_REGISTERED",
+        carrierName: "CJ대한통운",
+        trackingNumber: "malformed",
+        editable: true,
+        allocations: [],
+      },
+    ],
+    unallocatedItems: [{
+      orderItemId: "item-2",
+      productName: "안전화",
+      optionName: "270",
+      orderedQuantity: 3,
+      allocatedQuantity: 1,
+      remainingQuantity: 2,
+      sourceUnitPrice: 50_000,
+    }],
+    allocationComplete: false,
+    canRegisterShipment: true,
+    nextAction: "REGISTER_SHIPMENT",
+  });
+
+  expect(collection.allocationComplete).toBe(false);
+  expect(collection.canRegisterShipment).toBe(true);
+  expect(collection.unallocatedItems).toEqual([{
+    orderItemId: "item-2",
+    productName: "안전화",
+    optionName: "270",
+    remainingQuantity: 2,
+  }]);
+  expect(collection.shipments[0].officialTrackingUrl).toBe("https://carrier.example/track/1234567890");
+  expect(collection.shipments[1].officialTrackingUrl).toBeNull();
+  expect(collection.shipments[1].editable).toBe(false);
+  expect(collection.shipments[1].countsTowardAllocation).toBe(false);
+  expect(collection.shipments[2].version).toBeNull();
+  expect(collection.shipments[2].editable).toBe(false);
+  expect(JSON.stringify(collection)).not.toContain("must-not-survive");
+  expect(JSON.stringify(collection)).not.toContain("unitPrice");
+  expect(safeOfficialTrackingUrl("http://carrier.example/track/1")).toBeNull();
+});
+
+test("B-104 supplier mutation authority is fail-closed when the API omits it", () => {
+  const omitted = normalizeSupplierShipments({
+    shipments: [],
+    unallocatedItems: [{ orderItemId: "item-1", remainingQuantity: 1 }],
+  });
+  const allowed = normalizeSupplierShipments({
+    shipments: [],
+    unallocatedItems: [{ orderItemId: "item-1", remainingQuantity: 1 }],
+    canRegisterShipment: true,
+  });
+
+  expect(omitted.canRegisterShipment).toBeNull();
+  expect(supplierShipmentRegistrationAllowed(omitted)).toBe(false);
+  expect(supplierShipmentRegistrationAllowed(allowed)).toBe(true);
+});
+
+test("B-104 supplier mutation recovery refreshes stale or lost authority state", async () => {
+  let refreshes = 0;
+  const refresh = async () => { refreshes += 1; };
+
+  expect(await recoverSupplierShipmentConflict(new SupplierOrderApiError(409, "STALE_VERSION"), refresh)).toBe(true);
+  expect(refreshes).toBe(1);
+  expect(await recoverSupplierShipmentConflict(new SupplierOrderApiError(404, "RESOURCE_NOT_FOUND"), refresh)).toBe(true);
+  expect(await recoverSupplierShipmentConflict(new SupplierOrderApiError(403, "FORBIDDEN"), refresh)).toBe(true);
+  expect(await recoverSupplierShipmentConflict(new SupplierOrderApiError(400, "VALIDATION_FAILED"), refresh)).toBe(false);
+  expect(refreshes).toBe(3);
+});
+
+test("B-104 partial refresh keeps the new masked order and drops stale shipment actions", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response(JSON.stringify({
+        orderNumber: "ORD-104-MASKED",
+        status: "TRACKING_REGISTERED",
+        requestedAt: "2026-08-30T00:00:00Z",
+        piiAccessLevel: "MASKED",
+        piiBasis: "CUTOFF_REACHED",
+        piiAccessUntil: null,
+        recipient: {
+          name: "고**",
+          phone: "*******2222",
+          postalCode: null,
+          address1: null,
+          address2: null,
+          deliveryMemo: null,
+        },
+        items: [],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ code: "RESOURCE_NOT_FOUND" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  try {
+    const refreshed = await loadSupplierShipmentRefresh("ORD-104-MASKED");
+    expect(refreshed.order?.piiAccessLevel).toBe("MASKED");
+    expect(refreshed.order?.recipient.address1).toBeNull();
+    expect(refreshed.shipmentState).toBeNull();
+    expect(refreshed.shipmentError).toBeInstanceOf(SupplierOrderApiError);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("B-104 shipment command keys survive uncertain outcomes and rotate after definite rejection", () => {
+  const supplierKeys = new Map<string, string>();
+  let created = 0;
+  const createKey = () => `supplier-command-${++created}`;
+
+  expect(supplierShipmentCommandKey(supplierKeys, "create", createKey)).toBe("supplier-command-1");
+  expect(supplierShipmentCommandKey(supplierKeys, "create", createKey)).toBe("supplier-command-1");
+  releaseSupplierShipmentCommandKey(supplierKeys, "create", new Error("refresh failed after API success"));
+  expect(supplierShipmentCommandKey(supplierKeys, "create", createKey)).toBe("supplier-command-1");
+  releaseSupplierShipmentCommandKey(supplierKeys, "create", new SupplierOrderApiError(500, "UPSTREAM_FAILURE"));
+  expect(supplierShipmentCommandKey(supplierKeys, "create", createKey)).toBe("supplier-command-1");
+  releaseSupplierShipmentCommandKey(supplierKeys, "create", new SupplierOrderApiError(409, "IDEMPOTENCY_CONFLICT"));
+  expect(supplierShipmentCommandKey(supplierKeys, "create", createKey)).toBe("supplier-command-2");
+
+  const adminKey = "11111111-1111-4111-8111-111111111111";
+  expect(uncertainAdminCommandKey(new Error("network failure"), adminKey)).toBe(adminKey);
+  expect(uncertainAdminCommandKey(new ApiError(500, "temporary"), adminKey)).toBe(adminKey);
+  expect(uncertainAdminCommandKey(new ApiError(409, "conflict"), adminKey)).toBeUndefined();
+});
+
+test("B-104 admin carrier and allocation contracts fail closed on missing fields", () => {
+  expect(normalizeAdminCarriers({})).toEqual([]);
+  expect(normalizeAdminCarriers({ carriers: [{ carrierCode: "", carrierName: "이름 없음" }] })).toEqual([]);
+  expect(normalizeAdminCarriers({
+    carriers: [{
+      carrierCode: "CJ_LOGISTICS",
+      carrierName: "CJ대한통운",
+      officialTrackingSupported: true,
+      trackingTemplate: "must-not-survive",
+    }],
+  })).toEqual([{
+    carrierCode: "CJ_LOGISTICS",
+    carrierName: "CJ대한통운",
+    officialTrackingSupported: true,
+  }]);
+
+  expect(hasCanonicalAdminShipmentAllocations(undefined)).toBe(false);
+  expect(hasCanonicalAdminShipmentAllocations([])).toBe(true);
+  expect(hasCanonicalAdminShipmentAllocations([{ shipmentId: "missing" }])).toBe(false);
+  expect(hasCanonicalAdminShipmentAllocations([{ shipmentId: "complete", allocations: [] }])).toBe(true);
+  expect(adminPortalShipmentMutationAllowed(true, "SUPPLIER", 0)).toBe(true);
+  expect(adminPortalShipmentMutationAllowed(true, "COREABLE", 2)).toBe(true);
+  expect(adminPortalShipmentMutationAllowed(true, null, 2)).toBe(false);
+  expect(adminPortalShipmentMutationAllowed(true, "SUPPLIER", null)).toBe(false);
+  expect(parseAdminExpectedVersion("0")).toBe(0);
+  expect(parseAdminExpectedVersion("12")).toBe(12);
+  expect(parseAdminExpectedVersion("")).toBeNull();
+  expect(parseAdminExpectedVersion("-1")).toBeNull();
+  expect(parseAdminExpectedVersion("1.5")).toBeNull();
+});
+
+test("B-104 supplier shipment requests preserve paths, methods, allocations and idempotency", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ path: String(input), init });
+    const body = calls.length === 1
+      ? { carriers: [] }
+      : calls.length === 2 ? { shipments: [], unallocatedItems: [], allocationComplete: false } : {};
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    await listSupplierCarriers();
+    await listSupplierShipments("ORD 104/1");
+    await createSupplierShipment("ORD 104/1", {
+      carrierCode: "CJ_LOGISTICS",
+      trackingNumber: "first",
+    }, "first-command");
+    await createSupplierShipment("ORD 104/1", {
+      carrierCode: "CJ_LOGISTICS",
+      trackingNumber: "split",
+      allocations: [{ orderItemId: "item-1", quantity: 1 }],
+    }, "split-command");
+    await correctSupplierShipment("ORD 104/1", "shipment/1", {
+      expectedVersion: 2,
+      carrierCode: "HANJIN",
+      trackingNumber: "corrected",
+      reason: "오입력 정정",
+    }, "correction-command");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  expect(calls.map((call) => call.path)).toEqual([
+    "/api/supplier/carriers",
+    "/api/supplier/orders/ORD%20104%2F1/shipments",
+    "/api/supplier/orders/ORD%20104%2F1/shipments",
+    "/api/supplier/orders/ORD%20104%2F1/shipments",
+    "/api/supplier/orders/ORD%20104%2F1/shipments/shipment%2F1",
+  ]);
+  expect(calls.map((call) => call.init?.method ?? "GET")).toEqual(["GET", "GET", "POST", "POST", "PATCH"]);
+  expect(JSON.parse(String(calls[2].init?.body))).toEqual({
+    carrierCode: "CJ_LOGISTICS",
+    trackingNumber: "first",
+  });
+  expect(JSON.parse(String(calls[3].init?.body))).toEqual({
+    carrierCode: "CJ_LOGISTICS",
+    trackingNumber: "split",
+    allocations: [{ orderItemId: "item-1", quantity: 1 }],
+  });
+  expect(new Headers(calls[2].init?.headers).get("Idempotency-Key")).toBe("first-command");
+  expect(new Headers(calls[4].init?.headers).get("Idempotency-Key")).toBe("correction-command");
+  for (const call of calls) {
+    expect(call.init?.cache).toBe("no-store");
+    expect(call.init?.credentials).toBe("same-origin");
+  }
+});
+
 test("supplier status and admin portal actions fail closed", () => {
   expect(supplierOrderStatusView("FULFILLMENT_REQUESTED").label).toBe("출고 요청");
+  expect(supplierOrderStatusView("TRACKING_REGISTERED").label).toBe("송장 등록 · 배송조회 가능");
+  expect(orderStatusLabel("TRACKING_REGISTERED")).toBe("송장 등록 · 배송조회 가능");
+  expect(shipmentStatusLabel("TRACKING_REGISTERED")).toBe("송장 등록 · 배송조회 가능");
+  expect(adminStatusLabel("TRACKING_REGISTERED")).toBe("송장 등록 · 배송조회 가능");
+  expect(customerDirectCancelBlocked("TRACKING_REGISTERED")).toBe(true);
+  expect(customerDirectCancelBlocked("SUPPLIER_ORDER_PENDING")).toBe(false);
   expect(supplierOrderStatusView("INTERNAL_UNKNOWN").label).toBe("상태 확인 필요");
 
   const portal = (owner: string) => ({

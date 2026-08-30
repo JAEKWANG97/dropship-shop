@@ -39,6 +39,17 @@
 - [x] V42 fresh/upgrade의 delivery memo 길이, grant/access-log FK·unique·index와 기존 null/backfill 호환을 PostgreSQL에서 검증한다.
 - [x] 전체 API suite, Web lint/build와 공급처 출고 목록·상세 desktop/mobile 계약 Playwright를 검증한다.
 
+### B-104 Supplier Multiple Shipments And Tracking Links
+
+- [x] 첫 송장 전체 기본 할당, 분할·추가 송장 명시 할당, 중복·과할당·타 주문 item 거절과 동일 Order 동시 등록 직렬화를 검증한다.
+- [x] supplier/customer/admin role·tenant·owner 404/403, feature-off 신규 admin 생성 차단과 저장된 동일 creation replay, supplier-owned 기존 송장의 관리자 운영 액션을 검증한다.
+- [x] creation/action key의 actor·action·canonical body 충돌, expected version 필수·빈 값 fail-closed·stale 거절, 불확실한 실패의 동일 key 재시도와 정정·void·재등록 이력 보존을 검증한다.
+- [x] 전체 할당·Shipment별 Coreable 증거 이후만 배송완료, 오완료 재개·시각 정정과 후속 Claim/Refund 차단을 검증한다.
+- [x] 각 등록의 PII cutoff 단축, void/replacement 비연장, `TRACKING_REGISTERED` 취소 경계와 마지막 non-voided 배송완료 Claim 기준을 검증한다.
+- [x] legacy singular customer/admin projection, Domeggook tracking sync·관리자 수동 보정, portal channel 분리와 PostgreSQL UUID 순서의 high-bit batch 잠금을 검증한다.
+- [x] V43 fresh/upgrade, legacy allocation·old-writer commit trigger, partial unique, actor index, cross-order allocation·parent reassignment 차단을 PostgreSQL 17에서 검증한다.
+- [x] Web lint/build와 supplier/customer/admin shipment 계약을 Desktop/Mobile Playwright로 검증한다.
+
 ## Production Read-Only
 
 - [x] 홈페이지·상품 목록·상품 상세·정책·회사·고객문의 접근
@@ -69,4 +80,6 @@
 - [ ] B-103 공급처 상세 동시 접근에서 owner takeover·접근 로그가 유실 또는 중복 상태 전이를 만들지 않는지 확인
 - [ ] B-103 cutoff scheduler 100건 batch와 공급처 주문 목록의 query 수·응답시간 측정
 - [ ] B-103 운영 email retry·retention cleanup batch의 처리량과 재시도 폭주 방지 확인
+- [ ] B-104 실제 PostgreSQL에서 같은 Order의 supplier/admin 송장 등록 경합과 서로 반대 순서의 복수 Order tracking batch deadlock 부재 확인
+- [ ] B-104 다품목·다송장 주문의 supplier/admin 목록 query 수와 lock 대기·응답시간 측정
 - [ ] EC2 메모리·swap·CPU credit·컨테이너 재시작 상태 확인

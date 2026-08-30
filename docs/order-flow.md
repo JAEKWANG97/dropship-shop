@@ -2,7 +2,7 @@
 
 Current payment path: direct bank transfer with manual admin deposit confirmation.
 
-현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주에 더해 `B-100`~`B-103` 공급처 포털 신청·상품·재고·출고 요청 기반을 설명한다. `B-104` 복수 송장과 `B-105` 품절·클레임 사실 흐름은 Planned다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
+현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주에 더해 `B-100`~`B-104` 공급처 포털 신청·상품·재고·출고 요청·복수 송장 흐름을 설명한다. `B-105` 품절·클레임 사실 흐름은 Planned다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
 
 ## Current Legacy/Domeggook Happy Path — Implemented
 
@@ -69,7 +69,7 @@ DS-10 backend implementation notes:
 - Customer APIs return display statuses instead of raw internal order statuses.
 - Order detail includes implemented payment, shipment, fulfillment, and refund summaries.
 
-## Supplier Portal Slice Map — B-100~B-103 Implemented, B-104~B-105 Planned
+## Supplier Portal Slice Map — B-100~B-104 Implemented, B-105 Planned
 
 | Slice | Order-flow impact |
 | --- | --- |
@@ -77,10 +77,10 @@ DS-10 backend implementation notes:
 | `B-101` | 개별 상품 등록, 기본 옵션, 자동 공개/위험상품 검토, Coreable 고객가 계산. 주문 상태 변경 없음 |
 | `B-102` (Implemented) | `TRACKED` 재고, checkout 24시간 예약·만료, 늦은 입금 재확보 |
 | `B-103` (Implemented) | 입금확인 즉시 수락 단계 없는 출고 요청, 주소 잠금, 최소 PII, 이메일 알림 기반 |
-| `B-104` | 복수 Shipment와 수량 allocation, `TRACKING_REGISTERED`, 공식 택배사 링크 |
+| `B-104` (Implemented) | 복수 Shipment와 수량 allocation, `TRACKING_REGISTERED`, 공식 택배사 링크 |
 | `B-105` | 송장 전 배송 그룹 전체 품절 보고, supplier facts, Coreable 환불 경계 |
 
-Implemented B-102 inventory/checkout guard와 B-103 fulfillment/privacy 기반은 supplier portal release의 필요조건이지만 충분조건은 아니다. Planned B-104~B-105와 privacy notice, 실제 operational email, 외부 공급처 계약, production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
+Implemented B-102 inventory/checkout guard, B-103 fulfillment/privacy 기반과 B-104 복수 송장은 supplier portal release의 필요조건이지만 충분조건은 아니다. Planned B-105와 privacy notice, 실제 operational email, B-098 외부 공급처 계약, production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
 
 ### Tracked Checkout And Late Deposit — Implemented (`B-102`)
 
@@ -157,7 +157,7 @@ Supplier opens own order detail
 -> delivery memo is optional, trimmed, limited to 300 characters and stored as null when blank
 -> Hide customer account, payment, bank, refund, other supplier and internal admin data
 -> Read stored monotonic piiAccessCutoffAt initialized to requestedAt +60 days
--> Planned B-104 tracking registration stores min(current cutoff, registeredAt +30 days); void/replacement never extends it
+-> Implemented B-104 tracking registration stores min(current cutoff, registeredAt +30 days); void/replacement never extends it
 -> An OUT_OF_STOCK/CANCELLED/REFUND_REQUESTED/REFUNDED order is TERMINAL_MASKED immediately regardless of non-voided Shipment presence
 -> Contract EXPIRED/REVOKED hands open work to COREABLE and closes detail regardless of an older Claim grant
 -> At cutoff and after (now >= cutoff), one-character name becomes *; longer names become first Unicode code point + fixed **
@@ -172,7 +172,7 @@ After the portal request is visible, customer self-service cancellation and addr
 
 An earlier admin `portal-takeover` requires an idempotency key, request hash and one of `COREABLE_FULFILLMENT_TAKEOVER|SUPPLIER_SUPPORT_REQUIRED|OPERATIONAL_RISK`. Identical replay returns the first result, different payload reuse is rejected, and actor, owner before/after and time remain in append-only command history. Neither scheduler nor admin takeover auto-returns ownership after portal reactivation.
 
-### Portal Tracking And Multiple Shipments — Planned (`B-104`)
+### Portal Tracking And Multiple Shipments — Implemented (`B-104`)
 
 ```text
 Supplier registers carrier code, tracking number and positive item allocations
@@ -180,13 +180,14 @@ Supplier registers carrier code, tracking number and positive item allocations
 -> Cumulative allocation for each item must not exceed ordered quantity
 -> First tracking registration may omit allocation and receive all currently unallocated quantities
 -> Additional tracking registrations require explicit allocation
+-> Select one of CJ_LOGISTICS, LOTTE, HANJIN or KOREA_POST from the server registry
 -> Server generates the official carrier tracking URL
 -> Atomically store piiAccessCutoffAt=min(current cutoff, registeredAt+30 days)
 -> Shipment/order display state: TRACKING_REGISTERED
 -> Tracking registration is not proof of pickup or in-transit delivery
 
 Supplier corrects its own non-delivered Shipment
--> Replace carrier/tracking only with idempotency key, optimistic version guard and required reason
+-> Replace carrier/tracking only with idempotency key, optimistic version guard and required 200-character single-line PII-free reason
 -> Preserve before/after history; do not delete evidence
 -> Allocation error requires Coreable void and a new Shipment registration
 
@@ -201,10 +202,10 @@ Coreable continues handed-over SUPPLIER_PORTAL work
 -> Keep channel SUPPLIER_PORTAL and owner COREABLE; COREABLE_MANUAL fallback remains on the legacy admin path
 
 Coreable verifies delivery on the official carrier page
--> Record evidenceObservedAt, reason and ADMIN actor for that Shipment
+-> Record evidenceObservedAt, 200-character single-line PII-free reason and ADMIN actor for that Shipment
 -> Recalculate the Order aggregate
 
-Coreable discovers its planned manual delivery completion was wrong
+Coreable discovers its manual delivery completion was wrong
 -> Require idempotency key, expected version and reason
 -> Allow REOPEN_TRACKING or CORRECT_DELIVERED_AT only before any later Claim/Refund exists
 -> Preserve original delivery evidence; return 409 and use incident/claim handling when a dependency exists
@@ -420,7 +421,7 @@ Order status: SUPPLIER_ORDER_PENDING
 -> Address correction requires customer support before supplier work starts
 -> If admin started supplier order work and addressLockedAt is set, correction is no longer accepted
 
-Planned SUPPLIER_PORTAL order after deposit confirmation
+Implemented SUPPLIER_PORTAL order after deposit confirmation
 -> Fulfillment request and addressLockedAt are created together
 -> Supplier can immediately read the minimum delivery address
 -> Customer self-service address change is not allowed
@@ -572,13 +573,13 @@ Admin detects wrong operational state or shipment information
 - Seller-fault return/exchange shipping cost is borne by the seller/operator by default.
 - `OUT_OF_STOCK` must lead to customer notification and refund handling.
 - Existing legacy `SHIPPED` requires carrier and tracking number.
-- Planned portal tracking registration creates one or more allocated Shipments and uses `TRACKING_REGISTERED`; it is not evidence that the carrier has picked up the parcel.
+- Implemented portal tracking registration creates one or more allocated Shipments and uses `TRACKING_REGISTERED`; it is not evidence that the carrier has picked up the parcel.
 - `DELIVERED` requires a shipment record plus delivered tracking or admin correction evidence. A portal claim's delivery basis is the maximum deliveredAt among non-voided Shipments.
 - Current Domeggook flow includes automatic carrier tracking sync after carrier and tracking number are entered.
 - Automatic tracking sync failure must not block order, payment, or refund operations.
 - Current legacy/Domeggook flow uses one shipment per order and excludes partial shipment or split shipment.
-- Planned portal orders allow multiple Shipments with positive item allocations; cumulative allocation cannot exceed each ordered quantity.
-- Planned portal MVP does not call a live carrier-status API. The server generates an official carrier tracking link; suppliers may correct non-delivered records, while Coreable alone may void a pre-delivery record or record per-Shipment delivery evidence and recalculate the Order aggregate.
+- Implemented portal orders allow multiple Shipments with positive item allocations; cumulative allocation cannot exceed each ordered quantity.
+- The implemented portal does not call a live carrier-status API. The server generates an official carrier tracking link for the four supported carriers; suppliers may correct non-delivered records, while Coreable alone may void a pre-delivery record or record per-Shipment delivery evidence and recalculate the Order aggregate.
 - Automatic tracking sync can move shipment state forward, but must not overwrite admin manual correction or move shipment state backward.
 - `REFUNDED` requires a completed refund record.
 - Orders can move to `REFUNDED` only after an administrator records actual manual bank-transfer completion.

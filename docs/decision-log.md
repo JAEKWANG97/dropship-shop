@@ -6,9 +6,9 @@
 - 고객 결제의 현재 기준은 `2026-07-17: Direct Bank Transfer Only, No Toss Payments`와 `2026-07-18: Remove Unused Toss Payments Execution Paths`다. 이전 Toss/PG 항목은 역사 기록이다.
 - 상품 가격의 현재 기준은 `2026-07-28: Supplier Shipping Is Excluded From Product Markup`이다. 공급처 배송비는 수집 가능성 검증에는 사용하지만 판매가 계산에는 더하지 않는다.
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
-- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`과 `2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data`다. `B-100` 신청·인증, `B-101` 개별 상품·검토, `B-102` 옵션 재고·예약·입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반은 구현됐고 `B-104` 복수 송장과 `B-105` 품절·클레임 사실은 Planned다.
+- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`, `2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data`, `2026-08-30: Portal Multiple Shipments Preserve Legacy Compatibility`다. `B-100` 신청·인증, `B-101` 개별 상품·검토, `B-102` 옵션 재고·예약·입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반과 `B-104` 복수 송장은 구현됐고 `B-105` 품절·클레임 사실은 Planned다.
 - 계좌입금 금액 불일치의 현재 기준도 같은 2026-08-29 결정과 구현된 B-102다. 식별된 양수 실제 수령액을 메모-only `PAYMENT_PENDING`으로 두지 않고 결제그룹 단위 전액 환불 예외로 처리한다. B-068의 과거 메모는 읽기 호환으로 남기며 어느 PaymentGroup인지 식별하지 못한 은행 거래는 주문을 추측해 변경하지 않는다.
-- Planned 포털 송장 등록은 실제 배송 시작과 다르다. 공식 택배사 조회 링크만 제공하고, 기존 Domeggook 배송 동기화와 관리자 수동 보정은 호환 경로로 유지한다.
+- Implemented 포털 송장 등록은 실제 배송 시작과 다르다. 고객에게 `송장 등록 · 배송조회 가능`과 공식 택배사 조회 링크만 제공하고, 기존 Domeggook 배송 동기화와 관리자 수동 보정은 호환 경로로 유지한다.
 - 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Implemented`/`Planned` 절을 함께 맞춘다.
 
 ## 2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data
@@ -24,11 +24,30 @@ Operational email 기반은 신규 출고 요청, 관리자 상품 검토 결과
 Consequences:
 
 - B-103은 initial `requestedAt+60일` cutoff 저장, cutoff scheduler/lazy takeover, terminal masking, 관리자 takeover, append-only Claim grant와 최소 접근 로그를 구현한다.
-- 송장 등록마다 `min(current, registeredAt+30일)`로 cutoff를 단축하는 실제 호출과 void/replacement 비연장은 Shipment를 만드는 `B-104`가 구현·검증한다. B-103은 아직 송장을 만들거나 택배사 링크를 제공하지 않는다.
+- B-103 자체는 송장을 만들거나 택배사 링크를 제공하지 않는다. 현재 Implemented B-104가 송장 등록마다 `min(current, registeredAt+30일)`로 cutoff를 단축하고 void/replacement가 늘리지 않게 한다.
 - B-105 claim-task/fact를 만들기 전에도 관리자 Claim grant API는 존재하지만, grant는 허용된 진행 Claim 상태와 time-valid contract 안에서 상세 read-only FULL만 열고 공급처 출고 권한이나 Claim 판단 권한을 주지 않는다.
 - Append-only 인계·PII grant 이력에는 자유문을 저장하지 않는다. 관리자 takeover는 `COREABLE_FULFILLMENT_TAKEOVER|SUPPLIER_SUPPORT_REQUIRED|OPERATIONAL_RISK`, grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED`만 허용한다.
 - 운영 이메일은 발송·retry마다 verified current email, active portal/manager와 time-valid contract를 재검증하며 불일치는 `SKIPPED`다. Invite는 generic retry 대상이 아니고 supplier operational `FAILED`만 생성+7일까지 retry하며 terminal recipient/failure material은 정해진 기한 뒤 정리한다.
-- 실제 SES 도착 검증, 외부 공급처·택배사 제3자 제공 개인정보처리방침의 새 시행 버전, B-098 계약 증적/관계 종료 cleanup과 B-104/B-105가 남아 있으므로 production supplier portal flag는 기본 `off`를 유지한다.
+- 실제 SES 도착 검증, 외부 공급처·택배사 제3자 제공 개인정보처리방침의 새 시행 버전, B-098 계약 증적/관계 종료 cleanup과 B-105가 남아 있으므로 production `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다. B-104 구현만으로 활성화하지 않는다.
+
+## 2026-08-30: Portal Multiple Shipments Preserve Legacy Compatibility
+
+Decision:
+
+`B-104`는 `SUPPLIER_PORTAL` 주문에만 복수 Shipment와 주문 항목별 양수 수량 할당을 구현한다. 첫 송장은 allocation 생략 시 남은 전체 수량을 배정하고, 추가 송장은 명시적 allocation을 요구한다. 송장 등록은 `TRACKING_REGISTERED`이며 실제 집하·배송중 증거가 아니다. 고객 표시는 정확히 `송장 등록 · 배송조회 가능`으로 한다.
+
+서버 carrier registry는 `CJ_LOGISTICS`(CJ대한통운), `LOTTE`(롯데택배), `HANJIN`(한진택배), `KOREA_POST`(우체국택배) 네 개만 제공하고 공식 조회 URL을 서버에서 만든다. live carrier-status API는 호출하지 않는다. 공급처와 관리자의 택배사·송장 정정 사유 및 관리자의 void·배송완료·배송완료 정정 사유는 모두 200자 이하 single-line PII-free 문구다.
+
+Supplier는 자기 owner 주문에 송장을 등록·정정하고, Coreable은 인계된 portal 주문에 같은 allocation service로 송장을 만들며 정정·void·배송완료·제한된 배송완료 오보정을 수행한다. 실제 read/action surface는 supplier/customer plural Shipment API와 `GET /api/admin/carriers`, `GET|POST /api/admin/orders/{orderId}/portal-shipments`, versioned admin Shipment actions다.
+
+Consequences:
+
+- V43은 기존 expand-contract 원칙 아래 plural Shipment, immutable allocation과 append-only change history를 구현한다.
+- 고객/admin 주문 상세에는 canonical `shipments[]`, allocation 완료 여부와 singular compatibility truncation 표시를 추가한다. 기존 singular row projection은 가장 이른 non-voided row를 고르고, row가 없을 때 customer READY placeholder와 admin null을 유지한다.
+- VOIDED row와 allocation/history는 감사 증적으로 보존하며 유효 할당 합계에서만 제외한다. 모든 수량이 non-voided Shipment에 할당되고 각각 Coreable 배송 증적을 가져야 Order가 `DELIVERED`다.
+- 기존 Coreable/Domeggook 단일 Shipment 생성·tracking sync·manual correction은 유지하지만 `SUPPLIER_PORTAL` channel을 거절한다.
+- Production flag가 꺼진 동안 새 admin portal-Shipment 생성은 저장된 동일 idempotency replay를 먼저 허용한 뒤 `409`로 막고, 기존 Shipment 조회·정정·void·배송 증적 보정은 안전 운영 경로로 남긴다.
+- B-105 품절/클레임 사실, B-098 계약, privacy/live-email 검증이 남아 있으므로 production feature flag는 계속 닫는다.
 
 ## 2026-08-30: Supplier Product Auto Review Reuses The Approved Category Policy
 

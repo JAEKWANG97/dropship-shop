@@ -2,14 +2,19 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  adminPortalShipmentMutationAllowed,
   adminStatusLabel,
   adminPortalFulfillmentAction,
   adminRefundProjection,
+  getAdminCarriers,
   getAdminOrder,
   getAdminOrderActions,
   getAdminOrders,
+  hasCanonicalAdminShipmentAllocations,
+  type AdminCarrier,
   type AdminOrder,
   type AdminOrderActionHistory,
+  type AdminPortalShipment,
 } from "@/lib/admin";
 import { adminRefundNextAction, retryCommandKey, type RetryCommand } from "@/lib/admin-payment";
 import { formatPrice } from "@/lib/catalog";
@@ -27,11 +32,15 @@ import {
   approveRefund,
   cancelUnpaidDeposit,
   cancelSupplierPurchase,
+  completePortalShipmentDelivery,
   completeManualRefund,
   completeSupplierOrder,
   confirmDeposit,
   correctShipmentDelivered,
+  correctPortalShipmentDelivery,
+  correctPortalShipmentTracking,
   createOrderShipment,
+  createPortalShipment,
   markOrderOutOfStock,
   recordDepositMismatch,
   recordLateDeposit,
@@ -44,6 +53,7 @@ import {
   takeOverPortalFulfillment,
   retrySupplierPurchase,
   validateSupplierPurchase,
+  voidPortalShipment,
 } from "./actions";
 
 type AdminOrdersPageProps = {
@@ -74,9 +84,17 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
   const totalPages = data.error ? 0 : data.orders.totalPages;
   const selectedOrderId = params.orderId ?? orders[0]?.orderId;
   const selectedSummary = orders.find((order) => order.orderId === selectedOrderId) ?? orders[0];
-  const [detail, actionHistory] = selectedOrderId
-    ? await Promise.all([loadOrderDetail(selectedOrderId), loadOrderActions(selectedOrderId)])
-    : [{ error: false as const, order: null }, { error: false as const, actions: [] }];
+  const [detail, actionHistory, carrierState] = selectedOrderId
+    ? await Promise.all([
+        loadOrderDetail(selectedOrderId),
+        loadOrderActions(selectedOrderId),
+        loadAdminCarriers(),
+      ])
+    : [
+        { error: false as const, order: null },
+        { error: false as const, actions: [] },
+        { error: false as const, carriers: [] as AdminCarrier[] },
+      ];
   const selectedOrder = mergeOrderDetail(selectedSummary, detail.order);
 
   return (
@@ -113,6 +131,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
             <option value="CANCELLED">취소완료</option>
             <option value="SUPPLIER_ORDER_PENDING">발주대기</option>
             <option value="SUPPLIER_ORDERED">발주완료</option>
+            <option value="TRACKING_REGISTERED">송장 등록 · 배송조회 가능</option>
             <option value="SHIPPED">배송중</option>
             <option value="REFUND_REQUESTED">환불요청</option>
             <option value="REFUNDED">환불완료</option>
@@ -207,7 +226,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               <h3>주문 상품</h3>
               <div className="admin-list">
                 {(selectedOrder.items ?? []).map((item) => (
-                  <div key={`${item.productName}-${item.optionName}`}>
+                  <div key={item.orderItemId ?? `${item.productName}-${item.optionName}`}>
                     <strong>{item.productName}</strong>
                     <span>
                       {item.optionName} / {item.quantity}개
@@ -218,7 +237,14 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               </div>
               <h3>배송 정보</h3>
               <p>{shippingAddressText(selectedOrder.shippingAddress)}</p>
-              {!detail.error ? <ShipmentPanel order={selectedOrder} /> : null}
+              {!detail.error ? (
+                <ShipmentPanel
+                  carrierError={carrierState.error}
+                  carriers={carrierState.carriers}
+                  order={selectedOrder}
+                  retry={{ action: params.retryAction, key: params.idempotencyKey }}
+                />
+              ) : null}
               <h3>결제 정보</h3>
               <div className="summary-list compact">
                 <div>
@@ -240,7 +266,11 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                 </div>
                 <div>
                   <span>배송</span>
-                  <strong>{selectedOrder.shipment ? shipmentStatusLabel(selectedOrder.shipment.status) : "없음"}</strong>
+                  <strong>
+                    {selectedOrder.fulfillment?.channel === "SUPPLIER_PORTAL"
+                      ? adminStatusLabel(selectedOrder.status)
+                      : selectedOrder.shipment ? shipmentStatusLabel(selectedOrder.shipment.status) : "없음"}
+                  </strong>
                 </div>
                 <div>
                   <span>환불</span>
@@ -301,6 +331,14 @@ async function loadOrderActions(orderId: string) {
     return { error: false as const, actions: await getAdminOrderActions(orderId) };
   } catch {
     return { error: true as const, actions: [] as AdminOrderActionHistory[] };
+  }
+}
+
+async function loadAdminCarriers() {
+  try {
+    return { error: false as const, carriers: await getAdminCarriers() };
+  } catch {
+    return { error: true as const, carriers: [] as AdminCarrier[] };
   }
 }
 
@@ -486,7 +524,32 @@ function adminActionLabel(actionType: string) {
   );
 }
 
-function ShipmentPanel({ order }: { order: AdminOrder }) {
+function ShipmentPanel({
+  carrierError,
+  carriers,
+  order,
+  retry,
+}: {
+  carrierError: boolean;
+  carriers: AdminCarrier[];
+  order: AdminOrder;
+  retry: RetryCommand;
+}) {
+  if (order.fulfillment?.channel === "SUPPLIER_PORTAL") {
+    return (
+      <PortalShipmentPanel
+        carrierError={carrierError}
+        carriers={carriers}
+        order={order}
+        retry={retry}
+      />
+    );
+  }
+
+  return <LegacyShipmentPanel order={order} />;
+}
+
+function LegacyShipmentPanel({ order }: { order: AdminOrder }) {
   const shipment = order.shipment;
   if (!shipment) {
     return (
@@ -559,6 +622,360 @@ function ShipmentPanel({ order }: { order: AdminOrder }) {
       ) : null}
     </div>
   );
+}
+
+function PortalShipmentPanel({
+  carrierError,
+  carriers,
+  order,
+  retry,
+}: {
+  carrierError: boolean;
+  carriers: AdminCarrier[];
+  order: AdminOrder;
+  retry: RetryCommand;
+}) {
+  const canonicalAvailable = Array.isArray(order.shipments);
+  const shipments = canonicalAvailable ? order.shipments ?? [] : [];
+  const allocationContractAvailable = hasCanonicalAdminShipmentAllocations(order.shipments);
+  const carrierMutationAvailable = !carrierError && carriers.length > 0;
+  const remainingItems = allocationContractAvailable ? portalRemainingItems(order, shipments) : [];
+  const coreableOwned = order.fulfillment?.operationalOwner === "COREABLE";
+  const canCreate = canonicalAvailable
+    && allocationContractAvailable
+    && carrierMutationAvailable
+    && coreableOwned
+    && ["SUPPLIER_ORDER_PENDING", "TRACKING_REGISTERED"].includes(order.status)
+    && remainingItems.length > 0;
+  const requiresAllocation = shipments.length > 0;
+
+  return (
+    <section className="admin-shipment-panel admin-portal-shipment-panel">
+      <div className="admin-panel-head">
+        <strong>공급처 포털 복수 송장</strong>
+        <span>{shipments.filter((shipment) => shipment.status !== "VOIDED").length}건 유효</span>
+      </div>
+
+      {!canonicalAvailable ? (
+        <div className="notice danger">
+          <strong>복수 송장 정보를 확인할 수 없습니다</strong>
+          <span>기존 단일 송장 처리 대신 API 응답을 확인한 뒤 다시 시도하세요.</span>
+        </div>
+      ) : null}
+
+      {canonicalAvailable && !allocationContractAvailable ? (
+        <div className="notice danger">
+          <strong>송장 할당 정보를 확인할 수 없습니다</strong>
+          <span>과할당을 막기 위해 송장 처리를 잠시 사용할 수 없습니다.</span>
+        </div>
+      ) : null}
+
+      {coreableOwned && !carrierMutationAvailable ? (
+        <div className="notice danger">
+          <strong>택배사 목록을 확인할 수 없습니다</strong>
+          <span>송장 등록과 택배사·송장 정정은 목록을 다시 불러온 뒤 사용할 수 있습니다.</span>
+        </div>
+      ) : null}
+
+      <div className="admin-portal-shipment-list">
+        {shipments.map((shipment) => (
+          <PortalShipmentCard
+            allocationContractAvailable={allocationContractAvailable}
+            carrierMutationAvailable={carrierMutationAvailable}
+            carriers={carriers}
+            key={shipment.shipmentId}
+            order={order}
+            retry={retry}
+            shipment={shipment}
+          />
+        ))}
+        {canonicalAvailable && shipments.length === 0 ? (
+          <div className="admin-empty compact">
+            <strong>등록된 포털 송장이 없습니다</strong>
+            <span>Coreable 담당 주문이면 아래에서 첫 송장을 등록할 수 있습니다.</span>
+          </div>
+        ) : null}
+      </div>
+
+      {canCreate ? (
+        <form action={createPortalShipment} className="admin-inline-form">
+          <input name="orderId" type="hidden" value={order.orderId} />
+          <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, "portal-shipment-create")} />
+          <AdminCarrierSelect carriers={carriers} />
+          <label>
+            송장번호
+            <input maxLength={100} name="trackingNumber" required />
+          </label>
+          {requiresAllocation ? (
+            <div className="admin-shipment-allocations wide">
+              <strong>추가 송장 할당 수량</strong>
+              <span className="field-help">한 개 이상의 남은 상품 수량을 입력해야 합니다.</span>
+              {remainingItems.map((item) => (
+                <label key={item.orderItemId}>
+                  {item.productName} / {item.optionName} (남음 {item.remainingQuantity}개)
+                  <input
+                    max={item.remainingQuantity}
+                    min="0"
+                    name={`allocation:${item.orderItemId}`}
+                    step="1"
+                    type="number"
+                  />
+                </label>
+              ))}
+            </div>
+          ) : (
+            <span className="field-help wide">첫 송장은 남은 전체 상품 수량을 자동 할당합니다.</span>
+          )}
+          <button className="button primary" type="submit">
+            {requiresAllocation ? "추가 송장 등록" : "첫 송장 등록"}
+          </button>
+        </form>
+      ) : null}
+
+      {canonicalAvailable && !coreableOwned ? (
+        <div className="notice">
+          <strong>현재 공급처 담당 주문입니다</strong>
+          <span>Coreable 인계 후에만 관리자 송장 처리를 사용할 수 있습니다.</span>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function PortalShipmentCard({
+  allocationContractAvailable,
+  carrierMutationAvailable,
+  carriers,
+  order,
+  retry,
+  shipment,
+}: {
+  allocationContractAvailable: boolean;
+  carrierMutationAvailable: boolean;
+  carriers: AdminCarrier[];
+  order: AdminOrder;
+  retry: RetryCommand;
+  shipment: AdminPortalShipment;
+}) {
+  const allocations = shipment.allocations ?? [];
+  const histories = shipment.histories ?? [];
+  const status = shipment.status ?? "";
+  const officialTrackingUrl = officialShipmentHref(shipment.officialTrackingUrl ?? null);
+  const canMutate = adminPortalShipmentMutationAllowed(
+    allocationContractAvailable,
+    order.fulfillment?.operationalOwner,
+    shipment.version,
+  );
+
+  return (
+    <article className={`admin-portal-shipment-card${status === "VOIDED" ? " voided" : ""}`}>
+      <div className="admin-panel-head">
+        <strong>{shipment.carrierName || shipment.carrierCode || "택배사 확인 필요"} · {shipment.trackingNumber || "송장번호 확인 필요"}</strong>
+        <span className={`admin-badge ${status === "DELIVERED" ? "success" : "neutral"}`}>
+          {portalShipmentStatusLabel(status)}
+        </span>
+      </div>
+      <div className="summary-list compact">
+        <SummaryItem label="등록시각" value={formatDateTime(shipment.registeredAt)} />
+        <SummaryItem label="배송완료시각" value={formatDateTime(shipment.deliveredAt)} />
+        <SummaryItem label="버전" value={shipment.version == null ? "-" : String(shipment.version)} />
+      </div>
+      {allocations.length > 0 ? (
+        <ul className="admin-shipment-allocation-list">
+          {allocations.map((allocation) => {
+            const item = order.items?.find((candidate) => candidate.orderItemId === allocation.orderItemId);
+            return <li key={allocation.orderItemId}>{item?.productName ?? "주문 상품"} {allocation.quantity}개</li>;
+          })}
+        </ul>
+      ) : null}
+      {officialTrackingUrl ? (
+        <a className="button" href={officialTrackingUrl} rel="noreferrer" target="_blank">공식 배송조회</a>
+      ) : (
+        <span>공식 배송조회 링크 없음</span>
+      )}
+      {histories.length > 0 ? (
+        <details>
+          <summary>정정 이력 {histories.length}건</summary>
+          <div className="admin-list compact">
+            {histories.map((history) => (
+              <div key={history.historyId}>
+                <strong>{portalShipmentHistoryLabel(history.action)}</strong>
+                <span>{history.reason}</span>
+                <span>{formatDateTime(history.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {status === "VOIDED" ? (
+        <div className="notice"><strong>무효 처리된 송장입니다</strong><span>감사 이력으로만 보이며 수정할 수 없습니다.</span></div>
+      ) : null}
+
+      {canMutate && status === "TRACKING_REGISTERED" ? (
+        <div className="admin-order-actions">
+          {carrierMutationAvailable ? (
+            <form action={correctPortalShipmentTracking} className="admin-inline-form">
+              <PortalShipmentCommandFields action={`portal-shipment-tracking-${shipment.shipmentId}`} order={order} retry={retry} shipment={shipment} />
+              <AdminCarrierSelect carriers={carriers} defaultValue={shipment.carrierCode ?? ""} />
+              <label>
+                송장번호
+                <input defaultValue={shipment.trackingNumber ?? ""} maxLength={100} name="trackingNumber" required />
+              </label>
+              <label className="wide">
+                정정 사유
+                <input maxLength={200} name="reason" required placeholder="예: 공식 택배사 페이지에서 번호 재확인" />
+              </label>
+              <button className="button" type="submit">택배사·송장 정정</button>
+            </form>
+          ) : null}
+
+          <form action={voidPortalShipment} className="admin-inline-form">
+            <PortalShipmentCommandFields action={`portal-shipment-void-${shipment.shipmentId}`} order={order} retry={retry} shipment={shipment} />
+            <label className="wide">
+              무효 사유
+              <input maxLength={200} name="reason" required placeholder="예: 중복 등록" />
+            </label>
+            <button className="button" type="submit">송장 무효 처리</button>
+          </form>
+
+          <form action={completePortalShipmentDelivery} className="admin-inline-form">
+            <PortalShipmentCommandFields action={`portal-shipment-delivery-${shipment.shipmentId}`} order={order} retry={retry} shipment={shipment} />
+            <label>
+              실제 배송완료 시각
+              <input name="deliveredAt" required step="60" type="datetime-local" />
+            </label>
+            <label>
+              증적 확인 시각
+              <input name="evidenceObservedAt" required step="60" type="datetime-local" />
+            </label>
+            <label className="wide">
+              확인 사유
+              <input maxLength={200} name="reason" required placeholder="예: 공식 택배사 페이지에서 배송완료 확인" />
+            </label>
+            <button className="button primary" type="submit">배송완료 반영</button>
+          </form>
+        </div>
+      ) : null}
+
+      {canMutate && status === "DELIVERED" ? (
+        <div className="admin-order-actions">
+          <form action={correctPortalShipmentDelivery} className="admin-inline-form">
+            <PortalShipmentCommandFields action={`portal-shipment-reopen-${shipment.shipmentId}`} order={order} retry={retry} shipment={shipment} />
+            <input name="correctionType" type="hidden" value="REOPEN_TRACKING" />
+            <label className="wide">
+              되돌림 사유
+              <input maxLength={200} name="reason" required placeholder="예: 다른 송장의 배송완료를 잘못 반영" />
+            </label>
+            <button className="button" type="submit">배송조회 상태로 되돌리기</button>
+          </form>
+
+          <form action={correctPortalShipmentDelivery} className="admin-inline-form">
+            <PortalShipmentCommandFields action={`portal-shipment-delivery-time-${shipment.shipmentId}`} order={order} retry={retry} shipment={shipment} />
+            <input name="correctionType" type="hidden" value="CORRECT_DELIVERED_AT" />
+            <label>
+              정정 배송완료 시각
+              <input name="correctedDeliveredAt" required step="60" type="datetime-local" />
+            </label>
+            <label>
+              증적 확인 시각
+              <input name="evidenceObservedAt" required step="60" type="datetime-local" />
+            </label>
+            <label className="wide">
+              정정 사유
+              <input maxLength={200} name="reason" required placeholder="예: 공식 배송완료 시각 재확인" />
+            </label>
+            <button className="button" type="submit">배송완료 시각 정정</button>
+          </form>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function PortalShipmentCommandFields({
+  action,
+  order,
+  retry,
+  shipment,
+}: {
+  action: string;
+  order: AdminOrder;
+  retry: RetryCommand;
+  shipment: AdminPortalShipment;
+}) {
+  return (
+    <>
+      <input name="orderId" type="hidden" value={order.orderId} />
+      <input name="shipmentId" type="hidden" value={shipment.shipmentId} />
+      <input name="expectedVersion" type="hidden" value={shipment.version} />
+      <input name="idempotencyKey" type="hidden" value={stableCommandKey(retry, action)} />
+    </>
+  );
+}
+
+function AdminCarrierSelect({
+  carriers,
+  defaultValue = "",
+}: {
+  carriers: AdminCarrier[];
+  defaultValue?: string;
+}) {
+  return (
+    <label>
+      택배사
+      <select defaultValue={defaultValue} name="carrierCode" required>
+        <option disabled value="">택배사를 선택하세요</option>
+        {carriers.map((carrier) => (
+          <option key={carrier.carrierCode} value={carrier.carrierCode}>
+            {carrier.carrierName}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function portalRemainingItems(order: AdminOrder, shipments: AdminPortalShipment[]) {
+  const allocated = new Map<string, number>();
+  for (const shipment of shipments) {
+    if (shipment.status === "VOIDED" || shipment.countsTowardAllocation === false) continue;
+    for (const allocation of shipment.allocations ?? []) {
+      allocated.set(allocation.orderItemId, (allocated.get(allocation.orderItemId) ?? 0) + allocation.quantity);
+    }
+  }
+  return (order.items ?? []).flatMap((item) => {
+    if (!item.orderItemId) return [];
+    const remainingQuantity = Math.max(0, item.quantity - (allocated.get(item.orderItemId) ?? 0));
+    return remainingQuantity > 0 ? [{ ...item, orderItemId: item.orderItemId, remainingQuantity }] : [];
+  });
+}
+
+function portalShipmentStatusLabel(status: string) {
+  return status ? shipmentStatusLabel(status) : "상태 확인 필요";
+}
+
+function portalShipmentHistoryLabel(action: string) {
+  return ({
+    SUPPLIER_CORRECTED: "공급처 택배사·송장 정정",
+    ADMIN_CORRECTED: "택배사·송장 정정",
+    ADMIN_VOIDED: "송장 무효 처리",
+    ADMIN_TRACKING_CORRECTED: "택배사·송장 정정",
+    ADMIN_SHIPMENT_VOIDED: "송장 무효 처리",
+    ADMIN_DELIVERY_COMPLETED: "배송완료 반영",
+    ADMIN_DELIVERY_REOPENED: "배송조회 상태로 되돌림",
+    ADMIN_DELIVERED_AT_CORRECTED: "배송완료 시각 정정",
+  }[action] ?? action);
+}
+
+function officialShipmentHref(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function ClaimPanel({ order }: { order: AdminOrder }) {
@@ -665,7 +1082,7 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatDateTime(value: string | null) {
+function formatDateTime(value?: string | null) {
   if (!value) {
     return "-";
   }
@@ -768,7 +1185,7 @@ function AdminOrderActions({ order, retry }: { order: AdminOrder; retry: RetryCo
     return (
       <div className="notice">
         <strong>Coreable 처리로 인계된 포털 주문입니다</strong>
-        <span>기존 수동 발주 액션은 사용할 수 없습니다. 송장 처리는 복수 송장 기능에서 이어집니다.</span>
+        <span>기존 수동 발주 액션은 사용할 수 없습니다. 위 배송 정보에서 송장을 처리하세요.</span>
       </div>
     );
   }

@@ -1,0 +1,10 @@
+package com.dropshipshop.api.shipment.domain;
+
+public enum ShipmentChangeAction {
+	SUPPLIER_CORRECTED,
+	ADMIN_CORRECTED,
+	ADMIN_VOIDED,
+	ADMIN_DELIVERY_COMPLETED,
+	ADMIN_DELIVERY_REOPENED,
+	ADMIN_DELIVERED_AT_CORRECTED
+}

@@ -17,6 +17,15 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
 	List<OrderItem> findAllByOrder_IdOrderByCreatedAtAsc(UUID orderId);
 
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select item
+		from OrderItem item
+		where item.order.id = :orderId
+		order by item.id
+		""")
+	List<OrderItem> findAllByOrderIdForUpdate(@Param("orderId") UUID orderId);
+
 	long countByOrder_Id(UUID orderId);
 
 	boolean existsByProductOption_IdAndOrder_Status(UUID productOptionId, OrderStatus orderStatus);

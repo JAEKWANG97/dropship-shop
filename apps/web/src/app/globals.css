@@ -3155,6 +3155,63 @@ body:has(.admin-shell) > .page-shell {
   gap: 12px;
 }
 
+.customer-shipment-list,
+.supplier-shipment-list,
+.admin-portal-shipment-list {
+  display: grid;
+  gap: 12px;
+}
+
+.customer-shipment-card,
+.supplier-shipment-card,
+.admin-portal-shipment-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.customer-shipment-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.customer-shipment-card ul,
+.admin-shipment-allocation-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.customer-shipment-card .button,
+.supplier-shipment-card .button,
+.admin-portal-shipment-card > .button {
+  width: fit-content;
+}
+
+.admin-portal-shipment-card.voided {
+  background: var(--surface-soft);
+}
+
+.admin-portal-shipment-card details {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-portal-shipment-card summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.supplier-shipment-allocations,
+.admin-shipment-allocations {
+  display: grid;
+  gap: 10px;
+}
+
 .admin-order-detail h3 {
   margin: 8px 0 0;
   font-size: 16px;

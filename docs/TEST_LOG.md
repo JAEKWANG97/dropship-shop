@@ -2,6 +2,19 @@
 
 실행한 검증만 기록한다. 실제 외부 서비스 검증은 자동 테스트 결과와 합치지 않는다.
 
+## 2026-08-30 B-104 Supplier Multiple Shipments And Tracking Links
+
+- 판정: 구현·문서 동기화와 독립 backend/migration/test/Web 검토를 완료해 `Review Ready`다. 검토에서 발견한 DB parent reassignment, PostgreSQL UUID 잠금 정렬, Web stale 개인정보·행동 권한과 관리자 version fail-open 위험까지 보강했으며 최종 blocker와 major는 0건이다.
+- API 전체: `cd apps/api && ./gradlew cleanTest test --no-daemon` → `82 suites / 367 tests / 0 failures / 0 errors / 0 skipped`.
+- Portal API: `PortalShipmentApiIntegrationTest` `11 passed`. 기본·분할 할당, 중복·과할당·타 주문 item, H2 동일 Order 동시 등록 1건 성공/1건 `409`, actor-safe replay, owner takeover, expected version, cutoff, void/replacement, 배송완료·재개·후속 Refund 차단을 확인했다. Coreable 관리자 생성의 기본 전체 할당·ADMIN 이력, flag-off stored replay·기존 정정·신규 생성 차단, stale version 무변경과 활성 2건/void 1건의 customer/admin/legacy projection도 확인했다.
+- PostgreSQL: 전체 suite의 `PostgresMigrationSmokeTest` `12 passed`. V43 legacy backfill, V42-shaped old writer의 commit-time allocation, legacy partial unique, portal key unique, cross-order allocation과 Shipment/OrderItem parent reassignment trigger, preflight 실패를 PostgreSQL 17 Testcontainers에서 확인했다.
+- Web 정적 검증: `npm run lint` → `0 errors / 기존 <img> warnings 3`; `npm run build` → 30 pages production build PASS.
+- Web 계약: `supplier-fulfillment-contract.spec.ts` Desktop/Mobile `26 passed`. carrier·shipment fail-closed normalizer, supplier/admin 누락·비정상 version의 정정 차단, 공급처·Coreable owner의 관리자 기존 송장 액션, `403/404/409` refresh, 부분 refresh의 최신 MASKED 주문 보존·stale 송장 행동 제거, 불확실한 실패의 idempotency key 재사용과 확정적 거절 뒤 교체, supplier/admin request method·path·allocation과 고객 직접취소 차단 계약을 확인했다. 실제 로그인 session과 live API를 포함한 end-to-end 증거는 아니다.
+- 공식 링크 확인: registry의 CJ대한통운·롯데·한진·우체국 공식 URL 템플릿은 임의 송장번호로 HTTP 200 응답을 확인했다. 실제 배송건 조회 결과나 실시간 상태 정확성을 검증한 것은 아니다.
+- 정적 품질: `git diff --check`, Markdown fence parity와 B-104 Implemented/production flag-off 문서 대조를 통과했다.
+- 미실행·잔여: 실제 PostgreSQL application-level supplier/admin 동일 Order 경합과 다중 Order 반대 순서 batch 부하, 실제 supplier/admin 로그인 live E2E, 실제 택배 배송건 조회는 검증하지 않았다.
+- 운영 경계: 배포, 운영 데이터, 실제 송장과 production flag를 변경하지 않았다. `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지하며 B-105·B-098·개인정보 고지·실 email gate 전에는 외부 포털을 열지 않는다.
+
 ## 2026-08-30 B-103 Supplier Fulfillment And Minimum PII
 
 - 판정: 로컬 구현·문서 동기화와 독립 backend/test/Web 검토를 완료해 `Review Ready`다. 최종 구현 검토에서 P0/P1/P2 finding은 0건이며 production 공급처 포털은 계속 비활성이다.

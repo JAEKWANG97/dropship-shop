@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.common.error.ApiErrorCode;
 import com.dropshipshop.api.common.error.ApiErrorException;
+import com.dropshipshop.api.checkout.CheckoutLockService;
 
 import com.dropshipshop.api.claim.repository.ClaimRepository;
 import com.dropshipshop.api.order.domain.CustomerOrder;
@@ -32,7 +33,6 @@ import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentProvider;
 import com.dropshipshop.api.payment.repository.PaymentEventRepository;
 import com.dropshipshop.api.payment.repository.PaymentRepository;
-import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.refund.domain.Refund;
 import com.dropshipshop.api.refund.domain.RefundReason;
 import com.dropshipshop.api.refund.domain.RefundStatus;
@@ -51,8 +51,8 @@ public class RefundService {
 	private final RefundRepository refundRepository;
 	private final ClaimRepository claimRepository;
 	private final PaymentRepository paymentRepository;
-	private final PaymentGroupRepository paymentGroupRepository;
 	private final PaymentEventRepository paymentEventRepository;
+	private final CheckoutLockService checkoutLockService;
 	private final CustomerOrderRepository orderRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
@@ -66,8 +66,8 @@ public class RefundService {
 		RefundRepository refundRepository,
 		ClaimRepository claimRepository,
 		PaymentRepository paymentRepository,
-		PaymentGroupRepository paymentGroupRepository,
 		PaymentEventRepository paymentEventRepository,
+		CheckoutLockService checkoutLockService,
 		CustomerOrderRepository orderRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
@@ -80,8 +80,8 @@ public class RefundService {
 		this.refundRepository = refundRepository;
 		this.claimRepository = claimRepository;
 		this.paymentRepository = paymentRepository;
-		this.paymentGroupRepository = paymentGroupRepository;
 		this.paymentEventRepository = paymentEventRepository;
+		this.checkoutLockService = checkoutLockService;
 		this.orderRepository = orderRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
@@ -168,14 +168,14 @@ public class RefundService {
 		if (replay != null) {
 			return replay;
 		}
-		PaymentGroup paymentGroup = paymentGroupRepository.findByIdForUpdate(paymentGroupId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment group not found"));
+		CheckoutLockService.LockedCheckout checkout = checkoutLockService.lock(paymentGroupId);
+		PaymentGroup paymentGroup = checkout.paymentGroup();
 		replay = refundReplay(paymentGroupId, key, requestHash);
 		if (replay != null) {
 			return replay;
 		}
 		List<Payment> payments = paymentRepository.findAllByPaymentGroupIdForUpdate(paymentGroupId);
-		List<CustomerOrder> groupOrders = orderRepository.findAllByPaymentGroupIdForUpdate(paymentGroupId);
+		List<CustomerOrder> groupOrders = checkout.orders();
 		Refund refund = refundRepository.findByIdForUpdate(refundId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
 		if (!refund.getPaymentGroup().getId().equals(paymentGroup.getId())) {
@@ -380,16 +380,18 @@ public class RefundService {
 	}
 
 	private Refund createRefund(CustomerOrder order, RefundReason reason) {
-		return refundRepository.findByOrder_Id(order.getId())
+		CustomerOrder lockedOrder = orderRepository.findByIdForUpdate(order.getId())
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		return refundRepository.findByOrder_Id(lockedOrder.getId())
 			.orElseGet(() -> {
-				Refund refund = refundRepository.save(new Refund(order, reason));
+				Refund refund = refundRepository.save(new Refund(lockedOrder, reason));
 				paymentEventRepository.save(new PaymentEvent(
 					null,
-					order.getPaymentGroup(),
-					order,
+					lockedOrder.getPaymentGroup(),
+					lockedOrder,
 					null,
 					PaymentEventType.REFUND_REQUESTED,
-					"Refund requested for order " + order.getOrderNumber(),
+					"Refund requested for order " + lockedOrder.getOrderNumber(),
 					Instant.now()
 				));
 				return refund;
@@ -397,8 +399,33 @@ public class RefundService {
 	}
 
 	private Refund findRefundForUpdate(UUID refundId) {
-		return refundRepository.findByIdForUpdate(refundId)
+		RefundRepository.RefundLockTarget target = refundRepository.findLockTargetById(refundId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
+		if (isReceivedPaymentException(target.getReason())) {
+			checkoutLockService.lock(target.getPaymentGroupId());
+		} else {
+			if (target.getOrderId() == null) {
+				throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT,
+					"Order-scoped refund is missing its parent order");
+			}
+			orderRepository.findByIdForUpdate(target.getOrderId())
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		}
+		Refund refund = refundRepository.findByIdForUpdate(refundId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund not found"));
+		if (!refund.getPaymentGroup().getId().equals(target.getPaymentGroupId())
+			|| (target.getOrderId() != null
+				&& (refund.getOrder() == null || !refund.getOrder().getId().equals(target.getOrderId())))) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT,
+				"Refund lock target changed while acquiring its parent lock");
+		}
+		return refund;
+	}
+
+	private boolean isReceivedPaymentException(RefundReason reason) {
+		return reason == RefundReason.PAYMENT_AMOUNT_MISMATCH
+			|| reason == RefundReason.LATE_DEPOSIT_EXCEPTION
+			|| reason == RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT;
 	}
 
 	private record RefundCommandResult(

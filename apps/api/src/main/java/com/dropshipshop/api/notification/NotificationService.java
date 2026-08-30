@@ -200,6 +200,7 @@ public class NotificationService {
 			case OUT_OF_STOCK -> "[코어블SAF] 품절로 환불 안내 예정입니다. 주문상세 확인";
 			case SHIPMENT_STARTED -> "[코어블SAF] 출고되었습니다. 주문상세에서 운송장을 확인해 주세요";
 			case DELIVERY_COMPLETED -> "[코어블SAF] 배송완료 처리되었습니다. 주문상세 확인";
+			case DELIVERY_STATUS_CORRECTED -> "[코어블SAF] 배송완료 상태가 정정되었습니다. 주문상세를 확인해 주세요";
 			case DELAY_NOTICE -> "[코어블SAF] 출고 지연 중입니다. 확인 후 안내드리겠습니다";
 			case CLAIM_STATUS_CHANGED -> "[코어블SAF] 클레임 처리 상태가 변경되었습니다. 주문상세 확인";
 			case REFUND_COMPLETED -> "[코어블SAF] 환불 완료 처리되었습니다. 주문상세 확인";

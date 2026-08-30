@@ -107,7 +107,7 @@ Notes:
 - 입금확인 완료 즉시 수락 단계 없이 공급처에 출고 요청을 보여준다.
 - 실제 email 전달 검증 전에는 production supplier activation을 열지 않는다.
 - B-103 구현과 문서 동기화, 전체 API/PostgreSQL/Web 검증 및 독립 구현·테스트 검토를 완료했다. Production supplier activation과 실제 email 검증은 별도 release gate로 남는다.
-- 송장 등록 시 cutoff 단축은 Planned B-104, `SUPPLIER_CLAIM_WORK_REQUESTED` 실제 producer는 Planned B-105가 소유한다.
+- 송장 등록 시 cutoff 단축은 Implemented B-104, `SUPPLIER_CLAIM_WORK_REQUESTED` 실제 producer는 Planned B-105가 소유한다.
 
 Tasks:
 - [x] portal fulfillment 생성, 요청시각·배송지 잠금과 portal access가 비활성인 `salesAction=KEEP` 신규 주문의 `COREABLE_MANUAL` fallback을 구현한다.
@@ -120,24 +120,26 @@ Tasks:
 
 ### B-104 공급처 복수 송장과 공식 배송조회 링크
 
-Status: Todo
+Status: Review Ready
 
 Notes:
 - 송장 등록과 실제 출고를 분리하고 택배사 실시간 API 없이 공식 조회 링크를 제공한다.
+- B-104 구현과 문서 동기화, 전체 API/PostgreSQL/Web 검증 및 독립 backend/migration/test 검토를 완료했다. Production supplier activation과 실제 택배 배송건 검증은 별도 release gate로 남는다.
+- Production `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지하며 새 admin portal-Shipment 생성도 저장된 동일 replay 외에는 차단한다. 기존 증거의 조회·정정·void·배송 보정은 안전 운영 경로로 남긴다.
 
 Tasks:
-- [ ] Shipment 1:N과 order item 수량 allocation을 expand-contract migration으로 구현한다.
-- [ ] 단일 송장 기본 전체 할당, 분할 출고 opt-in과 추가 송장 명시 할당을 구현한다.
-- [ ] over-allocation·중복·타 주문 item·동시 등록을 거절한다.
-- [ ] carrier registry 기반 공식 URL과 `TRACKING_REGISTERED` 표시를 구현한다.
-- [ ] 고객 plural shipment 응답과 `송장 등록 · 배송조회 가능` 링크 UI를 구현하고 legacy singular 응답을 호환한다.
-- [ ] action+actor+canonical body를 hash하는 supplier/admin 공유-key creation/action idempotency와 immutable result, Shipment version 0 backfill·writer 이관, optimistic guard, 배송완료 전 carrier/tracking 정정과 allocation 오류 void+재등록을 구현한다.
-- [ ] Coreable void/배송완료와 후속 Claim/Refund 전 guarded 배송완료 재개·시각 정정 이력을 구현한다.
-- [ ] 각 송장 등록이 stored cutoff를 `min(current, registeredAt+30일)`로만 단축하고 void/replacement가 늘리지 않도록 B-103 경계를 확장한다.
-- [ ] `TRACKING_REGISTERED`를 Claim/refund transition guard와 customer/admin allowlist에 이관하고 Claim 기준시각을 `max(non-voided deliveredAt)` aggregate로 교체한다.
-- [ ] Shipment와 admin portal-shipment가 Order→Fulfillment→all Shipment→OrderItems 공통 lock을 공유하도록 구현한다. Shortage report lock/guard 확장은 B-105가 맡는다.
-- [ ] 모든 Claim/Refund writer가 parent Order를 해당 row보다 먼저 잠그도록 이관한다. Payment-origin Refund는 PaymentGroup→Supplier→Product→Option→Order→Refund 전역 순서를 유지해 배송완료 correction과 후속 처리 생성이 경합하지 않게 한다.
-- [ ] 기존 단일 shipment 응답·Domeggook tracking·관리자 수동 보정·취소 Claim 호환 테스트를 추가한다.
+- [x] Shipment 1:N과 order item 수량 allocation을 expand-contract migration으로 구현한다.
+- [x] 단일 송장 기본 전체 할당, 분할 출고 opt-in과 추가 송장 명시 할당을 구현한다.
+- [x] over-allocation·중복·타 주문 item·동시 등록을 거절한다.
+- [x] carrier registry 기반 공식 URL과 `TRACKING_REGISTERED` 표시를 구현한다.
+- [x] 고객 plural shipment 응답과 `송장 등록 · 배송조회 가능` 링크 UI를 구현하고 legacy singular 응답을 호환한다.
+- [x] action+actor+canonical body를 hash하는 supplier/admin 공유-key creation/action idempotency와 immutable result, Shipment version 0 backfill·writer 이관, optimistic guard, 배송완료 전 carrier/tracking 정정과 allocation 오류 void+재등록을 구현한다.
+- [x] Coreable void/배송완료와 후속 Claim/Refund 전 guarded 배송완료 재개·시각 정정 이력을 구현한다.
+- [x] 각 송장 등록이 stored cutoff를 `min(current, registeredAt+30일)`로만 단축하고 void/replacement가 늘리지 않도록 B-103 경계를 확장한다.
+- [x] `TRACKING_REGISTERED`를 Claim/refund transition guard와 customer/admin allowlist에 이관하고 Claim 기준시각을 `max(non-voided deliveredAt)` aggregate로 교체한다.
+- [x] Shipment와 admin portal-shipment가 Order→Fulfillment→all Shipment→OrderItems 공통 lock을 공유하도록 구현한다. Shortage report lock/guard 확장은 B-105가 맡는다.
+- [x] 모든 Claim/Refund writer가 parent Order를 해당 row보다 먼저 잠그도록 이관한다. Payment-origin Refund는 PaymentGroup→Supplier→Product→Option→Order→Refund 전역 순서를 유지해 배송완료 correction과 후속 처리 생성이 경합하지 않게 한다.
+- [x] 기존 단일 shipment 응답·Domeggook tracking·관리자 수동 보정·취소 Claim 호환 테스트를 추가한다.
 
 ### B-105 공급처 품절 보고와 클레임 사실 입력
 

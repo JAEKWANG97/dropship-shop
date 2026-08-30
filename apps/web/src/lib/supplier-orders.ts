@@ -34,6 +34,60 @@ export type SupplierOrderDetail = Omit<SupplierOrderSummary, "items"> & {
   items: SupplierOrderItemDetail[];
 };
 
+export type SupplierCarrier = {
+  carrierCode: string;
+  carrierName: string;
+  officialTrackingSupported: boolean;
+};
+
+export type ShipmentAllocation = {
+  orderItemId: string;
+  quantity: number;
+};
+
+export type SupplierShipment = {
+  shipmentId: string;
+  version: number | null;
+  status: string;
+  carrierCode: string | null;
+  carrierName: string;
+  trackingNumber: string;
+  officialTrackingUrl: string | null;
+  editable: boolean;
+  countsTowardAllocation: boolean;
+  registeredAt: string | null;
+  deliveredAt: string | null;
+  allocations: ShipmentAllocation[];
+};
+
+export type SupplierUnallocatedItem = {
+  orderItemId: string;
+  productName: string;
+  optionName: string;
+  remainingQuantity: number;
+};
+
+export type SupplierShipmentCollection = {
+  shipments: SupplierShipment[];
+  unallocatedItems: SupplierUnallocatedItem[];
+  allocationComplete: boolean | null;
+  canRegisterShipment: boolean | null;
+  nextAction: string | null;
+};
+
+export type SupplierShipmentCreateInput = {
+  carrierCode: string;
+  trackingNumber: string;
+  allocations?: ShipmentAllocation[];
+};
+
+export type SupplierShipmentCorrectionInput = {
+  expectedVersion: number;
+  carrierCode: string;
+  trackingNumber: string;
+  reason: string;
+};
+
 export class SupplierOrderApiError extends Error {
   constructor(
     public readonly status: number,
@@ -55,12 +109,98 @@ export function supplierOrderStatusView(status: string) {
   return STATUS_VIEWS[status] ?? { label: "상태 확인 필요", tone: "warning" as const };
 }
 
+export function supplierShipmentRegistrationAllowed(value: SupplierShipmentCollection) {
+  return value.canRegisterShipment === true;
+}
+
+export async function recoverSupplierShipmentConflict(
+  error: unknown,
+  refresh: () => Promise<void>,
+) {
+  if (!(error instanceof SupplierOrderApiError) || ![403, 404, 409].includes(error.status)) {
+    return false;
+  }
+  await refresh();
+  return true;
+}
+
+export function supplierShipmentCommandKey(
+  keys: Map<string, string>,
+  action: string,
+  create: () => string = () => crypto.randomUUID(),
+) {
+  const current = keys.get(action);
+  if (current) return current;
+  const created = create();
+  keys.set(action, created);
+  return created;
+}
+
+export function releaseSupplierShipmentCommandKey(
+  keys: Map<string, string>,
+  action: string,
+  error: unknown,
+) {
+  if (error instanceof SupplierOrderApiError && error.status < 500) keys.delete(action);
+}
+
+export async function loadSupplierShipmentRefresh(orderNumber: string) {
+  const [orderResult, shipmentResult] = await Promise.allSettled([
+    getSupplierOrder(orderNumber),
+    listSupplierShipments(orderNumber),
+  ]);
+  return {
+    order: orderResult.status === "fulfilled" ? orderResult.value : null,
+    orderError: orderResult.status === "rejected" ? orderResult.reason : null,
+    shipmentState: shipmentResult.status === "fulfilled" ? shipmentResult.value : null,
+    shipmentError: shipmentResult.status === "rejected" ? shipmentResult.reason : null,
+  };
+}
+
 export async function listSupplierOrders() {
   return normalizeSupplierOrderList(await request("/api/supplier/orders"));
 }
 
 export async function getSupplierOrder(orderNumber: string) {
   return normalizeSupplierOrderDetail(await request(`/api/supplier/orders/${encodeURIComponent(orderNumber)}`));
+}
+
+export async function listSupplierCarriers() {
+  return normalizeSupplierCarriers(await request("/api/supplier/carriers"));
+}
+
+export async function listSupplierShipments(orderNumber: string) {
+  return normalizeSupplierShipments(await request(
+    `/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments`,
+  ));
+}
+
+export async function createSupplierShipment(
+  orderNumber: string,
+  input: SupplierShipmentCreateInput,
+  idempotencyKey: string,
+) {
+  return request(`/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments`, {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function correctSupplierShipment(
+  orderNumber: string,
+  shipmentId: string,
+  input: SupplierShipmentCorrectionInput,
+  idempotencyKey: string,
+) {
+  return request(
+    `/api/supplier/orders/${encodeURIComponent(orderNumber)}/shipments/${encodeURIComponent(shipmentId)}`,
+    {
+      method: "PATCH",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function normalizeSupplierOrderList(value: unknown): SupplierOrderSummary[] {
@@ -104,6 +244,72 @@ export function normalizeSupplierOrderDetail(value: unknown): SupplierOrderDetai
   };
 }
 
+export function normalizeSupplierCarriers(value: unknown): SupplierCarrier[] {
+  const wrapper = record(value);
+  return array(wrapper.carriers ?? value)
+    .map((value) => {
+      const carrier = record(value);
+      return {
+        carrierCode: text(carrier.carrierCode) || text(carrier.code),
+        carrierName: text(carrier.carrierName) || text(carrier.displayName) || text(carrier.name),
+        officialTrackingSupported: carrier.officialTrackingSupported === true
+          || carrier.officialLinkSupported === true
+          || carrier.trackingUrlSupported === true,
+      };
+    })
+    .filter((carrier) => carrier.carrierCode && carrier.carrierName);
+}
+
+export function normalizeSupplierShipments(value: unknown): SupplierShipmentCollection {
+  const wrapper = record(value);
+  return {
+    shipments: array(wrapper.shipments).map(normalizeSupplierShipment)
+      .filter((shipment) => shipment.shipmentId),
+    unallocatedItems: array(wrapper.unallocatedItems).map((value) => {
+      const item = record(value);
+      return {
+        orderItemId: text(item.orderItemId),
+        productName: text(item.productName),
+        optionName: text(item.optionName),
+        remainingQuantity: nonNegativeInteger(item.remainingQuantity ?? item.quantity),
+      };
+    }).filter((item) => item.orderItemId && item.remainingQuantity > 0),
+    allocationComplete: typeof wrapper.allocationComplete === "boolean"
+      ? wrapper.allocationComplete
+      : null,
+    canRegisterShipment: typeof wrapper.canRegisterShipment === "boolean"
+      ? wrapper.canRegisterShipment
+      : null,
+    nextAction: nullableText(wrapper.nextAction),
+  };
+}
+
+function normalizeSupplierShipment(value: unknown): SupplierShipment {
+  const shipment = record(value);
+  const status = text(shipment.status);
+  const version = nullableNonNegativeInteger(shipment.version);
+  return {
+    shipmentId: text(shipment.shipmentId),
+    version,
+    status,
+    carrierCode: nullableText(shipment.carrierCode),
+    carrierName: text(shipment.carrierName) || text(shipment.carrier),
+    trackingNumber: text(shipment.trackingNumber),
+    officialTrackingUrl: safeOfficialTrackingUrl(shipment.officialTrackingUrl),
+    editable: shipment.editable === true && status === "TRACKING_REGISTERED" && version !== null,
+    countsTowardAllocation: shipment.countsTowardAllocation !== false && status !== "VOIDED",
+    registeredAt: nullableText(shipment.registeredAt),
+    deliveredAt: nullableText(shipment.deliveredAt),
+    allocations: array(shipment.allocations).map((value) => {
+      const allocation = record(value);
+      return {
+        orderItemId: text(allocation.orderItemId),
+        quantity: nonNegativeInteger(allocation.quantity),
+      };
+    }).filter((allocation) => allocation.orderItemId && allocation.quantity > 0),
+  };
+}
+
 function normalizeSupplierOrderSummary(value: unknown): SupplierOrderSummary {
   const item = record(value);
   return {
@@ -123,11 +329,16 @@ function normalizeSupplierOrderItem(value: unknown): SupplierOrderItemSummary {
   };
 }
 
-async function request(path: string) {
+async function request(path: string, init: RequestInit = {}) {
   const response = await fetch(path, {
+    ...init,
     credentials: "same-origin",
     cache: "no-store",
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
   });
   if (!response.ok) {
     let code = "";
@@ -160,6 +371,17 @@ function nullableText(value: unknown) {
   return result || null;
 }
 
+export function safeOfficialTrackingUrl(value: unknown) {
+  const result = nullableText(value);
+  if (!result) return null;
+  try {
+    const url = new URL(result);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function maskedName(value: unknown) {
   const points = Array.from(text(value));
   if (points.length === 1 && points[0] === "*") return "*";
@@ -175,4 +397,8 @@ function maskedPhone(value: unknown) {
 
 function nonNegativeInteger(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function nullableNonNegativeInteger(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 }

@@ -149,7 +149,7 @@ class PostgresMigrationSmokeTest {
 			Integer.class
 		);
 
-		assertThat(migrationCount).isNotNull().isGreaterThanOrEqualTo(42);
+		assertThat(migrationCount).isNotNull().isGreaterThanOrEqualTo(43);
 		assertThat(pricingPolicyCount).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForObject(
 			"select version from pricing_policies where active = true",
@@ -212,6 +212,49 @@ class PostgresMigrationSmokeTest {
 			  'ck_supplier_pii_access_logs_reason'
 			)
 			""", Integer.class)).isEqualTo(3);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from information_schema.tables
+			where table_schema = current_schema()
+			  and table_name in ('shipment_items', 'shipment_change_histories')
+			""", Integer.class)).isEqualTo(2);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from information_schema.columns
+			where table_schema = current_schema()
+			  and table_name = 'shipments'
+			  and column_name in (
+			    'version', 'idempotency_key', 'creation_request_hash', 'creation_result_snapshot',
+			    'carrier_code', 'registered_at', 'registered_by_user_id', 'registered_actor_type',
+			    'delivery_evidence_observed_at'
+			  )
+			""", Integer.class)).isEqualTo(9);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from pg_constraint
+			where conname = 'uk_shipments_order_id'
+			""", Integer.class)).isZero();
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from pg_indexes
+			where schemaname = current_schema()
+			  and indexname in (
+			    'uk_shipments_order_legacy',
+			    'idx_shipments_registered_by_user_id',
+			    'idx_shipment_change_histories_actor_user_id'
+			  )
+			""", Integer.class)).isEqualTo(3);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from pg_trigger
+			where not tgisinternal
+			  and tgname in (
+			    'trg_shipment_items_order_match',
+			    'trg_shipments_order_update_match',
+			    'trg_order_items_order_update_match',
+			    'trg_shipments_legacy_allocations'
+			  )
+			""", Integer.class)).isEqualTo(4);
 
 		Supplier supplier = supplierRepository.saveAndFlush(new Supplier(
 			"Postgres smoke supplier",
@@ -330,6 +373,149 @@ class PostgresMigrationSmokeTest {
 				assertV41Inventory(connection, rollbackCompatibleOptionId, "UNTRACKED", null);
 				assertV41OrderItemSnapshot(connection, rollbackCompatibleOrder.orderItemId());
 			}
+		}
+	}
+
+	@Test
+	void backfillsV43LegacyShipmentsBeforeAllowingPluralRows() throws Exception {
+		try (PostgreSQLContainer<?> upgrade = new PostgreSQLContainer<>("postgres:17-alpine")) {
+			upgrade.start();
+			migrateTo(upgrade, "42");
+
+			UUID userId = UUID.randomUUID();
+			UUID supplierId = UUID.randomUUID();
+			UUID productId = UUID.randomUUID();
+			UUID optionId = UUID.randomUUID();
+			UUID secondOrderItemId = UUID.randomUUID();
+			UUID legacyShipmentId = UUID.randomUUID();
+			V40OrderIds order;
+			try (Connection connection = connection(upgrade)) {
+				insertV40User(connection, userId);
+				insertV40Supplier(connection, supplierId);
+				insertV40Product(connection, productId, supplierId, "COREABLE", null);
+				insertV40Option(connection, optionId, productId);
+				order = insertV40PendingOrder(connection, userId, supplierId, productId, optionId);
+				insertV42OrderItem(
+					connection, secondOrderItemId, order.orderId(), productId, optionId, supplierId, 2);
+				insertV42Shipment(
+					connection, legacyShipmentId, order.orderId(), "CJ대한통운", "V43-LEGACY-1");
+			}
+
+			migrateLatest(upgrade);
+
+			try (Connection connection = connection(upgrade)) {
+				try (PreparedStatement shipment = connection.prepareStatement("""
+					select version, carrier_code, registered_at = created_at as registered_from_created
+					from shipments
+					where id = ?
+					""")) {
+					shipment.setObject(1, legacyShipmentId);
+					try (ResultSet result = shipment.executeQuery()) {
+						assertThat(result.next()).isTrue();
+						assertThat(result.getLong("version")).isZero();
+						assertThat(result.getString("carrier_code")).isEqualTo("CJ_LOGISTICS");
+						assertThat(result.getBoolean("registered_from_created")).isTrue();
+					}
+				}
+				try (PreparedStatement allocations = connection.prepareStatement("""
+					select count(*) as allocation_count, sum(quantity) as allocated_quantity
+					from shipment_items
+					where shipment_id = ?
+					""")) {
+					allocations.setObject(1, legacyShipmentId);
+					try (ResultSet result = allocations.executeQuery()) {
+						assertThat(result.next()).isTrue();
+						assertThat(result.getInt("allocation_count")).isEqualTo(2);
+						assertThat(result.getInt("allocated_quantity")).isEqualTo(3);
+					}
+				}
+
+				assertThatThrownBy(() -> insertV42Shipment(
+					connection, UUID.randomUUID(), order.orderId(), "한진택배", "V43-LEGACY-2"
+				)).isInstanceOf(SQLException.class);
+
+				UUID rollbackOptionId = UUID.randomUUID();
+				insertV40Option(connection, rollbackOptionId, productId);
+				V40OrderIds rollbackOrder = insertV40PendingOrder(
+					connection, userId, supplierId, productId, rollbackOptionId);
+				UUID rollbackShipmentId = UUID.randomUUID();
+				insertV42Shipment(
+					connection, rollbackShipmentId, rollbackOrder.orderId(), "한진택배", "V43-ROLLBACK-WRITER");
+				try (PreparedStatement allocation = connection.prepareStatement("""
+					select count(*) as allocation_count, sum(quantity) as allocated_quantity
+					from shipment_items
+					where shipment_id = ?
+					""")) {
+					allocation.setObject(1, rollbackShipmentId);
+					try (ResultSet result = allocation.executeQuery()) {
+						assertThat(result.next()).isTrue();
+						assertThat(result.getInt("allocation_count")).isEqualTo(1);
+						assertThat(result.getInt("allocated_quantity")).isEqualTo(1);
+					}
+				}
+
+				UUID portalShipmentId = UUID.randomUUID();
+				insertV43PortalShipment(
+					connection, portalShipmentId, order.orderId(), userId, "portal-create-key");
+				insertV43Allocation(
+					connection, UUID.randomUUID(), portalShipmentId, order.orderItemId(), 1);
+				assertThatThrownBy(() -> insertV43PortalShipment(
+					connection, UUID.randomUUID(), order.orderId(), userId, "portal-create-key"
+				)).isInstanceOf(SQLException.class);
+				assertThatThrownBy(() -> insertIncompleteV43PortalShipment(
+					connection, UUID.randomUUID(), order.orderId(), userId
+				)).isInstanceOf(SQLException.class);
+				assertThatThrownBy(() -> insertV43Allocation(
+					connection, UUID.randomUUID(), portalShipmentId, order.orderItemId(), 0
+				)).isInstanceOf(SQLException.class);
+				assertThatThrownBy(() -> insertV43Allocation(
+					connection, UUID.randomUUID(), portalShipmentId, rollbackOrder.orderItemId(), 1
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("shipment_items order mismatch");
+				assertThatThrownBy(() -> updateOrderId(
+					connection, "shipments", portalShipmentId, rollbackOrder.orderId()
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("shipment_items order mismatch after shipment");
+				assertThatThrownBy(() -> updateOrderId(
+					connection, "order_items", order.orderItemId(), rollbackOrder.orderId()
+				)).isInstanceOf(SQLException.class)
+					.hasMessageContaining("shipment_items order mismatch after order item");
+			}
+		}
+	}
+
+	@Test
+	void blocksV43UpgradeWhenALegacyShipmentOrderHasNoItems() throws Exception {
+		try (PostgreSQLContainer<?> upgrade = new PostgreSQLContainer<>("postgres:17-alpine")) {
+			upgrade.start();
+			migrateTo(upgrade, "42");
+
+			UUID userId = UUID.randomUUID();
+			UUID supplierId = UUID.randomUUID();
+			UUID productId = UUID.randomUUID();
+			UUID optionId = UUID.randomUUID();
+			try (Connection connection = connection(upgrade)) {
+				insertV40User(connection, userId);
+				insertV40Supplier(connection, supplierId);
+				insertV40Product(connection, productId, supplierId, "COREABLE", null);
+				insertV40Option(connection, optionId, productId);
+				V40OrderIds order = insertV40PendingOrder(
+					connection, userId, supplierId, productId, optionId);
+				try (PreparedStatement delete = connection.prepareStatement(
+					"delete from order_items where order_id = ?")) {
+					delete.setObject(1, order.orderId());
+					assertThat(delete.executeUpdate()).isEqualTo(1);
+				}
+				insertV42Shipment(
+					connection, UUID.randomUUID(), order.orderId(), "CJ대한통운", "V43-NO-ITEMS");
+			}
+
+			Flyway migration = latestFlyway(upgrade);
+			assertThatThrownBy(migration::migrate)
+				.hasMessageContaining("V43__add_plural_portal_shipments.sql")
+				.hasStackTraceContaining(
+					"V43 preflight failed: every legacy shipment order must contain at least one order item"
+				);
 		}
 	}
 
@@ -985,6 +1171,132 @@ class PostgresMigrationSmokeTest {
 			statement.setObject(2, order.paymentGroupId());
 			statement.setObject(3, order.orderId());
 			statement.setLong(4, amount);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV42OrderItem(
+		Connection connection,
+		UUID orderItemId,
+		UUID orderId,
+		UUID productId,
+		UUID optionId,
+		UUID supplierId,
+		int quantity
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into order_items(
+				id, order_id, product_id, product_option_id, supplier_id,
+				product_name, product_summary, product_detail_version, option_name,
+				unit_price, quantity, line_amount, created_at, updated_at
+			) values (?, ?, ?, ?, ?, 'V42 second item', 'V42 allocation fixture', 1, 'V42 option',
+				1000, ?, 1000 * ?, now(), now())
+			""")) {
+			statement.setObject(1, orderItemId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, productId);
+			statement.setObject(4, optionId);
+			statement.setObject(5, supplierId);
+			statement.setInt(6, quantity);
+			statement.setInt(7, quantity);
+			assertThat(statement.executeUpdate()).isEqualTo(1);
+		}
+	}
+
+	private void insertV42Shipment(
+		Connection connection,
+		UUID shipmentId,
+		UUID orderId,
+		String carrier,
+		String trackingNumber
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into shipments(
+				id, order_id, carrier, tracking_number, status, shipped_at, created_at, updated_at
+			) values (?, ?, ?, ?, 'SHIPPED', now(), now(), now())
+			""")) {
+			statement.setObject(1, shipmentId);
+			statement.setObject(2, orderId);
+			statement.setString(3, carrier);
+			statement.setString(4, trackingNumber);
+			assertThat(statement.executeUpdate()).isEqualTo(1);
+		}
+	}
+
+	private void insertV43PortalShipment(
+		Connection connection,
+		UUID shipmentId,
+		UUID orderId,
+		UUID actorUserId,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into shipments(
+				id, order_id, carrier, carrier_code, tracking_number, status,
+				registered_at, registered_by_user_id, registered_actor_type,
+				idempotency_key, creation_request_hash, creation_result_snapshot,
+				created_at, updated_at
+			) values (?, ?, 'CJ대한통운', 'CJ_LOGISTICS', 'V43-PORTAL', 'TRACKING_REGISTERED',
+				now(), ?, 'SUPPLIER', ?, 'v43-create-hash', '{}'::jsonb, now(), now())
+			""")) {
+			statement.setObject(1, shipmentId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, actorUserId);
+			statement.setString(4, idempotencyKey);
+			assertThat(statement.executeUpdate()).isEqualTo(1);
+		}
+	}
+
+	private void insertIncompleteV43PortalShipment(
+		Connection connection,
+		UUID shipmentId,
+		UUID orderId,
+		UUID actorUserId
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into shipments(
+				id, order_id, carrier, carrier_code, tracking_number, status,
+				registered_at, registered_by_user_id, registered_actor_type,
+				idempotency_key, creation_request_hash, creation_result_snapshot,
+				created_at, updated_at
+			) values (?, ?, 'CJ대한통운', 'CJ_LOGISTICS', 'V43-INCOMPLETE', 'TRACKING_REGISTERED',
+				now(), ?, 'SUPPLIER', 'incomplete-key', 'incomplete-hash', null, now(), now())
+			""")) {
+			statement.setObject(1, shipmentId);
+			statement.setObject(2, orderId);
+			statement.setObject(3, actorUserId);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertV43Allocation(
+		Connection connection,
+		UUID allocationId,
+		UUID shipmentId,
+		UUID orderItemId,
+		int quantity
+	) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement("""
+			insert into shipment_items(id, shipment_id, order_item_id, quantity, created_at)
+			values (?, ?, ?, ?, now())
+			""")) {
+			statement.setObject(1, allocationId);
+			statement.setObject(2, shipmentId);
+			statement.setObject(3, orderItemId);
+			statement.setInt(4, quantity);
+			statement.executeUpdate();
+		}
+	}
+
+	private void updateOrderId(Connection connection, String table, UUID rowId, UUID orderId)
+		throws SQLException {
+		if (!table.equals("shipments") && !table.equals("order_items")) {
+			throw new IllegalArgumentException("Unsupported V43 order-owner table");
+		}
+		try (PreparedStatement statement = connection.prepareStatement(
+			"update " + table + " set order_id = ? where id = ?")) {
+			statement.setObject(1, orderId);
+			statement.setObject(2, rowId);
 			statement.executeUpdate();
 		}
 	}

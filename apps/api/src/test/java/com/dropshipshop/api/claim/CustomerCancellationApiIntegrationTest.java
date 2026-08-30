@@ -59,6 +59,7 @@ import com.dropshipshop.api.payment.repository.PaymentRepository;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.refund.repository.RefundRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentActorType;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
@@ -263,6 +264,63 @@ class CustomerCancellationApiIntegrationTest {
 	}
 
 	@Test
+	void trackingRegisteredOrderAcceptsReviewClaimButBlocksApprovalUntilActiveTrackingIsVoided() throws Exception {
+		UserAccount customer = createCustomer("cancel-tracking-customer");
+		CustomerOrder order = createApprovedOrder(
+			customer,
+			"CANCEL-TRACKING-1",
+			"CANCEL-TRACKING-CO-1",
+			24500
+		);
+		order.markTrackingRegistered();
+		orderRepository.saveAndFlush(order);
+		Shipment shipment = Shipment.portal(
+			order,
+			"CJ_LOGISTICS",
+			"CJ대한통운",
+			"TRACK-CANCEL-ACTIVE",
+			Instant.now(),
+			customer.getId(),
+			ShipmentActorType.SUPPLIER,
+			"cancel-active-shipment",
+			"cancel-active-shipment-hash"
+		);
+		shipment.storeCreationResult("{}");
+		shipmentRepository.saveAndFlush(shipment);
+
+		MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/claims", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "CANCEL",
+					  "claimReason": "SIMPLE_CHANGE_OF_MIND",
+					  "customerMemo": "Please review cancellation after tracking registration"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.orderStatus", is("TRACKING_REGISTERED")))
+			.andExpect(jsonPath("$.status", is("REQUESTED")))
+			.andReturn();
+
+		String claimId = fieldFrom(result, "claimId");
+		mockMvc.perform(post("/api/admin/claims/{claimId}/approve", claimId)
+				.with(authentication(TestAuthentication.admin()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "reason": "Cancellation cannot bypass active tracking"
+					}
+					"""))
+			.andExpect(status().isConflict());
+
+		assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+			.isEqualTo(OrderStatus.TRACKING_REGISTERED);
+		assertThat(claimRepository.findById(UUID.fromString(claimId)).orElseThrow().getStatus().name())
+			.isEqualTo("REQUESTED");
+	}
+
+	@Test
 	void validatesCancellationClaimAndAdminReviewRequests() throws Exception {
 		UserAccount customer = createCustomer("cancel-customer-5");
 		CustomerOrder order = createSupplierOrderedOrder(customer, "CANCEL-VALIDATION-1", "CANCEL-VALIDATION-CO-1", 25000);
@@ -375,6 +433,40 @@ class CustomerCancellationApiIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.claims[?(@.claimId == '%s')]".formatted(returnClaimId), hasSize(1)))
 			.andExpect(jsonPath("$.claims[?(@.claimId == '%s')].claimType".formatted(returnClaimId), hasItem("RETURN")));
+	}
+
+	@Test
+	void returnWindowUsesLatestNonVoidedShipmentDelivery() throws Exception {
+		UserAccount customer = createCustomer("return-plural-delivery-customer");
+		CustomerOrder order = createDeliveredOrder(
+			customer,
+			"RETURN-PLURAL-1",
+			"RETURN-PLURAL-CO-1",
+			27500,
+			Instant.now().minusSeconds(8 * 24 * 60 * 60)
+		);
+		Instant latestDeliveredAt = Instant.now().minusSeconds(60);
+		Shipment latestShipment = new Shipment(
+			order,
+			"한진택배",
+			"TRACK-RETURN-PLURAL-LATEST",
+			latestDeliveredAt.minusSeconds(3600)
+		);
+		latestShipment.markDeliveredByTracking(latestDeliveredAt);
+		shipmentRepository.saveAndFlush(latestShipment);
+
+		mockMvc.perform(post("/api/orders/{orderId}/claims", order.getId())
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "claimType": "RETURN",
+					  "claimReason": "SIMPLE_CHANGE_OF_MIND",
+					  "customerMemo": "Return window follows the final package delivery"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status", is("REQUESTED")));
 	}
 
 	@Test

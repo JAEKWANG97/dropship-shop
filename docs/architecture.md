@@ -15,7 +15,7 @@ Browser
   -> Backup job copies database and uploads to S3
 ```
 
-이 다이어그램은 현재 구현 기준이다. 공급처 포털의 `B-100` 신청·초대·Kakao 연결·lifecycle, `B-101` 개별 상품·검토, `B-102` 옵션 재고·24시간 예약·계좌입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반 Web/API와 additive schema는 같은 Next.js web, Spring Boot modular monolith와 PostgreSQL 안에 구현됐다. `B-104`~`B-105`는 Planned 확장이며 별도 판매자 서비스, 정산 시스템 또는 결제 시스템을 만들지 않는다.
+이 다이어그램은 현재 구현 기준이다. 공급처 포털의 `B-100` 신청·초대·Kakao 연결·lifecycle, `B-101` 개별 상품·검토, `B-102` 옵션 재고·24시간 예약·계좌입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반, `B-104` 복수 송장·수량 할당·공식 조회 링크 Web/API와 additive schema는 같은 Next.js web, Spring Boot modular monolith와 PostgreSQL 안에 구현됐다. `B-105`는 Planned 확장이며 별도 판매자 서비스, 정산 시스템 또는 결제 시스템을 만들지 않는다.
 
 ## Repository Structure
 
@@ -83,17 +83,17 @@ Primary data:
 - refunds
 - order_status_histories
 
-Supplier portal data (`B-100`~`B-103` Implemented, `B-104`~`B-105` Planned):
+Supplier portal data (`B-100`~`B-104` Implemented, `B-105` Planned):
 
 - public supplier applications and one-time invitation digests — Implemented B-100
 - one active supplier manager link per supplier — Implemented B-100
 - product review state separated from existing compliance state — Implemented B-101
 - `TRACKED` option inventory and order-item reservation lifecycle — Implemented B-102
 - fulfillment channel/owner/handover additive base — Implemented B-100; portal request timestamp behavior, minimal supplier PII access logs and append-only claim access grants — Implemented B-103
-- multiple shipments with item quantity allocations and correction/void/delivery evidence — Planned B-104
+- multiple shipments with item quantity allocations and correction/void/delivery evidence — Implemented B-104
 - shortage reports, Coreable-owned claim tasks and append-only supplier claim facts — Planned B-105; operational supplier email audit and fulfillment/product-review producers — Implemented B-103; claim-work producer — Planned B-105
 
-V39 implements the B-100 schema extensions, V40 implements the B-101 catalog/review extensions, V41 implements the B-102 inventory, reservation, payment-command replay and received-payment exception extensions, and V42 implements the B-103 delivery memo, Claim PII grant and access-log schema plus operational-email retention index without changing legacy behavior. B-104 and later shipment/claim changes remain Planned and will use expand-contract migrations.
+V39 implements the B-100 schema extensions, V40 implements the B-101 catalog/review extensions, V41 implements the B-102 inventory, reservation, payment-command replay and received-payment exception extensions, V42 implements the B-103 delivery memo, Claim PII grant and access-log schema plus operational-email retention index, and V43 implements the B-104 plural Shipment/allocation/history expansion while preserving the expand-contract compatibility principle. B-105 claim changes remain Planned.
 
 ## Frontend
 
@@ -126,7 +126,7 @@ Supplier portal routes:
 /supplier/products/new          Implemented B-101 individual product registration
 /supplier/products/:productId   Implemented B-101 product edit/resubmit
 /supplier/orders                Implemented B-103 fulfillment request queue
-/supplier/orders/:orderNumber   Implemented B-103 minimum-PII detail; Planned B-104 tracking registration
+/supplier/orders/:orderNumber   Implemented B-103 minimum-PII detail and B-104 tracking registration
 /supplier/claim-tasks           Planned B-105 Coreable-requested safe fact tasks
 /admin/product-reviews          Implemented B-101 review queue
 /admin/product-reviews/:productId Implemented B-101 review detail/action
@@ -147,7 +147,7 @@ First admin screens:
 - Fulfillment action panel
 - Refund action panel
 
-## Supplier Portal — `B-100`~`B-103` Implemented, `B-104`~`B-105` Planned
+## Supplier Portal — `B-100`~`B-104` Implemented, `B-105` Planned
 
 The portal is a tenant-scoped operational surface for approved suppliers. Coreable remains the only customer-facing seller and keeps customer price, payment, refund, CS, claim decisions and final product control. The portal has no supplier settlement or seller-led customer transaction flow.
 
@@ -175,7 +175,7 @@ Implementation boundaries:
 - Image cleanup keys are single-use tombstones once a job exists. Enqueue is unique and idempotent; the worker checks live ProductImage references immediately before deletion, completes without deleting as `LIVE_REFERENCE` when one exists, and the later metadata-removal enqueue reopens the same job.
 - `B-102` defaults new portal options to `TRACKED` with 24-hour reservations while allowing an explicit `UNTRACKED` choice. Existing manual/Domeggook options remain `UNTRACKED`. It also owns the shared bank-transfer exception boundary: a mismatched receipt becomes one actual-amount PaymentGroup Refund with no fulfillment, while exact late/saleability failures keep order-scoped Refunds. An exact receipt found after qualifying unpaid cancellation also uses order-scoped Refunds but never reacquires or revives the checkout, for portal and legacy groups alike.
 - `B-103` creates the portal fulfillment request, initial `requestedAt+60일` PII cutoff and address lock in the successful deposit-confirmation transaction. It snapshots an optional max-300-character delivery memo after trim/blank-to-null normalization. There is no supplier accept/reject step.
-- `B-104` expands Shipment from the legacy single record to multiple records with immutable item allocations for portal orders. Tracking registration uses `TRACKING_REGISTERED`, generates an official carrier URL and does not call a live carrier-status API. Supplier carrier/tracking correction and Coreable void/delivery-complete/guarded delivery-correction actions are idempotent, preserve evidence and recalculate the Order aggregate.
+- Implemented `B-104` expands Shipment from the legacy single record to multiple records with immutable item allocations for portal orders. Tracking registration uses `TRACKING_REGISTERED`, generates an official carrier URL from the four-code registry (`CJ_LOGISTICS`, `LOTTE`, `HANJIN`, `KOREA_POST`) and does not call a live carrier-status API. Supplier carrier/tracking correction and Coreable void/delivery-complete/guarded delivery-correction actions use 200-character single-line PII-free reasons, are idempotent, preserve evidence and recalculate the Order aggregate.
 - `B-105` accepts shortage only before any tracking registration and lets suppliers answer only Coreable-created claim tasks without granting refund or claim-decision authority.
 
 Supplier order lists contain no customer PII. Supplier order detail returns only the recipient and address data needed for the owning supplier's delivery, for a limited access window, and every access is audited without copying PII values into the log.
@@ -216,7 +216,7 @@ Runtime storage rules:
 
 - Admin APIs require admin role.
 - Customer APIs must scope data by authenticated user.
-- B-100 dynamically derives supplier authority from an active user, active portal status and manager link. Implemented B-101 catalog, B-102 inventory and B-103 fulfillment APIs scope supplier resources by both resource id and supplier id; Planned B-104~B-105 operational resource APIs must preserve the same boundary. `Supplier.status` separately gates new catalog sales/checkouts, and cross-supplier access returns `404` without revealing existence.
+- B-100 dynamically derives supplier authority from an active user, active portal status and manager link. Implemented B-101 catalog, B-102 inventory, B-103 fulfillment and B-104 Shipment APIs scope supplier resources by both resource id and supplier id; Planned B-105 operational resource APIs must preserve the same boundary. `Supplier.status` separately gates new catalog sales/checkouts, and cross-supplier access returns `404` without revealing existence.
 - One-time invitation tokens are stored only as digests and must not appear in application logs, email payload snapshots, access logs or Referer values.
 - Supplier list responses contain no customer PII. Detail responses expose only delivery-required fields for a bounded period and use `Cache-Control: no-store` on PII-bearing responses.
 - Supplier PII access logs record only actor, order, access basis and time, never PII values or the response body.
@@ -244,7 +244,7 @@ Do not introduce microservices before order and fulfillment workflows are stable
 
 The supplier portal does not change this deployment topology. New routes, tables, schedulers and email templates ship in the existing web/API containers, and each `B-100`~`B-105` slice must preserve legacy customer/admin and Domeggook contracts.
 
-Production keeps `APP_SUPPLIER_PORTAL_ENABLED=false` by default. External routes and portal-product sale stay disabled, and admin commands or dispatch jobs that would create/send an activation invite fail closed, until B-100 through B-105, required tenant/CSRF/migration/concurrency tests, real email delivery, the new privacy disclosure and B-098 supplier contract/privacy obligations all pass their activation gates. Safety/admin cleanup paths remain available. Even afterward each portal-product public read and checkout requires its Supplier to be ACTIVE with time-valid VERIFIED contract evidence; a global flag never substitutes for that per-supplier gate.
+Production keeps `APP_SUPPLIER_PORTAL_ENABLED=false` by default. Implemented B-100 through B-104 do not open external routes or portal-product sale: they stay disabled, and admin commands or dispatch jobs that would create/send an activation invite fail closed, until Planned B-105, required tenant/CSRF/migration/concurrency tests, real email delivery, the new privacy disclosure and B-098 supplier contract/privacy obligations all pass their activation gates. B-104 also blocks a new admin portal-Shipment creation while disabled, after first allowing an exact stored idempotency replay; read, correction, void and delivery-evidence cleanup paths remain available. Even afterward each portal-product public read and checkout requires its Supplier to be ACTIVE with time-valid VERIFIED contract evidence; a global flag never substitutes for that per-supplier gate.
 
 Production baseline is tracked in [Production Readiness](production-readiness.md).
 

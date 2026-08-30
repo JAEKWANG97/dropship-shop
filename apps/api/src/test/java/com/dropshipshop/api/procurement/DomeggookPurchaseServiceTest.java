@@ -1,5 +1,6 @@
 package com.dropshipshop.api.procurement;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -28,16 +29,21 @@ import com.dropshipshop.api.order.repository.AdminOrderActionHistoryRepository;
 import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
+import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.repository.ShipmentItemRepository;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.user.domain.UserAccount;
 
 class DomeggookPurchaseServiceTest {
 
 	private final DomeggookPurchaseClient client = mock(DomeggookPurchaseClient.class);
+	private final DomeggookProperties properties = mock(DomeggookProperties.class);
 	private final CustomerOrderRepository orderRepository = mock(CustomerOrderRepository.class);
 	private final OrderItemRepository itemRepository = mock(OrderItemRepository.class);
 	private final FulfillmentRepository fulfillmentRepository = mock(FulfillmentRepository.class);
 	private final SupplierPurchaseAttemptRepository attemptRepository = mock(SupplierPurchaseAttemptRepository.class);
+	private final ShipmentRepository shipmentRepository = mock(ShipmentRepository.class);
+	private final ShipmentItemRepository shipmentItemRepository = mock(ShipmentItemRepository.class);
 	private final AdminOrderActionHistoryRepository actionRepository = mock(AdminOrderActionHistoryRepository.class);
 	private final OrderStatusHistoryRepository statusRepository = mock(OrderStatusHistoryRepository.class);
 	private final CustomerOrder order = mock(CustomerOrder.class);
@@ -53,13 +59,14 @@ class DomeggookPurchaseServiceTest {
 		PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
 		when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
 		service = new DomeggookPurchaseService(
-			mock(DomeggookProperties.class),
+			properties,
 			client,
 			orderRepository,
 			itemRepository,
 			fulfillmentRepository,
 			attemptRepository,
-			mock(ShipmentRepository.class),
+			shipmentRepository,
+			shipmentItemRepository,
 			actionRepository,
 			statusRepository,
 			mock(NotificationService.class),
@@ -122,5 +129,25 @@ class DomeggookPurchaseServiceTest {
 
 		verify(fulfillment).markPurchaseFailed("No matching supplier order was found; retry is allowed");
 		verify(attempt).fail(eq("ORDER_NOT_FOUND_AFTER_RECONCILIATION"), any(), any());
+	}
+
+	@Test
+	void rejectsPortalShipmentDuringLegacyDomeggookTrackingSync() {
+		Shipment portalShipment = mock(Shipment.class);
+		when(properties.enabled()).thenReturn(true);
+		when(fulfillment.getPurchaseStatus()).thenReturn(SupplierPurchaseStatus.ORDERED);
+		when(fulfillment.getSupplierOrderNumber()).thenReturn("12345");
+		when(fulfillmentRepository.findById(fulfillmentId)).thenReturn(Optional.of(fulfillment));
+		when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+		when(fulfillmentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(fulfillment));
+		when(client.orderView("12345")).thenReturn(new DomeggookPurchaseClient.OrderView(
+			"12345", "배송중", 3450, "CJ_LOGISTICS", "1234567890", "OD-TEST", "63511465"
+		));
+		when(shipmentRepository.findAllByOrderIdForUpdate(orderId)).thenReturn(List.of(portalShipment));
+		when(portalShipment.isPortal()).thenReturn(true);
+
+		assertThatThrownBy(() -> service.sync(fulfillmentId))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("Portal shipments cannot be synchronized through Domeggook tracking");
 	}
 }

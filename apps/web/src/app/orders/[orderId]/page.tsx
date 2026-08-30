@@ -7,6 +7,7 @@ import {
   claimReasonLabel,
   claimStatusLabel,
   claimTypeLabel,
+  customerDirectCancelBlocked,
   customerOrderProjection,
   fulfillmentStatusLabel,
   getCustomerOrder,
@@ -86,16 +87,82 @@ export default async function OrderDetailPage({ params, searchParams }: OrderDet
       ) : null}
 
       <OrderSummaryPanel order={order} />
+      <CustomerShipmentsPanel order={order} />
       <ClaimProgressPanel order={order} />
       <OrderItems order={order} />
       <OrderShippingAddressPanel order={order} />
-      <CancelOrderForm orderId={order.orderId} />
+      {!customerDirectCancelBlocked(order.status) ? <CancelOrderForm orderId={order.orderId} /> : null}
       <ClaimForm orderId={order.orderId} />
       <Link className="button" href="/orders">
         주문 목록
       </Link>
     </section>
   );
+}
+
+function CustomerShipmentsPanel({ order }: { order: OrderDetail }) {
+  if (!Array.isArray(order.shipments)) {
+    return null;
+  }
+
+  return (
+    <section className="detail-section">
+      <h2>배송조회</h2>
+      {order.shipments.length === 0 ? (
+        <div className="notice">
+          <strong>등록된 송장이 없습니다</strong>
+          <span>송장이 등록되면 여기에서 배송조회 정보를 확인할 수 있습니다.</span>
+        </div>
+      ) : (
+        <div className="customer-shipment-list">
+          {order.shipments.map((shipment) => {
+            const officialTrackingUrl = officialShipmentHref(shipment.officialTrackingUrl ?? null);
+            const allocations = shipment.allocations ?? [];
+            return (
+              <article className="customer-shipment-card" key={shipment.shipmentId}>
+                <div>
+                  <strong>{shipment.displayStatus ? shipmentStatusLabel(shipment.displayStatus) : "상태 확인 필요"}</strong>
+                  <span>{shipment.carrierName || "택배사 확인 필요"} · {shipment.trackingNumber || "송장번호 확인 필요"}</span>
+                </div>
+                {allocations.length > 0 ? (
+                  <ul>
+                    {allocations.map((allocation) => {
+                      const item = order.items.find((candidate) => candidate.orderItemId === allocation.orderItemId);
+                      return (
+                        <li key={allocation.orderItemId}>
+                          {item?.productName ?? "주문 상품"} {allocation.quantity}개
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                {officialTrackingUrl ? (
+                  <a className="button" href={officialTrackingUrl} rel="noreferrer" target="_blank">
+                    배송조회
+                  </a>
+                ) : (
+                  <span>공식 배송조회 링크를 제공하지 않는 택배사입니다.</span>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {order.shipmentAllocationComplete === false ? (
+        <p className="field-help">아직 송장이 등록되지 않은 상품이 있습니다.</p>
+      ) : null}
+    </section>
+  );
+}
+
+function officialShipmentHref(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function AdminCustomerOrderNotice() {

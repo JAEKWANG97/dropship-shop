@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.dropshipshop.api.fulfillment.domain.Fulfillment;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentChannel;
 import com.dropshipshop.api.fulfillment.domain.SupplierPurchaseAttempt;
 import com.dropshipshop.api.fulfillment.domain.SupplierPurchaseStatus;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
@@ -31,6 +32,8 @@ import com.dropshipshop.api.order.repository.CustomerOrderRepository;
 import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
+import com.dropshipshop.api.shipment.domain.ShipmentItem;
+import com.dropshipshop.api.shipment.repository.ShipmentItemRepository;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
 import com.dropshipshop.api.common.money.MoneyMath;
 
@@ -44,6 +47,7 @@ public class DomeggookPurchaseService {
 	private final FulfillmentRepository fulfillmentRepository;
 	private final SupplierPurchaseAttemptRepository attemptRepository;
 	private final ShipmentRepository shipmentRepository;
+	private final ShipmentItemRepository shipmentItemRepository;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final NotificationService notificationService;
@@ -57,6 +61,7 @@ public class DomeggookPurchaseService {
 		FulfillmentRepository fulfillmentRepository,
 		SupplierPurchaseAttemptRepository attemptRepository,
 		ShipmentRepository shipmentRepository,
+		ShipmentItemRepository shipmentItemRepository,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		NotificationService notificationService,
@@ -69,6 +74,7 @@ public class DomeggookPurchaseService {
 		this.fulfillmentRepository = fulfillmentRepository;
 		this.attemptRepository = attemptRepository;
 		this.shipmentRepository = shipmentRepository;
+		this.shipmentItemRepository = shipmentItemRepository;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.notificationService = notificationService;
@@ -218,7 +224,19 @@ public class DomeggookPurchaseService {
 			if (!view.trackingNumber().isBlank()) tracking.add(view.carrier() + "|" + view.trackingNumber());
 		}
 		transactionTemplate.executeWithoutResult(status -> {
-			Fulfillment fulfillment = fulfillmentRepository.findByIdForUpdate(context.fulfillmentId()).orElseThrow();
+			CustomerOrder order = orderRepository.findByIdForUpdate(context.orderId()).orElseThrow();
+			Fulfillment fulfillment = fulfillmentRepository.findByOrderIdForUpdate(order.getId()).orElseThrow();
+			if (!fulfillment.getId().equals(context.fulfillmentId())) {
+				throw new IllegalStateException("Fulfillment changed while synchronizing Domeggook tracking");
+			}
+			if (fulfillment.getChannel() == FulfillmentChannel.SUPPLIER_PORTAL) {
+				throw new IllegalStateException("Supplier portal fulfillment requires the portal shipment workflow");
+			}
+			List<Shipment> shipments = shipmentRepository.findAllByOrderIdForUpdate(order.getId());
+			if (shipments.stream().anyMatch(Shipment::isPortal)) {
+				throw new IllegalStateException("Portal shipments cannot be synchronized through Domeggook tracking");
+			}
+			List<OrderItem> orderItems = orderItemRepository.findAllByOrderIdForUpdate(order.getId());
 			Instant now = Instant.now();
 			fulfillment.markPurchaseSynced(now);
 			if (context.purchaseStatus() == SupplierPurchaseStatus.CANCEL_REQUESTED
@@ -232,13 +250,25 @@ public class DomeggookPurchaseService {
 				return;
 			}
 			if (tracking.isEmpty()) return;
+			if (shipments.size() > 1) {
+				fulfillment.recordPurchaseSyncFailure("Multiple recorded shipments require manual shipment handling", now);
+				return;
+			}
 			String[] carrierTracking = tracking.iterator().next().split("\\|", 2);
-			CustomerOrder order = fulfillment.getOrder();
-			Shipment shipment = shipmentRepository.findByOrder_Id(order.getId()).orElse(null);
+			Shipment shipment = shipments.stream().findFirst().orElse(null);
 			if (shipment == null) {
+				if (orderItems.isEmpty()) {
+					throw new IllegalStateException("Order items are required for shipment allocation");
+				}
 				OrderStatus before = order.getStatus();
 				order.markShipped();
-				shipment = shipmentRepository.save(new Shipment(order, carrierTracking[0], carrierTracking[1], Instant.now()));
+				shipment = shipmentRepository.saveAndFlush(
+					new Shipment(order, carrierTracking[0], carrierTracking[1], now)
+				);
+				Shipment savedShipment = shipment;
+				shipmentItemRepository.saveAll(orderItems.stream()
+					.map(item -> new ShipmentItem(savedShipment, item, item.getQuantity()))
+					.toList());
 				statusHistoryRepository.save(new OrderStatusHistory(
 					order,
 					order.getAddressLockedByAdminId(),
@@ -258,7 +288,7 @@ public class DomeggookPurchaseService {
 				shipment.markTrackingSynced(now);
 			}
 			boolean delivered = views.stream().allMatch(view -> view.status().contains("배송완료"));
-			if (delivered && shipment.markDeliveredByTracking(Instant.now())) {
+			if (delivered && shipment.markDeliveredByTracking(now)) {
 				order.markDeliveredByTracking();
 			}
 		});

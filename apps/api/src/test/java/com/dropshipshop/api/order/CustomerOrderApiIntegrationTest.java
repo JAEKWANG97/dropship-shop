@@ -128,6 +128,9 @@ class CustomerOrderApiIntegrationTest {
 			.andExpect(jsonPath("$.items[0].productName", is("Order Product ORD-DETAIL-1")))
 			.andExpect(jsonPath("$.fulfillment.status", is("PENDING")))
 			.andExpect(jsonPath("$.shipment.status", is("READY")))
+			.andExpect(jsonPath("$.shipments", hasSize(0)))
+			.andExpect(jsonPath("$.shipmentAllocationComplete", is(false)))
+			.andExpect(jsonPath("$.shipmentCompatibilityTruncated", is(false)))
 			.andExpect(jsonPath("$.refund.status").doesNotExist());
 
 		mockMvc.perform(get("/api/orders/{orderId}", order.getId())

@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -88,6 +89,14 @@ class ApiExceptionHandler {
 		HttpServletRequest request
 	) {
 		return error(HttpStatus.BAD_REQUEST, ApiErrorCode.MALFORMED_REQUEST, "Malformed request parameter", request);
+	}
+
+	@ExceptionHandler(ServletRequestBindingException.class)
+	ResponseEntity<ApiErrorResponse> handleServletRequestBinding(
+		ServletRequestBindingException exception,
+		HttpServletRequest request
+	) {
+		return error(HttpStatus.BAD_REQUEST, ApiErrorCode.MALFORMED_REQUEST, "Missing or invalid request value", request);
 	}
 
 	@ExceptionHandler(ResponseStatusException.class)

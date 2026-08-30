@@ -14,6 +14,7 @@ import com.dropshipshop.api.payment.domain.PaymentGroupStatus;
 import com.dropshipshop.api.payment.domain.PaymentStatus;
 import com.dropshipshop.api.refund.domain.RefundStatus;
 import com.dropshipshop.api.shipment.domain.ShipmentStatus;
+import com.dropshipshop.api.shipment.PortalShipmentDtos;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -57,6 +58,9 @@ final class OrderDtos {
 		List<OrderItemResponse> items,
 		FulfillmentSummaryResponse fulfillment,
 		ShipmentSummaryResponse shipment,
+		List<PortalShipmentDtos.CustomerShipmentResponse> shipments,
+		boolean shipmentAllocationComplete,
+		boolean shipmentCompatibilityTruncated,
 		RefundSummaryResponse refund,
 		List<ClaimSummaryResponse> claims,
 		ClaimSummaryResponse claim
