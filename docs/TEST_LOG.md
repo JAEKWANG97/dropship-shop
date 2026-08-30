@@ -2,6 +2,19 @@
 
 실행한 검증만 기록한다. 실제 외부 서비스 검증은 자동 테스트 결과와 합치지 않는다.
 
+## 2026-08-30 B-103 Supplier Fulfillment And Minimum PII
+
+- 판정: 로컬 구현·문서 동기화와 독립 backend/test/Web 검토를 완료해 `Review Ready`다. 최종 구현 검토에서 P0/P1/P2 finding은 0건이며 production 공급처 포털은 계속 비활성이다.
+- API 전체: `cd apps/api && ./gradlew cleanTest test --no-daemon` → `78 suites / 342 tests / 0 failures / 0 errors / 0 skipped`.
+- CI 이식성 회귀: PR #55 최초 API run은 Linux/JDK 21에서 retention cleanup 시각의 나노초 완전일치 assertion 1건만 실패했다. 운영 코드는 바꾸지 않고 DB timestamp 정밀도에 맞춘 1 microsecond 이내 비교로 수정했으며, 동일 JDK 21의 알림 suite와 전체 `78 suites / 342 tests`가 다시 통과했다.
+- PostgreSQL: 전체 suite의 `PostgresMigrationSmokeTest` `10 passed`. V42 fresh/upgrade, 기존 null 호환, delivery memo 길이, Claim PII grant/access-log FK·unique·index와 action별 reason constraint를 PostgreSQL 17 Testcontainers에서 확인했다.
+- API 회귀: portal/fallback/legacy/결제 예외 routing, outbox 실패 전체 rollback, tenant·role·PII allowlist, cutoff/terminal/takeover, Claim grant, 배송 메모 HTTP projection, PII-free email·retry·retention·redaction과 B-105 전 claim-work producer 미호출을 확인했다.
+- Web 정적 검증: `npm run lint` → `0 errors / 기존 <img> warnings 3`; `npm run build` → 30 pages production build PASS.
+- Web 계약: `supplier-fulfillment-contract.spec.ts` Desktop/Mobile `12 passed`. normalize된 목록 PII 비노출과 상세 FULL/MASKED 최소정보를 실제 DOM으로 렌더했다. `page.setContent` 기반이라 실제 supplier session, route fetch, hydration과 앱 CSS를 포함한 live E2E 증거는 아니다.
+- 정적 품질: `git diff --check` PASS. README와 설계 문서의 B-103 구현 상태, contract expiry/revoke `403`, reason-code allowlist와 Markdown fence parity를 대조했다.
+- 미실행·잔여: 실제 PostgreSQL 동시 트랜잭션의 detail/takeover/claim/lifecycle lock-order, 100건 초과 scheduler·notification batch 부하, 실제 supplier 로그인/live API, 실제 email 도착은 검증하지 않았다. Email provider 수락 후 DB commit 실패 시 복구는 중복 전달 가능한 at-least-once 특성이 남는다.
+- 운영 경계: 배포, 외부 연락, 운영 데이터와 입금은 변경하지 않았다. `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지하며 실제 email·개인정보 고지·계약 및 B-104/B-105 release gate를 모두 검증하기 전에는 열지 않는다.
+
 ## 2026-08-30 B-102 Supplier Inventory And Reservation
 
 - 판정: 로컬 구현·문서 동기화·독립 코드/Web/문서 리뷰 완료. P0/P1 잔여 없음. Production 공급처 포털은 계속 비활성이며 외부 입금·이메일·운영 데이터는 변경하지 않음.

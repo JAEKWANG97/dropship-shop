@@ -6,6 +6,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import com.dropshipshop.api.claim.domain.Claim;
 import com.dropshipshop.api.claim.domain.ClaimStatus;
@@ -32,4 +36,11 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 		ClaimType claimType,
 		Collection<ClaimStatus> statuses
 	);
+
+	@Query("select claim.order.id from Claim claim where claim.id = :id")
+	Optional<UUID> findOrderIdById(@Param("id") UUID id);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select claim from Claim claim where claim.id = :id")
+	Optional<Claim> findByIdForUpdate(@Param("id") UUID id);
 }

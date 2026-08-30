@@ -237,6 +237,10 @@ function CreateCheckoutForm({
         address2={defaultAddress?.address2 ?? undefined}
       />
       <label>
+        배송 메모
+        <textarea maxLength={300} name="deliveryMemo" placeholder="예: 문 앞에 놓아 주세요" rows={3} />
+      </label>
+      <label>
         입금자명
         <input name="depositorName" placeholder="비워두면 받는 사람 이름으로 안내됩니다" />
       </label>

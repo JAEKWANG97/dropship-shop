@@ -62,6 +62,8 @@ import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.PricingPolicyRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.notification.NotificationLogRepository;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.user.domain.UserRole;
 
 @SpringBootTest(properties = {
@@ -87,6 +89,7 @@ class AdminProductReviewApiIntegrationTest {
 	@Autowired ProductImageCleanupJobRepository cleanupJobRepository;
 	@Autowired ProductDetailBlockRepository detailBlockRepository;
 	@Autowired ProductNoticeRepository noticeRepository;
+	@Autowired NotificationLogRepository notificationLogRepository;
 
 	@Test
 	void listsAndReadsOnlyReviewRequiredProductsWithStructuredContent() throws Exception {
@@ -148,6 +151,7 @@ class AdminProductReviewApiIntegrationTest {
 			.andExpect(jsonPath("$.code", is("PRODUCT_VERSION_CONFLICT")));
 
 		assertReviewState(fixture.productId(), fixture.version(), ProductReviewStatus.REVIEW_REQUIRED);
+		assertThat(reviewNotifications(fixture)).isEmpty();
 
 		mockMvc.perform(post("/api/admin/product-reviews/{productId}/approve", fixture.productId())
 				.with(authentication(TestAuthentication.admin()))
@@ -165,6 +169,7 @@ class AdminProductReviewApiIntegrationTest {
 		assertReviewState(fixture.productId(), fixture.version() + 1, ProductReviewStatus.APPROVED);
 		assertThat(productRepository.findById(fixture.productId()).orElseThrow().getStatus())
 			.isEqualTo(ProductStatus.ACTIVE);
+		assertReviewNotification(fixture, ProductReviewStatus.APPROVED);
 	}
 
 	@Test
@@ -245,6 +250,7 @@ class AdminProductReviewApiIntegrationTest {
 			.andExpect(jsonPath("$.internalReason").doesNotExist())
 			.andExpect(jsonPath("$.reviewedByAdminId").doesNotExist())
 			.andExpect(content().string(not(containsString(internalReason))));
+		assertReviewNotification(fixture, ProductReviewStatus.SUPPLEMENT_REQUESTED);
 	}
 
 	@Test
@@ -296,6 +302,7 @@ class AdminProductReviewApiIntegrationTest {
 			.andExpect(jsonPath("$.reviewMessage", is("현재 판매 정책상 등록할 수 없는 상품입니다.")))
 			.andExpect(jsonPath("$.internalReason").doesNotExist())
 			.andExpect(jsonPath("$.reviewedByAdminId").doesNotExist());
+		assertReviewNotification(fixture, ProductReviewStatus.REJECTED);
 	}
 
 	@Test
@@ -526,7 +533,27 @@ class AdminProductReviewApiIntegrationTest {
 			"반품·교환 안내",
 			List.of(new ProductNoticeRow("인증번호", "SAFE-123"))
 		));
-		return new Fixture(product.getId(), product.getVersion(), managerUserId);
+		return new Fixture(product.getId(), product.getVersion(), managerUserId, supplier.getId());
+	}
+
+	private List<com.dropshipshop.api.notification.domain.NotificationLog> reviewNotifications(Fixture fixture) {
+		return notificationLogRepository.findAll().stream()
+			.filter(log -> fixture.supplierId().equals(log.getSupplierId()))
+			.filter(log -> log.getType() == NotificationType.SUPPLIER_PRODUCT_REVIEW_RESULT)
+			.toList();
+	}
+
+	private void assertReviewNotification(Fixture fixture, ProductReviewStatus expectedStatus) {
+		assertThat(reviewNotifications(fixture)).singleElement().satisfies(log -> {
+			assertThat(log.getPayloadSnapshot()).contains(
+				"event=PRODUCT_REVIEW_RESULT",
+				"productId=" + fixture.productId(),
+				"reviewStatus=" + expectedStatus
+			);
+			assertThat(log.getPayloadSnapshot()).doesNotContain(
+				"Review Supplier", "010-", "@supplier.example", "Structured review summary"
+			);
+		});
 	}
 
 	private void assertReviewState(UUID productId, long version, ProductReviewStatus status) {
@@ -566,7 +593,7 @@ class AdminProductReviewApiIntegrationTest {
 		return objectMapper.writeValueAsString(value);
 	}
 
-	private record Fixture(UUID productId, long version, UUID managerUserId) {
+	private record Fixture(UUID productId, long version, UUID managerUserId, UUID supplierId) {
 	}
 
 	private record PiiCase(String supplierMessage, String internalReason) {

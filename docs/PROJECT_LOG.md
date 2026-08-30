@@ -1148,3 +1148,22 @@
 - 문서: README, requirements, Confirmed Policy, decision log, API, domain model, ERD, order flow, architecture, supplier portal design을 B-102 Implemented/B-103~B-105 Planned 경계와 V41 스키마에 맞게 동기화했다.
 - 검증: API `303 passed`(실제 PostgreSQL 17 migration/concurrency smoke `10 passed` 포함), Web lint `0 errors / 기존 3 warnings`, production build `29 pages`, 공급처/결제 Web 계약 Playwright desktop/mobile `40 passed`, 격리 PostgreSQL 17·로컬 시드의 환불 승인 화면과 만료/취소 필터 smoke `2 passed`, `git diff --check`를 통과했다.
 - 후속작업: production `SUPPLIER_PORTAL_ENABLED`는 계속 false로 두고 운영 데이터·외부 연락·실제 입금을 변경하지 않았다. 다음 구현 단위는 B-103 출고 요청·최소 PII·이메일 알림이며, managed 공개 정책 버전과 checkout 동의는 실제 활성화 전 gate로 남긴다.
+
+## 2026-08-30 16:35 KST
+
+- 관련 항목: B-103
+- 작업: 현재 shared worktree의 B-103 출고 routing, 공급처 주문 목록·최소 PII 상세, cutoff/terminal 인계, 관리자 takeover·Claim PII grant·접근 로그, 운영 email 기반, V42 migration과 Web 표면에 맞춰 요구사항·정책·결정 로그·API·도메인·ERD·order flow·architecture·supplier portal 설계를 동기화했다.
+- 결정: 배송 메모는 최대 300자로 trim하고 blank는 `null` snapshot으로 저장한다. All-portal 주문도 portal 접근이 일시 불가한 KEEP 상태면 신규 입금확인 work를 `COREABLE_MANUAL`로 fallback한다. B-103은 `requestedAt+60일` cutoff와 출고 요청·상품 검토 email producer까지 구현하며, 송장 등록 시 `min(current, registeredAt+30일)` 단축은 Planned B-104, claim-work email 실제 producer는 Planned B-105가 맡는다.
+- 개인정보·운영 경계: 목록은 PII-free, 상세는 자기 item과 배송 최소정보만 `no-store`로 제공하고 정상·cutoff/terminal masking·기한부 Claim grant를 구분한다. 실제 SES 도착, 새 공급처·택배사 제3자 제공 고지 시행 버전, B-098 계약 증적/관계 종료 cleanup, B-104/B-105와 전체 release 검증 전에는 production flag를 계속 끈다.
+- 검증 상태: 구현·문서 계약과 오래된 `Planned B-103` 표현을 정적 대조하고 변경 문서의 whitespace와 Markdown fence parity를 확인했다. 전체 API/PostgreSQL/Web 명령 결과와 독립 검토가 아직 확정되지 않아 B-103은 `In Progress`, 새 `TEST_CHECKLIST` 항목은 미체크로 두고 `TEST_LOG`에는 결과를 쓰지 않았다.
+- 후속작업: 전체 API suite와 PostgreSQL V42 fresh/upgrade smoke, Web lint/build, 공급처 출고 계약 Playwright, 독립 구현 검토 결과를 반영한 뒤에만 `Review Ready`로 올린다. 이후 B-104 송장/공식 조회 링크, B-105 품절·클레임 사실을 각각 별도 backlog/commit으로 진행한다.
+
+## 2026-08-30 19:46 KST
+
+- 관련 항목: B-103
+- 완료: 입금확인 후 supplier portal 출고 요청과 KEEP fallback, 주소 잠금, PII-free 목록·최소 상세, +60일 cutoff·terminal/Coreable 인계, 관리자 takeover와 Claim 한시 접근, 접근 로그, 배송 메모 snapshot, PII-free 운영 email·retry·retention 및 V42 migration을 구현·문서화했다.
+- 검토 개선: 독립 검토에서 lock 순서, stale entity, 개인정보가 섞일 수 있는 free-text reason, 결제 예외·tenant item 방어, outbox rollback, endpoint role matrix, 배송 메모 HTTP projection, invite retry와 provider skip redaction, Web 실제 DOM 계약을 찾아 회귀 테스트와 함께 보강했다. 최종 backend 구현 finding은 P0/P1/P2 모두 0건이다.
+- 검증: API 전체 `78 suites / 342 tests` 전부 통과했고 PostgreSQL 17 migration smoke `10 passed`를 포함한다. Web lint는 `0 errors / 기존 warnings 3`, production build는 30 pages, 공급처 출고 DOM 계약 Playwright는 Desktop/Mobile `12 passed`, `git diff --check`를 통과했다.
+- CI 개선: PR #55 최초 API run에서 Linux/JDK 21의 DB timestamp 정밀도 때문에 retention test의 나노초 완전일치가 1건 실패했다. 운영 로직은 유지하고 assertion을 1 microsecond 이내 비교로 좁게 수정한 뒤 동일 JDK 21 전체 `342 tests`를 재검증했다.
+- 제한: 실제 supplier 로그인·route/API·CSS를 포함한 live E2E, 실제 email 도착, PostgreSQL 실동시 lock-order, 100건 초과 batch/부하와 provider accept 뒤 commit 실패 시 at-least-once 복구는 별도 운영 검증으로 남긴다.
+- 상태·후속작업: B-103은 `Review Ready`로 올렸다. 배포와 production flag 활성화는 하지 않았고 `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다. branch/PR 반영 뒤 다음 독립 작업 단위는 B-104 복수 송장·공식 배송조회 링크다.

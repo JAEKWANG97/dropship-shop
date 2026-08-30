@@ -47,7 +47,8 @@ class CustomerOrderAddressService {
 			request.recipientPhone(),
 			request.postalCode(),
 			request.address1(),
-			request.address2()
+			request.address2(),
+			request.deliveryMemo()
 		));
 		return customerOrderQueryService.getOrder(userId, orderId);
 	}

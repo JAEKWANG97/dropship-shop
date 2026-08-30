@@ -171,7 +171,8 @@ public class CheckoutService {
 			request.recipientPhone(),
 			request.postalCode(),
 			request.address1(),
-			request.address2()
+			request.address2(),
+			request.deliveryMemo()
 		);
 		Instant checkoutAt = Instant.now(clock);
 		Instant expiresAt = checkoutAt.plus(bankTransferProperties.depositDeadline());
@@ -236,7 +237,8 @@ public class CheckoutService {
 			request.recipientPhone(),
 			request.postalCode(),
 			request.address1(),
-			request.address2()
+			request.address2(),
+			request.deliveryMemo()
 		);
 		List<CustomerOrder> orders = orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId());
 		if (orders.isEmpty() || orders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAYMENT_PENDING)) {
@@ -449,14 +451,16 @@ public class CheckoutService {
 			first.getRecipientPhone(),
 			first.getPostalCode(),
 			first.getAddress1(),
-			first.getAddress2()
+			first.getAddress2(),
+			first.getDeliveryMemo()
 		);
 		boolean inconsistent = orders.stream().skip(1).anyMatch(order -> !address.equals(new ShippingAddressSnapshot(
 			order.getRecipientName(),
 			order.getRecipientPhone(),
 			order.getPostalCode(),
 			order.getAddress1(),
-			order.getAddress2()
+			order.getAddress2(),
+			order.getDeliveryMemo()
 		)));
 		if (inconsistent) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout shipping address is inconsistent");
@@ -466,7 +470,8 @@ public class CheckoutService {
 			address.recipientPhone(),
 			address.postalCode(),
 			address.address1(),
-			address.address2()
+			address.address2(),
+			address.deliveryMemo()
 		);
 	}
 

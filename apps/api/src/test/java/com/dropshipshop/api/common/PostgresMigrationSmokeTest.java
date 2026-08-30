@@ -16,6 +16,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -148,7 +149,7 @@ class PostgresMigrationSmokeTest {
 			Integer.class
 		);
 
-		assertThat(migrationCount).isNotNull().isGreaterThanOrEqualTo(41);
+		assertThat(migrationCount).isNotNull().isGreaterThanOrEqualTo(42);
 		assertThat(pricingPolicyCount).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForObject(
 			"select version from pricing_policies where active = true",
@@ -188,6 +189,27 @@ class PostgresMigrationSmokeTest {
 				'chk_product_options_inventory_projection',
 				'chk_order_items_reservation_evidence',
 				'uk_supplier_inventory_history_subject_key'
+			)
+			""", Integer.class)).isEqualTo(3);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from information_schema.columns
+			where table_schema = current_schema()
+			  and table_name = 'orders'
+			  and column_name = 'delivery_memo'
+				""", Integer.class)).isEqualTo(1);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*)
+			from information_schema.tables
+			where table_schema = current_schema()
+			  and table_name in ('supplier_pii_access_grants', 'supplier_pii_access_logs')
+				""", Integer.class)).isEqualTo(2);
+		assertThat(jdbcTemplate.queryForObject("""
+			select count(*) from pg_constraint
+			where conname in (
+			  'uk_supplier_pii_access_grants_claim_sequence',
+			  'uk_supplier_pii_access_grants_claim_key',
+			  'ck_supplier_pii_access_logs_reason'
 			)
 			""", Integer.class)).isEqualTo(3);
 
@@ -299,6 +321,7 @@ class PostgresMigrationSmokeTest {
 				assertV41Inventory(connection, coreableOptionId, "UNTRACKED", null);
 				assertV41Inventory(connection, portalOptionId, "TRACKED", 0L);
 				assertV41OrderItemSnapshot(connection, coreableOrder.orderItemId());
+				assertV42PrivacySchema(connection, coreableOrder.orderId(), userId, supplierId);
 
 				UUID rollbackCompatibleOptionId = UUID.randomUUID();
 				insertV40Option(connection, rollbackCompatibleOptionId, coreableProductId);
@@ -1008,6 +1031,133 @@ class PostgresMigrationSmokeTest {
 				assertThat(result.getObject("released_at")).isNull();
 				assertThat(result.getObject("reacquired_at")).isNull();
 			}
+		}
+	}
+
+	private void assertV42PrivacySchema(
+		Connection connection,
+		UUID legacyOrderId,
+		UUID userId,
+		UUID supplierId
+	) throws SQLException {
+		try (PreparedStatement order = connection.prepareStatement(
+			"select delivery_memo from orders where id = ?")) {
+			order.setObject(1, legacyOrderId);
+			try (ResultSet result = order.executeQuery()) {
+				assertThat(result.next()).isTrue();
+				assertThat(result.getString("delivery_memo")).isNull();
+			}
+		}
+		try (Statement statement = connection.createStatement()) {
+			assertThat(singleInt(statement, """
+				select count(*)
+				from pg_constraint
+				where conname in (
+				  'fk_supplier_pii_access_grants_claim',
+				  'fk_supplier_pii_access_grants_supplier',
+				  'fk_supplier_pii_access_grants_previous',
+				  'fk_supplier_pii_access_grants_admin',
+				  'fk_supplier_pii_access_logs_actor_user',
+				  'fk_supplier_pii_access_logs_order',
+				  'uk_supplier_pii_access_grants_claim_sequence',
+				  'uk_supplier_pii_access_grants_claim_key'
+				)
+				""")).isEqualTo(8);
+			assertThat(singleInt(statement, """
+				select count(*)
+				from pg_indexes
+				where schemaname = current_schema()
+				  and indexname in (
+				    'idx_supplier_pii_access_grants_claim_sequence',
+				    'idx_supplier_pii_access_grants_supplier',
+				    'idx_supplier_pii_access_logs_actor_time',
+				    'idx_supplier_pii_access_logs_order_time',
+				    'idx_notification_logs_supplier_operational_retention'
+				  )
+				""")).isEqualTo(5);
+		}
+		try (PreparedStatement update = connection.prepareStatement(
+			"update orders set delivery_memo = repeat('x', ?) where id = ?")) {
+			update.setInt(1, 300);
+			update.setObject(2, legacyOrderId);
+			assertThat(update.executeUpdate()).isEqualTo(1);
+		}
+		try (PreparedStatement length = connection.prepareStatement(
+			"select char_length(delivery_memo) from orders where id = ?")) {
+			length.setObject(1, legacyOrderId);
+			try (ResultSet result = length.executeQuery()) {
+				assertThat(result.next()).isTrue();
+				assertThat(result.getInt(1)).isEqualTo(300);
+			}
+		}
+		assertThatThrownBy(() -> {
+			try (PreparedStatement tooLong = connection.prepareStatement(
+				"update orders set delivery_memo = repeat('x', ?) where id = ?")) {
+				tooLong.setInt(1, 301);
+				tooLong.setObject(2, legacyOrderId);
+				tooLong.executeUpdate();
+			}
+		}).isInstanceOf(SQLException.class);
+
+		UUID claimId = UUID.randomUUID();
+		try (PreparedStatement claim = connection.prepareStatement("""
+			insert into claims(
+				id, order_id, user_id, claim_type, claim_reason, status, requested_action,
+				customer_memo, created_at, updated_at
+			) values (?, ?, ?, 'CANCEL', 'DEFECT', 'APPROVED', 'REFUND',
+				'V42 reason constraint fixture', now(), now())
+			""")) {
+			claim.setObject(1, claimId);
+			claim.setObject(2, legacyOrderId);
+			claim.setObject(3, userId);
+			assertThat(claim.executeUpdate()).isEqualTo(1);
+		}
+		assertThatThrownBy(() -> insertV42Grant(
+			connection, claimId, supplierId, userId, "GRANTED", Instant.now().plusSeconds(3600),
+			"Return coordination required", "v42-invalid-free-text"
+		)).isInstanceOf(SQLException.class);
+		assertThatThrownBy(() -> insertV42Grant(
+			connection, claimId, supplierId, userId, "REVOKED", null,
+			"RETURN_COORDINATION_REQUIRED", "v42-invalid-action-code"
+		)).isInstanceOf(SQLException.class);
+		insertV42Grant(
+			connection, claimId, supplierId, userId, "GRANTED", Instant.now().plusSeconds(3600),
+			"RETURN_COORDINATION_REQUIRED", "v42-valid-grant-code"
+		);
+	}
+
+	private void insertV42Grant(
+		Connection connection,
+		UUID claimId,
+		UUID supplierId,
+		UUID actorId,
+		String action,
+		Instant accessUntil,
+		String reason,
+		String idempotencyKey
+	) throws SQLException {
+		try (PreparedStatement grant = connection.prepareStatement("""
+			insert into supplier_pii_access_grants(
+				id, claim_id, supplier_id, sequence, action, access_until, previous_grant_id,
+				acted_by_admin_id, reason, request_hash, idempotency_key, result_snapshot, created_at
+			) values (?, ?, ?, 1, ?, ?, null, ?, ?, 'v42-smoke-hash', ?, '{}'::jsonb, now())
+			""")) {
+			grant.setObject(1, UUID.randomUUID());
+			grant.setObject(2, claimId);
+			grant.setObject(3, supplierId);
+			grant.setString(4, action);
+			grant.setTimestamp(5, accessUntil == null ? null : Timestamp.from(accessUntil));
+			grant.setObject(6, actorId);
+			grant.setString(7, reason);
+			grant.setString(8, idempotencyKey);
+			assertThat(grant.executeUpdate()).isEqualTo(1);
+		}
+	}
+
+	private int singleInt(Statement statement, String sql) throws SQLException {
+		try (ResultSet result = statement.executeQuery(sql)) {
+			assertThat(result.next()).isTrue();
+			return result.getInt(1);
 		}
 	}
 

@@ -64,6 +64,9 @@ public class CustomerOrder {
 	@Column(length = 300)
 	private String address2;
 
+	@Column(name = "delivery_memo", length = 300)
+	private String deliveryMemo;
+
 	@Column(name = "subtotal_amount", nullable = false)
 	private long subtotalAmount;
 
@@ -119,6 +122,7 @@ public class CustomerOrder {
 		this.postalCode = address.postalCode();
 		this.address1 = address.address1();
 		this.address2 = address.address2();
+		this.deliveryMemo = normalizedDeliveryMemo(address.deliveryMemo());
 		this.subtotalAmount = MoneyMath.requirePositive(subtotalAmount, "subtotalAmount");
 		this.shippingFee = 0;
 		this.discountAmount = 0;
@@ -170,6 +174,14 @@ public class CustomerOrder {
 		this.supplierOrderStartedAt = startedAt;
 		this.addressLockedAt = startedAt;
 		this.addressLockedByAdminId = adminUserId;
+	}
+
+	public void lockAddressForSupplierPortal(Instant lockedAt) {
+		if (status != OrderStatus.SUPPLIER_ORDER_PENDING || supplierOrderStartedAt != null || addressLockedAt != null) {
+			throw new IllegalStateException("Supplier portal address can be locked only once after payment approval");
+		}
+		this.addressLockedAt = java.util.Objects.requireNonNull(lockedAt, "lockedAt");
+		this.addressLockedByAdminId = null;
 	}
 
 	public void markSupplierOrdered() {
@@ -286,6 +298,18 @@ public class CustomerOrder {
 		this.postalCode = address.postalCode();
 		this.address1 = address.address1();
 		this.address2 = address.address2();
+		this.deliveryMemo = normalizedDeliveryMemo(address.deliveryMemo());
+	}
+
+	private String normalizedDeliveryMemo(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		String normalized = value.trim();
+		if (normalized.length() > 300) {
+			throw new IllegalArgumentException("Delivery memo must be at most 300 characters");
+		}
+		return normalized;
 	}
 
 	public UUID getId() {
@@ -330,6 +354,10 @@ public class CustomerOrder {
 
 	public String getAddress2() {
 		return address2;
+	}
+
+	public String getDeliveryMemo() {
+		return deliveryMemo;
 	}
 
 	public long getSubtotalAmount() {

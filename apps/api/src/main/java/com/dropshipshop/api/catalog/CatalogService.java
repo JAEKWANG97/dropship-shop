@@ -76,6 +76,7 @@ import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
 import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
 import com.dropshipshop.api.supplierproduct.ProductSaleability;
+import com.dropshipshop.api.notification.NotificationService;
 
 @Service
 public class CatalogService {
@@ -121,6 +122,7 @@ public class CatalogService {
 	private final ProductImageCleanupService productImageCleanupService;
 	private final CatalogPriceCalculator catalogPriceCalculator;
 	private final ProductSaleability productSaleability;
+	private final NotificationService notificationService;
 
 	public CatalogService(
 		SupplierRepository supplierRepository,
@@ -139,7 +141,8 @@ public class CatalogService {
 		SupplierPortalInputPolicy supplierPortalInputPolicy,
 		ProductImageCleanupService productImageCleanupService,
 		CatalogPriceCalculator catalogPriceCalculator,
-		ProductSaleability productSaleability
+		ProductSaleability productSaleability,
+		NotificationService notificationService
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -158,6 +161,7 @@ public class CatalogService {
 		this.productImageCleanupService = productImageCleanupService;
 		this.catalogPriceCalculator = catalogPriceCalculator;
 		this.productSaleability = productSaleability;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional(readOnly = true)
@@ -259,6 +263,7 @@ public class CatalogService {
 		}
 		lock.product().incrementVersion();
 		recordAdminReviewChange(lock.product(), adminUserId, beforeVersion, before, internalReason);
+		notificationService.supplierProductReviewResult(lock.supplier(), lock.product());
 		return toProductReviewDetail(lock.product());
 	}
 
@@ -306,6 +311,7 @@ public class CatalogService {
 		}
 		lock.product().incrementVersion();
 		recordAdminReviewChange(lock.product(), adminUserId, beforeVersion, before, internalReason);
+		notificationService.supplierProductReviewResult(lock.supplier(), lock.product());
 		return toProductReviewDetail(lock.product());
 	}
 

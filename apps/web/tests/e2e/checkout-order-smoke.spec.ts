@@ -50,6 +50,7 @@ test("checkout shows, updates, and locks the confirmed shipping address", async 
     await expect(page.getByRole("heading", { name: "배송지" })).toBeVisible();
     await expect(page.locator("body")).toContainText("서울특별시 송파구 초기로 1");
     await expect(page.getByLabel("받는 사람")).toHaveValue("E2E 주문 고객");
+    await expect(page.getByLabel("배송 메모")).toHaveValue("초기 배송 메모");
 
     await page.getByLabel("받는 사람").fill("변경된 주문 고객");
     await page.getByLabel("연락처").fill("010-9999-8888");
@@ -57,10 +58,12 @@ test("checkout shows, updates, and locks the confirmed shipping address", async 
     await expect(page.getByLabel("우편번호")).toHaveValue("05555");
     await expect(page.getByLabel("주소", { exact: true })).toHaveValue("서울특별시 송파구 테스트로 1");
     await page.getByLabel("상세 주소").fill("202호");
+    await page.getByLabel("배송 메모").fill("문 앞에 놓아 주세요");
     await page.getByRole("button", { name: "배송지 변경" }).click();
 
     await expect(page.locator("body")).toContainText("배송지를 변경했습니다.");
     await expect(page.locator("body")).toContainText("서울특별시 송파구 테스트로 1 202호");
+    await expect(page.locator("body")).toContainText("문 앞에 놓아 주세요");
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "정책 확인 저장" }).click();
 
@@ -68,6 +71,7 @@ test("checkout shows, updates, and locks the confirmed shipping address", async 
     await expect(page.getByText("주문 정책 확인이 완료된 배송지는 고객 문의를 통해서만 변경할 수 있습니다.")).toBeVisible();
     await expect(page.getByRole("button", { name: "배송지 변경" })).toHaveCount(0);
     await expect(page.locator("body")).toContainText("서울특별시 송파구 테스트로 1 202호");
+    await expect(page.locator("body")).toContainText("문 앞에 놓아 주세요");
     await expectNoHorizontalOverflow(page);
   } finally {
     await cancelUnpaidCheckout(checkout.orderId);
@@ -161,6 +165,7 @@ async function createPendingCheckout(customerCookie: string): Promise<CheckoutFi
       postalCode: "05554",
       address1: "서울특별시 송파구 초기로 1",
       address2: "101호",
+      deliveryMemo: "초기 배송 메모",
     }),
   })) as { checkoutNumber: string; orders: { id: string }[] };
   return { checkoutNumber: checkout.checkoutNumber, orderId: checkout.orders[0].id };

@@ -64,6 +64,8 @@ import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.common.storage.FileStorage;
 import com.dropshipshop.api.common.storage.StoredFile;
+import com.dropshipshop.api.notification.NotificationLogRepository;
+import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.user.domain.SocialProvider;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
@@ -92,6 +94,7 @@ class SupplierProductApiIntegrationTest {
 	@Autowired PricingPolicyRepository pricingPolicyRepository;
 	@Autowired ProductChangeHistoryRepository historyRepository;
 	@Autowired ObjectMapper objectMapper;
+	@Autowired NotificationLogRepository notificationLogRepository;
 	@MockitoBean FileStorage fileStorage;
 
 	@Test
@@ -188,6 +191,10 @@ class SupplierProductApiIntegrationTest {
 			.andExpect(jsonPath("$.id", is(productId.toString())))
 			.andExpect(jsonPath("$.sourcePrice").doesNotExist())
 			.andExpect(jsonPath("$.supplierId").doesNotExist());
+		assertThat(notificationLogRepository.findAll()).noneSatisfy(log -> {
+			assertThat(log.getSupplierId()).isEqualTo(manager.supplier().getId());
+			assertThat(log.getType()).isEqualTo(NotificationType.SUPPLIER_PRODUCT_REVIEW_RESULT);
+		});
 	}
 
 	@Test

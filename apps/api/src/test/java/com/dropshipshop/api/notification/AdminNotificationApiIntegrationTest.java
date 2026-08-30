@@ -1,6 +1,7 @@
 package com.dropshipshop.api.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -11,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +27,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +38,8 @@ import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
+import com.dropshipshop.api.catalog.domain.SupplierSalesAction;
+import com.dropshipshop.api.catalog.domain.SupplierStatus;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
@@ -61,7 +67,7 @@ import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.domain.UserRole;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.supplier-portal.enabled=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -105,6 +111,15 @@ class AdminNotificationApiIntegrationTest {
 
 	@Autowired
 	private NotificationLogRepository notificationLogRepository;
+
+	@Autowired
+	private SupplierNotificationRetentionService supplierNotificationRetentionService;
+
+	@Autowired
+	private SupplierOperationalNotificationScheduler supplierOperationalNotificationScheduler;
+
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
 
 	@BeforeEach
 	void resetSmsSender() {
@@ -205,6 +220,24 @@ class AdminNotificationApiIntegrationTest {
 	}
 
 	@Test
+	void rejectsGenericRetryForSupplierInvitationWithoutSending() throws Exception {
+		NotificationLog invite = NotificationLog.supplierInvitation(
+			UUID.randomUUID(), UUID.randomUUID(), "invite@example.com", "activation_link_not_stored"
+		);
+		invite.markFailed("EMAIL_PROVIDER_FAILURE");
+		invite = notificationLogRepository.saveAndFlush(invite);
+
+		mockMvc.perform(post("/api/admin/notifications/{notificationId}/retry", invite.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code", is("INVITE_REISSUE_NOT_ALLOWED")));
+
+		assertThat(emailSender.messages()).isEmpty();
+		assertThat(notificationLogRepository.findById(invite.getId()).orElseThrow().getStatus())
+			.isEqualTo(NotificationStatus.FAILED);
+	}
+
+	@Test
 	void dispatchesInquiryEmailWithLookupLinkAndRecordsFailure() {
 		UUID inquiryId = UUID.randomUUID();
 		NotificationLog sentLog = notificationLogRepository.saveAndFlush(new NotificationLog(
@@ -253,6 +286,186 @@ class AdminNotificationApiIntegrationTest {
 			});
 	}
 
+	@Test
+	void supplierOperationalDispatchRevalidatesAuthorizationAndExactRecipient() {
+		Supplier supplier = createActivePortalSupplier("dispatch-revalidation");
+		NotificationLog mismatchedRecipient = notificationLogRepository.saveAndFlush(
+			operationalLog(supplier, "old-contact@example.com")
+		);
+		NotificationLog missingSupplier = notificationLogRepository.saveAndFlush(NotificationLog.supplierOperational(
+			UUID.randomUUID(), UUID.randomUUID(), null,
+			NotificationType.SUPPLIER_FULFILLMENT_REQUESTED,
+			"missing-supplier@example.com",
+			"supplier_fulfillment_requested",
+			"event=FULFILLMENT_REQUESTED, orderNumber=SAFE-2, portalPath=/supplier/orders/SAFE-2"
+		));
+
+		notificationDispatchListener.dispatchNow(mismatchedRecipient.getId());
+		notificationDispatchListener.dispatchNow(missingSupplier.getId());
+
+		assertThat(emailSender.messages()).isEmpty();
+		assertThat(notificationLogRepository.findById(mismatchedRecipient.getId()).orElseThrow())
+			.satisfies(log -> {
+				assertThat(log.getStatus()).isEqualTo(NotificationStatus.SKIPPED);
+				assertThat(log.getFailureReason()).isEqualTo("SUPPLIER_AUTHORIZATION_CHANGED");
+				assertThat(log.getRecipientRetentionExpiresAt()).isNotNull();
+			});
+		assertThat(notificationLogRepository.findById(missingSupplier.getId()).orElseThrow().getStatus())
+			.isEqualTo(NotificationStatus.SKIPPED);
+	}
+
+	@Test
+	void supplierOperationalProviderFailureStoresOnlyRedactedCode() {
+		Supplier supplier = createActivePortalSupplier("redacted-provider-failure");
+		NotificationLog log = notificationLogRepository.saveAndFlush(operationalLog(supplier, supplier.getEmail()));
+		emailSender.fail("SES rejected customer@example.com at 010-9999-0000");
+
+		notificationDispatchListener.dispatchNow(log.getId());
+
+		assertThat(notificationLogRepository.findById(log.getId()).orElseThrow())
+			.satisfies(failed -> {
+				assertThat(failed.getStatus()).isEqualTo(NotificationStatus.FAILED);
+				assertThat(failed.getFailureReason()).isEqualTo("EMAIL_PROVIDER_FAILURE");
+				assertThat(failed.getFailureReason()).doesNotContain("customer@example.com", "010-9999-0000");
+				assertThat(failed.getRecipientRetentionExpiresAt())
+					.isEqualTo(failed.getCreatedAt().plus(37, ChronoUnit.DAYS));
+				});
+	}
+
+	@Test
+	void supplierOperationalUnsuccessfulResultUsesAllowlistedSkipCode() {
+		Supplier supplier = createActivePortalSupplier("provider-skipped-result");
+		NotificationLog log = notificationLogRepository.saveAndFlush(operationalLog(supplier, supplier.getEmail()));
+		emailSender.skip("SES suppressed private@example.com");
+
+		notificationDispatchListener.dispatchNow(log.getId());
+
+		assertThat(notificationLogRepository.findById(log.getId()).orElseThrow())
+			.satisfies(skipped -> {
+				assertThat(skipped.getStatus()).isEqualTo(NotificationStatus.SKIPPED);
+				assertThat(skipped.getFailureReason()).isEqualTo("EMAIL_PROVIDER_SKIPPED");
+				assertThat(skipped.getFailureReason()).doesNotContain("private@example.com");
+				assertThat(skipped.getRecipientRetentionExpiresAt()).isNotNull();
+			});
+		assertThat(emailSender.messages()).hasSize(1);
+	}
+
+	@Test
+	void recoversCommittedPendingSupplierOperationalOutboxRow() {
+		Supplier supplier = createActivePortalSupplier("pending-outbox-recovery");
+		NotificationLog pending = notificationLogRepository.saveAndFlush(
+			operationalLog(supplier, supplier.getEmail())
+		);
+
+		assertThat(supplierOperationalNotificationScheduler.recoverPendingBatch()).isGreaterThanOrEqualTo(1);
+
+		assertThat(notificationLogRepository.findById(pending.getId()).orElseThrow().getStatus())
+			.isEqualTo(NotificationStatus.SENT);
+		assertThat(emailSender.messages()).anySatisfy(message ->
+			assertThat(message).contains(supplier.getEmail(), "[코어블SAF] 새 출고 요청", "/supplier/orders")
+		);
+	}
+
+	@Test
+	void terminalizesExpiredPendingSupplierOperationalWithoutSending() {
+		Supplier supplier = createActivePortalSupplier("expired-pending-outbox");
+		NotificationLog pending = notificationLogRepository.saveAndFlush(
+			operationalLog(supplier, supplier.getEmail())
+		);
+		Instant backdatedCreatedAt = Instant.now().minus(8, ChronoUnit.DAYS);
+		jdbcTemplate.update(
+			"update notification_logs set created_at = ? where id = ?",
+			Timestamp.from(backdatedCreatedAt), pending.getId()
+		);
+		emailSender.reset();
+
+		notificationDispatchListener.dispatchNow(pending.getId());
+
+		assertThat(emailSender.messages()).isEmpty();
+		assertThat(notificationLogRepository.findById(pending.getId()).orElseThrow())
+			.satisfies(expired -> {
+				assertThat(expired.getStatus()).isEqualTo(NotificationStatus.FAILED);
+				assertThat(expired.getFailureReason()).isEqualTo("DELIVERY_WINDOW_EXPIRED");
+				assertThat(expired.getRecipientRetentionExpiresAt())
+					.isEqualTo(expired.getCreatedAt().plus(37, ChronoUnit.DAYS));
+			});
+	}
+
+	@Test
+	void supplierOperationalRetryIsFailedOnlyWithinSevenDaysAndRetentionClearsRecipient() throws Exception {
+		Supplier supplier = createActivePortalSupplier("retry-retention");
+		NotificationLog retryable = notificationLogRepository.saveAndFlush(operationalLog(supplier, supplier.getEmail()));
+		retryable.markFailed("EMAIL_PROVIDER_FAILURE");
+		retryable.scheduleOperationalCleanup(Instant.now());
+		notificationLogRepository.saveAndFlush(retryable);
+
+		mockMvc.perform(post("/api/admin/notifications/{notificationId}/retry", retryable.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk());
+
+		assertThat(notificationLogRepository.findById(retryable.getId()).orElseThrow())
+			.satisfies(sent -> {
+				assertThat(sent.getStatus()).isEqualTo(NotificationStatus.SENT);
+				assertThat(sent.getFailureReason()).isNull();
+				assertThat(sent.getRecipientRetentionExpiresAt()).isNotNull();
+			});
+
+		NotificationLog expired = notificationLogRepository.saveAndFlush(operationalLog(supplier, supplier.getEmail()));
+		expired.markFailed("EMAIL_PROVIDER_FAILURE");
+		expired.scheduleOperationalCleanup(Instant.now());
+		notificationLogRepository.saveAndFlush(expired);
+		jdbcTemplate.update(
+			"update notification_logs set created_at = ? where id = ?",
+			Timestamp.from(Instant.now().minus(8, ChronoUnit.DAYS)), expired.getId()
+		);
+
+		mockMvc.perform(post("/api/admin/notifications/{notificationId}/retry", expired.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isConflict());
+		assertThat(notificationLogRepository.findById(expired.getId()).orElseThrow().getStatus())
+			.isEqualTo(NotificationStatus.FAILED);
+
+		NotificationLog retained = notificationLogRepository.saveAndFlush(operationalLog(supplier, supplier.getEmail()));
+		retained.markFailed("EMAIL_PROVIDER_FAILURE");
+		retained.scheduleOperationalCleanup(Instant.now());
+		notificationLogRepository.saveAndFlush(retained);
+		Instant cleanupAt = retained.getRecipientRetentionExpiresAt();
+		assertThat(supplierNotificationRetentionService.candidateIds(cleanupAt)).contains(retained.getId());
+		assertThat(supplierNotificationRetentionService.cleanup(retained.getId(), cleanupAt)).isTrue();
+		assertThat(notificationLogRepository.findById(retained.getId()).orElseThrow())
+			.satisfies(cleaned -> {
+				assertThat(cleaned.getRecipient()).isNull();
+				assertThat(cleaned.getFailureReason()).isNull();
+				assertThat(cleaned.getRecipientAnonymizedAt())
+					.isCloseTo(cleanupAt, within(1, ChronoUnit.MICROS));
+			});
+	}
+
+	@Test
+	void supplierOperationalRetryRevalidatesPortalLifecycleBeforeSending() throws Exception {
+		Supplier supplier = createActivePortalSupplier("retry-lifecycle-revalidation");
+		NotificationLog failed = notificationLogRepository.saveAndFlush(
+			operationalLog(supplier, supplier.getEmail())
+		);
+		failed.markFailed("EMAIL_PROVIDER_FAILURE");
+		failed.scheduleOperationalCleanup(Instant.now());
+		notificationLogRepository.saveAndFlush(failed);
+		supplier.suspendPortal(SupplierSalesAction.KEEP);
+		supplierRepository.saveAndFlush(supplier);
+
+		mockMvc.perform(post("/api/admin/notifications/{notificationId}/retry", failed.getId())
+				.with(authentication(TestAuthentication.admin())))
+			.andExpect(status().isOk());
+
+		assertThat(emailSender.messages()).isEmpty();
+		assertThat(notificationLogRepository.findById(failed.getId()).orElseThrow())
+			.satisfies(skipped -> {
+				assertThat(skipped.getStatus()).isEqualTo(NotificationStatus.SKIPPED);
+				assertThat(skipped.getFailureReason()).isEqualTo("SUPPLIER_AUTHORIZATION_CHANGED");
+				assertThat(skipped.getRecipientRetentionExpiresAt()).isNotNull();
+			});
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		return userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,
@@ -261,6 +474,46 @@ class AdminNotificationApiIntegrationTest {
 			providerUserId,
 			UserRole.CUSTOMER
 		));
+	}
+
+	private Supplier createActivePortalSupplier(String suffix) {
+		UserAccount manager = userAccountRepository.saveAndFlush(new UserAccount(
+			SocialProvider.KAKAO,
+			"supplier-notification-manager-" + suffix,
+			"manager-" + suffix + "@example.com",
+			"Supplier manager",
+			UserRole.CUSTOMER
+		));
+		Instant now = Instant.now();
+		Supplier supplier = Supplier.portalApplicant(
+			"Supplier " + suffix,
+			"Manager",
+			"010-0000-0000",
+			manager.getEmail(),
+			null
+		);
+		supplier.verifyPortalContract(
+			"notification-contract-" + suffix,
+			now.minusSeconds(60),
+			now.plus(30, ChronoUnit.DAYS),
+			now,
+			TestAuthentication.ADMIN_ID
+		);
+		supplier.changeSalesStatus(SupplierStatus.ACTIVE, now);
+		supplier.bindManager(manager.getId(), now);
+		return supplierRepository.saveAndFlush(supplier);
+	}
+
+	private NotificationLog operationalLog(Supplier supplier, String recipient) {
+		return NotificationLog.supplierOperational(
+			supplier.getId(),
+			UUID.randomUUID(),
+			null,
+			NotificationType.SUPPLIER_FULFILLMENT_REQUESTED,
+			recipient,
+			"supplier_fulfillment_requested",
+			"event=FULFILLMENT_REQUESTED, orderNumber=SAFE-1, portalPath=/supplier/orders/SAFE-1"
+		);
 	}
 
 	private CustomerOrder createPaymentPendingOrder(
@@ -359,6 +612,7 @@ class AdminNotificationApiIntegrationTest {
 
 		private final List<String> messages = new ArrayList<>();
 		private String failureMessage;
+		private String skippedReason;
 
 		@Override
 		public EmailSendResult sendTransactional(String recipient, String subject, String body) {
@@ -366,15 +620,20 @@ class AdminNotificationApiIntegrationTest {
 				throw new IllegalStateException(failureMessage);
 			}
 			messages.add(recipient + "|" + subject + "|" + body);
-			return EmailSendResult.sent();
+			return skippedReason == null ? EmailSendResult.sent() : EmailSendResult.skipped(skippedReason);
 		}
 
 		void fail(String message) {
 			failureMessage = message;
 		}
 
+		void skip(String reason) {
+			skippedReason = reason;
+		}
+
 		void reset() {
 			failureMessage = null;
+			skippedReason = null;
 			messages.clear();
 		}
 

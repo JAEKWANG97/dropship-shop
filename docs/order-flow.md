@@ -2,7 +2,7 @@
 
 Current payment path: direct bank transfer with manual admin deposit confirmation.
 
-현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주를 설명한다. 공급처 포털은 `B-100`~`B-102` 기반까지 구현됐고 `B-103`~`B-105` 출고·송장·품절 흐름은 Planned다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
+현재 구현 흐름은 기존 Coreable 수동 발주와 Domeggook 자동 발주에 더해 `B-100`~`B-103` 공급처 포털 신청·상품·재고·출고 요청 기반을 설명한다. `B-104` 복수 송장과 `B-105` 품절·클레임 사실 흐름은 Planned다. 기존 주문의 상태·발주·단일 Shipment 의미를 바꾸지 않고 별도 channel과 expand-contract 방식으로 추가한다.
 
 ## Current Legacy/Domeggook Happy Path — Implemented
 
@@ -69,18 +69,18 @@ DS-10 backend implementation notes:
 - Customer APIs return display statuses instead of raw internal order statuses.
 - Order detail includes implemented payment, shipment, fulfillment, and refund summaries.
 
-## Supplier Portal Slice Map — B-100~B-102 Implemented, B-103~B-105 Planned
+## Supplier Portal Slice Map — B-100~B-103 Implemented, B-104~B-105 Planned
 
 | Slice | Order-flow impact |
 | --- | --- |
 | `B-100` | 공급처 신청, Coreable 승인, 1회용 이메일 초대, Kakao-only 담당자 연결. 주문 상태 변경 없음 |
 | `B-101` | 개별 상품 등록, 기본 옵션, 자동 공개/위험상품 검토, Coreable 고객가 계산. 주문 상태 변경 없음 |
 | `B-102` (Implemented) | `TRACKED` 재고, checkout 24시간 예약·만료, 늦은 입금 재확보 |
-| `B-103` | 입금확인 즉시 수락 단계 없는 출고 요청, 주소 잠금, 최소 PII, 이메일 알림 |
+| `B-103` (Implemented) | 입금확인 즉시 수락 단계 없는 출고 요청, 주소 잠금, 최소 PII, 이메일 알림 기반 |
 | `B-104` | 복수 Shipment와 수량 allocation, `TRACKING_REGISTERED`, 공식 택배사 링크 |
 | `B-105` | 송장 전 배송 그룹 전체 품절 보고, supplier facts, Coreable 환불 경계 |
 
-`B-102` inventory migration과 checkout guard는 supplier portal release의 필요조건이지만 충분조건은 아니다. B-100~B-105와 privacy, operational email, 외부 공급처 계약, production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
+Implemented B-102 inventory/checkout guard와 B-103 fulfillment/privacy 기반은 supplier portal release의 필요조건이지만 충분조건은 아니다. Planned B-104~B-105와 privacy notice, 실제 operational email, 외부 공급처 계약, production feature-flag gate가 모두 준비될 때까지 외부 supplier route와 portal 상품 구매를 열지 않는다.
 
 ### Tracked Checkout And Late Deposit — Implemented (`B-102`)
 
@@ -101,8 +101,8 @@ Deposit confirmed before expiry
 -> Actual amount differs from PaymentGroup total: record PAYMENT_AMOUNT_MISMATCH first, release HELD once, create one actual-amount PaymentGroup Refund, move every Order to REFUND_REQUESTED, stop
 -> If actual deposit time is within the deadline and every guard passes, consume every HELD reservation exactly once
 -> onHandQuantity and reservedQuantity decrease
--> Move every Order to SUPPLIER_ORDER_PENDING; B-102 creates or routes no Fulfillment
--> Planned B-103 later creates the portal fulfillment request or KEEP COREABLE_MANUAL fallback from this paid state
+-> Move every Order to SUPPLIER_ORDER_PENDING; B-102 itself creates or routes no Fulfillment
+-> Implemented B-103 then creates the portal fulfillment request or KEEP COREABLE_MANUAL fallback in the same deposit transaction
 -> First reason priority: if current saleability/contract or inventory mode changed, release HELD once and use SALE_UNAVAILABLE_AT_DEPOSIT even when the timestamp is also late
 -> Otherwise, if actual deposit time is after the deadline even though scheduler has not expired the group, release HELD once and use LATE_DEPOSIT_EXCEPTION
 
@@ -117,7 +117,7 @@ Admin finds a deposit after expiry
 -> Actual amount differs from PaymentGroup total: do not reacquire stock; create the same single PaymentGroup Refund and stop
 -> If the actual deposit time was within the original deadline, recheck current saleability and immutable mode snapshots, then reacquire every TRACKED quantity atomically
 -> Current saleability or mode mismatch: rollback tentative stock and use SALE_UNAVAILABLE_AT_DEPOSIT
--> Reacquisition succeeds: approve deposit and move every Order to SUPPLIER_ORDER_PENDING; B-103 owns later Fulfillment routing
+-> Reacquisition succeeds: approve deposit, move every Order to SUPPLIER_ORDER_PENDING and invoke implemented B-103 Fulfillment routing in the same transaction
 -> Reacquisition fails after saleability passes: record received BANK_TRANSFER Payment once and LATE_DEPOSIT_EXCEPTION evidence, no supplier exposure
 -> Actual deposit time was after the deadline: record received Payment and PAYMENT_EXCEPTION evidence once without reacquisition
 -> The same command creates one reason-matched SALE_UNAVAILABLE_AT_DEPOSIT or LATE_DEPOSIT_EXCEPTION Refund per delivery-group Order
@@ -133,7 +133,7 @@ Supplier inventory PUT은 immutable subject option id, nullable live Option FK, 
 
 Checkout은 영향받는 Supplier, Product, 모든 ProductOption을 각 id 순서로 잠그며 UNTRACKED-only checkout도 생략하지 않는다. 만료와 정상·늦은 입금은 공유 전역 순서 `PaymentGroup -> Supplier(id) -> Product(id) -> ProductOption(id, UNTRACKED 포함) -> Order/Fulfillment(id)`를 따른다. lifecycle-only 명령은 Supplier 뒤 Fulfillment만 잠그고 Product/Option을 잡지 않는다. Catalog/inventory saleability writer는 필요한 Supplier 뒤 Product -> Option 순서를 사용하고 Product를 잡은 뒤 Supplier를 역순으로 획득하지 않는다. 입금 처리는 잠금 아래 거래 상태, portal-origin item에 한정한 time-valid contract, 상품·옵션·compliance·availability, immutable supplier/mode snapshot을 다시 검사한 뒤 reason별 승인 또는 exception을 결정한다. Portal/manager 가용성에 따른 fulfillment routing은 B-103이 맡는다. Duplicate scheduler/admin 요청은 inventory를 두 번 소비·해제하지 않는다.
 
-### Immediate Portal Fulfillment — Planned (`B-103`)
+### Immediate Portal Fulfillment — Implemented (`B-103`)
 
 ```text
 Admin confirms the deposit and tracked inventory consumption succeeds
@@ -154,9 +154,10 @@ Supplier opens order list
 
 Supplier opens own order detail
 -> Show only recipient name/phone, postal code/address and delivery memo required for this delivery
+-> delivery memo is optional, trimmed, limited to 300 characters and stored as null when blank
 -> Hide customer account, payment, bank, refund, other supplier and internal admin data
 -> Read stored monotonic piiAccessCutoffAt initialized to requestedAt +60 days
--> Every tracking registration stores min(current cutoff, registeredAt +30 days); void/replacement never extends it
+-> Planned B-104 tracking registration stores min(current cutoff, registeredAt +30 days); void/replacement never extends it
 -> An OUT_OF_STOCK/CANCELLED/REFUND_REQUESTED/REFUNDED order is TERMINAL_MASKED immediately regardless of non-voided Shipment presence
 -> Contract EXPIRED/REVOKED hands open work to COREABLE and closes detail regardless of an older Claim grant
 -> At cutoff and after (now >= cutoff), one-character name becomes *; longer names become first Unicode code point + fixed **
@@ -169,7 +170,7 @@ Supplier opens own order detail
 
 After the portal request is visible, customer self-service cancellation and address change are blocked. Coreable handles cancellation as a claim and remains responsible for payment, refund and customer communication.
 
-An earlier admin `portal-takeover` requires idempotency key, request hash and reason. Identical replay returns the first result, different payload reuse is rejected, and actor, owner before/after and time remain in append-only command history. Neither scheduler nor admin takeover auto-returns ownership after portal reactivation.
+An earlier admin `portal-takeover` requires an idempotency key, request hash and one of `COREABLE_FULFILLMENT_TAKEOVER|SUPPLIER_SUPPORT_REQUIRED|OPERATIONAL_RISK`. Identical replay returns the first result, different payload reuse is rejected, and actor, owner before/after and time remain in append-only command history. Neither scheduler nor admin takeover auto-returns ownership after portal reactivation.
 
 ### Portal Tracking And Multiple Shipments — Planned (`B-104`)
 
@@ -538,7 +539,7 @@ Admin detects wrong operational state or shipment information
 - Failed, pending, and expired payment orders are not shown in customer order history.
 - `PAYMENT_PENDING`, `EXPIRED`, and payment failure states belong to checkout/retry surfaces, not normal customer order history.
 - `SUPPLIER_ORDER_PENDING` is the main admin work queue for current legacy orders.
-- A planned delivery-group Order creates `SUPPLIER_PORTAL` with owner SUPPLIER only when every item snapshot is portal-origin and its Supplier trade/portal/manager state is ACTIVE under the deposit lock. All-portal KEEP fallback is COREABLE_MANUAL with no supplier queue/email; mixed/legacy Orders preserve existing routing.
+- A delivery-group Order creates `SUPPLIER_PORTAL` with owner SUPPLIER only when every item snapshot is portal-origin and its Supplier trade/portal/manager state is ACTIVE under the deposit lock. Implemented B-103 sends all-portal KEEP fallback to COREABLE_MANUAL with no supplier queue/email; mixed/legacy Orders preserve existing routing.
 - DS-11 implements the admin supplier order queue with `GET /api/admin/orders`; it shows only `SUPPLIER_ORDER_PENDING` orders.
 - Admin order detail shows internal statuses and fulfillment inputs, while customer order detail keeps customer-facing display statuses.
 - One MVP order contains exactly one delivery group.
@@ -547,7 +548,7 @@ Admin detects wrong operational state or shipment information
 - Delivery groups are based on supplier, but customer UI should use delivery group wording instead of supplier wording.
 - Customers can directly change shipping address only until `SUPPLIER_ORDER_PENDING` in the current legacy flow.
 - Customer direct shipping address change is blocked after checkout policy confirmation. `addressLockedAt` additionally records that supplier work has started.
-- Planned portal orders record `addressLockedAt` when the deposit is confirmed and the request becomes visible to the supplier, so customer self-service address changes and cancellations are blocked immediately.
+- Portal orders record `addressLockedAt` when the deposit is confirmed and the request becomes visible to the supplier, so customer self-service address changes and cancellations are blocked immediately. Implemented in B-103.
 - `SUPPLIER_ORDERED` means the operator has placed the order with the supplier.
 - DS-12 implements admin supplier actions: supplier work start, supplier order completed, and supplier out-of-stock.
 - Supplier work start records `supplierOrderStartedAt`, `addressLockedAt`, and `addressLockedByAdminId` without changing order status.
@@ -560,7 +561,7 @@ Admin detects wrong operational state or shipment information
 - Supplier order work should start on the same business day or next business day after payment confirmation.
 - Supplier response or expected ship date should be secured within 1 business day after supplier order.
 - Customer delay notice is required when expected shipment remains unclear for 2 business days after supplier order.
-- Customer direct cancellation is allowed only for `COREABLE_MANUAL`/`DOMEGGOOK_API` orders whose status is `SUPPLIER_ORDER_PENDING` and whose supplier work/address lock has not started. Planned B-103 `SUPPLIER_PORTAL` orders are address-locked when deposit-confirmed work is exposed to the supplier and then always use the Claim path.
+- Customer direct cancellation is allowed only for `COREABLE_MANUAL`/`DOMEGGOOK_API` orders whose status is `SUPPLIER_ORDER_PENDING` and whose supplier work/address lock has not started. B-103 `SUPPLIER_PORTAL` orders are address-locked when deposit-confirmed work is exposed to the supplier and then always use the Claim path.
 - After supplier order work starts, cancellation is handled as a claim with admin manual review.
 - After delivery, return and exchange are handled as claims with admin manual review.
 - Simple change-of-mind return/exchange request window is 7 days from delivery completion; portal delivery completion is `max(non-voided Shipment.deliveredAt)`.
@@ -595,7 +596,7 @@ Admin detects wrong operational state or shipment information
 - Admin deposit confirmation, out-of-stock, shipment started, delivery completed, claim status change, and refund completed create transactional notification logs.
 - Supplier delay notice is a manual admin action before shipment; automatic delay scheduler is deferred.
 - SMS dispatch runs after the main order/payment transaction commits, so provider failure must not roll back the operational action.
-- Planned supplier operational notifications use email only. Their subject, body and payload snapshot contain no customer name, phone, address, delivery memo, payment or refund information. Every dispatch/retry revalidates the current verified contact, active portal/manager and time-valid VERIFIED contract; recipient/lifecycle/contract mismatch becomes SKIPPED.
+- Supplier operational notifications use email only. Their subject, body and payload snapshot contain no customer name, phone, address, delivery memo, payment or refund information. Every dispatch/retry revalidates the current verified contact, active portal/manager and time-valid VERIFIED contract; recipient/lifecycle/contract mismatch becomes SKIPPED. B-103 produces fulfillment-request and admin product-review-result events; Planned B-105 claim-task creation will produce `SUPPLIER_CLAIM_WORK_REQUESTED`.
 
 ## Risk Points
 

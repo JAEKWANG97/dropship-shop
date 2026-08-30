@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -163,6 +164,7 @@ class CheckoutApiIntegrationTest {
 			.andExpect(jsonPath("$.shippingAddress.postalCode", is("12345")))
 			.andExpect(jsonPath("$.shippingAddress.address1", is("Seoul test road")))
 			.andExpect(jsonPath("$.shippingAddress.address2", is("101")))
+			.andExpect(jsonPath("$.shippingAddress.deliveryMemo", nullValue()))
 			.andExpect(jsonPath("$.policyEvidence.termsVersion", is("2026-08-02")))
 			.andExpect(jsonPath("$.policyEvidence.privacyVersion", is("2026-08-04")))
 			.andExpect(jsonPath("$.policyEvidence.orderPolicyVersion", is("2026-08-02")))
@@ -238,6 +240,47 @@ class CheckoutApiIntegrationTest {
 				.with(authentication(TestAuthentication.customer(customer.getId()))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.policyConfirmedAt").exists());
+	}
+
+	@Test
+	void normalizesDeliveryMemoAndEnforcesTheHttpLengthBoundary() throws Exception {
+		ProductOption option = createOption(
+			"Checkout Delivery Memo Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0, 1
+		);
+
+		UserAccount blankCustomer = createCustomer("checkout-delivery-memo-blank");
+		addCartItem(blankCustomer.getId(), option.getId(), 1);
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(blankCustomer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(checkoutRequestWithDeliveryMemo("x".repeat(301))))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code", is("VALIDATION_FAILED")));
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(blankCustomer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(checkoutRequestWithDeliveryMemo("   ")))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.shippingAddress.deliveryMemo", nullValue()));
+
+		UserAccount trimmedCustomer = createCustomer("checkout-delivery-memo-trimmed");
+		addCartItem(trimmedCustomer.getId(), option.getId(), 1);
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(trimmedCustomer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(checkoutRequestWithDeliveryMemo("  Leave at the door  ")))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.shippingAddress.deliveryMemo", is("Leave at the door")));
+
+		UserAccount maxCustomer = createCustomer("checkout-delivery-memo-max");
+		addCartItem(maxCustomer.getId(), option.getId(), 1);
+		String maxMemo = "x".repeat(300);
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(maxCustomer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(checkoutRequestWithDeliveryMemo(maxMemo)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.shippingAddress.deliveryMemo", is(maxMemo)));
 	}
 
 	@Test
@@ -627,6 +670,19 @@ class CheckoutApiIntegrationTest {
 			  "address2": "101"
 			}
 			""";
+	}
+
+	private String checkoutRequestWithDeliveryMemo(String deliveryMemo) {
+		return """
+			{
+			  "recipientName": "Receiver",
+			  "recipientPhone": "010-1111-2222",
+			  "postalCode": "12345",
+			  "address1": "Seoul test road",
+			  "address2": "101",
+			  "deliveryMemo": "%s"
+			}
+			""".formatted(deliveryMemo);
 	}
 
 	private String policyConfirmationRequest(String version, String privacyVersion) {

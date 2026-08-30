@@ -21,9 +21,22 @@ final class CheckoutDtos {
 		@NotBlank @Size(max = 20) String postalCode,
 		@NotBlank @Size(max = 300) String address1,
 		@Size(max = 300) String address2,
+		@Size(max = 300) String deliveryMemo,
 		@Size(max = 100) String depositorName,
 		Long clientSubmittedTotalAmount
 	) {
+		CreateCheckoutRequest(
+			String recipientName,
+			String recipientPhone,
+			String postalCode,
+			String address1,
+			String address2,
+			String depositorName,
+			Long clientSubmittedTotalAmount
+		) {
+			this(recipientName, recipientPhone, postalCode, address1, address2, null,
+				depositorName, clientSubmittedTotalAmount);
+		}
 	}
 
 	record UpdateShippingAddressRequest(
@@ -31,8 +44,18 @@ final class CheckoutDtos {
 		@NotBlank @Size(max = 30) String recipientPhone,
 		@NotBlank @Size(max = 20) String postalCode,
 		@NotBlank @Size(max = 300) String address1,
-		@Size(max = 300) String address2
+		@Size(max = 300) String address2,
+		@Size(max = 300) String deliveryMemo
 	) {
+		UpdateShippingAddressRequest(
+			String recipientName,
+			String recipientPhone,
+			String postalCode,
+			String address1,
+			String address2
+		) {
+			this(recipientName, recipientPhone, postalCode, address1, address2, null);
+		}
 	}
 
 	record PolicyConfirmationRequest(
@@ -68,7 +91,8 @@ final class CheckoutDtos {
 		String recipientPhone,
 		String postalCode,
 		String address1,
-		String address2
+		String address2,
+		String deliveryMemo
 	) {
 	}
 

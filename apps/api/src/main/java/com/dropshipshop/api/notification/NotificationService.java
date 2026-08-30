@@ -8,6 +8,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import com.dropshipshop.api.claim.domain.Claim;
+import com.dropshipshop.api.catalog.domain.Product;
+import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.notification.domain.NotificationChannel;
 import com.dropshipshop.api.notification.domain.NotificationLog;
 import com.dropshipshop.api.notification.domain.NotificationType;
@@ -104,6 +106,57 @@ public class NotificationService {
 		return log;
 	}
 
+	public NotificationLog supplierFulfillmentRequested(Supplier supplier, CustomerOrder order) {
+		return supplierOperational(
+			supplier,
+			order.getId(),
+			null,
+			NotificationType.SUPPLIER_FULFILLMENT_REQUESTED,
+			"supplier_fulfillment_requested",
+			"event=FULFILLMENT_REQUESTED, orderNumber=%s, portalPath=/supplier/orders/%s"
+				.formatted(order.getOrderNumber(), order.getOrderNumber())
+		);
+	}
+
+	public NotificationLog supplierProductReviewResult(Supplier supplier, Product product) {
+		return supplierOperational(
+			supplier,
+			null,
+			null,
+			NotificationType.SUPPLIER_PRODUCT_REVIEW_RESULT,
+			"supplier_product_review_result",
+			"event=PRODUCT_REVIEW_RESULT, productId=%s, reviewStatus=%s, portalPath=/supplier/products/%s"
+				.formatted(product.getId(), product.getReviewStatus(), product.getId())
+		);
+	}
+
+	public NotificationLog supplierClaimWorkRequested(Supplier supplier, CustomerOrder order, Claim claim) {
+		return supplierOperational(
+			supplier,
+			order.getId(),
+			claim.getId(),
+			NotificationType.SUPPLIER_CLAIM_WORK_REQUESTED,
+			"supplier_claim_work_requested",
+			"event=CLAIM_WORK_REQUESTED, orderNumber=%s, portalPath=/supplier/claim-tasks"
+				.formatted(order.getOrderNumber())
+		);
+	}
+
+	private NotificationLog supplierOperational(
+		Supplier supplier,
+		UUID orderId,
+		UUID claimId,
+		NotificationType type,
+		String templateKey,
+		String payload
+	) {
+		NotificationLog log = notificationLogRepository.saveAndFlush(NotificationLog.supplierOperational(
+			supplier.getId(), orderId, claimId, type, supplier.getEmail(), templateKey, payload
+		));
+		eventPublisher.publishEvent(new NotificationDispatchRequested(log.getId()));
+		return log;
+	}
+
 	public boolean exists(CustomerOrder order, NotificationType type) {
 		return notificationLogRepository.existsByOrderIdAndType(order.getId(), type);
 	}
@@ -152,6 +205,9 @@ public class NotificationService {
 			case REFUND_COMPLETED -> "[코어블SAF] 환불 완료 처리되었습니다. 주문상세 확인";
 			case CUSTOMER_INQUIRY_ANSWERED -> "[코어블SAF] 고객 문의 답변이 등록되었습니다";
 			case SUPPLIER_INVITATION -> "[코어블SAF] 공급처 포털 초대";
+			case SUPPLIER_FULFILLMENT_REQUESTED -> "[코어블SAF] 새 출고 요청";
+			case SUPPLIER_PRODUCT_REVIEW_RESULT -> "[코어블SAF] 상품 검토 결과";
+			case SUPPLIER_CLAIM_WORK_REQUESTED -> "[코어블SAF] 클레임 처리 요청";
 			case MARKETING -> "[코어블SAF] 안내 메시지입니다";
 		};
 	}

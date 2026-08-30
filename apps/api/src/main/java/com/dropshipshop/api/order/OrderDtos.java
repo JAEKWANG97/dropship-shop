@@ -89,7 +89,8 @@ final class OrderDtos {
 		String recipientPhone,
 		String postalCode,
 		String address1,
-		String address2
+		String address2,
+		String deliveryMemo
 	) {
 	}
 
@@ -98,8 +99,18 @@ final class OrderDtos {
 		@NotBlank @Size(max = 30) String recipientPhone,
 		@NotBlank @Size(max = 20) String postalCode,
 		@NotBlank @Size(max = 300) String address1,
-		@Size(max = 300) String address2
+		@Size(max = 300) String address2,
+		@Size(max = 300) String deliveryMemo
 	) {
+		UpdateShippingAddressRequest(
+			String recipientName,
+			String recipientPhone,
+			String postalCode,
+			String address1,
+			String address2
+		) {
+			this(recipientName, recipientPhone, postalCode, address1, address2, null);
+		}
 	}
 
 	record OrderItemResponse(

@@ -36,6 +36,7 @@ import com.dropshipshop.api.policy.CustomerPolicyLinkService;
 import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
 import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
 import com.dropshipshop.api.supplierproduct.ProductSaleability;
+import com.dropshipshop.api.notification.NotificationService;
 
 class CatalogOwnershipLockTest {
 
@@ -73,7 +74,8 @@ class CatalogOwnershipLockTest {
 			mock(SupplierPortalInputPolicy.class),
 			mock(ProductImageCleanupService.class),
 			mock(CatalogPriceCalculator.class),
-			mock(ProductSaleability.class)
+			mock(ProductSaleability.class),
+			mock(NotificationService.class)
 		);
 		CatalogDtos.ProductUpdateRequest request = new CatalogDtos.ProductUpdateRequest(
 			requestedSupplierId,

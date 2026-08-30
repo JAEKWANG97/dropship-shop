@@ -131,6 +131,12 @@ export type AdminOrder = {
   fulfillment?: {
     fulfillmentId: string | null;
     status: string;
+    channel?: string | null;
+    requestedAt?: string | null;
+    operationalOwner?: string | null;
+    piiAccessCutoffAt?: string | null;
+    handedOverAt?: string | null;
+    handedOverReason?: string | null;
     supplierOrderStartedAt: string | null;
     supplierOrderNumber: string | null;
     expectedShipDate: string | null;
@@ -207,6 +213,7 @@ export type AdminOrder = {
     postalCode: string;
     address1: string;
     address2: string | null;
+    deliveryMemo?: string | null;
   };
   paymentMethod?: string;
 };
@@ -227,6 +234,11 @@ export function adminRefundProjection(refund: NonNullable<AdminOrder["refund"]>)
     appliedOrderIds: refund.appliedOrderIds ?? (refund.orderId ? [refund.orderId] : []),
     refundAmount: refund.refundAmount,
   };
+}
+
+export function adminPortalFulfillmentAction(fulfillment: AdminOrder["fulfillment"]) {
+  if (fulfillment?.channel !== "SUPPLIER_PORTAL") return null;
+  return fulfillment.operationalOwner === "SUPPLIER" ? "TAKEOVER" : "COREABLE";
 }
 
 export type AdminOrderActionHistory = {

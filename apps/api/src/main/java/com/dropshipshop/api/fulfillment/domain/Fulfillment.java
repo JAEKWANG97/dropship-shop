@@ -143,10 +143,26 @@ public class Fulfillment {
 		this.piiAccessCutoffAt = piiAccessCutoffAt;
 	}
 
+	public boolean shortenPiiAccessCutoffAt(Instant candidate) {
+		Objects.requireNonNull(candidate, "candidate");
+		if (channel != FulfillmentChannel.SUPPLIER_PORTAL || piiAccessCutoffAt == null) {
+			throw new IllegalStateException("PII cutoff exists only for portal fulfillment");
+		}
+		if (!candidate.isBefore(piiAccessCutoffAt)) {
+			return false;
+		}
+		piiAccessCutoffAt = candidate;
+		return true;
+	}
+
 	public boolean isOpenPortalSupplierOwned() {
-		return channel == FulfillmentChannel.SUPPLIER_PORTAL
-			&& operationalOwner == FulfillmentOperationalOwner.SUPPLIER
+		return isPortalSupplierOwned()
 			&& (status == FulfillmentStatus.PENDING || status == FulfillmentStatus.ORDERED);
+	}
+
+	public boolean isPortalSupplierOwned() {
+		return channel == FulfillmentChannel.SUPPLIER_PORTAL
+			&& operationalOwner == FulfillmentOperationalOwner.SUPPLIER;
 	}
 
 	public boolean handOverToCoreable(
@@ -157,9 +173,46 @@ public class Fulfillment {
 		if (!isOpenPortalSupplierOwned()) {
 			return false;
 		}
+		return applyHandover(handedOverAt, reasonCode, reasonCode.name(), handedOverByAdminId);
+	}
+
+	public boolean handOverToCoreable(
+		Instant handedOverAt,
+		FulfillmentHandoverReasonCode reasonCode,
+		String reason,
+		UUID handedOverByAdminId
+	) {
+		if (!isOpenPortalSupplierOwned()) {
+			return false;
+		}
+		return applyHandover(handedOverAt, reasonCode, reason, handedOverByAdminId);
+	}
+
+	public boolean handOverTerminalToCoreable(Instant handedOverAt) {
+		if (!isPortalSupplierOwned()) {
+			return false;
+		}
+		return applyHandover(
+			handedOverAt,
+			FulfillmentHandoverReasonCode.TERMINAL_STATE,
+			FulfillmentHandoverReasonCode.TERMINAL_STATE.name(),
+			null
+		);
+	}
+
+	private boolean applyHandover(
+		Instant handedOverAt,
+		FulfillmentHandoverReasonCode reasonCode,
+		String reason,
+		UUID handedOverByAdminId
+	) {
 		this.operationalOwner = FulfillmentOperationalOwner.COREABLE;
 		this.handedOverAt = Objects.requireNonNull(handedOverAt, "handedOverAt");
-		this.handedOverReason = Objects.requireNonNull(reasonCode, "reasonCode").name();
+		this.handedOverReason = Objects.requireNonNull(reason, "reason");
+		if (reason.length() > 200) {
+			throw new IllegalArgumentException("Handover reason must be at most 200 characters");
+		}
+		Objects.requireNonNull(reasonCode, "reasonCode");
 		this.handedOverByAdminId = handedOverByAdminId;
 		return true;
 	}

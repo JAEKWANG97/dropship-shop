@@ -16,4 +16,6 @@ public interface FulfillmentHandoverHistoryRepository extends JpaRepository<Fulf
 	);
 
 	List<FulfillmentHandoverHistory> findAllByFulfillment_IdOrderByCreatedAtAsc(UUID fulfillmentId);
+
+	Optional<FulfillmentHandoverHistory> findFirstByFulfillment_IdOrderByCreatedAtDesc(UUID fulfillmentId);
 }

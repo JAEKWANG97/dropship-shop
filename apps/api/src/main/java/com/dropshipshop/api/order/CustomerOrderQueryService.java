@@ -154,7 +154,8 @@ public class CustomerOrderQueryService {
 				order.getRecipientPhone(),
 				order.getPostalCode(),
 				order.getAddress1(),
-				order.getAddress2()
+				order.getAddress2(),
+				order.getDeliveryMemo()
 			),
 			items,
 			new OrderDtos.FulfillmentSummaryResponse(FulfillmentStatus.PENDING),

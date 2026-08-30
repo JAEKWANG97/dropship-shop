@@ -6,10 +6,29 @@
 - 고객 결제의 현재 기준은 `2026-07-17: Direct Bank Transfer Only, No Toss Payments`와 `2026-07-18: Remove Unused Toss Payments Execution Paths`다. 이전 Toss/PG 항목은 역사 기록이다.
 - 상품 가격의 현재 기준은 `2026-07-28: Supplier Shipping Is Excluded From Product Markup`이다. 공급처 배송비는 수집 가능성 검증에는 사용하지만 판매가 계산에는 더하지 않는다.
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
-- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`이다. `B-100` 신청·인증, `B-101` 개별 상품·검토와 `B-102` 옵션 재고·예약·입금 예외는 구현됐고, `B-103`~`B-105` 출고·송장·품절 slice가 구현될 때까지 기존 Domeggook/수동 발주 동작을 유지한다.
+- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`과 `2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data`다. `B-100` 신청·인증, `B-101` 개별 상품·검토, `B-102` 옵션 재고·예약·입금 예외, `B-103` 출고 요청·최소 PII·운영 이메일 기반은 구현됐고 `B-104` 복수 송장과 `B-105` 품절·클레임 사실은 Planned다.
 - 계좌입금 금액 불일치의 현재 기준도 같은 2026-08-29 결정과 구현된 B-102다. 식별된 양수 실제 수령액을 메모-only `PAYMENT_PENDING`으로 두지 않고 결제그룹 단위 전액 환불 예외로 처리한다. B-068의 과거 메모는 읽기 호환으로 남기며 어느 PaymentGroup인지 식별하지 못한 은행 거래는 주문을 추측해 변경하지 않는다.
 - Planned 포털 송장 등록은 실제 배송 시작과 다르다. 공식 택배사 조회 링크만 제공하고, 기존 Domeggook 배송 동기화와 관리자 수동 보정은 호환 경로로 유지한다.
-- 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 `B-103`~`B-105` 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Planned` 절을 함께 맞추되, 이를 현재 구현으로 해석하지 않는다.
+- 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Implemented`/`Planned` 절을 함께 맞춘다.
+
+## 2026-08-30: Paid Portal Fulfillment Exposes Only Minimum Delivery Data
+
+Decision:
+
+정상 또는 허용된 늦은 입금확정으로 배송 그룹 주문이 `SUPPLIER_ORDER_PENDING`이 되면 같은 트랜잭션에서 immutable OrderItem snapshot으로 출고 경로를 정한다. 모든 항목이 portal-origin이고 거래 상태, time-valid VERIFIED contract, active portal/current manager가 모두 유효할 때만 `SUPPLIER_PORTAL/owner=SUPPLIER` Fulfillment, `requestedAt`, `requestedAt+60일` PII cutoff와 `addressLockedAt`을 만들고 수락 단계 없이 공급처 목록과 PII-free 이메일에 노출한다. 계약과 판매는 유효하지만 `salesAction=KEEP`으로 portal 또는 manager가 일시 불가한 경우는 `COREABLE_MANUAL/owner=COREABLE`로 보내 공급처 queue/email을 만들지 않는다. Mixed/legacy 주문은 기존 Coreable/Domeggook 경로를 유지한다.
+
+Checkout 배송 메모는 선택값이며 최대 300자다. 서버는 앞뒤 공백을 제거하고 null 또는 공백-only 입력을 `null` snapshot으로 저장한다. 공급처 목록에는 고객 PII를 넣지 않고, 상세는 배송에 필요한 이름·전화·우편번호·주소·배송 메모와 자기 item만 반환한다. 상세 응답은 `no-store`이며 정상 FULL, cutoff/terminal MASKED, 승인 Claim의 기한부 read-only FULL을 구분하고 모든 성공 응답을 PII-free 최소 로그로 남긴다.
+
+Operational email 기반은 신규 출고 요청, 관리자 상품 검토 결과, 승인된 클레임 작업 요청 type/template을 제공한다. B-103은 출고 요청과 관리자 승인·보완·거절 상품 검토 결과 producer를 연결한다. `SUPPLIER_CLAIM_WORK_REQUESTED`의 실제 producer는 Coreable이 claim task를 만드는 `B-105`가 연결하며, B-103만 배포된 상태에서 임의로 발송하지 않는다.
+
+Consequences:
+
+- B-103은 initial `requestedAt+60일` cutoff 저장, cutoff scheduler/lazy takeover, terminal masking, 관리자 takeover, append-only Claim grant와 최소 접근 로그를 구현한다.
+- 송장 등록마다 `min(current, registeredAt+30일)`로 cutoff를 단축하는 실제 호출과 void/replacement 비연장은 Shipment를 만드는 `B-104`가 구현·검증한다. B-103은 아직 송장을 만들거나 택배사 링크를 제공하지 않는다.
+- B-105 claim-task/fact를 만들기 전에도 관리자 Claim grant API는 존재하지만, grant는 허용된 진행 Claim 상태와 time-valid contract 안에서 상세 read-only FULL만 열고 공급처 출고 권한이나 Claim 판단 권한을 주지 않는다.
+- Append-only 인계·PII grant 이력에는 자유문을 저장하지 않는다. 관리자 takeover는 `COREABLE_FULFILLMENT_TAKEOVER|SUPPLIER_SUPPORT_REQUIRED|OPERATIONAL_RISK`, grant/extension은 `RETURN_COORDINATION_REQUIRED|EXCHANGE_COORDINATION_REQUIRED|REFUND_COORDINATION_REQUIRED`, revoke는 `CLAIM_ACCESS_NO_LONGER_REQUIRED`만 허용한다.
+- 운영 이메일은 발송·retry마다 verified current email, active portal/manager와 time-valid contract를 재검증하며 불일치는 `SKIPPED`다. Invite는 generic retry 대상이 아니고 supplier operational `FAILED`만 생성+7일까지 retry하며 terminal recipient/failure material은 정해진 기한 뒤 정리한다.
+- 실제 SES 도착 검증, 외부 공급처·택배사 제3자 제공 개인정보처리방침의 새 시행 버전, B-098 계약 증적/관계 종료 cleanup과 B-104/B-105가 남아 있으므로 production supplier portal flag는 기본 `off`를 유지한다.
 
 ## 2026-08-30: Supplier Product Auto Review Reuses The Approved Category Policy
 

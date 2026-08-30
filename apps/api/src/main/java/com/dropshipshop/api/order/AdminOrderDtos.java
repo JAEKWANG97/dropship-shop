@@ -10,6 +10,8 @@ import com.dropshipshop.api.claim.domain.ClaimStatus;
 import com.dropshipshop.api.claim.domain.ClaimType;
 import com.dropshipshop.api.claim.domain.RequestedAction;
 import com.dropshipshop.api.fulfillment.domain.FulfillmentStatus;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentChannel;
+import com.dropshipshop.api.fulfillment.domain.FulfillmentOperationalOwner;
 import com.dropshipshop.api.fulfillment.domain.SupplierPurchaseStatus;
 import com.dropshipshop.api.order.domain.AdminOrderActionType;
 import com.dropshipshop.api.order.domain.OrderStatus;
@@ -97,7 +99,8 @@ final class AdminOrderDtos {
 		String recipientPhone,
 		String postalCode,
 		String address1,
-		String address2
+		String address2,
+		String deliveryMemo
 	) {
 	}
 
@@ -148,6 +151,13 @@ final class AdminOrderDtos {
 	record AdminFulfillmentResponse(
 		UUID fulfillmentId,
 		FulfillmentStatus status,
+		FulfillmentChannel channel,
+		Instant requestedAt,
+		FulfillmentOperationalOwner operationalOwner,
+		Instant piiAccessCutoffAt,
+		Instant handedOverAt,
+		String handedOverReason,
+		UUID handedOverByAdminId,
 		Instant supplierOrderStartedAt,
 		Instant addressLockedAt,
 		UUID addressLockedByAdminId,

@@ -26,6 +26,7 @@ import com.dropshipshop.api.checkout.CheckoutReservationService;
 import com.dropshipshop.api.common.error.ApiErrorCode;
 import com.dropshipshop.api.common.error.ApiErrorException;
 import com.dropshipshop.api.fulfillment.repository.FulfillmentRepository;
+import com.dropshipshop.api.fulfillment.SupplierFulfillmentRoutingService;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.notification.domain.NotificationType;
 import com.dropshipshop.api.order.domain.AdminOrderActionHistory;
@@ -65,6 +66,7 @@ class AdminOrderPaymentService {
 	private final PaymentEventRepository paymentEventRepository;
 	private final RefundRepository refundRepository;
 	private final FulfillmentRepository fulfillmentRepository;
+	private final SupplierFulfillmentRoutingService supplierFulfillmentRoutingService;
 	private final AdminOrderActionHistoryRepository actionHistoryRepository;
 	private final OrderStatusHistoryRepository statusHistoryRepository;
 	private final AdminOrderQueryService adminOrderQueryService;
@@ -83,6 +85,7 @@ class AdminOrderPaymentService {
 		PaymentEventRepository paymentEventRepository,
 		RefundRepository refundRepository,
 		FulfillmentRepository fulfillmentRepository,
+		SupplierFulfillmentRoutingService supplierFulfillmentRoutingService,
 		AdminOrderActionHistoryRepository actionHistoryRepository,
 		OrderStatusHistoryRepository statusHistoryRepository,
 		AdminOrderQueryService adminOrderQueryService,
@@ -100,6 +103,7 @@ class AdminOrderPaymentService {
 		this.paymentEventRepository = paymentEventRepository;
 		this.refundRepository = refundRepository;
 		this.fulfillmentRepository = fulfillmentRepository;
+		this.supplierFulfillmentRoutingService = supplierFulfillmentRoutingService;
 		this.actionHistoryRepository = actionHistoryRepository;
 		this.statusHistoryRepository = statusHistoryRepository;
 		this.adminOrderQueryService = adminOrderQueryService;
@@ -206,11 +210,12 @@ class AdminOrderPaymentService {
 			return replay;
 		}
 		CustomerOrder selectedOrder = selectedOrder(checkout, orderId);
+		Instant commandNow = Instant.now();
 		boolean portalOrigin = hasPortalOrigin(checkout);
 		if (commandType == PaymentCommandType.CONFIRM_BANK_TRANSFER_DEPOSIT && portalOrigin && key == null) {
 			inputPolicy.requireIdempotencyKey(null);
 		}
-		validateReceiptCommand(checkout.paymentGroup(), commandType, receipt);
+		validateReceiptCommand(checkout.paymentGroup(), commandType, receipt, commandNow);
 		fulfillmentRepository.findAllByPaymentGroupIdForUpdate(paymentGroupId);
 		boolean cancelledTerminal = checkout.paymentGroup().getStatus() == PaymentGroupStatus.CANCELLED;
 		if (cancelledTerminal) {
@@ -222,7 +227,7 @@ class AdminOrderPaymentService {
 				throw conflict("Deposit amount differs from checkout total; use the deposit-mismatch action");
 			}
 			return receivedPaymentException(checkout, selectedOrder, adminUserId, key, requestHash, commandType,
-				receipt, PaymentExceptionReason.AMOUNT_MISMATCH, RefundReason.PAYMENT_AMOUNT_MISMATCH);
+				receipt, PaymentExceptionReason.AMOUNT_MISMATCH, RefundReason.PAYMENT_AMOUNT_MISMATCH, commandNow);
 		}
 		if (commandType == PaymentCommandType.RECORD_AMOUNT_MISMATCH) {
 			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.DEPOSIT_AMOUNT_NOT_MISMATCHED,
@@ -230,13 +235,13 @@ class AdminOrderPaymentService {
 		}
 		if (cancelledTerminal) {
 			return receivedPaymentException(checkout, selectedOrder, adminUserId, key, requestHash, commandType,
-				receipt, PaymentExceptionReason.APPROVED_AFTER_EXPIRED, RefundReason.LATE_DEPOSIT_EXCEPTION);
+				receipt, PaymentExceptionReason.APPROVED_AFTER_EXPIRED, RefundReason.LATE_DEPOSIT_EXCEPTION, commandNow);
 		}
 		if (checkout.paymentGroup().getPolicyConfirmedAt() == null) {
 			if (portalOrigin) {
 				return receivedPaymentException(checkout, selectedOrder, adminUserId, key, requestHash, commandType,
 					receipt, PaymentExceptionReason.SELLABILITY_CHECK_FAILED,
-					RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT);
+					RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT, commandNow);
 			}
 			validatePolicyConfirmed(checkout.paymentGroup());
 		}
@@ -244,27 +249,27 @@ class AdminOrderPaymentService {
 			requirePendingCheckout(checkout);
 		} else {
 			requireLateCheckout(checkout, portalOrigin);
-			reservationService.release(checkout, Instant.now());
+			reservationService.release(checkout, commandNow);
 		}
 		if (portalOrigin) {
-			expirePortalContracts(checkout, adminUserId);
-			if (!isCurrentlySaleable(checkout)) {
+			expirePortalContracts(checkout, adminUserId, commandNow);
+			if (!isCurrentlySaleable(checkout, commandNow)) {
 				return receivedPaymentException(checkout, selectedOrder, adminUserId, key, requestHash, commandType,
 					receipt, PaymentExceptionReason.SELLABILITY_CHECK_FAILED,
-					RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT);
+					RefundReason.SALE_UNAVAILABLE_AT_DEPOSIT, commandNow);
 			}
 			if (receipt.depositedAt().isAfter(checkout.paymentGroup().getExpiresAt())) {
 				return receivedPaymentException(checkout, selectedOrder, adminUserId, key, requestHash, commandType,
-					receipt, PaymentExceptionReason.APPROVED_AFTER_EXPIRED, RefundReason.LATE_DEPOSIT_EXCEPTION);
+					receipt, PaymentExceptionReason.APPROVED_AFTER_EXPIRED, RefundReason.LATE_DEPOSIT_EXCEPTION, commandNow);
 			}
 		} else {
 			validateLegacySellability(checkout);
 		}
 		if (commandType == PaymentCommandType.RECORD_LATE_DEPOSIT && !reservationService.canReacquire(checkout)) {
 			return receivedPaymentException(checkout, selectedOrder, adminUserId, key, requestHash, commandType,
-				receipt, PaymentExceptionReason.APPROVED_AFTER_EXPIRED, RefundReason.LATE_DEPOSIT_EXCEPTION);
+				receipt, PaymentExceptionReason.APPROVED_AFTER_EXPIRED, RefundReason.LATE_DEPOSIT_EXCEPTION, commandNow);
 		}
-		return approveDeposit(checkout, selectedOrder, adminUserId, key, requestHash, commandType, receipt);
+		return approveDeposit(checkout, selectedOrder, adminUserId, key, requestHash, commandType, receipt, commandNow);
 	}
 
 	private AdminOrderDtos.BankTransferPaymentCommandResponse approveDeposit(
@@ -274,11 +279,11 @@ class AdminOrderPaymentService {
 		String key,
 		String requestHash,
 		PaymentCommandType commandType,
-		Receipt receipt
+		Receipt receipt,
+		Instant now
 	) {
 		String providerPaymentKey = bankTransferPaymentKey(checkout.paymentGroup());
 		ensurePaymentAbsent(providerPaymentKey);
-		Instant now = Instant.now();
 		if (commandType == PaymentCommandType.RECORD_LATE_DEPOSIT) {
 			reservationService.reacquireAndConsume(checkout, now);
 			checkout.paymentGroup().confirmLateBankTransferDeposit(adminUserId, receipt.depositorName(),
@@ -297,9 +302,12 @@ class AdminOrderPaymentService {
 			} else {
 				order.confirmBankTransferDeposit();
 			}
-			if (orderItemsFor(checkout, order).stream()
-				.allMatch(item -> item.getManagementChannelSnapshot() == ProductManagementChannel.COREABLE)) {
+			List<OrderItem> orderItems = orderItemsFor(checkout, order);
+			if (orderItems.stream()
+				.anyMatch(item -> item.getManagementChannelSnapshot() == ProductManagementChannel.COREABLE)) {
 				domeggookPurchaseService.queueAfterDeposit(order, adminUserId);
+			} else {
+				supplierFulfillmentRoutingService.routePaidOrder(order, orderItems, now);
 			}
 			recordHistory(order, adminUserId, AdminOrderActionType.BANK_TRANSFER_DEPOSIT_CONFIRMED,
 				beforeStatus, "Bank transfer deposit confirmed", receipt.reason());
@@ -325,11 +333,11 @@ class AdminOrderPaymentService {
 		PaymentCommandType commandType,
 		Receipt receipt,
 		PaymentExceptionReason exceptionReason,
-		RefundReason refundReason
+		RefundReason refundReason,
+		Instant now
 	) {
 		String providerPaymentKey = bankTransferPaymentKey(checkout.paymentGroup());
 		ensurePaymentAbsent(providerPaymentKey);
-		Instant now = Instant.now();
 		reservationService.release(checkout, now);
 		checkout.paymentGroup().recordReceivedPaymentException(adminUserId, receipt.depositorName(),
 			receipt.actualAmount(), receipt.depositedAt(), receipt.transactionReference(), receipt.reason(), now);
@@ -396,12 +404,15 @@ class AdminOrderPaymentService {
 		}
 	}
 
-	private void expirePortalContracts(CheckoutLockService.LockedCheckout checkout, UUID adminUserId) {
+	private void expirePortalContracts(
+		CheckoutLockService.LockedCheckout checkout,
+		UUID adminUserId,
+		Instant now
+	) {
 		Set<UUID> portalSupplierIds = checkout.items().stream()
 			.filter(item -> item.getManagementChannelSnapshot() == ProductManagementChannel.SUPPLIER_PORTAL)
 			.map(item -> item.getSupplier().getId())
 			.collect(Collectors.toSet());
-		Instant now = Instant.now();
 		for (Supplier supplier : checkout.suppliers()) {
 			if (portalSupplierIds.contains(supplier.getId())) {
 				contractTerminalService.expireIfOverdue(
@@ -410,8 +421,7 @@ class AdminOrderPaymentService {
 		}
 	}
 
-	private boolean isCurrentlySaleable(CheckoutLockService.LockedCheckout checkout) {
-		Instant now = Instant.now();
+	private boolean isCurrentlySaleable(CheckoutLockService.LockedCheckout checkout, Instant now) {
 		for (OrderItem item : checkout.items()) {
 			Product product = item.getProduct();
 			ProductOption option = checkout.optionsById().get(item.getProductOption().getId());
@@ -453,7 +463,12 @@ class AdminOrderPaymentService {
 			&& snapshotSupplierId.equals(item.getProduct().getSupplier().getId());
 	}
 
-	private void validateReceiptCommand(PaymentGroup paymentGroup, PaymentCommandType commandType, Receipt receipt) {
+	private void validateReceiptCommand(
+		PaymentGroup paymentGroup,
+		PaymentCommandType commandType,
+		Receipt receipt,
+		Instant now
+	) {
 		if (receipt.depositorName() == null || receipt.depositorName().isBlank()
 			|| receipt.actualAmount() <= 0 || receipt.depositedAt() == null
 			|| receipt.transactionReference() == null || receipt.transactionReference().isBlank()
@@ -461,7 +476,7 @@ class AdminOrderPaymentService {
 			throw new ApiErrorException(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_FAILED,
 				"Complete bank-transfer receipt evidence is required");
 		}
-		if (receipt.depositedAt().isAfter(Instant.now())) {
+		if (receipt.depositedAt().isAfter(now)) {
 			throw new ApiErrorException(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_FAILED,
 				"Deposit received time cannot be in the future");
 		}
@@ -500,7 +515,8 @@ class AdminOrderPaymentService {
 		PaymentGroup paymentGroup = selectedOrder.getPaymentGroup();
 		return new AdminOrderDtos.BankTransferPaymentCommandResponse(
 			selectedOrder.getId(), selectedOrder.getStatus(),
-			adminOrderQueryService.toFulfillmentResponse(selectedOrder, null), null,
+			adminOrderQueryService.toFulfillmentResponse(selectedOrder,
+				fulfillmentRepository.findByOrder_Id(selectedOrder.getId()).orElse(null)), null,
 			outcome, exceptionReason, paymentGroup.getTotalAmount(), receipt.actualAmount(),
 			paymentGroup.getStatus(),
 			orderRepository.findAllByPaymentGroup_IdOrderByCreatedAtAsc(paymentGroup.getId()).stream()

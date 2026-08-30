@@ -1,6 +1,7 @@
 package com.dropshipshop.api.notification;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,8 @@ import com.dropshipshop.api.supplierportal.repository.SupplierInviteRepository;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.domain.SupplierPortalStatus;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.user.domain.UserStatus;
+import com.dropshipshop.api.user.repository.UserAccountRepository;
 
 @Service
 class NotificationDispatchListener {
@@ -40,6 +43,7 @@ class NotificationDispatchListener {
 	private final SupplierPortalHasher supplierPortalHasher;
 	private final SupplierRepository supplierRepository;
 	private final SupplierInviteRepository supplierInviteRepository;
+	private final UserAccountRepository userAccountRepository;
 
 	NotificationDispatchListener(
 		NotificationLogRepository notificationLogRepository,
@@ -50,6 +54,7 @@ class NotificationDispatchListener {
 		SupplierPortalHasher supplierPortalHasher,
 		SupplierRepository supplierRepository,
 		SupplierInviteRepository supplierInviteRepository,
+		UserAccountRepository userAccountRepository,
 		@Value("${app.public-base-url:http://localhost:3000}") String publicBaseUrl
 	) {
 		this.notificationLogRepository = notificationLogRepository;
@@ -60,6 +65,7 @@ class NotificationDispatchListener {
 		this.supplierPortalHasher = supplierPortalHasher;
 		this.supplierRepository = supplierRepository;
 		this.supplierInviteRepository = supplierInviteRepository;
+		this.userAccountRepository = userAccountRepository;
 		this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
 	}
 
@@ -72,7 +78,7 @@ class NotificationDispatchListener {
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void dispatchSupplierInvite(SupplierInviteDispatchRequested event) {
-		dispatchNow(event.notificationId(), event.inviteToken());
+		dispatchSupplierInviteNow(event.notificationId(), event.inviteToken());
 	}
 
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -81,19 +87,42 @@ class NotificationDispatchListener {
 	}
 
 	private NotificationLog dispatchNow(UUID notificationId, String inviteToken) {
-		NotificationLog log = notificationLogRepository.findById(notificationId)
+		NotificationLog log = notificationLogRepository.findByIdForUpdate(notificationId)
 			.orElseThrow();
+		return dispatchLocked(log, inviteToken, null, null);
+	}
+
+	private NotificationLog dispatchSupplierInviteNow(UUID notificationId, String inviteToken) {
+		NotificationLogRepository.SupplierInviteDispatchScope scope = notificationLogRepository
+			.findSupplierInviteDispatchScope(notificationId)
+			.orElseThrow();
+		Supplier supplier = scope.getSupplierId() == null ? null
+			: supplierRepository.findByIdForUpdate(scope.getSupplierId()).orElse(null);
+		SupplierInvite invite = scope.getSupplierInviteId() == null ? null
+			: supplierInviteRepository.findByIdForUpdate(scope.getSupplierInviteId()).orElse(null);
+		NotificationLog log = notificationLogRepository.findByIdForUpdate(notificationId).orElseThrow();
+		return dispatchLocked(log, inviteToken, supplier, invite);
+	}
+
+	private NotificationLog dispatchLocked(
+		NotificationLog log,
+		String inviteToken,
+		Supplier lockedSupplier,
+		SupplierInvite lockedInvite
+	) {
 		if (log.getStatus() != NotificationStatus.PENDING) {
 			return log;
 		}
 		try {
 			switch (log.getChannel()) {
 				case SMS -> dispatchSms(log);
-				case EMAIL -> dispatchEmail(log, inviteToken);
+				case EMAIL -> dispatchEmail(log, inviteToken, lockedSupplier, lockedInvite);
 				default -> log.markSkipped("Unsupported notification channel: " + log.getChannel());
 			}
 		} catch (RuntimeException exception) {
-			log.markFailed(log.getSupplierInviteId() == null ? failureReason(exception) : "EMAIL_PROVIDER_FAILURE");
+			log.markFailed(log.getSupplierInviteId() == null && !log.isSupplierOperational()
+				? failureReason(exception) : "EMAIL_PROVIDER_FAILURE");
+			log.scheduleOperationalCleanup(Instant.now());
 		}
 		return log;
 	}
@@ -107,9 +136,18 @@ class NotificationDispatchListener {
 		markResult(log, result.successful(), result.skippedReason());
 	}
 
-	private void dispatchEmail(NotificationLog log, String inviteToken) {
+	private void dispatchEmail(
+		NotificationLog log,
+		String inviteToken,
+		Supplier lockedSupplier,
+		SupplierInvite lockedInvite
+	) {
 		if (log.getSupplierInviteId() != null) {
-			dispatchSupplierInvite(log, inviteToken);
+			dispatchSupplierInvite(log, inviteToken, lockedSupplier, lockedInvite);
+			return;
+		}
+		if (log.isSupplierOperational()) {
+			dispatchSupplierOperational(log);
 			return;
 		}
 		if (isBlank(log.getRecipient()) || log.getCustomerInquiryId() == null) {
@@ -129,7 +167,61 @@ class NotificationDispatchListener {
 		markResult(log, result.successful(), result.skippedReason());
 	}
 
-	private void dispatchSupplierInvite(NotificationLog log, String inviteToken) {
+	private void dispatchSupplierOperational(NotificationLog log) {
+		Instant now = Instant.now();
+		if (log.getCreatedAt() == null || !now.isBefore(log.getCreatedAt().plus(Duration.ofDays(7)))) {
+			log.markFailed("DELIVERY_WINDOW_EXPIRED");
+			log.scheduleOperationalCleanup(now);
+			return;
+		}
+		if (!supplierPortalFeatureGate.isEnabled()) {
+			log.markSkipped("PORTAL_NOT_RELEASED");
+			log.scheduleOperationalCleanup(now);
+			return;
+		}
+		Supplier supplier = log.getSupplierId() == null ? null
+			: supplierRepository.findByIdForUpdate(log.getSupplierId()).orElse(null);
+		if (supplier == null
+			|| supplier.getPortalStatus() != SupplierPortalStatus.ACTIVE
+			|| supplier.getManagerUserId() == null
+			|| supplier.getContactEmailVerifiedAt() == null
+			|| !supplier.hasTimeValidContract(now)
+			|| userAccountRepository.findByIdAndStatus(supplier.getManagerUserId(), UserStatus.ACTIVE).isEmpty()
+			|| isBlank(log.getRecipient())
+			|| !log.getRecipient().equals(supplier.getEmail())) {
+			log.markSkipped("SUPPLIER_AUTHORIZATION_CHANGED");
+			log.scheduleOperationalCleanup(now);
+			return;
+		}
+		String portalUrl = publicBaseUrl + switch (log.getType()) {
+			case SUPPLIER_FULFILLMENT_REQUESTED -> "/supplier/orders";
+			case SUPPLIER_PRODUCT_REVIEW_RESULT -> "/supplier/products";
+			case SUPPLIER_CLAIM_WORK_REQUESTED -> "/supplier/claim-tasks";
+			default -> "/supplier";
+		};
+		String subject = switch (log.getType()) {
+			case SUPPLIER_FULFILLMENT_REQUESTED -> "[코어블SAF] 새 출고 요청";
+			case SUPPLIER_PRODUCT_REVIEW_RESULT -> "[코어블SAF] 상품 검토 결과";
+			case SUPPLIER_CLAIM_WORK_REQUESTED -> "[코어블SAF] 클레임 처리 요청";
+			default -> "[코어블SAF] 공급처 포털 알림";
+		};
+		EmailSendResult result = emailSender.sendTransactional(
+			log.getRecipient(), subject, "%s\n\n공급처 포털\n%s".formatted(log.getPayloadSnapshot(), portalUrl)
+		);
+		if (result.successful()) {
+			log.markSent(now);
+		} else {
+			log.markSkipped("EMAIL_PROVIDER_SKIPPED");
+		}
+		log.scheduleOperationalCleanup(now);
+	}
+
+	private void dispatchSupplierInvite(
+		NotificationLog log,
+		String inviteToken,
+		Supplier supplier,
+		SupplierInvite invite
+	) {
 		if (!supplierPortalFeatureGate.isEnabled()) {
 			log.markSkipped("PORTAL_NOT_RELEASED");
 			return;
@@ -138,12 +230,6 @@ class NotificationDispatchListener {
 			log.markSkipped("INVITE_TOKEN_UNAVAILABLE");
 			return;
 		}
-		Supplier supplier = log.getSupplierId() == null ? null : supplierRepository
-			.findByIdForUpdate(log.getSupplierId())
-			.orElse(null);
-		SupplierInvite invite = log.getSupplierInviteId() == null ? null : supplierInviteRepository
-			.findByIdForUpdate(log.getSupplierInviteId())
-			.orElse(null);
 		Instant now = Instant.now();
 		if (supplier == null || invite == null
 			|| !supplier.getId().equals(invite.getSupplier().getId())

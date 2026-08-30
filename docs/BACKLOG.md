@@ -101,19 +101,22 @@ Tasks:
 
 ### B-103 공급처 출고 요청·최소 PII·이메일 알림
 
-Status: Todo
+Status: Review Ready
 
 Notes:
 - 입금확인 완료 즉시 수락 단계 없이 공급처에 출고 요청을 보여준다.
 - 실제 email 전달 검증 전에는 production supplier activation을 열지 않는다.
+- B-103 구현과 문서 동기화, 전체 API/PostgreSQL/Web 검증 및 독립 구현·테스트 검토를 완료했다. Production supplier activation과 실제 email 검증은 별도 release gate로 남는다.
+- 송장 등록 시 cutoff 단축은 Planned B-104, `SUPPLIER_CLAIM_WORK_REQUESTED` 실제 producer는 Planned B-105가 소유한다.
 
 Tasks:
-- [ ] portal fulfillment 생성, 요청시각·배송지 잠금과 portal access가 비활성인 `salesAction=KEEP` 신규 주문의 `COREABLE_MANUAL` fallback을 구현한다.
-- [ ] PII 없는 목록과 stable order-item id·수량을 가진 최소 상세 DTO를 구현해 B-104 allocation 입력 경계를 준비한다.
-- [ ] 요청 +60일로 시작해 각 송장 등록 +30일로만 짧아지는 stored monotonic cutoff, scheduler·mutation lazy takeover, cutoff/terminal MASKED read와 PII-free 사유의 승인 클레임 FULL 한시 재개, time-valid contract 직접 guard, admin takeover command history와 PII 접근 로그 1년 삭제를 구현한다.
-- [ ] checkout 배송 메모 snapshot과 공급처 최소 PII 응답의 `no-store`를 구현한다.
-- [ ] PII 없는 신규 주문·검토·클레임 이메일 알림과 발송 이력을 구현하고 dispatch/retry마다 active manager·time-valid contract·검증 이메일을 재확인해 old/unauthorized recipient를 `SKIPPED` 처리하며 raw exception 미저장, invite generic-retry 금지, supplier FAILED-only 7일 retry, terminal+30일 recipient/legacy failure reason cleanup을 적용한다.
-- [ ] 권한, 타 공급처 404, PII 필드 부재와 기간 경계 테스트를 추가한다.
+- [x] portal fulfillment 생성, 요청시각·배송지 잠금과 portal access가 비활성인 `salesAction=KEEP` 신규 주문의 `COREABLE_MANUAL` fallback을 구현한다.
+- [x] PII 없는 목록과 stable order-item id·수량을 가진 최소 상세 DTO를 구현해 B-104 allocation 입력 경계를 준비한다.
+- [x] 요청 +60일 stored cutoff, scheduler/read-lazy·terminal takeover, cutoff/terminal MASKED read와 PII-free 사유의 승인 클레임 read-only FULL 한시 재개, time-valid contract 직접 guard, admin takeover command history와 PII 접근 로그 1년 삭제를 구현한다.
+- [x] checkout 배송 메모를 최대 300자로 trim하고 blank를 `null` snapshot으로 저장하며 공급처 최소 PII 상세 응답에 `Cache-Control: no-store`를 적용한다.
+- [x] PII 없는 신규 출고 요청·관리자 상품 검토 결과 producer와 세 운영 email type/template을 구현하고 dispatch/retry마다 active manager·time-valid contract·검증 이메일을 재확인해 old/unauthorized recipient를 `SKIPPED` 처리하며 raw exception 미저장, invite generic-retry 금지, supplier FAILED-only 7일 retry, terminal+30일 recipient/legacy failure reason cleanup을 적용한다. 클레임 작업 producer는 B-105까지 연결하지 않는다.
+- [x] V42 delivery memo, Claim PII grant/access log와 notification retention index를 expand migration으로 추가한다.
+- [x] 추가된 API 통합 테스트와 PostgreSQL V42 smoke, 전체 API suite, Web lint/build, 공급처 출고 Web 계약 Playwright를 실행하고 독립 검토를 반영한다.
 
 ### B-104 공급처 복수 송장과 공식 배송조회 링크
 

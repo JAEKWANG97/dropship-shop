@@ -243,7 +243,8 @@ class AdminOrderQueryService {
 				order.getRecipientPhone(),
 				order.getPostalCode(),
 				order.getAddress1(),
-				order.getAddress2()
+				order.getAddress2(),
+				order.getDeliveryMemo()
 			),
 			new AdminOrderDtos.AdminPaymentGroupResponse(
 				order.getPaymentGroup().getId(),
@@ -398,6 +399,13 @@ class AdminOrderQueryService {
 			return new AdminOrderDtos.AdminFulfillmentResponse(
 				null,
 				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
 				order.getSupplierOrderStartedAt(),
 				order.getAddressLockedAt(),
 				order.getAddressLockedByAdminId(),
@@ -419,6 +427,13 @@ class AdminOrderQueryService {
 		return new AdminOrderDtos.AdminFulfillmentResponse(
 			fulfillment.getId(),
 			fulfillment.getStatus(),
+			fulfillment.getChannel(),
+			fulfillment.getRequestedAt(),
+			fulfillment.getOperationalOwner(),
+			fulfillment.getPiiAccessCutoffAt(),
+			fulfillment.getHandedOverAt(),
+			fulfillment.getHandedOverReason(),
+			fulfillment.getHandedOverByAdminId(),
 			fulfillment.getSupplierOrderStartedAt(),
 			order.getAddressLockedAt(),
 			order.getAddressLockedByAdminId(),
