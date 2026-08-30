@@ -2,13 +2,28 @@
 
 ## Current Overrides
 
+- 공급처 포털 상품 자동 분류의 현재 기준은 `2026-08-30: Supplier Product Auto Review Reuses The Approved Category Policy`다. 구조·필수정보를 모두 갖춘 B-093 `A` category와 일반 작업장갑만 자동 승인 후보이며, 기존 KOSHA 인증 대상은 인증 상태가 `VERIFIED` 또는 `NOT_REQUIRED`가 아니면 인증 검토, B-093 `R`/`M` category는 category 검토, 누락·미분류·실행 실패는 수동 검토로 fail closed한다.
 - 고객 결제의 현재 기준은 `2026-07-17: Direct Bank Transfer Only, No Toss Payments`와 `2026-07-18: Remove Unused Toss Payments Execution Paths`다. 이전 Toss/PG 항목은 역사 기록이다.
 - 상품 가격의 현재 기준은 `2026-07-28: Supplier Shipping Is Excluded From Product Markup`이다. 공급처 배송비는 수집 가능성 검증에는 사용하지만 판매가 계산에는 더하지 않는다.
 - 공급처 발주의 현재 기준은 `2026-07-27: Domeggook Fulfillment Uses Prefunded E-Money After Customer Deposit`이다. 지원되는 주문은 자동 발주하고 나머지만 수동 처리한다.
-- 외부 공급처 포털의 후속 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`이다. `B-100`~`B-105` 구현 전 현재 동작이 아니며, 각 slice가 구현될 때까지 기존 Domeggook/수동 발주 동작을 유지한다.
+- 외부 공급처 포털의 설계 기준은 `2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal`이다. `B-100` 신청·인증과 `B-101` 개별 상품·검토는 구현됐고, `B-102`~`B-105`는 각 slice가 구현될 때까지 기존 Domeggook/수동 발주 동작을 유지한다.
 - 계좌입금 금액 불일치의 후속 설계 기준도 같은 2026-08-29 결정이다. `B-102`가 구현되면 실제 수령액을 메모-only `PAYMENT_PENDING`으로 두지 않고 결제그룹 단위 전액 환불 예외로 처리하며, 그 전까지는 B-068의 기존 동작을 현재 구현으로 읽는다.
 - Planned 포털 송장 등록은 실제 배송 시작과 다르다. 공식 택배사 조회 링크만 제공하고, 기존 Domeggook 배송 동기화와 관리자 수동 보정은 호환 경로로 유지한다.
-- 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Planned` 절을 함께 맞추되, 이를 현재 구현으로 해석하지 않는다.
+- 완료 로그와 과거 결정이 현재 동작과 충돌하면 각 정책 문서의 `Confirmed Policy`를 우선한다. 공급처 포털의 `B-102`~`B-105` 후속 구현 계약끼리 충돌하면 이 결정과 관련 `Planned` 절을 함께 맞추되, 이를 현재 구현으로 해석하지 않는다.
+
+## 2026-08-30: Supplier Product Auto Review Reuses The Approved Category Policy
+
+Decision:
+
+The supplier-product classifier reuses the already approved B-093 category policy instead of inventing a private certification model. A structurally sale-ready product may become `AUTO_APPROVED` only when its category is B-093 `A` or `PPE_WORK_GLOVES`, its required notice, thumbnail and active option are present, and any category covered by the existing KOSHA review set has `ProductComplianceStatus=VERIFIED|NOT_REQUIRED`. KOSHA-covered products without that evidence become `REVIEW_REQUIRED/CERTIFICATION_REVIEW`; B-093 `R` or `M` categories become `REVIEW_REQUIRED/CATEGORY_REVIEW`; missing sale-readiness data becomes `REVIEW_REQUIRED/REQUIRED_INFO_MISSING`; an unknown category, missing rule, or classifier failure becomes `REVIEW_REQUIRED/SAFETY_REVIEW`.
+
+Consequences:
+
+- B-093 `A` remains only the category allowlist; it cannot bypass structural, notice, image, option, or KOSHA evidence checks.
+- The classifier reads existing public structured category/notice/compliance data and validated ProductImage rows. B-101 adds no private certification upload or evidence table.
+- Any new ProductCategory is review-only until this decision and the classifier allowlist are updated together.
+- A `SUPPLEMENT_REQUESTED` resubmission returns to `REVIEW_REQUIRED` regardless of classifier result, as already defined by the portal review transition policy.
+- Production supplier-portal sale and external-route flags remain off; an auto-approved row is not release authorization.
 
 ## 2026-08-29: Approved Suppliers Manage Catalog And Fulfillment In A Bounded Portal
 

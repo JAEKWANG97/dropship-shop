@@ -3,6 +3,7 @@ package com.dropshipshop.api.procurement;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -76,14 +77,33 @@ class DomeggookCatalogSyncServiceTest {
 		service.sync(productId, true);
 		assertThat(product.getBasePrice()).isEqualTo(2000);
 		assertThat(product.getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+		assertThat(product.isSourceAutoSoldOut()).isTrue();
 		assertThat(option.getStatus()).isEqualTo(ProductOptionStatus.SOLD_OUT);
 
 		service.sync(productId, true);
 		service.sync(productId, true);
 		assertThat(product.getStatus()).isEqualTo(ProductStatus.ACTIVE);
 		assertThat(product.getSourceAvailable()).isTrue();
+		assertThat(product.isSourceAutoSoldOut()).isFalse();
 		assertThat(option.getStatus()).isEqualTo(ProductOptionStatus.ACTIVE);
-		verify(historyRepository, Mockito.times(7)).save(any());
+		verify(historyRepository, Mockito.times(10)).save(any());
+	}
+
+	@Test
+	void doesNotRecoverManualSoldOutEvenWhenTheLastSourceSnapshotWasUnavailable() {
+		product.updateStatus(ProductStatus.SOLD_OUT);
+		product.markSourceSynced(false, java.time.Instant.now());
+		when(client.catalogSnapshot("12345")).thenReturn(new DomeggookPurchaseClient.CatalogSnapshot(
+			true, 1_200, 2_000, 1, 1,
+			List.of(new DomeggookPurchaseClient.SourceOption("00", "기본", 100, 5L, true, 0))
+		));
+
+		service.sync(productId, true);
+
+		assertThat(product.getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+		assertThat(product.getSourceAvailable()).isFalse();
+		assertThat(product.isSourceAutoSoldOut()).isFalse();
+		verify(historyRepository, never()).save(any());
 	}
 
 	@Test
@@ -132,5 +152,40 @@ class DomeggookCatalogSyncServiceTest {
 		assertThat(product.getBasePrice()).isEqualTo(1250);
 		assertThat(product.getMinimumOrderQuantity()).isEqualTo(1);
 		assertThat(product.getSourceSyncError()).contains("rate limited");
+	}
+
+	@Test
+	void ignoresSnapshotWhenSourceItemChangesDuringTheUpstreamRequest() {
+		when(client.catalogSnapshot("12345")).thenAnswer(invocation -> {
+			product.updateSourceItemNo("67890");
+			return new DomeggookPurchaseClient.CatalogSnapshot(
+				true, 9_000, 0, 1, 1,
+				List.of(new DomeggookPurchaseClient.SourceOption("00", "changed", 500, 1L, true, 0))
+			);
+		});
+
+		service.sync(productId, true);
+
+		assertThat(product.getSourceItemNo()).isEqualTo("67890");
+		assertThat(product.getSourcePrice()).isEqualTo(1_000);
+		assertThat(product.getBasePrice()).isEqualTo(1_250);
+		assertThat(product.getVersion()).isZero();
+		verify(historyRepository, never()).save(any());
+	}
+
+	@Test
+	void doesNotMarkTheNewSourceAsFailedWhenTheOldSourceRequestFails() {
+		when(client.catalogSnapshot("12345")).thenAnswer(invocation -> {
+			product.updateSourceItemNo("67890");
+			throw new DomeggookApiException("429", "old source failed", false);
+		});
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.sync(productId, true))
+			.isInstanceOf(DomeggookApiException.class);
+
+		assertThat(product.getSourceItemNo()).isEqualTo("67890");
+		assertThat(product.getSourceSyncError()).isNull();
+		assertThat(product.getVersion()).isZero();
+		verify(historyRepository, never()).save(any());
 	}
 }

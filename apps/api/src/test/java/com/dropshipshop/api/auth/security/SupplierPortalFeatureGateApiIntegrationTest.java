@@ -49,5 +49,9 @@ class SupplierPortalFeatureGateApiIntegrationTest {
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code", is("RESOURCE_NOT_FOUND")))
 			.andExpect(jsonPath("$.path", is("/api/supplier/me")));
+
+		mockMvc.perform(get("/api/supplier/products"))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code", is("RESOURCE_NOT_FOUND")));
 	}
 }

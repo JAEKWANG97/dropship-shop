@@ -90,7 +90,7 @@ Order and payment state conflicts caused by optimistic locking return `409 CONFL
 - Fulfillment/Shipment: admin supplier actions, shipment entry, tracking sync, shipment correction.
 - Refund/Claim: customer claim submission and admin review/refund execution.
 - Policy Pages: public policy, business disclosure, privacy processing table, admin policy management.
-- Supplier Portal: B-100 public application, one-time Kakao invitation, lifecycle and tenant session are implemented; B-101 through B-105 catalog/inventory, paid fulfillment, tracking, and requested claim facts remain planned.
+- Supplier Portal: B-100 public application, one-time Kakao invitation, lifecycle and tenant session plus B-101 individual catalog/review are implemented; B-102 through B-105 inventory, paid fulfillment, tracking, and requested claim facts remain planned.
 
 ## Implemented Endpoints
 
@@ -217,7 +217,7 @@ PATCH /api/me/addresses/{addressId}
 
 ## Supplier Portal APIs
 
-Status: `B-100` onboarding, lifecycle, Kakao activation and tenant/session endpoints are Implemented. The `B-098` contract-evidence endpoint and `B-101` through `B-105` endpoints remain Planned. Existing customer/admin legacy response shapes remain compatible.
+Status: `B-100` onboarding, lifecycle, Kakao activation and tenant/session endpoints and `B-101` catalog/review endpoints are Implemented. The `B-098` contract-evidence endpoint and `B-102` through `B-105` endpoints remain Planned. Existing customer/admin legacy response shapes remain compatible.
 
 ### Application, Approval, Invitation, And Session (Implemented B-100)
 
@@ -378,29 +378,29 @@ B-100 rules:
 - For VERIFIED, `contractVersion` is the new version and `effectiveAt`, optional `expiresAt`, and `evidenceReference` are required as documented. For EXPIRED/REVOKED, `contractVersion` must equal the non-null `expectedCurrentContractVersion`; effective/expiry/evidence fields are forbidden because the terminal event refers to the current verified evidence rather than replacing it.
 - After B-100, legacy `PATCH /api/admin/suppliers/{supplierId}` rejects contact-email, manager, portal lifecycle, and trade-status mutations for any supplier whose portal status is not DISABLED or that has portal manager/invite history. Admins must use contact-email/portal-status/sales-status lifecycle routes so invite revocation, salesAction and handover cannot be bypassed; unrelated legacy supplier fields remain compatible.
 
-### Supplier Catalog And Coreable Review (Planned B-101)
+### Supplier Catalog And Coreable Review (Implemented B-101)
 
 | Method | Path | Auth | Status | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/supplier/products` | `ROLE_SUPPLIER` | Planned B-101 | List only current supplier products |
-| `POST` | `/api/supplier/products` | `ROLE_SUPPLIER` | Planned B-101 | Create one internal product draft used by the single registration flow; CSV is not supported in this slice |
-| `GET` | `/api/supplier/products/{productId}` | `ROLE_SUPPLIER` | Planned B-101 | Read one owned product and supplier-editable fields |
-| `PATCH` | `/api/supplier/products/{productId}` | `ROLE_SUPPLIER` | Planned B-101 | Update supplier-editable product fields only |
-| `DELETE` | `/api/supplier/products/{productId}` | `ROLE_SUPPLIER` | Planned B-101 | Hard-delete an unreferenced, never-submitted portal draft and queue owned binary cleanup |
-| `POST` | `/api/supplier/products/{productId}/submit` | `ROLE_SUPPLIER` | Planned B-101 | Final call behind the same visible registration action; classify and auto-publish or queue review |
-| `POST` | `/api/supplier/products/{productId}/options` | `ROLE_SUPPLIER` | Planned B-101 | Add an owned product option |
-| `PATCH` | `/api/supplier/products/{productId}/options/{optionId}` | `ROLE_SUPPLIER` | Planned B-101 | Update an option after product+option tenant check |
-| `DELETE` | `/api/supplier/products/{productId}/options/{optionId}` | `ROLE_SUPPLIER` | Planned B-101 | Hard-delete an unreferenced option under a never-submitted draft while preserving one option |
-| `POST` | `/api/supplier/products/{productId}/images` | `ROLE_SUPPLIER` | Planned B-101 | Upload validated owned-product image |
-| `DELETE` | `/api/supplier/products/{productId}/images/{imageId}` | `ROLE_SUPPLIER` | Planned B-101 | Remove an owned draft image and schedule binary cleanup after commit |
-| `PUT` | `/api/supplier/products/{productId}/images/order` | `ROLE_SUPPLIER` | Planned B-101 | Reorder owned images and select exactly one thumbnail |
-| `PUT` | `/api/supplier/products/{productId}/detail-blocks` | `ROLE_SUPPLIER` | Planned B-101 | Replace sanitized owned-product detail blocks |
-| `PUT` | `/api/supplier/products/{productId}/notice` | `ROLE_SUPPLIER` | Planned B-101 | Create/update structured product information notice |
-| `GET` | `/api/admin/product-reviews` | `ADMIN` | Planned B-101 | Review queue for certification/category/required-info flags |
-| `GET` | `/api/admin/product-reviews/{productId}` | `ADMIN` | Planned B-101 | Read the exact version and structured category/notice/product fields for review |
-| `POST` | `/api/admin/product-reviews/{productId}/approve` | `ADMIN` | Planned B-101 | Approve with audit reason |
-| `POST` | `/api/admin/product-reviews/{productId}/supplement` | `ADMIN` | Planned B-101 | Request supplier supplementation with reason |
-| `POST` | `/api/admin/product-reviews/{productId}/reject` | `ADMIN` | Planned B-101 | Reject and keep product hidden with reason |
+| `GET` | `/api/supplier/products` | `ROLE_SUPPLIER` | Implemented B-101 | List only current supplier products |
+| `POST` | `/api/supplier/products` | `ROLE_SUPPLIER` | Implemented B-101 | Create one internal product draft used by the single registration flow; CSV is not supported in this slice |
+| `GET` | `/api/supplier/products/{productId}` | `ROLE_SUPPLIER` | Implemented B-101 | Read one owned product and supplier-editable fields |
+| `PATCH` | `/api/supplier/products/{productId}` | `ROLE_SUPPLIER` | Implemented B-101 | Update supplier-editable product fields only |
+| `DELETE` | `/api/supplier/products/{productId}` | `ROLE_SUPPLIER` | Implemented B-101 | Hard-delete an unreferenced, never-submitted portal draft and queue owned binary cleanup |
+| `POST` | `/api/supplier/products/{productId}/submit` | `ROLE_SUPPLIER` | Implemented B-101 | Final call behind the same visible registration action; classify and auto-publish or queue review |
+| `POST` | `/api/supplier/products/{productId}/options` | `ROLE_SUPPLIER` | Implemented B-101 | Add an owned product option |
+| `PATCH` | `/api/supplier/products/{productId}/options/{optionId}` | `ROLE_SUPPLIER` | Implemented B-101 | Update an option after product+option tenant check |
+| `DELETE` | `/api/supplier/products/{productId}/options/{optionId}` | `ROLE_SUPPLIER` | Implemented B-101 | Hard-delete an unreferenced option under a never-submitted draft while preserving one option |
+| `POST` | `/api/supplier/products/{productId}/images` | `ROLE_SUPPLIER` | Implemented B-101 | Upload validated owned-product image |
+| `DELETE` | `/api/supplier/products/{productId}/images/{imageId}` | `ROLE_SUPPLIER` | Implemented B-101 | Remove an owned draft image and schedule binary cleanup after commit |
+| `PUT` | `/api/supplier/products/{productId}/images/order` | `ROLE_SUPPLIER` | Implemented B-101 | Reorder owned images and select exactly one thumbnail |
+| `PUT` | `/api/supplier/products/{productId}/detail-blocks` | `ROLE_SUPPLIER` | Implemented B-101 | Replace sanitized owned-product detail blocks |
+| `PUT` | `/api/supplier/products/{productId}/notice` | `ROLE_SUPPLIER` | Implemented B-101 | Create/update structured product information notice |
+| `GET` | `/api/admin/product-reviews` | `ADMIN` | Implemented B-101 | Review queue for certification/category/required-info flags |
+| `GET` | `/api/admin/product-reviews/{productId}` | `ADMIN` | Implemented B-101 | Read the exact version and structured category/notice/product fields for review |
+| `POST` | `/api/admin/product-reviews/{productId}/approve` | `ADMIN` | Implemented B-101 | Approve with audit reason |
+| `POST` | `/api/admin/product-reviews/{productId}/supplement` | `ADMIN` | Implemented B-101 | Request supplier supplementation with reason |
+| `POST` | `/api/admin/product-reviews/{productId}/reject` | `ADMIN` | Implemented B-101 | Reject and keep product hidden with reason |
 
 Review action request bodies:
 
@@ -430,10 +430,10 @@ POST /api/admin/product-reviews/{productId}/reject
 
 B-101 request and response boundaries:
 
-- B-101 supplier create/update may accept product name, summary, supplier cost, option supplier cost/code, MOQ/order step, category selection, public product images, detail blocks and structured notice/certification rows owned by that supplier. Supplier IMAGE detail blocks accept an owned same-Product `productImageId` of type `DETAIL`, never an arbitrary URL/key. Inventory mode/on-hand is owned only by the B-102 inventory endpoint.
+- B-101 supplier create/update may accept product name, summary, supplier cost, option supplier cost/code, MOQ/order step, category selection, public product images, detail blocks and structured notice rows owned by that supplier. The classifier may read the existing admin-managed compliance status, but supplier payloads cannot set it. Supplier IMAGE detail blocks accept an owned same-Product `productImageId` of type `DETAIL`, never an arbitrary URL/key. Inventory mode/on-hand is owned only by the B-102 inventory endpoint.
 - Supplier payload must not accept `supplierId`, `basePrice`, customer sale status, `complianceStatus`, `reviewStatus`, sale-readiness result, another supplier source identifier, or an arbitrary image owner/storage key.
-- Coreable computes prices deterministically from the active pricing policy whenever an approved supplier cost change takes effect. `basePrice=price(sourcePrice)`; each option's customer total is `price(sourcePrice + sourceAdditionalPrice)` and `additionalPrice=optionCustomerTotal-basePrice`, where `price` applies the same markup, resale-minimum floor, and rounding rules. `sourcePrice` and `sourceAdditionalPrice` are each non-negative integer KRW, preserving the existing non-negative customer option-delta contract. Price values and policy version change atomically and append audit history.
-- B-101 additively returns monotonic `version` from the existing admin pricing-policy API. Product price history stores applied policy id/version and a full immutable calculator snapshot (rates, rounding unit, resale minimum and before/after product/option prices), so later in-place policy edits cannot erase why a price was produced.
+- Coreable computes prices deterministically from the active pricing policy whenever an approved supplier cost change takes effect. `basePrice=price(sourcePrice)`; each option's customer total is `price(sourcePrice + sourceAdditionalPrice)` and `additionalPrice=optionCustomerTotal-basePrice`, where `price` applies the same markup, resale-minimum floor, and rounding rules. `sourcePrice` and `sourceAdditionalPrice` are each integer KRW in `0..100,000,000`; a calculated customer unit price is at most `1,000,000,000`. Exact add/multiply rejects overflow before any cart, order, or payment snapshot is written. Price values and policy version change atomically and append audit history.
+- B-101 additively returns monotonic `version` from the existing admin pricing-policy API. Each price-application history after state stores applied policy id/version, full rates/rounding/resale-minimum calculator snapshot and resulting product/option prices; its before state stores the prior applied policy id/version and prices. The prior full snapshot remains in the earlier application row, so a later in-place policy edit cannot fabricate a mixed-version audit value.
 - Portal checkout reuses the existing ADMIN-only `sourceUnitPrice` OrderItem snapshot for the then-current supplier option cost instead of adding a second cost column. It preserves customer `unitPrice` and `lineAmount`; supplier order responses and settlement UI never expose `sourceUnitPrice`, and supplier settlement remains a non-goal.
 - A no-option request creates one internal `기본` option so existing required order-item option references remain valid.
 - The web presents one `상품 등록` action. Internal draft creation and asset calls are implementation details; the supplier does not perform a second approval-request step. A successful submit must make a structurally sale-ready unflagged product `AUTO_APPROVED`; certification/category/legal-information flags or classifier uncertainty produce `REVIEW_REQUIRED` and keep it hidden.
@@ -443,12 +443,13 @@ B-101 request and response boundaries:
 - Supplier/admin product detail and every non-delete mutation response include the aggregate `version`. PATCH/submit and every option/image/detail/notice mutation that can affect review accepts the current `expectedVersion`; DELETE uses `If-Match`. An accepted mutation increments the aggregate unless the Product itself is deleted. A stale supplier or reviewer request returns `409 PRODUCT_VERSION_CONFLICT` with no partial write.
 - Review transitions are explicit: initial `DRAFT` submit classifies to `AUTO_APPROVED` or `REVIEW_REQUIRED`; `REVIEW_REQUIRED` admin review moves only to `APPROVED`, `SUPPLEMENT_REQUESTED`, or `REJECTED`; `SUPPLEMENT_REQUESTED` remains hidden while supplier edits and its resubmit always returns to `REVIEW_REQUIRED` rather than auto-publication; `REJECTED` has no direct supplier resubmit and maps to Coreable contact. Review-relevant edits of `AUTO_APPROVED`, `APPROVED`, or `REVIEW_REQUIRED` hide the product and move it to `DRAFT` before a new submit/classification.
 - Admin approve/supplement/reject is valid only for the exact `REVIEW_REQUIRED` version the reviewer loaded. Supplement/reject require an allowlisted supplier reason code and separately validated `supplierReviewMessage`; `internalReason` stays ADMIN-only but is also single-line, at most 500 characters, and rejects contact/customer PII. All review decisions and supplier edits append actor/version before-and-after history. History snapshots canonicalize only allowlisted product/option/image/detail/notice/pricing/review business fields and never copy request bodies, actor contact fields, customer/order data, or arbitrary admin notes.
-- B-101 uses an expand-contract rollout for existing admin/source writers: backfill Product version, make every legacy admin and source-sync product/option/image/detail/notice write lock and increment the same aggregate version, then update admin clients to send additive optional `expectedVersion`/`If-Match`. Product history distinguishes `ADMIN|SUPPLIER|SYSTEM`; the legacy zero-UUID Domeggook sentinel backfills to SYSTEM with null actor user rather than becoming a fake ADMIN/User FK. During compatibility, an omitted admin version uses the locked current row and returns the new version; source sync retries on optimistic conflict. Any review-relevant legacy/source mutation of a portal product also hides/invalidates its pending approval. Only a later contract release may require the admin precondition, so existing request bodies are not broken at B-101.
+- A Coreable `APPROVED` decision for `CERTIFICATION_REVIEW` completes only the portal human-review state. It does not write `complianceStatus`; the legacy compatibility rule remains that `PENDING` can sell and only `REJECTED` blocks sale readiness.
+- B-101 uses an expand-contract rollout for existing admin/source writers: backfill Product version, make every legacy admin, review, cart, checkout, and source-sync writer discover only scalar supplier/ownership first, then take `Supplier -> fresh Product -> ProductOption(id)` pessimistic locks and increment the aggregate version when it mutates the Product. After any lock wait, the fresh Product supplier must still match the discovered/requested supplier; stale ownership returns the applicable conflict or tenant-safe `404`. Product history distinguishes `ADMIN|SUPPLIER|SYSTEM`; the legacy zero-UUID Domeggook sentinel backfills to SYSTEM with null actor user rather than becoming a fake ADMIN/User FK. During compatibility, an omitted admin version uses the locked current row and returns the new version. Any review-relevant legacy/source mutation of a portal product also hides/invalidates its pending approval. For a portal product, legacy admin product/option mutations treat customer-price fields as compatibility input only and overwrite them with an active-policy recalculation of the product and every option, recording the same applied version/full snapshot. Only a later contract release may require the admin precondition, so existing request bodies are not broken at B-101.
 - Supplier responses expose supplier cost and source option metadata only for the current tenant. Public responses continue to omit all supplier cost, supplier identity, inventory mode/quantity, review internals, and source metadata.
 - Supplier product routes require both current supplier ownership and `managementChannel=SUPPLIER_PORTAL`; legacy COREABLE/Domeggook products remain Coreable-managed even after LINK_EXISTING and return tenant-safe `404` from supplier routes. No automatic ownership migration is included.
-- Every repository mutation includes resource id, current supplier id, portal management channel, and expected aggregate version. Image ownership is checked before binary write.
-- Supplier product/detail responses derive `deletable`; option rows derive `deletable` while the parent has never been submitted. The UI shows destructive deletion only when true. The server still rechecks every guard at mutation time. Image delete/reorder preserves exactly one thumbnail before submit.
-- B-101 does not collect private certification-document files. Review uses structured category/notice/certification fields and validated public product images; if a private document is operationally required, Coreable handles it outside this initial portal slice until a retention/access policy is separately approved.
+- Supplier product lookup and mutation first discover scalar ownership scoped by resource id, current supplier id and portal management channel. Mutations then lock the Supplier, reload a fresh Product, lock its Options in id order, and recheck tenant/channel/version; a post-wait owner mismatch is tenant-safe `404`. Image ownership and multipart metadata, including the 200-character alt-text limit, are validated before binary write.
+- Supplier product, option, and image rows return server-derived `deletable`. An image is not deletable while a detail block references it, and a current thumbnail with other presentation images must first be replaced through reorder. The UI shows destructive deletion only when true and can remove a DETAIL block reference before deleting its image. The server still rechecks every guard at mutation time. Reorder requires exactly one thumbnail; deleting the sole presentation thumbnail may temporarily leave a draft without one, and submit then routes it to required-information review.
+- B-101 does not collect private certification-document files. Review uses the structured category/notice fields, existing admin-managed compliance status and validated public product images; if a private document is operationally required, Coreable handles it outside this initial portal slice until a retention/access policy is separately approved.
 - Product/image/detail/notice HTML and files keep the existing sanitization, extension, signature, size, and count rules.
 - B-101 keeps the production supplier-portal feature gate closed. B-102 inventory migration and checkout guards are necessary catalog sale-readiness, but customer purchase and external supplier routes remain closed until B-100 through B-105 plus privacy, email, contract, and feature-flag release gates are all ready.
 
@@ -465,11 +466,12 @@ If-Match: "7"
 - Both requests have no body. A successful Product delete returns `204 No Content`; a successful Option delete returns `204 No Content` and the surviving Product version in `ETag`. Product/option detail and list queries return no tombstone after hard delete.
 - Both routes first require the current supplier tenant and `managementChannel=SUPPLIER_PORTAL`; absent, other-tenant, or Coreable-managed resources return tenant-safe `404`.
 - Product delete requires `reviewStatus=DRAFT`, immutable `firstSubmittedAt=null`, the matching Product version, and no CartItem/OrderItem reference to the Product or any of its Options. Option delete requires the same parent state/version, no reference to that Option, and at least one remaining Option. A row that was submitted, reviewed, published, or referenced is preserved through Coreable `HIDDEN`/`STOPPED`, not soft- or hard-deleted.
-- Missing `If-Match` returns `428 PRODUCT_VERSION_REQUIRED`. A stale value returns `409 PRODUCT_VERSION_CONFLICT`; invalid parent state returns `409 PRODUCT_NOT_DRAFT` or `409 PRODUCT_ALREADY_SUBMITTED`; references return `409 PRODUCT_REFERENCED` or `409 OPTION_REFERENCED`; deleting the last Option returns `409 LAST_OPTION_REQUIRED`. No path returns a raw FK error.
-- A new delete locks Product -> all ProductOptions in id order and rechecks the version, state, submission marker and references. Cart add and checkout take the same Product -> Option locks before inserting CartItem/OrderItem. If a reference wins, delete returns `409`; if delete wins, the reference writer returns `404`/not-sellable without a dangling row.
+- Missing `If-Match` returns `428 PRODUCT_VERSION_REQUIRED`. A stale value returns `409 PRODUCT_VERSION_CONFLICT`; invalid parent state returns `409 PRODUCT_NOT_DRAFT` or `409 PRODUCT_ALREADY_SUBMITTED`; references return `409 PRODUCT_REFERENCED`, `409 OPTION_REFERENCED`, or `409 DETAIL_IMAGE_REFERENCED`; deleting the last Option returns `409 LAST_OPTION_REQUIRED`. No path returns a raw FK error.
+- A new delete performs scalar ownership discovery, then locks `Supplier -> fresh Product -> all ProductOptions(id)` and rechecks tenant, version, state, submission marker and references. Cart add and checkout use the same lock contract plus fresh ownership/saleability and reference guards before inserting CartItem/OrderItem. A stale owner or deleted/not-sellable resource therefore returns the applicable conflict/`404` instead of a dangling row or raw FK error.
+- A valid deletable Product is a never-submitted `DRAFT/HIDDEN`, so normal cart and checkout APIs cannot create a new reference to it. B-101 verifies the shared lock order as a service contract and verifies existing CartItem/OrderItem reference rejection through integration tests; it does not fabricate a saleable-and-deletable state solely to claim a concurrent purchase-success E2E.
 - Before row removal, Product deletion appends `PRODUCT_DELETED` with `beforeVersion=current`, `afterVersion=null`, allowlisted before snapshot and immutable subject ids. Option deletion appends `OPTION_DELETED`, increments the surviving Product and records `v -> v+1`. Live history FKs use `ON DELETE SET NULL`; `/api/admin/products/{productId}/changes` queries the immutable subject id and returns deleted-subject history, while a random id with neither live Product nor history remains `404`.
 - DELETE takes no supplier free-text reason. Product deletion uses server reason `DRAFT_ABANDONED`; Option deletion uses `DRAFT_OPTION_REMOVED`.
-- Product deletion removes DetailBlock references before owned Image metadata, then Option and Notice metadata after checking restrictive CartItem/OrderItem FKs. Supplier uploads create `THUMBNAIL`, `GALLERY`, or `DETAIL` ProductImage rows with a server-generated, non-client-writable, single-use unique `storageObjectKey`; a referenced DETAIL image cannot be deleted alone. Metadata removal and a durable cleanup job commit together. The post-commit worker treats missing objects as success and retries other failures without restoring metadata. External/legacy URLs with no owned key are never deleted.
+- Product deletion removes DetailBlock references before owned Image metadata, then Option and Notice metadata after checking restrictive CartItem/OrderItem FKs. Supplier uploads create `THUMBNAIL`, `GALLERY`, or `DETAIL` ProductImage rows with a server-generated, non-client-writable, single-use unique `storageObjectKey`; a referenced DETAIL image cannot be deleted alone. Any key with a cleanup job is a tombstone and cannot be attached again through admin metadata, whether the job is pending or terminal. Metadata removal and durable cleanup enqueue commit together, and repeated enqueue of the same key returns the same job. Immediately before binary deletion the worker checks for a live `ProductImage.storageObjectKey` reference; if one exists, it skips deletion and completes the job with `LIVE_REFERENCE`. A later real metadata removal reopens that same job as pending. Missing objects are success, other failures retry without restoring metadata, and external/legacy URLs with no owned key are never deleted.
 
 ### Option Inventory And Reservation (Planned B-102)
 
@@ -1054,11 +1056,11 @@ B-105 rules:
 - Access and invite-context cookies are `HttpOnly` and `SameSite=Lax`; production cookies require `Secure` and HTTPS. OAuth callback additionally requires the existing one-time state check bound to invite context.
 - Raw invite tokens, applicant/supplier contact PII, customer PII, PII-bearing idempotency keys/HMACs, email bodies, supplier costs, and internal/admin memo must not be written to request/application logs.
 
-### Web Client Surface (`B-100` Implemented, Later Slices Planned)
+### Web Client Surface (`B-100`/`B-101` Implemented, Later Slices Planned)
 
 - Public, Implemented B-100: `/supplier/apply`, `/supplier/activate`
-- Supplier, Implemented B-100: `/supplier`; Planned B-101/B-103/B-105: `/supplier/products`, `/supplier/products/new`, `/supplier/products/{productId}`, `/supplier/orders`, `/supplier/orders/{orderNumber}`, `/supplier/claim-tasks`, `/supplier/claim-tasks/{taskId}`
-- Admin, Implemented B-100: `/admin/supplier-applications`, `/admin/supplier-applications/{applicationId}`, `/admin/suppliers`, `/admin/suppliers/{supplierId}`; Planned B-101/B-105: `/admin/product-reviews` and supplier task create/read/close inside the existing admin Claim detail surface
+- Supplier, Implemented B-100/B-101: `/supplier`, `/supplier/products`, `/supplier/products/new`, `/supplier/products/{productId}`; Planned B-103/B-105: `/supplier/orders`, `/supplier/orders/{orderNumber}`, `/supplier/claim-tasks`, `/supplier/claim-tasks/{taskId}`
+- Admin, Implemented B-100/B-101: `/admin/supplier-applications`, `/admin/supplier-applications/{applicationId}`, `/admin/suppliers`, `/admin/suppliers/{supplierId}`, `/admin/product-reviews`; Planned B-105: supplier task create/read/close inside the existing admin Claim detail surface
 - Supplier routes use `/api/supplier/me` as their session/tenant gate and never accept supplier id from URL/query/client state.
 - Supplier order detail must use uncached server/client fetching and avoid embedding PII in static HTML, page metadata, analytics, email, or browser-persistent storage.
 
@@ -1074,7 +1076,7 @@ B-105 rules:
 Customer visibility rules:
 
 - Show only products customer can view.
-- Purchase is allowed only when product status is `ACTIVE` and option status is `ACTIVE`.
+- Purchase requires product and option status `ACTIVE` and `Supplier.status=ACTIVE`. A `SUPPLIER_PORTAL` product additionally requires the global portal feature flag, `AUTO_APPROVED|APPROVED` review status, and a time-valid VERIFIED supplier contract.
 
 `GET /api/products` query:
 
@@ -1122,6 +1124,7 @@ DS-6 minimum:
 - Product option model and admin create/update API.
 - Product image metadata API with one thumbnail and up to ten gallery images.
 - Product image upload stores files under local product image storage and returns `imageUrl` and `objectKey`.
+- Admin thumbnail/gallery metadata may attach only the exact `objectKey` and URL returned for that Product by the upload endpoint. A key that already has any cleanup job is a non-reusable tombstone. Retained owned keys survive metadata reorder/replacement; removed keys enqueue the unique durable job idempotently, including reopening a prior `COMPLETED/LIVE_REFERENCE` job after the live metadata is actually removed. Omitted keys keep external/legacy URLs non-owned.
 - Products carry one fixed `categoryCode`; category administration and multi-category assignment are future scope.
 - Product detail block API with ordered `IMAGE` and sanitized `HTML` blocks.
 - Product notice/version source for structured product information notice rows and legacy shipping, AS, return, and exchange information.
@@ -1130,9 +1133,9 @@ DS-6 minimum:
 - Product create/update accepts optional `minimumOrderQuantity` and `orderQuantityStep` values from 1 to 99. Create defaults omitted values to `1`; update preserves the current values.
 - Admin and public product responses expose both quantity-rule fields.
 - Admin product responses include `sourcePrice`, optional `sourceItemNo`, `sourceUrl`, `sourceAvailable`, `sourceSyncedAt`, and `sourceSyncError`; public product responses expose none of them.
-- Source-backed `ACTIVE` products are refreshed in bounded batches. A supplier-side outage keeps the existing price and options and records `sourceSyncError`; confirmed unavailability changes the product to `SOLD_OUT`. Only products previously auto-marked unavailable are automatically restored to `ACTIVE`.
+- Source-backed `ACTIVE` products are refreshed in bounded batches. Both success apply and failure recording require the `sourceItemNo` used for the fetch to equal the fresh Product's current `sourceItemNo` after `Supplier -> Product -> Option` locking; a stale fetch writes nothing. V40 adds durable `sourceAutoSoldOut=false` for new and backfilled Products. Confirmed unavailability sets it to `true` only when sync actually changes `ACTIVE -> SOLD_OUT`; sync targeting/recovery includes only marker-backed `SOLD_OUT`. Recovery requires source MOQ at most 10, a positive price within the customer-price cap, compliance other than `REJECTED`, an active option, thumbnail, and active notice, then changes the marker to `false`. Any successful admin status command clears the marker, including `SOLD_OUT -> SOLD_OUT`, so a manual sold-out decision is never auto-recovered. A supplier-side outage otherwise keeps the existing price and options and records `sourceSyncError`.
 - `sourceUrl` is limited to 2,000 characters and accepts only `http` or `https`. Domeggook URLs must contain a product number, which the server stores as the unique `sourceItemNo`. Duplicate creation returns `409 Conflict`.
-- Admin product responses include `complianceStatus`; public product responses do not expose internal compliance review state.
+- Admin responses and the legacy public product detail response include `complianceStatus` for compatibility. Supplier product responses cannot set it and expose only their allowlisted review projection; public list responses do not add review internals.
 - Admin product list/detail responses include derived `saleReady`, stable `saleBlockers`, `optionCount`, `hasThumbnail`, `hasProductNotice`, and `hasDetailContent`. `saleBlockers` uses `BASE_PRICE`, `THUMBNAIL`, `ACTIVE_OPTION`, `PRODUCT_NOTICE`, and `COMPLIANCE` codes.
 - Admin product detail includes `supplierId` and `supplierName`; public product detail omits supplier information.
 - Admin product list accepts optional `q`, `status`, `category`, `supplierId`, `readiness=READY|BLOCKED`, `page`, and `size`. `page` is zero-based, `size` defaults to 20 and is limited to 1-100.

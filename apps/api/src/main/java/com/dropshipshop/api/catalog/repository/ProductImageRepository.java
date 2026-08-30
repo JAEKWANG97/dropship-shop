@@ -1,6 +1,7 @@
 package com.dropshipshop.api.catalog.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,7 +15,11 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, UUID
 
 	List<ProductImage> findAllByProduct_IdOrderBySortOrderAsc(UUID productId);
 
+	Optional<ProductImage> findByIdAndProduct_Id(UUID id, UUID productId);
+
 	boolean existsByProduct_IdAndType(UUID productId, ProductImageType type);
+
+	boolean existsByStorageObjectKey(String storageObjectKey);
 
 	void deleteAllByProduct_Id(UUID productId);
 

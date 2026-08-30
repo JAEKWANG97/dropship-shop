@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -27,7 +29,11 @@ import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
+import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
+import com.dropshipshop.api.catalog.repository.ProductRepository;
+import com.dropshipshop.api.catalog.repository.SupplierRepository;
 import com.dropshipshop.api.common.StorefrontSalesProperties;
+import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.notification.NotificationService;
 import com.dropshipshop.api.order.domain.CustomerOrder;
 import com.dropshipshop.api.order.domain.OrderItem;
@@ -42,8 +48,11 @@ import com.dropshipshop.api.payment.BankTransferProperties;
 import com.dropshipshop.api.payment.domain.PaymentGroup;
 import com.dropshipshop.api.payment.repository.PaymentGroupRepository;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
+import com.dropshipshop.api.supplierproduct.ProductSaleability;
 import com.dropshipshop.api.user.domain.UserAccount;
 import com.dropshipshop.api.user.repository.UserAccountRepository;
+
+import jakarta.persistence.EntityManager;
 
 @Service
 public class CheckoutService {
@@ -53,6 +62,9 @@ public class CheckoutService {
 	private final CartRepository cartRepository;
 	private final CartItemRepository cartItemRepository;
 	private final ProductNoticeRepository productNoticeRepository;
+	private final ProductRepository productRepository;
+	private final ProductOptionRepository productOptionRepository;
+	private final SupplierRepository supplierRepository;
 	private final PaymentGroupRepository paymentGroupRepository;
 	private final CustomerOrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
@@ -65,12 +77,17 @@ public class CheckoutService {
 	private final BankTransferProperties bankTransferProperties;
 	private final NotificationService notificationService;
 	private final StorefrontSalesProperties salesProperties;
+	private final ProductSaleability productSaleability;
+	private final EntityManager entityManager;
 	private final Clock clock;
 
 	public CheckoutService(
 		CartRepository cartRepository,
 		CartItemRepository cartItemRepository,
 		ProductNoticeRepository productNoticeRepository,
+		ProductRepository productRepository,
+		ProductOptionRepository productOptionRepository,
+		SupplierRepository supplierRepository,
 		PaymentGroupRepository paymentGroupRepository,
 		CustomerOrderRepository orderRepository,
 		OrderItemRepository orderItemRepository,
@@ -82,11 +99,16 @@ public class CheckoutService {
 		CheckoutPolicyProperties checkoutPolicyProperties,
 		BankTransferProperties bankTransferProperties,
 		NotificationService notificationService,
-		StorefrontSalesProperties salesProperties
+		StorefrontSalesProperties salesProperties,
+		ProductSaleability productSaleability,
+		EntityManager entityManager
 	) {
 		this.cartRepository = cartRepository;
 		this.cartItemRepository = cartItemRepository;
 		this.productNoticeRepository = productNoticeRepository;
+		this.productRepository = productRepository;
+		this.productOptionRepository = productOptionRepository;
+		this.supplierRepository = supplierRepository;
 		this.paymentGroupRepository = paymentGroupRepository;
 		this.orderRepository = orderRepository;
 		this.orderItemRepository = orderItemRepository;
@@ -99,6 +121,8 @@ public class CheckoutService {
 		this.bankTransferProperties = bankTransferProperties;
 		this.notificationService = notificationService;
 		this.salesProperties = salesProperties;
+		this.productSaleability = productSaleability;
+		this.entityManager = entityManager;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -117,6 +141,8 @@ public class CheckoutService {
 				"Checkout was already submitted for this cart. Please check your checkout or cart."
 			);
 		}
+		cartItems = lockCatalogAndReloadCart(cart.getId(), cartItems);
+		user = findUser(userId);
 		validateSellability(cartItems);
 
 		ShippingAddressSnapshot address = new ShippingAddressSnapshot(
@@ -127,7 +153,7 @@ public class CheckoutService {
 			request.address2()
 		);
 		Instant expiresAt = Instant.now(clock).plus(bankTransferProperties.depositDeadline());
-		long totalAmount = cartItems.stream().mapToLong(this::lineAmount).sum();
+		long totalAmount = sumLineAmounts(cartItems);
 		PaymentGroup paymentGroup = paymentGroupRepository.save(new PaymentGroup(
 			nextCheckoutNumber(),
 			user,
@@ -150,7 +176,7 @@ public class CheckoutService {
 				supplierItems.getFirst().getProduct().getSupplier(),
 				paymentGroup,
 				address,
-				supplierItems.stream().mapToLong(this::lineAmount).sum(),
+				sumLineAmounts(supplierItems),
 				expiresAt
 			));
 			createdOrders.add(order);
@@ -247,7 +273,7 @@ public class CheckoutService {
 		for (CartItem item : cartItems) {
 			Product product = item.getProduct();
 			ProductOption option = item.getProductOption();
-			if (product.getStatus() != ProductStatus.ACTIVE || option.getStatus() != ProductOptionStatus.ACTIVE) {
+			if (!productSaleability.isSellable(product, option)) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item");
 			}
 			if (!product.acceptsOrderQuantity(item.getQuantity())) {
@@ -257,6 +283,35 @@ public class CheckoutService {
 				);
 			}
 		}
+	}
+
+	private List<CartItem> lockCatalogAndReloadCart(UUID cartId, List<CartItem> discoveredItems) {
+		Set<UUID> supplierIds = new TreeSet<>();
+		Set<UUID> productIds = new TreeSet<>();
+		Map<UUID, UUID> discoveredSupplierByProductId = new LinkedHashMap<>();
+		for (CartItem item : discoveredItems) {
+			UUID productId = item.getProduct().getId();
+			UUID supplierId = item.getProduct().getSupplier().getId();
+			supplierIds.add(supplierId);
+			productIds.add(productId);
+			discoveredSupplierByProductId.put(productId, supplierId);
+		}
+		entityManager.clear();
+		for (UUID supplierId : supplierIds) {
+			supplierRepository.findByIdForUpdate(supplierId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item"));
+		}
+		for (UUID productId : productIds) {
+			Product product = productRepository.findByIdForUpdate(productId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item"));
+			if (!discoveredSupplierByProductId.get(productId).equals(product.getSupplier().getId())) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains unavailable item");
+			}
+		}
+		for (UUID productId : productIds) {
+			productOptionRepository.findAllByProductIdForUpdate(productId);
+		}
+		return cartItemRepository.findAllByCart_IdOrderByCreatedAtAsc(cartId);
 	}
 
 	private Map<UUID, List<CartItem>> groupBySupplier(List<CartItem> cartItems) {
@@ -288,7 +343,19 @@ public class CheckoutService {
 	}
 
 	private long lineAmount(CartItem item) {
-		return (item.getProduct().getBasePrice() + item.getProductOption().getAdditionalPrice()) * item.getQuantity();
+		long unitPrice = MoneyMath.requireCustomerUnitPrice(
+			MoneyMath.addNonNegative(item.getProduct().getBasePrice(), item.getProductOption().getAdditionalPrice()),
+			"unitPrice"
+		);
+		return MoneyMath.multiplyPositive(unitPrice, item.getQuantity());
+	}
+
+	private long sumLineAmounts(List<CartItem> items) {
+		long total = 0;
+		for (CartItem item : items) {
+			total = MoneyMath.addPositive(total, lineAmount(item));
+		}
+		return total;
 	}
 
 	private CheckoutDtos.CheckoutResponse toCheckoutResponse(PaymentGroup paymentGroup) {

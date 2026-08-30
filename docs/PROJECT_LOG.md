@@ -1125,3 +1125,15 @@
 - 문서: 요구사항, 정책, API, domain model, ERD, architecture, 배포·production readiness, 환경변수 예시를 구현 상태와 운영 gate에 맞게 동기화했다.
 - 검증: API 전체 테스트 `180 passed`, 실제 PostgreSQL 17 migration smoke `2 passed`(fresh V39와 V38 duplicate legacy email upgrade), Web lint `0 errors / 기존 3 warnings`, production build, 공급처 온보딩 Playwright desktop/mobile `6 passed`, `git diff --check`를 통과했다.
 - 후속작업: 실제 Kakao OAuth와 실 email 전달은 운영 자격증명·외부 시스템을 사용한 검증이 남아 있다. `SUPPLIER_PORTAL_ENABLED`는 production에서 계속 false이며, 외부 연락·계약은 B-097/B-098 승인 경계를 유지한다. 다음 기능 B-101은 현재 branch의 review와 main 반영·동기화 뒤 시작한다.
+
+## 2026-08-30 11:28 KST
+
+- 관련 항목: B-101
+- 작업: 승인된 공급처 담당자가 CSV 없이 상품 하나를 만들고 옵션·이미지·상세·상품정보제공고시를 채운 뒤 한 번의 `상품 등록`으로 자동 공개 또는 Coreable 검토에 보내는 공급처 상품 흐름을 구현했다. 공급처·관리자 목록/상세/편집/검토 화면과 공개 상품 연결도 함께 추가했다.
+- 정책·가격: 공급처는 supplier id, 고객 판매가, 판매·검토·compliance 상태를 정할 수 없고 고객가는 active Coreable 가격 정책과 monotonic policy version으로 결정적으로 계산한다. 일반 상품은 자동 공개하고 위험 규칙만 검토하며, `CERTIFICATION_REVIEW` 승인은 portal 사람 검토만 끝내고 기존 `complianceStatus`를 자동 변경하지 않는다.
+- 동시성·삭제: 모든 supplier/admin/review/cart/checkout/source writer는 scalar ownership discovery 뒤 `Supplier -> fresh Product -> Option` 잠금과 stale owner 재검증을 사용한다. 최초 submit 전 미참조 DRAFT 상품·옵션만 hard delete하고, immutable subject-id 감사 이력과 nullable live FK를 남긴다. 제출·검토·주문 사용 뒤에는 숨김·판매중지로 보존한다.
+- 이미지·정리: multipart 파일의 형식·시그니처·크기·alt text를 저장 전에 검증하고, DETAIL 소유권과 thumbnail partial-unique 교체를 보호한다. 삭제 metadata와 unique cleanup job을 함께 commit하며 tombstone key 재첨부를 막고, worker가 live reference를 발견하면 `LIVE_REFERENCE`로 보존한 뒤 실제 제거 시 같은 job을 다시 연다.
+- 기존 경로 보호: Portal 상품을 legacy admin API로 수정해도 고객가를 active policy로 재계산하고 review를 무효화한다. Domeggook success/failure는 fetch한 source item과 잠금 뒤 현재 item이 같을 때만 적용한다. 실제 source 자동 품절만 `sourceAutoSoldOut`으로 표시하고, 수동 `SOLD_OUT`·MOQ 10 초과·판매 준비 미충족 상품은 자동 재공개하지 않는다.
+- 문서: README, 요구사항, 상품·관리자·가격 정책, decision log, API, domain model, ERD, architecture, supplier portal design과 backlog를 Implemented 계약에 맞게 동기화했다.
+- 검증: API 전체 테스트 `267 passed`, PostgreSQL migration smoke `5 passed`, Web lint `0 errors / 기존 3 warnings`, production build `29 pages`, 공급처 상품 Playwright desktop/mobile `18 passed`, `git diff --check`를 통과했다. 병렬 감사 중 동일 Gradle 결과 디렉터리를 사용해 발생한 `EOFException`은 동시 실행을 중단하고 `cleanTest test --no-daemon`으로 직렬 재실행해 코드 실패가 아님을 확인했다.
+- 후속작업: production `SUPPLIER_PORTAL_ENABLED`는 계속 false다. B-098 계약 증적, 실제 이메일·Kakao 운영 검증과 B-102~B-105가 모두 준비되고 사용자가 별도 승인하기 전에는 외부 공급처와 고객 판매 경로를 열지 않는다. 다음 구현 단위는 B-102 재고 모드와 24시간 주문 예약이다.

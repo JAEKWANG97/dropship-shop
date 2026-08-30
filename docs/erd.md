@@ -25,6 +25,7 @@
 - User deletion timestamp fields: implemented in `apps/api/src/main/resources/db/migration/V26__add_user_deletion_fields.sql`.
 - User referral fields: implemented in `apps/api/src/main/resources/db/migration/V28__add_user_referral_fields.sql`.
 - Supplier portal onboarding, lifecycle, application/invite retention, fulfillment handover base and notification linkage: implemented in `apps/api/src/main/resources/db/migration/V39__add_supplier_portal_onboarding.sql` (`B-100`).
+- Supplier portal catalog/review, pricing history and image cleanup: implemented in `apps/api/src/main/resources/db/migration/V40__add_supplier_product_catalog_foundation.sql` (`B-101`).
 - Remaining legal/audit tables: planned.
 
 ## Modeling Rules
@@ -382,9 +383,9 @@ Rules:
 
 - `id`
 - `product_id`
-- `type`: `THUMBNAIL` / `GALLERY`; Planned B-101 also adds `DETAIL`
+- `type`: `THUMBNAIL` / `GALLERY` / `DETAIL` (B-101)
 - `image_url`
-- `storage_object_key`: Planned B-101 nullable, partial-unique when non-null
+- `storage_object_key`: B-101 nullable, partial-unique when non-null
 - `sort_order`
 - `alt_text`
 - `created_at`
@@ -394,7 +395,7 @@ Constraints:
 
 - One thumbnail image per product.
 - Up to ten gallery images per product.
-- Planned B-101 allows up to 50 `DETAIL` images. Supplier uploads use a server-generated key; legacy/external URLs keep a null key.
+- Implemented B-101 allows up to 50 `DETAIL` images. Supplier uploads use a server-generated key; legacy/external URLs keep a null key.
 - DS-42 stores uploaded binary files in local product image storage and keeps URL/object-key metadata in `product_images`.
 
 ### product_detail_blocks
@@ -403,7 +404,7 @@ Constraints:
 - `product_id`
 - `type`: `IMAGE` / `HTML`
 - `image_url`
-- `product_image_id`: Planned B-101 nullable live FK to `product_images(id)`
+- `product_image_id`: B-101 nullable live FK to `product_images(id)`
 - `html_content`
 - `sort_order`
 - `alt_text`
@@ -1016,9 +1017,9 @@ Rules:
 - DS-44 exposes admin reads for `order_status_histories` and `admin_order_action_histories`.
 - Product change history records product, option, image, detail block, notice, and supplier changes. Field-level diffs remain after MVP.
 
-## Supplier Portal ERD (`B-100` Implemented; Later Slices Planned)
+## Supplier Portal ERD (`B-100`/`B-101` Implemented; Later Slices Planned)
 
-Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. `B-098` contract history/command/scheduler and `B-101` through `B-105` schema remain Planned. Existing legacy rows remain valid through the expand-contract migration.
+Status: V39 implements the `B-100` supplier, application, invitation, lifecycle, fulfillment-handover base and notification linkage schema. V40 implements the `B-101` catalog/review, pricing-history and image-cleanup schema. `B-098` contract history/command/scheduler and `B-102` through `B-105` schema remain Planned. Existing legacy rows remain valid through the expand-contract migrations.
 
 B-100 also implements `SUPPLIER_APPLICATION_PRIVACY` in `policy_documents.type`. The supplier application service reads the current ACTIVE row and validates the submitted version before persisting canonical consent evidence.
 
@@ -1194,9 +1195,9 @@ Constraints and transaction rules:
 - Kakao callback uses an initial non-locking digest lookup only to resolve Supplier id, then locks `Supplier -> Invite(id) -> User/manager` and rechecks digest, binding/state, expiry, revoked/consumed state, portal state, recipient, and manager uniqueness. Contact change, disable and reissue use the same Supplier-before-Invite order.
 - User lookup/create, manager binding, contact email verification, `portal_status=ACTIVE`, and invite consumption commit atomically. Concurrent callbacks allow one winner; callback/lifecycle deadlock races are tested.
 
-### product review and inventory additions (Planned B-101/B-102)
+### product review and inventory additions (B-101 Implemented; B-102 Planned)
 
-`products`:
+`products` (Implemented B-101):
 
 - `management_channel`: `COREABLE` / `SUPPLIER_PORTAL`, not null
 - `version`: optimistic aggregate version, not null
@@ -1207,14 +1208,14 @@ Constraints and transaction rules:
 - `review_reason_code`: nullable allowlisted supplier-facing code; required for `REVIEW_REQUIRED`, `SUPPLEMENT_REQUESTED`, and `REJECTED`
 - `supplier_review_message`: nullable supplier-safe single-line PII-free plain text up to 500 characters, required for `SUPPLEMENT_REQUESTED` and `REJECTED`; never stores an internal admin note, contact/customer identifier, or link
 
-`product_options`:
+`product_options` (Planned B-102):
 
 - `supplier_availability`: `AVAILABLE` / `UNAVAILABLE`, not null
 - `inventory_mode`: `TRACKED` / `UNTRACKED`, not null
 - `on_hand_quantity`: nullable
 - `reserved_quantity`: not null, default 0
 
-`order_items`:
+`order_items` (Planned B-102):
 
 - `management_channel_snapshot`: `COREABLE` / `SUPPLIER_PORTAL`, not null
 - `inventory_mode_snapshot`: `TRACKED` / `UNTRACKED`, not null
@@ -1245,18 +1246,18 @@ Constraints and compatibility:
 
 `product_change_histories` expand-contract migration:
 
-- Add non-null immutable `subject_product_id`, nullable immutable `subject_product_option_id`, nullable `actor_user_id`, `actor_type=ADMIN|SUPPLIER|SYSTEM`, `actor_supplier_id`, `actor_system_code`, `before_version`, and `after_version`.
-- Backfill subject ids from the current Product/ProductOption FKs, add subject-id indexes, migrate readers to subject ids, then make live `product_id` and `product_option_id` nullable FKs with `ON DELETE SET NULL`. Existing admin history response compatibility remains; `GET /api/admin/products/{productId}/changes` may resolve a deleted subject id with history even though product detail returns `404`.
-- Backfill the known zero-UUID legacy Domeggook sync sentinel as `actor_type=SYSTEM`, `actor_user_id=null`, `actor_system_code=DOMEGGOOK_CATALOG_SYNC`; backfill only real user ids as ADMIN. Deploy compatible readers/writers, use SYSTEM for all source jobs, then make `admin_user_id` nullable while preserving legacy response compatibility. Supplier rows use `admin_user_id=null`; the sentinel never enters the new User FK.
-- Every supplier, legacy admin, and source-sync review-relevant aggregate write locks/increments `products.version` and appends the version pair. Supplier/reviewer APIs require expected version; existing admin requests accept an additive optional precondition during the compatibility release, and source sync retries conflicts.
+- V40 adds non-null immutable `subject_product_id`, nullable immutable `subject_product_option_id`, nullable `actor_user_id`, `actor_type=ADMIN|SUPPLIER|SYSTEM`, `actor_supplier_id`, `actor_system_code`, `before_version`, and `after_version`.
+- V40 backfills subject ids from the current Product/ProductOption FKs, adds subject-id indexes, and makes live `product_id` and `product_option_id` nullable FKs with `ON DELETE SET NULL`. Existing admin history response compatibility remains; `GET /api/admin/products/{productId}/changes` may resolve a deleted subject id with history even though product detail returns `404`.
+- V40 backfills the known zero-UUID legacy Domeggook sync sentinel as `actor_type=SYSTEM`, `actor_user_id=null`, `actor_system_code=DOMEGGOOK_CATALOG_SYNC`; only real user ids become ADMIN. `admin_user_id` is nullable while existing response compatibility remains. Supplier rows use `admin_user_id=null`; the sentinel never enters the new User FK.
+- Every supplier, legacy admin, and source-sync review-relevant aggregate write takes the shared pessimistic lock order, increments `products.version`, and appends the version pair. Supplier/reviewer APIs require expected version; existing admin requests accept an additive optional precondition during the compatibility release.
 - ProductChangeHistory before/after JSON is built from an allowlist of product/option/image/detail/notice/pricing/review business fields, never a raw request. It excludes actor contact, customer/order data and arbitrary admin notes. Review `internal_reason` and `supplier_review_message` are separate single-line values up to 500 characters and reject email, phone, address, customer identifiers, and links before either may enter durable history.
 - Add `PRODUCT_DELETED` and `OPTION_DELETED` change types. Product deletion records current `before_version`, null `after_version`, allowlisted before JSON, null after JSON and server reason `DRAFT_ABANDONED`. Option deletion increments the surviving Product, records `v -> v+1` and server reason `DRAFT_OPTION_REMOVED`. DELETE takes no free-text reason; both histories retain subject ids after live FK removal.
-- Add monotonic `pricing_policies.version`, backfilled to 1 and incremented on each existing in-place policy update; include it additively in admin policy responses. Approved supplier cost changes atomically calculate `base_price=price(source_price)` and every `additional_price=price(source_price+source_additional_price)-base_price`, persist applied policy id/version, and append the full calculator inputs/rates/rounding/minimum plus before/after prices to ProductChangeHistory. Before adding nonnegative checks, scan existing `source_price` and `source_additional_price`; any negative row blocks migration pending explicit correction approval. Migrate every admin/source/supplier writer to reject negatives, then add constraints.
+- V40 adds monotonic `pricing_policies.version`, backfilled to 1 and incremented on each existing in-place policy update; the admin policy response includes it additively. Approved supplier cost changes atomically calculate `base_price=price(source_price)` and every `additional_price=price(source_price+source_additional_price)-base_price`, persist applied policy id/version, and append the full calculator inputs/rates/rounding/minimum plus before/after prices to ProductChangeHistory. The migration blocks incompatible legacy rows before adding ranges: each supplier cost/option cost is `0..100,000,000`, each stored customer base/option component is `0..1,000,000,000`, and every existing base+option customer unit is at most `1,000,000,000`. Order/payment snapshots add positive/nonnegative and exact line-amount checks.
 
-### product image deletion support (Planned B-101)
+### product image deletion support (Implemented B-101)
 
-- Add `DETAIL` image type and nullable `product_images.storage_object_key` with a partial unique index where non-null; B-101 supplier upload writes a server-generated single-use key and never accepts it from the supplier. Add nullable `product_detail_blocks.product_image_id`; new supplier IMAGE blocks require an owned same-Product DETAIL image while existing external/legacy URL rows backfill null and are never treated as owned binaries.
-- Add `product_image_cleanup_jobs` with `id`, unique `storage_object_key`, immutable `subject_product_id`, `status=PENDING|COMPLETED`, `attempt_count`, `next_attempt_at`, nullable allowlisted `last_error_code`, `created_at`, and nullable `completed_at`.
+- V40 adds `DETAIL` image type and nullable `product_images.storage_object_key` with a partial unique index where non-null; B-101 supplier upload writes a server-generated single-use key and never accepts it from the supplier. An admin thumbnail/gallery upload may register only its server-returned same-Product key/URL pair; retained keys are preserved and replaced keys enqueue cleanup. It also adds nullable `product_detail_blocks.product_image_id`; new supplier IMAGE blocks require an owned same-Product DETAIL image while existing external/legacy URL rows backfill null and are never treated as owned binaries.
+- V40 adds `product_image_cleanup_jobs` with `id`, unique `storage_object_key`, immutable `subject_product_id`, `status=PENDING|COMPLETED`, `attempt_count`, `next_attempt_at`, nullable allowlisted `last_error_code`, `created_at`, and nullable `completed_at`.
 - Product/image delete inserts cleanup jobs for server-owned keys in the same transaction that removes metadata. A post-commit worker performs idempotent delete, treats object-not-found as success, retries failure, and never recreates ProductImage/Product metadata.
 
 ### supplier_inventory_change_histories (Planned B-102)
@@ -1561,10 +1562,10 @@ DS-6 implemented:
 
 DS-43 implements admin product change history reads from `product_change_histories`.
 
-Current catalog implementation before the planned B-101/B-102 migrations intentionally has:
+Current catalog implementation after B-101 and before the planned B-102 migration intentionally has:
 
 - No supplier-portal authoritative stock fields.
-- Customer-facing supplier exposure.
+- No customer-facing supplier exposure.
 - Product or option status values outside the policy-approved sets.
 
 ## Open Modeling Notes

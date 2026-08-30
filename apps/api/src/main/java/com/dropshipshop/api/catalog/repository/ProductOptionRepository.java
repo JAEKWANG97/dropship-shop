@@ -4,7 +4,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.persistence.LockModeType;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,9 +24,48 @@ public interface ProductOptionRepository extends JpaRepository<ProductOption, UU
 		long getActiveOptionCount();
 	}
 
+	interface OptionOwnership {
+		UUID getProductId();
+
+		UUID getSupplierId();
+	}
+
 	List<ProductOption> findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(UUID productId);
 
 	Optional<ProductOption> findByIdAndProduct_Id(UUID id, UUID productId);
+
+	@Query("""
+		select option.product.id as productId, option.product.supplier.id as supplierId
+		from ProductOption option
+		where option.id = :optionId
+		""")
+	Optional<OptionOwnership> findOwnershipById(@Param("optionId") UUID optionId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select option from ProductOption option
+		where option.product.id = :productId
+		order by option.id
+		""")
+	List<ProductOption> findAllByProductIdForUpdate(@Param("productId") UUID productId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select option from ProductOption option
+		where option.product.id = :productId
+		order by option.id
+		""")
+	List<ProductOption> findAllByProduct_IdForUpdateOrderByIdAsc(@Param("productId") UUID productId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select option from ProductOption option
+		where option.id = :optionId and option.product.id = :productId
+		""")
+	Optional<ProductOption> findByIdAndProductIdForUpdate(
+		@Param("optionId") UUID optionId,
+		@Param("productId") UUID productId
+	);
 
 	boolean existsByProduct_IdAndStatus(UUID productId, ProductOptionStatus status);
 

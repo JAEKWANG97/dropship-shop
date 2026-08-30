@@ -981,6 +981,11 @@ p {
   background: #fff1f2;
 }
 
+.notice.warning {
+  border-color: #f4cf85;
+  background: #fff9e8;
+}
+
 .notice span {
   overflow-wrap: anywhere;
   color: var(--muted);
@@ -2639,6 +2644,24 @@ body:has(.admin-shell) > .page-shell {
   color: #c2410c !important;
 }
 
+.admin-badge.success {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857 !important;
+}
+
+.admin-badge.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c !important;
+}
+
+.admin-badge.danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b42318 !important;
+}
+
 .admin-filters {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
@@ -2695,6 +2718,85 @@ body:has(.admin-shell) > .page-shell {
 .admin-form {
   display: grid;
   gap: 14px;
+}
+
+.admin-form fieldset {
+  display: contents;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-review-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-review-code {
+  overflow: auto;
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-review-image-grid,
+.supplier-product-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.admin-review-image-card,
+.supplier-product-image-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.admin-review-image,
+.supplier-product-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  background: var(--surface);
+  object-fit: contain;
+}
+
+.admin-review-image-card figcaption,
+.supplier-product-image-card figcaption,
+.admin-review-detail-image {
+  display: grid;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+
+.admin-review-image-card figcaption span,
+.supplier-product-image-card figcaption span,
+.admin-review-detail-image span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-review-image-card a,
+.admin-review-detail-image a {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .admin-form-grid {
@@ -3534,6 +3636,10 @@ body:has(.supplier-shell) > .page-shell {
   .admin-dashboard-grid,
   .admin-orders-layout,
   .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-review-actions {
     grid-template-columns: 1fr;
   }
 

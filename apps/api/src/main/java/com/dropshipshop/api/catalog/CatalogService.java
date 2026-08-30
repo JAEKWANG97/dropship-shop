@@ -2,6 +2,7 @@ package com.dropshipshop.api.catalog;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -11,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductChangeHistory;
+import com.dropshipshop.api.catalog.domain.ProductChangeActor;
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
@@ -38,15 +41,19 @@ import com.dropshipshop.api.catalog.domain.ProductDetailBlock;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImage;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
+import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
 import com.dropshipshop.api.catalog.domain.ProductNotice;
 import com.dropshipshop.api.catalog.domain.ProductNoticeRow;
 import com.dropshipshop.api.catalog.domain.ProductNoticeStatus;
 import com.dropshipshop.api.catalog.domain.ProductOption;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
+import com.dropshipshop.api.catalog.domain.ProductReviewReasonCode;
+import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.PricingPolicy;
 import com.dropshipshop.api.catalog.domain.Supplier;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
+import com.dropshipshop.api.catalog.cleanup.ProductImageCleanupService;
 import com.dropshipshop.api.catalog.repository.PricingPolicyRepository;
 import com.dropshipshop.api.catalog.repository.ProductChangeHistoryRepository;
 import com.dropshipshop.api.catalog.repository.ProductDetailBlockRepository;
@@ -55,11 +62,19 @@ import com.dropshipshop.api.catalog.repository.ProductNoticeRepository;
 import com.dropshipshop.api.catalog.repository.ProductOptionRepository;
 import com.dropshipshop.api.catalog.repository.ProductRepository;
 import com.dropshipshop.api.catalog.repository.SupplierRepository;
+import com.dropshipshop.api.catalog.pricing.CatalogPriceCalculator;
+import com.dropshipshop.api.catalog.pricing.PricingCalculatorSnapshot;
+import com.dropshipshop.api.catalog.pricing.ProductPriceCalculation;
 import com.dropshipshop.api.common.StorefrontSalesProperties;
+import com.dropshipshop.api.common.error.ApiErrorCode;
+import com.dropshipshop.api.common.error.ApiErrorException;
+import com.dropshipshop.api.common.money.MoneyMath;
 import com.dropshipshop.api.common.storage.FileStorage;
 import com.dropshipshop.api.common.storage.ImageFileValidator;
 import com.dropshipshop.api.common.storage.StoredFile;
 import com.dropshipshop.api.policy.CustomerPolicyLinkService;
+import com.dropshipshop.api.supplierportal.SupplierPortalFeatureGate;
+import com.dropshipshop.api.supplierportal.SupplierPortalInputPolicy;
 
 @Service
 public class CatalogService {
@@ -100,6 +115,10 @@ public class CatalogService {
 	private final FileStorage fileStorage;
 	private final ImageFileValidator imageFileValidator;
 	private final StorefrontSalesProperties salesProperties;
+	private final SupplierPortalFeatureGate supplierPortalFeatureGate;
+	private final SupplierPortalInputPolicy supplierPortalInputPolicy;
+	private final ProductImageCleanupService productImageCleanupService;
+	private final CatalogPriceCalculator catalogPriceCalculator;
 
 	public CatalogService(
 		SupplierRepository supplierRepository,
@@ -113,7 +132,11 @@ public class CatalogService {
 		CustomerPolicyLinkService customerPolicyLinkService,
 		FileStorage fileStorage,
 		ImageFileValidator imageFileValidator,
-		StorefrontSalesProperties salesProperties
+		StorefrontSalesProperties salesProperties,
+		SupplierPortalFeatureGate supplierPortalFeatureGate,
+		SupplierPortalInputPolicy supplierPortalInputPolicy,
+		ProductImageCleanupService productImageCleanupService,
+		CatalogPriceCalculator catalogPriceCalculator
 	) {
 		this.supplierRepository = supplierRepository;
 		this.productRepository = productRepository;
@@ -127,6 +150,10 @@ public class CatalogService {
 		this.fileStorage = fileStorage;
 		this.imageFileValidator = imageFileValidator;
 		this.salesProperties = salesProperties;
+		this.supplierPortalFeatureGate = supplierPortalFeatureGate;
+		this.supplierPortalInputPolicy = supplierPortalInputPolicy;
+		this.productImageCleanupService = productImageCleanupService;
+		this.catalogPriceCalculator = catalogPriceCalculator;
 	}
 
 	@Transactional(readOnly = true)
@@ -191,13 +218,144 @@ public class CatalogService {
 	}
 
 	@Transactional(readOnly = true)
+	public CatalogDtos.ProductReviewQueueResponse listProductReviews(int page, int size) {
+		Page<Product> products = productRepository.findReviewQueue(
+			List.of(ProductReviewStatus.REVIEW_REQUIRED),
+			PageRequest.of(page, size, Sort.by(Sort.Order.asc("firstSubmittedAt"), Sort.Order.asc("id")))
+		);
+		return new CatalogDtos.ProductReviewQueueResponse(
+			products.getContent().stream().map(this::toProductReviewSummary).toList(),
+			products.getNumber(),
+			products.getSize(),
+			products.getTotalElements(),
+			products.getTotalPages()
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public CatalogDtos.ProductReviewDetailResponse getProductReview(UUID productId) {
+		return toProductReviewDetail(findReviewProduct(productId));
+	}
+
+	@Transactional
+	public CatalogDtos.ProductReviewDetailResponse approveProductReview(
+		UUID productId,
+		CatalogDtos.ProductReviewActionRequest request,
+		UUID adminUserId
+	) {
+		String internalReason = supplierPortalInputPolicy.requirePiiFreeReason(request.internalReason(), 500);
+		ReviewLock lock = lockReviewProduct(productId);
+		requireReviewVersion(lock.product(), request.expectedVersion());
+		validateSaleReadiness(lock.product());
+		long beforeVersion = lock.product().getVersion();
+		String before = reviewSnapshot(lock.product());
+		lock.product().updateReview(ProductReviewStatus.APPROVED, null, null);
+		if (lock.product().getStatus() != ProductStatus.STOPPED) {
+			lock.product().updateStatus(ProductStatus.ACTIVE);
+		}
+		lock.product().incrementVersion();
+		recordAdminReviewChange(lock.product(), adminUserId, beforeVersion, before, internalReason);
+		return toProductReviewDetail(lock.product());
+	}
+
+	@Transactional
+	public CatalogDtos.ProductReviewDetailResponse supplementProductReview(
+		UUID productId,
+		CatalogDtos.ProductReviewFeedbackRequest request,
+		UUID adminUserId
+	) {
+		if (request.reviewReasonCode() != ProductReviewReasonCode.SUPPLEMENT_REQUIRED) {
+			throw new ApiErrorException(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_FAILED,
+				"Supplement requires SUPPLEMENT_REQUIRED reason code");
+		}
+		return applyReviewFeedback(productId, request, adminUserId, ProductReviewStatus.SUPPLEMENT_REQUESTED);
+	}
+
+	@Transactional
+	public CatalogDtos.ProductReviewDetailResponse rejectProductReview(
+		UUID productId,
+		CatalogDtos.ProductReviewFeedbackRequest request,
+		UUID adminUserId
+	) {
+		if (request.reviewReasonCode() != ProductReviewReasonCode.REJECTED_POLICY) {
+			throw new ApiErrorException(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_FAILED,
+				"Rejection requires REJECTED_POLICY reason code");
+		}
+		return applyReviewFeedback(productId, request, adminUserId, ProductReviewStatus.REJECTED);
+	}
+
+	private CatalogDtos.ProductReviewDetailResponse applyReviewFeedback(
+		UUID productId,
+		CatalogDtos.ProductReviewFeedbackRequest request,
+		UUID adminUserId,
+		ProductReviewStatus nextStatus
+	) {
+		String message = supplierPortalInputPolicy.requirePiiFreeReason(request.supplierReviewMessage(), 500);
+		String internalReason = supplierPortalInputPolicy.requirePiiFreeReason(request.internalReason(), 500);
+		ReviewLock lock = lockReviewProduct(productId);
+		requireReviewVersion(lock.product(), request.expectedVersion());
+		long beforeVersion = lock.product().getVersion();
+		String before = reviewSnapshot(lock.product());
+		lock.product().updateReview(nextStatus, request.reviewReasonCode(), message);
+		if (lock.product().getStatus() != ProductStatus.STOPPED) {
+			lock.product().updateStatus(ProductStatus.HIDDEN);
+		}
+		lock.product().incrementVersion();
+		recordAdminReviewChange(lock.product(), adminUserId, beforeVersion, before, internalReason);
+		return toProductReviewDetail(lock.product());
+	}
+
+	private ReviewLock lockReviewProduct(UUID productId) {
+		UUID discoveredSupplierId = productRepository.findSupplierIdById(productId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+		Supplier supplier = supplierRepository.findByIdForUpdate(discoveredSupplierId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+		Product product = productRepository.findByIdForUpdate(productId)
+			.filter(candidate -> candidate.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+		List<ProductOption> options = productOptionRepository.findAllByProductIdForUpdate(productId);
+		if (product.getReviewStatus() != ProductReviewStatus.REVIEW_REQUIRED) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT,
+				"Product is not awaiting review");
+		}
+		return new ReviewLock(supplier, product, options);
+	}
+
+	private void requireReviewVersion(Product product, long expectedVersion) {
+		if (!product.hasVersion(expectedVersion)) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.PRODUCT_VERSION_CONFLICT,
+				"Product version is stale");
+		}
+	}
+
+	private void recordAdminReviewChange(
+		Product product,
+		UUID adminUserId,
+		long beforeVersion,
+		String before,
+		String internalReason
+	) {
+		productChangeHistoryRepository.save(new ProductChangeHistory(
+			product,
+			null,
+			ProductChangeActor.admin(adminUserId),
+			beforeVersion,
+			product.getVersion(),
+			ProductChangeType.REVIEW_STATUS,
+			before,
+			reviewSnapshot(product),
+			internalReason
+		));
+	}
+
+	@Transactional(readOnly = true)
 	public CatalogDtos.PricingPolicyResponse getPricingPolicy() {
 		return toPricingPolicyResponse(activePricingPolicy());
 	}
 
 	@Transactional
 	public CatalogDtos.PricingPolicyResponse updatePricingPolicy(CatalogDtos.PricingPolicyRequest request) {
-		PricingPolicy policy = pricingPolicyRepository.findFirstByActiveTrueOrderByCreatedAtAsc()
+		PricingPolicy policy = pricingPolicyRepository.findActiveForUpdate()
 			.orElseGet(this::defaultPricingPolicy);
 		policy.update(
 			request.name(),
@@ -247,9 +405,12 @@ public class CatalogService {
 
 	@Transactional(readOnly = true)
 	public CatalogDtos.ProductChangeHistoryListResponse listProductChanges(UUID productId) {
-		findProduct(productId);
+		if (!productRepository.existsById(productId)
+			&& !productChangeHistoryRepository.existsBySubjectProductId(productId)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+		}
 		return new CatalogDtos.ProductChangeHistoryListResponse(
-			productChangeHistoryRepository.findAllByProduct_IdOrderByCreatedAtAsc(productId)
+			productChangeHistoryRepository.findAllBySubjectProductIdOrderByCreatedAtAsc(productId)
 				.stream()
 				.map(this::toChangeHistoryResponse)
 				.toList()
@@ -262,13 +423,35 @@ public class CatalogService {
 		CatalogDtos.ProductUpdateRequest request,
 		UUID adminUserId
 	) {
-		Product product = findProduct(productId);
+		AdminProductLock lock = lockAdminProduct(productId, request.supplierId());
+		Product product = lock.product();
+		requireOptionalVersion(product, request.expectedVersion());
 		Supplier supplier = findSupplier(request.supplierId());
 		String sourceItemNo = sourceItemNo(request.sourceUrl(), request.sourceItemNo(), product.getSourceItemNo());
 		requireUniqueSourceItemNo(sourceItemNo, productId);
 		requireReason(request.reason());
-		recordProductBaseChanges(product, supplier, request, adminUserId);
-		product.updateBase(supplier, request.name(), request.summary(), sourcePrice(product, request), request.basePrice(), request.categoryCode());
+		long effectiveSourcePrice = sourcePrice(product, request);
+		PricingPolicy portalPolicy = product.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL
+			? activePricingPolicyForUpdate() : null;
+		ProductPriceCalculation portalCalculation = portalPolicy != null
+			? calculatePortalPrices(effectiveSourcePrice, sourceAdditionalPrices(lock.options()), portalPolicy)
+			: null;
+		long effectiveBasePrice = portalCalculation == null ? request.basePrice() : portalCalculation.basePrice();
+		if (portalCalculation == null) {
+			requireCustomerUnitPriceLimit(effectiveBasePrice, lock.options());
+		}
+		String beforePortalPrices = portalCalculation == null ? null : portalPriceValuesState(product, lock.options());
+		recordProductBaseChanges(
+			product, supplier, request, effectiveSourcePrice, effectiveBasePrice, adminUserId
+		);
+		product.updateBase(
+			supplier, request.name(), request.summary(), effectiveSourcePrice, effectiveBasePrice, request.categoryCode()
+		);
+		if (portalCalculation != null) {
+			applyPortalPrices(product, lock.options(), portalPolicy, portalCalculation);
+			recordChange(product, null, adminUserId, ProductChangeType.PRICE,
+				beforePortalPrices, portalPriceState(product, lock.options(), portalCalculation.snapshot()), request.reason());
+		}
 		product.updateOrderQuantityRules(
 			valueOrDefault(request.minimumOrderQuantity(), product.getMinimumOrderQuantity()),
 			valueOrDefault(request.orderQuantityStep(), product.getOrderQuantityStep())
@@ -277,6 +460,7 @@ public class CatalogService {
 		product.updateSourceUrl(request.sourceUrl());
 		product.updateComplianceStatus(valueOrDefault(request.complianceStatus(), product.getComplianceStatus()));
 		validateIfActive(product);
+		completeAdminMutation(product, adminUserId, request.reason());
 		return toAdminProductResponse(product);
 	}
 
@@ -344,8 +528,17 @@ public class CatalogService {
 		CatalogDtos.ProductStatusRequest request,
 		UUID adminUserId
 	) {
-		Product product = findProduct(productId);
+		Product product = lockAdminProduct(productId, null).product();
+		requireOptionalVersion(product, request.expectedVersion());
 		requireReason(request.reason());
+		product.clearSourceAutoSoldOut();
+		if (product.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL
+			&& request.status() == ProductStatus.ACTIVE
+			&& product.getReviewStatus() != ProductReviewStatus.AUTO_APPROVED
+			&& product.getReviewStatus() != ProductReviewStatus.APPROVED) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.CONFLICT,
+				"Portal product must pass review before activation");
+		}
 		if (product.getStatus() != request.status()) {
 			if (request.status() == ProductStatus.ACTIVE) {
 				validateSaleReadiness(product);
@@ -354,24 +547,55 @@ public class CatalogService {
 				product.getStatus().name(), request.status().name(), request.reason());
 			product.updateStatus(request.status());
 		}
+		completeAdminStatusMutation(product, adminUserId, request.reason());
 		return toAdminProductResponse(product);
 	}
 
 	@Transactional
-	public CatalogDtos.ProductOptionResponse createOption(UUID productId, CatalogDtos.ProductOptionRequest request) {
-		Product product = findProduct(productId);
+	public CatalogDtos.ProductOptionResponse createOption(
+		UUID productId,
+		CatalogDtos.ProductOptionRequest request,
+		UUID adminUserId
+	) {
+		AdminProductLock lock = lockAdminProduct(productId, null);
+		Product product = lock.product();
+		requireOptionalVersion(product, request.expectedVersion());
 		ProductOptionStatus status = request.status() == null ? ProductOptionStatus.ACTIVE : request.status();
+		Long sourceAdditionalPrice = request.sourceAdditionalPrice();
+		ProductPriceCalculation portalCalculation = null;
+		PricingPolicy portalPolicy = null;
+		String beforePortalPrices = null;
+		long additionalPrice = request.additionalPrice();
+		if (product.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL) {
+			sourceAdditionalPrice = valueOrDefault(sourceAdditionalPrice, 0L);
+			portalPolicy = activePricingPolicyForUpdate();
+			List<Long> sourcePrices = new ArrayList<>(sourceAdditionalPrices(lock.options()));
+			sourcePrices.add(sourceAdditionalPrice);
+			portalCalculation = calculatePortalPrices(product.getSourcePrice(), sourcePrices, portalPolicy);
+			beforePortalPrices = portalPriceValuesState(product, lock.options());
+			additionalPrice = portalCalculation.options().get(sourcePrices.size() - 1).additionalPrice();
+		}
 		ProductOption option = new ProductOption(
 			product,
 			request.name(),
-			request.additionalPrice(),
+			additionalPrice,
 			status,
 			request.sourceOptionCode(),
-			request.sourceAdditionalPrice(),
+			sourceAdditionalPrice,
 			request.sourceStockQuantity(),
 			valueOrDefault(request.sortOrder(), 0)
 		);
-		return toOptionResponse(productOptionRepository.save(option), true);
+		productOptionRepository.saveAndFlush(option);
+		if (portalCalculation != null) {
+			List<ProductOption> options = new ArrayList<>(lock.options());
+			options.add(option);
+			applyPortalPrices(product, options, portalPolicy, portalCalculation);
+			recordChange(product, option, adminUserId, ProductChangeType.PRICE,
+				beforePortalPrices, portalPriceState(product, options, portalCalculation.snapshot()), "OPTION_CREATED");
+		}
+		recordChange(product, option, adminUserId, ProductChangeType.OPTION_BASE, null, request.name(), "OPTION_CREATED");
+		completeAdminMutation(product, adminUserId, "OPTION_CREATED");
+		return toOptionResponse(option, true);
 	}
 
 	@Transactional
@@ -381,11 +605,38 @@ public class CatalogService {
 		CatalogDtos.ProductOptionRequest request,
 		UUID adminUserId
 	) {
-		ProductOption option = findOption(productId, optionId);
+		AdminProductLock lock = lockAdminProduct(productId, null);
+		requireOptionalVersion(lock.product(), request.expectedVersion());
+		ProductOption option = lockedOption(lock, optionId);
 		requireReason(request.reason());
-		if (option.getAdditionalPrice() != request.additionalPrice()) {
+		long effectiveAdditionalPrice = request.additionalPrice();
+		Long effectiveSourceAdditionalPrice = valueOrDefault(
+			request.sourceAdditionalPrice(), option.getSourceAdditionalPrice()
+		);
+		ProductPriceCalculation portalCalculation = null;
+		PricingPolicy portalPolicy = null;
+		String beforePortalPrices = null;
+		if (lock.product().getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL) {
+			portalPolicy = activePricingPolicyForUpdate();
+			effectiveSourceAdditionalPrice = valueOrDefault(effectiveSourceAdditionalPrice, 0L);
+			List<Long> sourcePrices = new ArrayList<>();
+			int targetIndex = -1;
+			for (int index = 0; index < lock.options().size(); index++) {
+				ProductOption candidate = lock.options().get(index);
+				if (candidate.getId().equals(optionId)) {
+					targetIndex = index;
+					sourcePrices.add(effectiveSourceAdditionalPrice);
+				} else {
+					sourcePrices.add(valueOrDefault(candidate.getSourceAdditionalPrice(), 0L));
+				}
+			}
+			portalCalculation = calculatePortalPrices(lock.product().getSourcePrice(), sourcePrices, portalPolicy);
+			beforePortalPrices = portalPriceValuesState(lock.product(), lock.options());
+			effectiveAdditionalPrice = portalCalculation.options().get(targetIndex).additionalPrice();
+		}
+		if (option.getAdditionalPrice() != effectiveAdditionalPrice) {
 			recordChange(option.getProduct(), option, adminUserId, ProductChangeType.PRICE,
-				String.valueOf(option.getAdditionalPrice()), String.valueOf(request.additionalPrice()), request.reason());
+				String.valueOf(option.getAdditionalPrice()), String.valueOf(effectiveAdditionalPrice), request.reason());
 		}
 		if (!Objects.equals(option.getName(), request.name())) {
 			recordChange(option.getProduct(), option, adminUserId, ProductChangeType.OPTION_BASE,
@@ -393,12 +644,20 @@ public class CatalogService {
 		}
 		option.update(
 			request.name(),
-			request.additionalPrice(),
+			effectiveAdditionalPrice,
 			valueOrDefault(request.sourceOptionCode(), option.getSourceOptionCode()),
-			valueOrDefault(request.sourceAdditionalPrice(), option.getSourceAdditionalPrice()),
+			effectiveSourceAdditionalPrice,
 			valueOrDefault(request.sourceStockQuantity(), option.getSourceStockQuantity()),
 			valueOrDefault(request.sortOrder(), option.getSortOrder())
 		);
+		if (portalCalculation != null) {
+			applyPortalPrices(lock.product(), lock.options(), portalPolicy, portalCalculation);
+			recordChange(lock.product(), option, adminUserId, ProductChangeType.PRICE,
+				beforePortalPrices,
+				portalPriceState(lock.product(), lock.options(), portalCalculation.snapshot()),
+				request.reason());
+		}
+		completeAdminMutation(lock.product(), adminUserId, request.reason());
 		return toOptionResponse(option, true);
 	}
 
@@ -409,7 +668,9 @@ public class CatalogService {
 		CatalogDtos.ProductOptionStatusRequest request,
 		UUID adminUserId
 	) {
-		ProductOption option = findOption(productId, optionId);
+		AdminProductLock lock = lockAdminProduct(productId, null);
+		requireOptionalVersion(lock.product(), request.expectedVersion());
+		ProductOption option = lockedOption(lock, optionId);
 		requireReason(request.reason());
 		if (option.getStatus() != request.status()) {
 			recordChange(option.getProduct(), option, adminUserId, ProductChangeType.OPTION_STATUS,
@@ -417,6 +678,7 @@ public class CatalogService {
 			option.updateStatus(request.status());
 			validateIfActive(option.getProduct());
 		}
+		completeAdminMutation(lock.product(), adminUserId, request.reason());
 		return toOptionResponse(option, true);
 	}
 
@@ -426,17 +688,43 @@ public class CatalogService {
 		CatalogDtos.ProductImagesRequest request,
 		UUID adminUserId
 	) {
-		Product product = findProduct(productId);
+		Product product = lockAdminProduct(productId, null).product();
+		requireOptionalVersion(product, request.expectedVersion());
 		requireReason(request.reason());
 		validateImages(request.images());
-		productImageRepository.deleteAllByProduct_Id(productId);
+		List<ProductImage> existingImages = productImageRepository.findAllByProduct_IdOrderBySortOrderAsc(productId);
+		List<ProductImage> replacedImages = product.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL
+			? existingImages.stream().filter(image -> image.getType() != ProductImageType.DETAIL).toList()
+			: existingImages;
+		Map<String, ProductImage> existingByUrl = replacedImages.stream()
+			.collect(Collectors.toMap(ProductImage::getImageUrl, image -> image, (first, ignored) -> first));
 		List<ProductImage> images = request.images().stream()
-			.map(item -> new ProductImage(product, item.type(), item.imageUrl(), item.sortOrder(), item.altText()))
+			.map(item -> new ProductImage(
+				product,
+				item.type(),
+				item.imageUrl(),
+				item.sortOrder(),
+				item.altText(),
+				adminStorageObjectKey(productId, item, existingByUrl)
+			))
 			.toList();
+		Set<String> retainedStorageKeys = images.stream()
+			.map(ProductImage::getStorageObjectKey)
+			.filter(key -> key != null && !key.isBlank())
+			.collect(Collectors.toSet());
+		productImageRepository.deleteAll(replacedImages);
+		productImageRepository.flush();
+		Instant cleanupRequestedAt = Instant.now();
+		replacedImages.stream()
+			.map(ProductImage::getStorageObjectKey)
+			.filter(key -> key != null && !key.isBlank())
+			.filter(key -> !retainedStorageKeys.contains(key))
+			.forEach(key -> productImageCleanupService.enqueueCleanup(key, productId, cleanupRequestedAt));
 		productImageRepository.saveAll(images);
 		product.updateThumbnailImageUrl(thumbnailUrl(images));
 		validateIfActive(product);
 		recordChange(product, null, adminUserId, ProductChangeType.IMAGES, null, "replaced", request.reason());
+		completeAdminMutation(product, adminUserId, request.reason());
 		return toProductDetailResponse(product, true);
 	}
 
@@ -465,7 +753,8 @@ public class CatalogService {
 		CatalogDtos.ProductDetailBlocksRequest request,
 		UUID adminUserId
 	) {
-		Product product = findProduct(productId);
+		Product product = lockAdminProduct(productId, null).product();
+		requireOptionalVersion(product, request.expectedVersion());
 		requireReason(request.reason());
 		validateDetailBlocks(request.detailBlocks());
 		productDetailBlockRepository.deleteAllByProduct_Id(productId);
@@ -483,6 +772,7 @@ public class CatalogService {
 		product.bumpDetailVersion();
 		recordChange(product, null, adminUserId, ProductChangeType.DETAIL_BLOCKS, null,
 			"detailVersion=" + product.getDetailVersion(), request.reason());
+		completeAdminMutation(product, adminUserId, request.reason());
 		return toProductDetailResponse(product, true);
 	}
 
@@ -492,7 +782,8 @@ public class CatalogService {
 		CatalogDtos.ProductNoticeRequest request,
 		UUID adminUserId
 	) {
-		Product product = findProduct(productId);
+		Product product = lockAdminProduct(productId, null).product();
+		requireOptionalVersion(product, request.expectedVersion());
 		requireReason(request.reason());
 		int nextVersion = productNoticeRepository.countByProduct_Id(productId) + 1;
 		List<ProductNoticeRow> noticeRows = request.noticeRows() == null
@@ -515,6 +806,7 @@ public class CatalogService {
 		productNoticeRepository.save(notice);
 		recordChange(product, null, adminUserId, ProductChangeType.NOTICE, null,
 			"productNoticeVersion=" + nextVersion, request.reason());
+		completeAdminMutation(product, adminUserId, request.reason());
 		return toProductDetailResponse(product, true);
 	}
 
@@ -543,11 +835,15 @@ public class CatalogService {
 			selectedCategories,
 			minPrice,
 			maxPrice,
+			supplierPortalFeatureGate.isEnabled(),
+			Instant.now(),
 			PageRequest.of(page, size, publicProductSort(sort))
 		);
 		Map<ProductCategory, Long> categoryCounts = new EnumMap<>(ProductCategory.class);
 		Arrays.stream(ProductCategory.values()).forEach(value -> categoryCounts.put(value, 0L));
-		productRepository.countPublicProductsByCategory(keyword, minPrice, maxPrice)
+		productRepository.countPublicProductsByCategory(
+			keyword, minPrice, maxPrice, supplierPortalFeatureGate.isEnabled(), Instant.now()
+		)
 			.forEach(count -> categoryCounts.put(count.getCategoryCode(), count.getProductCount()));
 		return new CatalogDtos.PublicProductPageResponse(
 			result.getContent().stream().map(this::toProductSummaryResponse).toList(),
@@ -576,10 +872,9 @@ public class CatalogService {
 
 	@Transactional(readOnly = true)
 	public CatalogDtos.ProductDetailResponse getPublicProduct(UUID productId) {
-		Product product = findProduct(productId);
-		if (product.getStatus() == ProductStatus.HIDDEN || product.getStatus() == ProductStatus.STOPPED) {
-			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
-		}
+		Product product = productRepository.findPublicProductById(
+			productId, supplierPortalFeatureGate.isEnabled(), Instant.now()
+		).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
 		return toProductDetailResponse(product, false);
 	}
 
@@ -587,19 +882,21 @@ public class CatalogService {
 		Product product,
 		Supplier newSupplier,
 		CatalogDtos.ProductUpdateRequest request,
+		long effectiveSourcePrice,
+		long effectiveBasePrice,
 		UUID adminUserId
 	) {
 		if (!Objects.equals(product.getSupplier().getId(), newSupplier.getId())) {
 			recordChange(product, null, adminUserId, ProductChangeType.SUPPLIER,
 				product.getSupplier().getId().toString(), newSupplier.getId().toString(), request.reason());
 		}
-		if (product.getBasePrice() != request.basePrice()) {
+		if (product.getBasePrice() != effectiveBasePrice) {
 			recordChange(product, null, adminUserId, ProductChangeType.PRICE,
-				String.valueOf(product.getBasePrice()), String.valueOf(request.basePrice()), request.reason());
+				String.valueOf(product.getBasePrice()), String.valueOf(effectiveBasePrice), request.reason());
 		}
-		if (product.getSourcePrice() != sourcePrice(product, request)) {
+		if (product.getSourcePrice() != effectiveSourcePrice) {
 			recordChange(product, null, adminUserId, ProductChangeType.PRICE,
-				"source=" + product.getSourcePrice(), "source=" + sourcePrice(product, request), request.reason());
+				"source=" + product.getSourcePrice(), "source=" + effectiveSourcePrice, request.reason());
 		}
 		if (product.getCategoryCode() != request.categoryCode()) {
 			recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_CATEGORY,
@@ -632,6 +929,15 @@ public class CatalogService {
 	private void validateIfActive(Product product) {
 		if (product.getStatus() == ProductStatus.ACTIVE) {
 			validateSaleReadiness(product);
+		}
+	}
+
+	private void requireCustomerUnitPriceLimit(long basePrice, List<ProductOption> options) {
+		for (ProductOption option : options) {
+			MoneyMath.requireCustomerUnitPrice(
+				MoneyMath.addNonNegative(basePrice, option.getAdditionalPrice()),
+				"unitPrice"
+			);
 		}
 	}
 
@@ -721,6 +1027,63 @@ public class CatalogService {
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
 	}
 
+	private AdminProductLock lockAdminProduct(UUID productId, UUID additionalSupplierId) {
+		UUID discoveredSupplierId = productRepository.findSupplierIdById(productId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+		Set<UUID> supplierIds = new TreeSet<>();
+		supplierIds.add(discoveredSupplierId);
+		if (additionalSupplierId != null) {
+			supplierIds.add(additionalSupplierId);
+		}
+		for (UUID supplierId : supplierIds) {
+			supplierRepository.findByIdForUpdate(supplierId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Supplier not found"));
+		}
+		Product product = productRepository.findByIdForUpdate(productId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+		if (!discoveredSupplierId.equals(product.getSupplier().getId())) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.PRODUCT_VERSION_CONFLICT,
+				"Product supplier changed while the product was being locked");
+		}
+		return new AdminProductLock(product, productOptionRepository.findAllByProductIdForUpdate(productId));
+	}
+
+	private ProductOption lockedOption(AdminProductLock lock, UUID optionId) {
+		return lock.options().stream()
+			.filter(option -> option.getId().equals(optionId))
+			.findFirst()
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product option not found"));
+	}
+
+	private void requireOptionalVersion(Product product, Long expectedVersion) {
+		if (expectedVersion != null && !product.hasVersion(expectedVersion)) {
+			throw new ApiErrorException(HttpStatus.CONFLICT, ApiErrorCode.PRODUCT_VERSION_CONFLICT,
+				"Product version is stale");
+		}
+	}
+
+	private void completeAdminMutation(Product product, UUID adminUserId, String reason) {
+		if (product.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL) {
+			ProductStatus postMutationStatus = product.getStatus() == ProductStatus.STOPPED
+				? ProductStatus.STOPPED : ProductStatus.HIDDEN;
+			if (product.getReviewStatus() != ProductReviewStatus.DRAFT) {
+				recordChange(product, null, adminUserId, ProductChangeType.REVIEW_STATUS,
+					reviewSnapshot(product),
+					"reviewStatus=DRAFT;productStatus=" + postMutationStatus,
+					reason);
+				product.updateReview(ProductReviewStatus.DRAFT, null, null);
+			}
+			product.updateStatus(postMutationStatus);
+		}
+		completeAdminStatusMutation(product, adminUserId, reason);
+	}
+
+	private void completeAdminStatusMutation(Product product, UUID adminUserId, String reason) {
+		recordChange(product, null, adminUserId, ProductChangeType.PRODUCT_BASE,
+			"aggregateVersion=" + product.getVersion(), "aggregateVersion=" + (product.getVersion() + 1), reason);
+		product.incrementVersion();
+	}
+
 	private void recordChange(
 		Product product,
 		ProductOption option,
@@ -733,7 +1096,9 @@ public class CatalogService {
 		productChangeHistoryRepository.save(new ProductChangeHistory(
 			product,
 			option,
-			adminUserId,
+			ProductChangeActor.admin(adminUserId),
+			product.getVersion(),
+			product.getVersion() + 1,
 			changeType,
 			beforeValue,
 			afterValue,
@@ -742,6 +1107,10 @@ public class CatalogService {
 	}
 
 	private void validateImages(List<CatalogDtos.ProductImageItem> images) {
+		if (images.stream().anyMatch(image -> image.type() == ProductImageType.DETAIL)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"Detail images must be managed through product detail blocks");
+		}
 		long thumbnailCount = images.stream().filter(image -> image.type() == ProductImageType.THUMBNAIL).count();
 		long galleryCount = images.stream().filter(image -> image.type() == ProductImageType.GALLERY).count();
 		if (thumbnailCount > 1) {
@@ -750,7 +1119,30 @@ public class CatalogService {
 		if (galleryCount > 10) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only ten gallery images are allowed");
 		}
+		if (images.stream().map(CatalogDtos.ProductImageItem::imageUrl).distinct().count() != images.size()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product image URLs must be unique");
+		}
 		images.forEach(image -> validateImageUrl(image.imageUrl()));
+	}
+
+	private String adminStorageObjectKey(
+		UUID productId,
+		CatalogDtos.ProductImageItem item,
+		Map<String, ProductImage> existingByUrl
+	) {
+		String requestedKey = normalized(item.storageObjectKey());
+		if (requestedKey == null) {
+			ProductImage existing = existingByUrl.get(item.imageUrl());
+			return existing == null ? null : existing.getStorageObjectKey();
+		}
+		String prefix = productId + "/";
+		String suffix = requestedKey.startsWith(prefix) ? requestedKey.substring(prefix.length()) : "";
+		if (suffix.isBlank() || suffix.contains("/") || suffix.contains("..")
+			|| productImageCleanupService.hasCleanupJob(requestedKey)
+			|| !fileStorage.matchesStoredFile(requestedKey, item.imageUrl())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid product image storage reference");
+		}
+		return requestedKey;
 	}
 
 	private void validateDetailBlocks(List<CatalogDtos.ProductDetailBlockItem> blocks) {
@@ -829,6 +1221,75 @@ public class CatalogService {
 			.orElse(defaultPricingPolicy());
 	}
 
+	private PricingPolicy activePricingPolicyForUpdate() {
+		return pricingPolicyRepository.findActiveForUpdate()
+			.orElseGet(() -> pricingPolicyRepository.saveAndFlush(defaultPricingPolicy()));
+	}
+
+	private ProductPriceCalculation calculatePortalPrices(
+		long sourcePrice,
+		List<Long> sourceAdditionalPrices,
+		PricingPolicy policy
+	) {
+		return catalogPriceCalculator.calculate(sourcePrice, sourceAdditionalPrices, 0, policy);
+	}
+
+	private List<Long> sourceAdditionalPrices(List<ProductOption> options) {
+		return options.stream()
+			.map(option -> valueOrDefault(option.getSourceAdditionalPrice(), 0L))
+			.toList();
+	}
+
+	private void applyPortalPrices(
+		Product product,
+		List<ProductOption> options,
+		PricingPolicy policy,
+		ProductPriceCalculation calculation
+	) {
+		product.updateSourcePricing(calculation.sourcePrice(), calculation.basePrice());
+		product.applyPricing(policy, calculation.basePrice());
+		for (int index = 0; index < options.size(); index++) {
+			ProductOption option = options.get(index);
+			option.update(
+				option.getName(),
+				calculation.options().get(index).additionalPrice(),
+				option.getSourceOptionCode(),
+				option.getSourceAdditionalPrice(),
+				option.getSourceStockQuantity(),
+				option.getSortOrder()
+			);
+		}
+	}
+
+	private String portalPriceValuesState(Product product, List<ProductOption> options) {
+		PricingPolicy policy = product.getPricingPolicyApplied();
+		String policyReference = policy == null ? "policy=null" :
+			"policyId=%s;policyVersion=%d".formatted(policy.getId(), product.getPricingPolicyVersionApplied());
+		return portalPriceValues(policyReference, product, options);
+	}
+
+	private String portalPriceState(
+		Product product,
+		List<ProductOption> options,
+		PricingCalculatorSnapshot snapshot
+	) {
+		String policySnapshot =
+			"policyId=%s;policyVersion=%d;commission=%s;taxBuffer=%s;overhead=%s;safetyMargin=%s;rounding=%d;minimumResale=%d"
+				.formatted(snapshot.pricingPolicyId(), snapshot.pricingPolicyVersion(), snapshot.commissionRate(),
+					snapshot.taxBufferRate(), snapshot.overheadRate(), snapshot.safetyMarginRate(),
+					snapshot.roundingUnit(), snapshot.minimumResalePrice());
+		return portalPriceValues(policySnapshot, product, options);
+	}
+
+	private String portalPriceValues(String policyState, Product product, List<ProductOption> options) {
+		String optionPrices = options.stream()
+			.map(option -> "%s:%s:%d".formatted(
+				option.getId(), valueOrDefault(option.getSourceAdditionalPrice(), 0L), option.getAdditionalPrice()
+			))
+			.collect(Collectors.joining(","));
+		return "%s;basePrice=%d;optionPrices=[%s]".formatted(policyState, product.getBasePrice(), optionPrices);
+	}
+
 	private PricingPolicy defaultPricingPolicy() {
 		return new PricingPolicy(
 			"기본 가격 정책",
@@ -876,6 +1337,7 @@ public class CatalogService {
 	private CatalogDtos.AdminProductResponse toAdminProductResponse(Product product, SaleReadiness readiness) {
 		return new CatalogDtos.AdminProductResponse(
 			product.getId(),
+			product.getVersion(),
 			product.getSupplier().getId(),
 			product.getSupplier().getName(),
 			product.getName(),
@@ -947,6 +1409,7 @@ public class CatalogService {
 		);
 		return new CatalogDtos.ProductDetailResponse(
 			product.getId(),
+			product.getVersion(),
 			includeSourcePrice ? product.getSupplier().getId() : null,
 			includeSourcePrice ? product.getSupplier().getName() : null,
 			product.getName(),
@@ -992,9 +1455,75 @@ public class CatalogService {
 	) {
 	}
 
+	private record ReviewLock(Supplier supplier, Product product, List<ProductOption> options) {
+	}
+
+	private record AdminProductLock(Product product, List<ProductOption> options) {
+	}
+
+	private Product findReviewProduct(UUID productId) {
+		return productRepository.findReviewProductById(productId)
+			.filter(product -> product.getManagementChannel() == ProductManagementChannel.SUPPLIER_PORTAL)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product review not found"));
+	}
+
+	private CatalogDtos.ProductReviewSummaryResponse toProductReviewSummary(Product product) {
+		return new CatalogDtos.ProductReviewSummaryResponse(
+			product.getId(),
+			product.getVersion(),
+			product.getSupplier().getId(),
+			product.getSupplier().getName(),
+			product.getName(),
+			product.getCategoryCode(),
+			product.getReviewStatus(),
+			product.getReviewReasonCode(),
+			product.getFirstSubmittedAt()
+		);
+	}
+
+	private CatalogDtos.ProductReviewDetailResponse toProductReviewDetail(Product product) {
+		ProductNotice notice = productNoticeRepository
+			.findFirstByProduct_IdAndStatusOrderByVersionDesc(product.getId(), ProductNoticeStatus.ACTIVE)
+			.orElse(null);
+		return new CatalogDtos.ProductReviewDetailResponse(
+			product.getId(),
+			product.getVersion(),
+			product.getSupplier().getId(),
+			product.getSupplier().getName(),
+			product.getName(),
+			product.getSummary(),
+			product.getSourcePrice(),
+			product.getBasePrice(),
+			product.getMinimumOrderQuantity(),
+			product.getOrderQuantityStep(),
+			product.getCategoryCode(),
+			product.getStatus(),
+			product.getComplianceStatus(),
+			product.getReviewStatus(),
+			product.getReviewReasonCode(),
+			product.getSupplierReviewMessage(),
+			productOptionRepository.findAllByProduct_IdOrderBySortOrderAscCreatedAtAsc(product.getId()).stream()
+				.map(option -> toOptionResponse(option, true))
+				.toList(),
+			productImageRepository.findAllByProduct_IdOrderBySortOrderAsc(product.getId()).stream()
+				.map(this::toImageResponse)
+				.toList(),
+			productDetailBlockRepository.findAllByProduct_IdOrderBySortOrderAsc(product.getId()).stream()
+				.map(this::toDetailBlockResponse)
+				.toList(),
+			notice == null ? null : toNoticeResponse(notice)
+		);
+	}
+
+	private String reviewSnapshot(Product product) {
+		return "reviewStatus=%s;reviewReasonCode=%s;productStatus=%s"
+			.formatted(product.getReviewStatus(), product.getReviewReasonCode(), product.getStatus());
+	}
+
 	private CatalogDtos.ProductOptionResponse toOptionResponse(ProductOption option, boolean includeSourceMetadata) {
 		return new CatalogDtos.ProductOptionResponse(
 			option.getId(),
+			option.getProduct().getVersion(),
 			option.getName(),
 			option.getAdditionalPrice(),
 			option.getStatus(),
@@ -1014,7 +1543,8 @@ public class CatalogService {
 			policy.getOverheadRate(),
 			policy.getSafetyMarginRate(),
 			policy.getRoundingUnit(),
-			totalMarkupRate(policy)
+			totalMarkupRate(policy),
+			policy.getVersion()
 		);
 	}
 
@@ -1037,8 +1567,14 @@ public class CatalogService {
 	private CatalogDtos.ProductChangeHistoryResponse toChangeHistoryResponse(ProductChangeHistory history) {
 		return new CatalogDtos.ProductChangeHistoryResponse(
 			history.getId(),
-			history.getProductOption() == null ? null : history.getProductOption().getId(),
+			history.getSubjectProductOptionId(),
 			history.getAdminUserId(),
+			history.getActorType(),
+			history.getActorUserId(),
+			history.getActorSupplierId(),
+			history.getActorSystemCode(),
+			history.getBeforeVersion(),
+			history.getAfterVersion(),
 			history.getChangeType(),
 			history.getBeforeValue(),
 			history.getAfterValue(),

@@ -1,18 +1,24 @@
 package com.dropshipshop.api.catalog.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import jakarta.persistence.LockModeType;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.dropshipshop.api.catalog.domain.Product;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
+import com.dropshipshop.api.catalog.domain.ProductManagementChannel;
+import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 
 public interface ProductRepository extends JpaRepository<Product, UUID> {
@@ -24,12 +30,45 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
 	Optional<Product> findBySourceItemNo(String sourceItemNo);
 
+	@Query("select product.supplier.id from Product product where product.id = :id")
+	Optional<UUID> findSupplierIdById(@Param("id") UUID id);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select product from Product product where product.id = :id")
+	Optional<Product> findByIdForUpdate(@Param("id") UUID id);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+		select product from Product product
+		where product.id = :id
+		and product.supplier.id = :supplierId
+		and product.managementChannel = :managementChannel
+		""")
+	Optional<Product> findByIdAndSupplierIdAndManagementChannelForUpdate(
+		@Param("id") UUID id,
+		@Param("supplierId") UUID supplierId,
+		@Param("managementChannel") ProductManagementChannel managementChannel
+	);
+
+	Optional<Product> findByIdAndSupplier_IdAndManagementChannel(
+		UUID id,
+		UUID supplierId,
+		ProductManagementChannel managementChannel
+	);
+
+	Page<Product> findAllBySupplier_IdAndManagementChannel(
+		UUID supplierId,
+		ProductManagementChannel managementChannel,
+		Pageable pageable
+	);
+
 	@Query("""
 		select product from Product product
 		where product.sourceItemNo is not null
+		and product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.COREABLE
 		and (
 			product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
-			or (product.status = com.dropshipshop.api.catalog.domain.ProductStatus.SOLD_OUT and product.sourceAvailable = false)
+				or (product.status = com.dropshipshop.api.catalog.domain.ProductStatus.SOLD_OUT and product.sourceAutoSoldOut = true)
 		)
 		order by case when product.sourceSyncedAt is null then 0 else 1 end, product.sourceSyncedAt, product.id
 		""")
@@ -38,7 +77,25 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 	@Query(
 		value = """
 			select product from Product product
+			join product.supplier supplier
 			where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+			and supplier.status = com.dropshipshop.api.catalog.domain.SupplierStatus.ACTIVE
+			and product.complianceStatus <> com.dropshipshop.api.catalog.domain.ProductComplianceStatus.REJECTED
+			and (
+				product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.COREABLE
+				or (
+					product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.SUPPLIER_PORTAL
+					and :portalEnabled = true
+					and product.reviewStatus in (
+						com.dropshipshop.api.catalog.domain.ProductReviewStatus.AUTO_APPROVED,
+						com.dropshipshop.api.catalog.domain.ProductReviewStatus.APPROVED
+					)
+					and supplier.portalContractStatus = com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus.VERIFIED
+					and supplier.portalContractEffectiveAt is not null
+					and supplier.portalContractEffectiveAt <= :now
+					and (supplier.portalContractExpiresAt is null or :now < supplier.portalContractExpiresAt)
+				)
+			)
 			and (:keyword is null
 				or lower(product.name) like :keyword
 				or lower(product.summary) like :keyword)
@@ -48,7 +105,25 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 			""",
 		countQuery = """
 			select count(product) from Product product
+			join product.supplier supplier
 			where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+			and supplier.status = com.dropshipshop.api.catalog.domain.SupplierStatus.ACTIVE
+			and product.complianceStatus <> com.dropshipshop.api.catalog.domain.ProductComplianceStatus.REJECTED
+			and (
+				product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.COREABLE
+				or (
+					product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.SUPPLIER_PORTAL
+					and :portalEnabled = true
+					and product.reviewStatus in (
+						com.dropshipshop.api.catalog.domain.ProductReviewStatus.AUTO_APPROVED,
+						com.dropshipshop.api.catalog.domain.ProductReviewStatus.APPROVED
+					)
+					and supplier.portalContractStatus = com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus.VERIFIED
+					and supplier.portalContractEffectiveAt is not null
+					and supplier.portalContractEffectiveAt <= :now
+					and (supplier.portalContractExpiresAt is null or :now < supplier.portalContractExpiresAt)
+				)
+			)
 			and (:keyword is null
 				or lower(product.name) like :keyword
 				or lower(product.summary) like :keyword)
@@ -62,13 +137,43 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 		@Param("categories") List<ProductCategory> categories,
 		@Param("minPrice") long minPrice,
 		@Param("maxPrice") Long maxPrice,
+		@Param("portalEnabled") boolean portalEnabled,
+		@Param("now") Instant now,
 		Pageable pageable
 	);
+
+	default Page<Product> findPublicProducts(
+		String keyword,
+		List<ProductCategory> categories,
+		long minPrice,
+		Long maxPrice,
+		Pageable pageable
+	) {
+		return findPublicProducts(keyword, categories, minPrice, maxPrice, false, Instant.now(), pageable);
+	}
 
 	@Query("""
 		select product.categoryCode as categoryCode, count(product) as productCount
 		from Product product
+		join product.supplier supplier
 		where product.status = com.dropshipshop.api.catalog.domain.ProductStatus.ACTIVE
+		and supplier.status = com.dropshipshop.api.catalog.domain.SupplierStatus.ACTIVE
+		and product.complianceStatus <> com.dropshipshop.api.catalog.domain.ProductComplianceStatus.REJECTED
+		and (
+			product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.COREABLE
+			or (
+				product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.SUPPLIER_PORTAL
+				and :portalEnabled = true
+				and product.reviewStatus in (
+					com.dropshipshop.api.catalog.domain.ProductReviewStatus.AUTO_APPROVED,
+					com.dropshipshop.api.catalog.domain.ProductReviewStatus.APPROVED
+				)
+				and supplier.portalContractStatus = com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus.VERIFIED
+				and supplier.portalContractEffectiveAt is not null
+				and supplier.portalContractEffectiveAt <= :now
+				and (supplier.portalContractExpiresAt is null or :now < supplier.portalContractExpiresAt)
+			)
+		)
 		and (:keyword is null
 			or lower(product.name) like :keyword
 			or lower(product.summary) like :keyword)
@@ -79,8 +184,84 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 	List<ProductCategoryCount> countPublicProductsByCategory(
 		@Param("keyword") String keyword,
 		@Param("minPrice") long minPrice,
-		@Param("maxPrice") Long maxPrice
+		@Param("maxPrice") Long maxPrice,
+		@Param("portalEnabled") boolean portalEnabled,
+		@Param("now") Instant now
 	);
+
+	default List<ProductCategoryCount> countPublicProductsByCategory(
+		String keyword,
+		long minPrice,
+		Long maxPrice
+	) {
+		return countPublicProductsByCategory(keyword, minPrice, maxPrice, false, Instant.now());
+	}
+
+	@Query("""
+		select product from Product product
+		join fetch product.supplier supplier
+		where product.id = :productId
+		and product.status not in (
+			com.dropshipshop.api.catalog.domain.ProductStatus.HIDDEN,
+			com.dropshipshop.api.catalog.domain.ProductStatus.STOPPED
+		)
+		and supplier.status = com.dropshipshop.api.catalog.domain.SupplierStatus.ACTIVE
+		and product.complianceStatus <> com.dropshipshop.api.catalog.domain.ProductComplianceStatus.REJECTED
+		and (
+			product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.COREABLE
+			or (
+				product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.SUPPLIER_PORTAL
+				and :portalEnabled = true
+				and product.reviewStatus in (
+					com.dropshipshop.api.catalog.domain.ProductReviewStatus.AUTO_APPROVED,
+					com.dropshipshop.api.catalog.domain.ProductReviewStatus.APPROVED
+				)
+				and supplier.portalContractStatus = com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus.VERIFIED
+				and supplier.portalContractEffectiveAt is not null
+				and supplier.portalContractEffectiveAt <= :now
+				and (supplier.portalContractExpiresAt is null or :now < supplier.portalContractExpiresAt)
+			)
+		)
+		""")
+	Optional<Product> findPublicProductById(
+		@Param("productId") UUID productId,
+		@Param("portalEnabled") boolean portalEnabled,
+		@Param("now") Instant now
+	);
+
+	@Query(
+		value = """
+			select product from Product product
+			join fetch product.supplier supplier
+			where product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.SUPPLIER_PORTAL
+			and product.reviewStatus in :reviewStatuses
+			""",
+		countQuery = """
+			select count(product) from Product product
+			where product.managementChannel = com.dropshipshop.api.catalog.domain.ProductManagementChannel.SUPPLIER_PORTAL
+			and product.reviewStatus in :reviewStatuses
+			"""
+	)
+	Page<Product> findReviewQueue(
+		@Param("reviewStatuses") List<ProductReviewStatus> reviewStatuses,
+		Pageable pageable
+	);
+
+	@EntityGraph(attributePaths = "supplier")
+	@Query("select product from Product product where product.id = :id")
+	Optional<Product> findReviewProductById(@Param("id") UUID id);
+
+	@Query("select (count(item) > 0) from CartItem item where item.product.id = :productId")
+	boolean existsCartReferenceByProductId(@Param("productId") UUID productId);
+
+	@Query("select (count(item) > 0) from OrderItem item where item.product.id = :productId")
+	boolean existsOrderReferenceByProductId(@Param("productId") UUID productId);
+
+	@Query("select (count(item) > 0) from CartItem item where item.productOption.id = :optionId")
+	boolean existsCartReferenceByOptionId(@Param("optionId") UUID optionId);
+
+	@Query("select (count(item) > 0) from OrderItem item where item.productOption.id = :optionId")
+	boolean existsOrderReferenceByOptionId(@Param("optionId") UUID optionId);
 
 	@Query(
 		value = """

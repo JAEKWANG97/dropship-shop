@@ -32,6 +32,7 @@ import com.dropshipshop.api.order.repository.OrderItemRepository;
 import com.dropshipshop.api.order.repository.OrderStatusHistoryRepository;
 import com.dropshipshop.api.shipment.domain.Shipment;
 import com.dropshipshop.api.shipment.repository.ShipmentRepository;
+import com.dropshipshop.api.common.money.MoneyMath;
 
 @Service
 public class DomeggookPurchaseService {
@@ -410,10 +411,15 @@ public class DomeggookPurchaseService {
 			if (quote.sourceUnitPrice() != line.sourceUnitPrice()) {
 				throw new DomeggookApiException("PRICE_MISMATCH", "Supplier price changed after checkout", false);
 			}
-			itemAmount += quote.sourceUnitPrice() * line.quantity();
-			if (shippingItems.add(line.itemNo())) shippingAmount += quote.shippingFee();
+			itemAmount = MoneyMath.addNonNegative(
+				itemAmount,
+				MoneyMath.multiplyNonNegative(quote.sourceUnitPrice(), line.quantity())
+			);
+			if (shippingItems.add(line.itemNo())) {
+				shippingAmount = MoneyMath.addNonNegative(shippingAmount, quote.shippingFee());
+			}
 		}
-		return new ValidationResult(itemAmount + shippingAmount, itemAmount, shippingAmount);
+		return new ValidationResult(MoneyMath.addNonNegative(itemAmount, shippingAmount), itemAmount, shippingAmount);
 	}
 
 	private PurchaseContext readContext(UUID orderId) {
@@ -486,12 +492,24 @@ public class DomeggookPurchaseService {
 	}
 
 	private long snapshotAmount(List<OrderItem> items) {
-		return items.stream().mapToLong(item -> item.getSourceUnitPrice() * item.getQuantity()).sum();
+		long total = 0;
+		for (OrderItem item : items) {
+			total = MoneyMath.addNonNegative(
+				total,
+				MoneyMath.multiplyNonNegative(item.getSourceUnitPrice(), item.getQuantity())
+			);
+		}
+		return total;
 	}
 
 	private long snapshotAmount(Iterable<PurchaseLine> lines) {
 		long total = 0;
-		for (PurchaseLine line : lines) total += line.sourceUnitPrice() * line.quantity();
+		for (PurchaseLine line : lines) {
+			total = MoneyMath.addNonNegative(
+				total,
+				MoneyMath.multiplyNonNegative(line.sourceUnitPrice(), line.quantity())
+			);
+		}
 		return total;
 	}
 

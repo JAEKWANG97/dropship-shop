@@ -400,6 +400,31 @@ class CheckoutApiIntegrationTest {
 			.andExpect(jsonPath("$.checkoutAvailable", is(false)));
 	}
 
+	@Test
+	void rejectsCheckoutAfterASavedItemBecomesHiddenAndZeroPriced() throws Exception {
+		UserAccount customer = createCustomer("checkout-zero-price");
+		ProductOption option = createOption(
+			"Checkout Zeroed Product", ProductStatus.ACTIVE, ProductOptionStatus.ACTIVE, 10000, 0, 1
+		);
+		addCartItem(customer.getId(), option.getId(), 1);
+
+		option.getProduct().updateStatus(ProductStatus.HIDDEN);
+		option.getProduct().updateSourcePricing(0, 0);
+		productRepository.saveAndFlush(option.getProduct());
+
+		mockMvc.perform(post("/api/checkouts")
+				.with(authentication(TestAuthentication.customer(customer.getId())))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validCheckoutRequest()))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(get("/api/cart")
+				.with(authentication(TestAuthentication.customer(customer.getId()))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.subtotalAmount", is(0)))
+			.andExpect(jsonPath("$.checkoutAvailable", is(false)));
+	}
+
 	private UserAccount createCustomer(String providerUserId) {
 		UserAccount customer = userAccountRepository.save(new UserAccount(
 			SocialProvider.GOOGLE,

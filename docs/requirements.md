@@ -24,7 +24,7 @@
 
 ### Supplier Portal Onboarding — Implemented (`B-100`), Production Gated
 
-`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면은 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup은 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 `B-101`~`B-105`가 준비될 때까지 production flag는 기본 `off`를 유지한다.
+`B-100`의 신청·승인/거절·초대·Kakao 연결·동적 권한·lifecycle·신청/초대 retention·Origin/feature gate와 기본 Web 화면, `B-101`의 개별 상품 등록·검토 흐름은 구현됐다. `B-098` 계약 증적 명령·scheduler·관계 종료 cleanup과 `B-102`~`B-105`는 Planned이며, active 공급처 신청 개인정보 고지와 실제 이메일 delivery 및 전체 release gate가 준비될 때까지 production flag는 기본 `off`를 유지한다.
 
 - 비로그인 사용자는 필수 공급처명·담당자명·연락 이메일과 선택 전화번호·문의 메모로 공급처 신청을 제출할 수 있어야 한다.
 - 신청 화면은 active `SUPPLIER_APPLICATION_PRIVACY`의 수집 목적, 항목, 보유 기간, 동의 거부 시 신청 불가를 고지해야 한다. 서버는 exact active version을 검증하고 canonical 동의시각을 저장해야 한다.
@@ -55,18 +55,19 @@
 - 운영자는 상품을 등록, 수정, 숨김, 판매중지 처리할 수 있어야 한다.
 - 운영자는 상품 옵션을 등록, 수정, 품절, 판매중지 처리할 수 있어야 한다.
 - 기존 수동/Domeggook 상품과 옵션은 실제 재고 수량 대신 판매 상태를 가진다.
+- Domeggook sync의 성공·실패 기록은 fetch에 사용한 `sourceItemNo`가 `Supplier -> fresh Product -> Option` 잠금 뒤 현재 값과 정확히 같을 때만 적용되어야 한다. V40의 durable `sourceAutoSoldOut`은 기본값과 backfill이 `false`여야 하고 sync가 confirmed unavailable로 실제 `ACTIVE -> SOLD_OUT`을 적용할 때만 `true`여야 한다. Target/자동 복구는 marker가 `true`인 `SOLD_OUT`만 포함하고, 공급처 MOQ가 10 이하이며 현재 가격이 양수·상한 이하이고 compliance가 `REJECTED`가 아니며 active option, thumbnail, active notice를 모두 갖춘 경우에만 `ACTIVE`로 복구한 뒤 marker를 지워야 한다. 성공한 admin status 명령은 같은 `SOLD_OUT` 재지정을 포함해 marker를 지워 수동 품절을 보호해야 한다.
 - 상품 가격 변경은 변경 이후 생성되는 새 주문부터 적용되어야 한다.
 - 결제 완료 주문은 결제 당시 가격과 주문 상품 스냅샷을 유지해야 한다.
 - 결제 완료 주문은 주문 시점의 상품 요약, 상품 상세 버전, 상품 정보 제공 고시 버전 참조를 유지해야 한다.
 - 운영자는 상품 상세 콘텐츠를 이미지와 HTML 블록으로 등록할 수 있어야 한다.
-- 기존 상품 상세 HTML은 관리자가 입력할 수 있고, Planned 포털 상품은 해당 공급처 담당자도 입력할 수 있다. 모든 HTML은 저장 시 안전하게 sanitize되어야 한다.
+- 기존 상품 상세 HTML은 관리자가 입력할 수 있고, 공급처 포털 상품은 해당 공급처 담당자도 입력할 수 있다. 모든 HTML은 저장 시 안전하게 sanitize되어야 한다.
 - 배송, 교환, 환불, 주문 후 품절 가능성 고지는 상품 상세 콘텐츠와 별도 정책 영역으로 노출되어야 한다.
 - 운영자는 상품 대표 이미지를 1장 등록할 수 있어야 한다.
 - 운영자는 상품 갤러리 이미지를 최대 10장 등록할 수 있어야 한다.
 - 운영자는 상세 블록 이미지를 최대 50장 등록할 수 있어야 한다.
 - 상품 이미지는 `jpg`, `jpeg`, `png`, `webp`만 허용하고 이미지당 최대 10MB로 제한해야 한다. 파일명 확장자와 실제 이미지 파일 시그니처가 모두 맞아야 한다.
 
-### Supplier Portal Product — Planned (`B-101`)
+### Supplier Portal Product — Implemented (`B-101`)
 
 - 공급처 포털의 첫 상품 기능은 개별 상품 등록이어야 한다.
 - 공급처 화면은 편집 중 내부 draft와 무관하게 `상품 등록` 동작 하나로 최종 검증·분류를 끝내고 별도의 승인 요청 단계를 요구하지 않아야 한다.
@@ -76,19 +77,22 @@
 - 공급처는 상품명, 요약, 공급가, 옵션 공급가, 공급처 옵션코드, MOQ/주문단위, 이미지, 상세, 상품정보제공고시를 입력할 수 있어야 한다.
 - 공급처 요청에서 `supplierId`, 고객 판매가, 판매 상태, 검토 상태와 인증 판단 결과를 받아서는 안 된다.
 - 고객 판매가는 공급가와 현재 Coreable active 가격 정책으로 서버가 계산해야 하며 공급처가 직접 지정할 수 없어야 한다.
+- 공급가와 옵션 공급가는 각각 0원 이상 1억원 이하, 계산된 고객 단가는 10억원 이하로 제한하고 장바구니·checkout·OrderItem·PaymentGroup 금액은 overflow 없는 exact 연산과 양수 snapshot 제약으로 보호해야 한다. 비공개 전환 뒤 0원이 된 기존 장바구니 항목은 조회 가능하되 checkout은 거절해야 한다.
+- Portal 상품을 기존 관리자 상품/옵션 API로 수정하는 경우에도 고객가 입력을 신뢰하지 않고 active pricing policy로 상품과 모든 옵션을 원자적으로 재계산해야 한다.
 - 구조 검증과 판매 준비 조건을 통과하고 사람 판단이 필요하지 않은 일반 상품은 반드시 자동 승인·공개되어야 한다.
 - 인증, 카테고리, 법정 필수정보 또는 안전 규칙이 사람 판단을 요구하는 상품만 숨김 상태로 Coreable 검토 큐에 들어가야 한다.
+- `CERTIFICATION_REVIEW`에 대한 Coreable 승인은 portal 사람 검토만 통과시켜야 하고 `complianceStatus`를 자동 변경해서는 안 된다. 기존 `PENDING`은 판매를 차단하지 않으며 `REJECTED`만 판매 준비를 차단해야 한다.
 - 자동 분류가 알 수 없거나 필수 근거가 누락되거나 실행에 실패하면 자동 공개하지 않고 검토 큐에 넣어야 한다.
 - 안전·인증·카테고리·고시처럼 분류에 영향이 있는 수정은 재분류하고 다시 위험해진 상품은 공개를 멈춰야 한다.
-- 공개 상품 조회와 checkout은 Supplier 거래 상태가 활성인지 검증해야 한다.
+- 공개 상품 조회와 checkout은 모든 상품의 Supplier 거래 상태가 활성인지 검증해야 한다. Portal 상품은 global feature gate, `AUTO_APPROVED|APPROVED`, time-valid VERIFIED 계약과 active option도 함께 검증해야 한다.
 - Coreable은 자동 공개 이후에도 상품을 숨김·판매중지할 수 있고 공급처는 그 상태를 덮어쓸 수 없어야 한다.
 - 공급처 상품 응답은 allowlist인 표시 상태, 안전한 검토 사유 코드·전달 문구와 다음 행동만 제공하고 관리자 내부 메모·담당자·분류 trace를 노출하지 않아야 한다. 보완은 같은 편집 화면과 `상품 등록` 동작으로 다시 제출할 수 있어야 한다.
 - 상품, 옵션, 이미지, 상세, 고시, 가격과 검토 변경은 actor user, actor type, 전후 값, 사유와 시각을 기록해야 한다. 공급처 안내와 내부 사유는 각각 500자 이하 single-line PII-free 문구여야 하며, before/after는 allowlisted business field만 저장하고 raw request, 연락처, 고객·주문 정보를 복제하지 않아야 한다.
-- 기존 상품과 portal 상품을 immutable management channel로 구분하고 OrderItem에 snapshot해야 한다. Product aggregate version을 모든 supplier/admin/source writer가 증가시키고 supplier/admin review는 expected version으로 stale 승인을 거절해야 한다. 기존 admin client는 additive optional precondition을 거쳐 호환 이관해야 한다.
+- B-101은 기존 상품과 portal 상품을 immutable Product management channel로 구분한다. B-102는 이를 OrderItem에 snapshot한다. Product aggregate version은 모든 supplier/admin/source writer가 증가시키고 supplier/admin review는 expected version으로 stale 승인을 거절해야 한다. Admin/review/cart/checkout/source writer는 scalar supplier/ownership discovery 뒤 `Supplier -> fresh Product -> 모든 ProductOption(id)` 순서로 잠그고, lock 대기 뒤 fresh owner가 discovery/request tenant와 다르면 conflict 또는 tenant-safe `404`로 거절해야 한다. 기존 admin client는 additive optional precondition을 거쳐 호환 이관해야 한다.
 - 최초 submit 시각을 immutable하게 저장해야 한다. 공급처는 자기 `SUPPLIER_PORTAL` 상품이 아직 한 번도 submit되지 않은 `DRAFT`이고 상품·모든 옵션에 CartItem/OrderItem 참조가 없을 때만 상품을 실제 삭제할 수 있어야 한다.
 - 옵션 실제 삭제도 최초 submit 전 DRAFT에서만 허용하고, 대상 옵션의 CartItem/OrderItem 참조가 없어야 하며 최소 한 옵션을 남겨야 한다. 한 번이라도 submit·검토·공개됐거나 참조된 상품과 옵션은 삭제 대신 Coreable의 숨김·판매중지 상태로 보존해야 한다.
-- 삭제는 expected Product version, tenant/management-channel guard와 Product -> 모든 Option 잠금을 사용해야 한다. Cart 추가와 checkout 참조 생성도 같은 잠금을 사용해 삭제와 새 CartItem/OrderItem insert가 경합해도 FK 오류나 유실 참조를 노출하지 않아야 한다.
-- 실제 삭제 뒤에도 immutable subject id, actor, 삭제 전 version과 allowlisted before snapshot 이력은 남아야 한다. Live Product/ProductOption 이력 FK는 nullable이어야 하며, 이미지 metadata 삭제와 durable binary-cleanup job 생성은 원자적으로 commit되어야 한다.
+- 삭제는 expected Product version, tenant/management-channel guard와 scalar ownership discovery 뒤 `Supplier -> fresh Product -> 모든 Option(id)` 잠금을 사용해야 한다. Cart 추가와 checkout 참조 생성도 같은 잠금 계약과 fresh ownership/saleability·참조 guard를 사용해 stale owner, FK 오류나 유실 참조를 노출하지 않아야 한다.
+- 실제 삭제 뒤에도 immutable subject id, actor, 삭제 전 version과 allowlisted before snapshot 이력은 남아야 한다. Live Product/ProductOption 이력 FK는 nullable이어야 하며, 이미지 metadata 삭제와 unique durable binary-cleanup job enqueue는 원자적으로 commit되어야 한다. Cleanup job이 생긴 key는 admin 재첨부를 거절하고, 반복 enqueue는 멱등이어야 한다. Worker는 삭제 직전 live ProductImage 참조가 있으면 binary를 보존하고 `LIVE_REFERENCE`로 완료하며, 실제 metadata 제거 시 같은 job을 다시 열어야 한다.
 - 최초 등록, 검토, 보완, 재제출과 거절의 허용 상태 전이를 명시해야 한다. 보완 재제출은 자동 공개하지 않고 다시 검토로 보내며 supplier-safe message와 내부 reason을 분리해야 한다.
 - B-101/B-102만 배포된 동안에는 production supplier portal feature gate를 닫아 고객 판매를 시작하지 않아야 한다. B-102 inventory migration과 checkout guard는 필요조건이며 B-100~B-105, 개인정보·email·계약 gate가 모두 준비된 뒤에만 실제 공개·외부 route를 열어야 한다.
 

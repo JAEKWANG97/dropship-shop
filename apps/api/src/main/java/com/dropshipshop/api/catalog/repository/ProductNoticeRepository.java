@@ -19,6 +19,8 @@ public interface ProductNoticeRepository extends JpaRepository<ProductNotice, UU
 
 	int countByProduct_Id(UUID productId);
 
+	void deleteAllByProduct_Id(UUID productId);
+
 	@Query("select distinct notice.product.id from ProductNotice notice where notice.product.id in :productIds and notice.status = :status")
 	List<UUID> findProductIdsByStatus(@Param("productIds") List<UUID> productIds, @Param("status") ProductNoticeStatus status);
 }

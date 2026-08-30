@@ -35,6 +35,9 @@ public class ProductImage {
 	@Column(name = "image_url", nullable = false, length = 1000)
 	private String imageUrl;
 
+	@Column(name = "storage_object_key", length = 1000, updatable = false)
+	private String storageObjectKey;
+
 	@Column(name = "sort_order", nullable = false)
 	private int sortOrder;
 
@@ -51,11 +54,34 @@ public class ProductImage {
 	}
 
 	public ProductImage(Product product, ProductImageType type, String imageUrl, int sortOrder, String altText) {
+		this(product, type, imageUrl, sortOrder, altText, null);
+	}
+
+	public ProductImage(
+		Product product,
+		ProductImageType type,
+		String imageUrl,
+		int sortOrder,
+		String altText,
+		String storageObjectKey
+	) {
 		this.product = product;
 		this.type = type;
 		this.imageUrl = imageUrl;
 		this.sortOrder = sortOrder;
 		this.altText = altText;
+		this.storageObjectKey = storageObjectKey;
+	}
+
+	public ProductImage(
+		Product product,
+		ProductImageType type,
+		String imageUrl,
+		String storageObjectKey,
+		int sortOrder,
+		String altText
+	) {
+		this(product, type, imageUrl, sortOrder, altText, storageObjectKey);
 	}
 
 	@PrePersist
@@ -74,6 +100,10 @@ public class ProductImage {
 		return id;
 	}
 
+	public Product getProduct() {
+		return product;
+	}
+
 	public ProductImageType getType() {
 		return type;
 	}
@@ -82,11 +112,21 @@ public class ProductImage {
 		return imageUrl;
 	}
 
+	public String getStorageObjectKey() {
+		return storageObjectKey;
+	}
+
 	public int getSortOrder() {
 		return sortOrder;
 	}
 
 	public String getAltText() {
 		return altText;
+	}
+
+	public void updatePresentation(ProductImageType type, int sortOrder, String altText) {
+		this.type = type;
+		this.sortOrder = sortOrder;
+		this.altText = altText;
 	}
 }

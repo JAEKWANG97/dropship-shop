@@ -9,15 +9,19 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import com.dropshipshop.api.catalog.domain.ProductChangeType;
+import com.dropshipshop.api.catalog.domain.ProductChangeActorType;
 import com.dropshipshop.api.catalog.domain.ProductCategory;
 import com.dropshipshop.api.catalog.domain.ProductComplianceStatus;
 import com.dropshipshop.api.catalog.domain.ProductDetailBlockType;
 import com.dropshipshop.api.catalog.domain.ProductImageType;
 import com.dropshipshop.api.catalog.domain.ProductOptionStatus;
+import com.dropshipshop.api.catalog.domain.ProductReviewReasonCode;
+import com.dropshipshop.api.catalog.domain.ProductReviewStatus;
 import com.dropshipshop.api.catalog.domain.ProductStatus;
 import com.dropshipshop.api.catalog.domain.SupplierStatus;
 import com.dropshipshop.api.catalog.domain.SupplierPortalStatus;
 import com.dropshipshop.api.catalog.domain.SupplierPortalContractStatus;
+import com.dropshipshop.api.common.money.MoneyMath;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -69,10 +73,10 @@ final class CatalogDtos {
 		@NotNull UUID supplierId,
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
-		@Min(0) Long sourcePrice,
+		@Min(0) @Max(MoneyMath.MAX_SUPPLIER_UNIT_COST) Long sourcePrice,
 		@Size(max = 50) @Pattern(regexp = "\\d+", message = "sourceItemNo must contain digits only") String sourceItemNo,
 		@Size(max = 2000) @Pattern(regexp = "(?i)^https?://\\S+$", message = "sourceUrl must use http or https") String sourceUrl,
-		@Min(0) long basePrice,
+		@Min(0) @Max(MoneyMath.MAX_CUSTOMER_UNIT_PRICE) long basePrice,
 		@Min(1) @Max(99) Integer minimumOrderQuantity,
 		@Min(1) @Max(99) Integer orderQuantityStep,
 		@NotNull ProductCategory categoryCode,
@@ -84,15 +88,16 @@ final class CatalogDtos {
 		@NotNull UUID supplierId,
 		@NotBlank @Size(max = 200) String name,
 		@NotBlank @Size(max = 500) String summary,
-		@Min(0) Long sourcePrice,
+		@Min(0) @Max(MoneyMath.MAX_SUPPLIER_UNIT_COST) Long sourcePrice,
 		@Size(max = 50) @Pattern(regexp = "\\d+", message = "sourceItemNo must contain digits only") String sourceItemNo,
 		@Size(max = 2000) @Pattern(regexp = "(?i)^https?://\\S+$", message = "sourceUrl must use http or https") String sourceUrl,
-		@Min(0) long basePrice,
+		@Min(0) @Max(MoneyMath.MAX_CUSTOMER_UNIT_PRICE) long basePrice,
 		@Min(1) @Max(99) Integer minimumOrderQuantity,
 		@Min(1) @Max(99) Integer orderQuantityStep,
 		@NotNull ProductCategory categoryCode,
 		ProductComplianceStatus complianceStatus,
-		@NotBlank @Size(max = 500) String reason
+		@NotBlank @Size(max = 500) String reason,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
@@ -114,37 +119,102 @@ final class CatalogDtos {
 		BigDecimal overheadRate,
 		BigDecimal safetyMarginRate,
 		int roundingUnit,
-		BigDecimal totalMarkupRate
+		BigDecimal totalMarkupRate,
+		long version
+	) {
+	}
+
+	record ProductReviewActionRequest(
+		@NotNull @Min(0) Long expectedVersion,
+		@NotBlank @Size(max = 500) String internalReason
+	) {
+	}
+
+	record ProductReviewFeedbackRequest(
+		@NotNull @Min(0) Long expectedVersion,
+		@NotNull ProductReviewReasonCode reviewReasonCode,
+		@NotBlank @Size(max = 500) String supplierReviewMessage,
+		@NotBlank @Size(max = 500) String internalReason
+	) {
+	}
+
+	record ProductReviewQueueResponse(
+		List<ProductReviewSummaryResponse> products,
+		int page,
+		int size,
+		long totalElements,
+		int totalPages
+	) {
+	}
+
+	record ProductReviewSummaryResponse(
+		UUID productId,
+		long version,
+		UUID supplierId,
+		String supplierName,
+		String name,
+		ProductCategory categoryCode,
+		ProductReviewStatus reviewStatus,
+		ProductReviewReasonCode reviewReasonCode,
+		Instant firstSubmittedAt
+	) {
+	}
+
+	record ProductReviewDetailResponse(
+		UUID productId,
+		long version,
+		UUID supplierId,
+		String supplierName,
+		String name,
+		String summary,
+		long sourcePrice,
+		long basePrice,
+		int minimumOrderQuantity,
+		int orderQuantityStep,
+		ProductCategory categoryCode,
+		ProductStatus status,
+		ProductComplianceStatus complianceStatus,
+		ProductReviewStatus reviewStatus,
+		ProductReviewReasonCode reviewReasonCode,
+		String supplierReviewMessage,
+		List<ProductOptionResponse> options,
+		List<ProductImageResponse> images,
+		List<ProductDetailBlockResponse> detailBlocks,
+		ProductNoticeResponse productNotice
 	) {
 	}
 
 	record ProductStatusRequest(
 		@NotNull ProductStatus status,
-		@NotBlank @Size(max = 500) String reason
+		@NotBlank @Size(max = 500) String reason,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
 	record ProductOptionRequest(
 		@NotBlank @Size(max = 200) String name,
-		@Min(0) long additionalPrice,
+		@Min(0) @Max(MoneyMath.MAX_CUSTOMER_UNIT_PRICE) long additionalPrice,
 		ProductOptionStatus status,
 		@Size(max = 500) String reason,
 		@Size(max = 100) String sourceOptionCode,
-		Long sourceAdditionalPrice,
+		@Min(0) @Max(MoneyMath.MAX_SUPPLIER_UNIT_COST) Long sourceAdditionalPrice,
 		@Min(0) Long sourceStockQuantity,
-		@Min(0) Integer sortOrder
+		@Min(0) Integer sortOrder,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
 	record ProductOptionStatusRequest(
 		@NotNull ProductOptionStatus status,
-		@NotBlank @Size(max = 500) String reason
+		@NotBlank @Size(max = 500) String reason,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
 	record ProductImageItem(
 		@NotNull ProductImageType type,
 		@NotBlank @Size(max = 1000) String imageUrl,
+		@Size(max = 1000) String storageObjectKey,
 		int sortOrder,
 		@Size(max = 200) String altText
 	) {
@@ -152,7 +222,8 @@ final class CatalogDtos {
 
 	record ProductImagesRequest(
 		@NotNull @Size(max = 11) List<@Valid ProductImageItem> images,
-		@NotBlank @Size(max = 500) String reason
+		@NotBlank @Size(max = 500) String reason,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
@@ -167,7 +238,8 @@ final class CatalogDtos {
 
 	record ProductDetailBlocksRequest(
 		@NotNull @Size(max = 50) List<@Valid ProductDetailBlockItem> detailBlocks,
-		@NotBlank @Size(max = 500) String reason
+		@NotBlank @Size(max = 500) String reason,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
@@ -177,7 +249,8 @@ final class CatalogDtos {
 		@NotBlank String asInfo,
 		@NotBlank String returnExchangeInfo,
 		@Size(max = 100) List<@Valid ProductNoticeRowItem> noticeRows,
-		@NotBlank @Size(max = 500) String reason
+		@NotBlank @Size(max = 500) String reason,
+		@Min(0) Long expectedVersion
 	) {
 	}
 
@@ -189,6 +262,7 @@ final class CatalogDtos {
 
 	record ProductOptionResponse(
 		UUID id,
+		long productVersion,
 		String name,
 		long additionalPrice,
 		ProductOptionStatus status,
@@ -239,6 +313,7 @@ final class CatalogDtos {
 
 	record AdminProductResponse(
 		UUID id,
+		long version,
 		UUID supplierId,
 		String supplierName,
 		String name,
@@ -300,6 +375,7 @@ final class CatalogDtos {
 
 	record ProductDetailResponse(
 		UUID id,
+		long version,
 		@JsonInclude(JsonInclude.Include.NON_NULL) UUID supplierId,
 		@JsonInclude(JsonInclude.Include.NON_NULL) String supplierName,
 		String name,
@@ -364,6 +440,12 @@ final class CatalogDtos {
 		UUID changeId,
 		UUID productOptionId,
 		UUID adminUserId,
+		ProductChangeActorType actorType,
+		UUID actorUserId,
+		UUID actorSupplierId,
+		String actorSystemCode,
+		Long beforeVersion,
+		Long afterVersion,
 		ProductChangeType changeType,
 		String beforeValue,
 		String afterValue,

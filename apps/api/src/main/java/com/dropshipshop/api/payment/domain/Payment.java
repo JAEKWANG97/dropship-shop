@@ -3,6 +3,8 @@ package com.dropshipshop.api.payment.domain;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.dropshipshop.api.common.money.MoneyMath;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -112,7 +114,8 @@ public class Payment {
 		Instant approvedAt
 	) {
 		Payment payment = new Payment(paymentGroup, PaymentProvider.BANK_TRANSFER, providerPaymentKey,
-			PaymentMethod.BANK_TRANSFER, PaymentStatus.APPROVED, approvedAmount);
+			PaymentMethod.BANK_TRANSFER, PaymentStatus.APPROVED,
+			MoneyMath.requirePositive(approvedAmount, "approvedAmount"));
 		payment.approvedAmount = approvedAmount;
 		payment.approvedAt = approvedAt;
 		payment.rawProviderStatus = "MANUAL_DEPOSIT_CONFIRMED";

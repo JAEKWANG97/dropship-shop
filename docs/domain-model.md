@@ -183,6 +183,7 @@ Suggested fields:
 - sourceAvailable: optional supplier sale availability from the last successful sync, admin-only
 - sourceSyncedAt: optional last sync attempt time, admin-only
 - sourceSyncError: optional last sync failure, admin-only
+- sourceAutoSoldOut: durable provenance for a source-sync `ACTIVE -> SOLD_OUT` transition; V40 default/backfill false
 - basePrice
 - minimumOrderQuantity: minimum purchasable quantity, 1-99, defaults to 1
 - orderQuantityStep: allowed quantity increment, 1-99, defaults to 1
@@ -203,7 +204,7 @@ Modeling notes:
 - `basePrice` is the customer sale price. Supplier shipping fees are operating costs and are not added to its calculation.
 - Customer quantity must be at least `minimumOrderQuantity` and be divisible by `orderQuantityStep`.
 - Default sale price is calculated from the active pricing policy, currently supplier cost plus 25% and rounded to the nearest 100 KRW.
-- Scheduled sync updates current product price, MOQ, order step and options; existing order snapshots never change. Manual `HIDDEN` and `STOPPED` states are not overridden.
+- Scheduled sync updates current product price, MOQ, order step and options; existing order snapshots never change. The `sourceItemNo` used to fetch must still exactly match the fresh locked Product for both success apply and failure recording. Manual `HIDDEN`, `STOPPED`, and `SOLD_OUT` states are not overridden. Sync sets `sourceAutoSoldOut=true` only when confirmed unavailability actually applies `ACTIVE -> SOLD_OUT`; target/recovery includes only this marker-backed state. Recovery requires source MOQ at most 10, a positive capped current price, compliance other than `REJECTED`, an active option, canonical thumbnail, and active notice, and clears the marker on success. Every successful admin status command also clears it, even when the requested status is already `SOLD_OUT`.
 - Category administration, multi-category assignment, and tag search are out of MVP scope.
 - `ACTIVE` requires a positive sale price, canonical thumbnail, active option, active notice, and compliance status other than `REJECTED`.
 - `saleReady` and `saleBlockers` are derived admin views over those conditions rather than persisted product state. Detail-content presence is shown as a recommendation and does not block activation.
@@ -229,7 +230,7 @@ Modeling notes:
 - One product can have up to ten `GALLERY` images.
 - If `Product.thumbnailImageUrl` is kept, it must be updated from the canonical thumbnail image.
 - DS-42 adds admin binary upload that stores the file and returns URL/object-key metadata.
-- Planned B-101 adds `DETAIL` to ProductImage type and nullable `storageObjectKey`. New supplier uploads always use a server-generated, globally single-use key; legacy/external URL rows keep it null.
+- Implemented B-101 adds `DETAIL` to ProductImage type and nullable `storageObjectKey`. New supplier uploads always use a server-generated, globally single-use key; legacy/external URL rows keep it null.
 - Portal ProductDetailBlock `IMAGE` stores an owned `productImageId` whose type is `DETAIL` instead of accepting an arbitrary URL or key. This keeps thumbnail, gallery, and up to 50 detail-image binaries under one ownership and cleanup path.
 
 ## ProductOption
@@ -267,14 +268,14 @@ Suggested fields:
 - productId
 - type: IMAGE / HTML
 - imageUrl
-- productImageId: Planned B-101 portal IMAGE block FK to an owned ProductImage of type DETAIL
+- productImageId: Implemented B-101 portal IMAGE block FK to an owned ProductImage of type DETAIL
 - htmlContent
 - sortOrder
 - altText
 - createdAt
 - updatedAt
 
-Planned B-101 keeps legacy/admin URL blocks readable. New supplier IMAGE blocks require `productImageId`, derive `imageUrl` from that row, and cannot reference another Product or supplier. A referenced DETAIL image cannot be deleted until the block is removed/replaced in the same Product transaction.
+Implemented B-101 keeps legacy/admin URL blocks readable. New supplier IMAGE blocks require `productImageId`, derive `imageUrl` from that row, and cannot reference another Product or supplier. A referenced DETAIL image cannot be deleted until the block is removed/replaced in the same Product transaction.
 
 ## ProductNotice
 
@@ -833,10 +834,10 @@ Implemented DS-44 scope:
 Suggested fields:
 
 - id
-- productId: live Product FK; Planned B-101에서 nullable
-- productOptionId: live ProductOption FK; Planned B-101에서 nullable
-- subjectProductId: Planned B-101 immutable audit subject id
-- subjectProductOptionId: Planned B-101 nullable immutable audit subject id
+- productId: live Product FK; Implemented B-101에서 nullable
+- productOptionId: live ProductOption FK; Implemented B-101에서 nullable
+- subjectProductId: Implemented B-101 immutable audit subject id
+- subjectProductOptionId: Implemented B-101 nullable immutable audit subject id
 - adminUserId
 - changeType: PRICE / PRODUCT_STATUS / COMPLIANCE_STATUS / OPTION_STATUS / SUPPLIER / PRODUCT_BASE / ORDER_QUANTITY / OPTION_BASE / IMAGES / DETAIL_BLOCKS / NOTICE / PRODUCT_DELETED / OPTION_DELETED
 - beforeValue
@@ -844,7 +845,7 @@ Suggested fields:
 - reason
 - createdAt
 
-Planned B-101 expands this existing history without dropping old rows. Add immutable `subjectProductId`, nullable immutable `subjectProductOptionId`, nullable `actorUserId`, `actorType=ADMIN|SUPPLIER|SYSTEM`, `actorSupplierId`, `actorSystemCode`, and aggregate `beforeVersion`/`afterVersion`. Backfill subject ids from the current associations, query audit history by subject id, then make the live Product/ProductOption associations nullable with `ON DELETE SET NULL`. Rows whose legacy `adminUserId` is the known zero-UUID source-sync sentinel backfill `actorType=SYSTEM`, `actorUserId=null`, `actorSystemCode=DOMEGGOOK_CATALOG_SYNC`; real user ids backfill ADMIN. New supplier rows use SUPPLIER and source jobs use SYSTEM, so the sentinel is never inserted into a new User FK. Switch readers/writers before making legacy `adminUserId` nullable; existing admin history responses remain compatible during the transition.
+Implemented B-101 expands this existing history without dropping old rows. It adds immutable `subjectProductId`, nullable immutable `subjectProductOptionId`, nullable `actorUserId`, `actorType=ADMIN|SUPPLIER|SYSTEM`, `actorSupplierId`, `actorSystemCode`, and aggregate `beforeVersion`/`afterVersion`. Subject ids are backfilled from the current associations, history is queried by subject id, and live Product/ProductOption associations are nullable with `ON DELETE SET NULL`. Rows whose legacy `adminUserId` is the known zero-UUID source-sync sentinel backfill `actorType=SYSTEM`, `actorUserId=null`, `actorSystemCode=DOMEGGOOK_CATALOG_SYNC`; real user ids backfill ADMIN. New supplier rows use SUPPLIER and source jobs use SYSTEM, so the sentinel is never inserted into a new User FK. Existing admin history responses remain compatible.
 
 B-101 history writers canonicalize before/after snapshots from an explicit allowlist of product, option, image, detail, notice, pricing, and review business fields. They never serialize a raw request, actor contact data, customer/order data, or arbitrary admin notes. Durable review/internal reasons and supplier-facing messages are bounded single-line PII-free text.
 
@@ -1194,7 +1195,7 @@ Rules:
 
 ## Supplier Portal Extension
 
-Status: `B-100` onboarding, lifecycle, application/invite retention, browser security and V39 additive schema are Implemented. `B-098` contract evidence/expiry automation and relationship cleanup plus `B-101` through `B-105` remain Planned.
+Status: `B-100` onboarding, lifecycle, application/invite retention and browser security plus `B-101` catalog/review and V40 additive schema are Implemented. `B-098` contract evidence/expiry automation and relationship cleanup plus `B-102` through `B-105` remain Planned.
 
 `B-100`은 기존 legacy 주문·배송 의미를 유지한 expand-contract 변경이다. 이후 slice도 같은 호환 경계를 따른다.
 
@@ -1354,9 +1355,9 @@ Rules:
 - Invitation notification audit에는 invite id, recipient, template, expiry와 delivery result만 저장하고 raw token이나 token-bearing link는 넣지 않는다. Raw token은 after-commit send context에만 존재하며 발송 유실/실패는 generic resend가 아니라 새 key의 revoke/reissue로 복구한다.
 - 소비·폐기·만료 중 가장 먼저 성립한 terminal 시각 +30일에 recipientEmail, issuance idempotency key/HMAC와 연결 NotificationLog recipient를 null 처리하고 `recipientAnonymizedAt`을 남긴다. `consumedByUserId`는 B-098 관계 종료 보관기한 뒤 null 처리하며 digest와 terminal/action 비PII audit은 보존한다.
 
-### Supplier Product Review (Planned B-101)
+### Supplier Product Review (Implemented B-101)
 
-Planned `Product` field:
+Implemented `Product` fields:
 
 - managementChannel: COREABLE / SUPPLIER_PORTAL
 - version: optimistic aggregate version
@@ -1372,32 +1373,32 @@ Rules:
 - B-101에서 공급처는 자기 상품의 이름, 요약, 공급가, 옵션 공급가, 공급처 옵션코드, MOQ/주문단위, 이미지, 상세와 상품정보제공고시만 입력한다. 재고 모드와 수량은 B-102가 같은 편집 화면에 추가한다.
 - 공급처 요청은 supplierId, 고객 판매가인 `basePrice`, 상품 판매 상태, compliance 상태와 review 상태를 받지 않는다.
 - Coreable 서버가 active pricing policy로 고객 판매가를 계산한다.
-- 가격 계산은 `basePrice=price(sourcePrice)`, `optionCustomerTotal=price(sourcePrice+sourceAdditionalPrice)`, `additionalPrice=optionCustomerTotal-basePrice`다. `price`는 동일 markup, resale-minimum floor와 rounding rule을 적용하며 B-101 이후 모든 writer는 `sourcePrice`와 `sourceAdditionalPrice`를 각각 0 이상 정수 KRW로 검증해 customer option delta의 비음수 계약을 유지한다. 제약 추가 전 legacy 음수 row를 스캔하고 발견하면 명시적 정정 승인 없이 migration을 진행하지 않는다. 승인된 비용 변경은 모든 고객 가격, applied policy id/version과 full calculator snapshot history를 원자적으로 갱신한다. B-101은 existing PricingPolicy에 monotonic version을 추가하고 in-place 정책 update마다 version을 증가시킨다.
+- 가격 계산은 `basePrice=price(sourcePrice)`, `optionCustomerTotal=price(sourcePrice+sourceAdditionalPrice)`, `additionalPrice=optionCustomerTotal-basePrice`다. `price`는 동일 markup, resale-minimum floor와 rounding rule을 적용한다. B-101 이후 모든 writer는 `sourcePrice`와 `sourceAdditionalPrice`를 각각 `0..100,000,000` 정수 KRW, customer unit price를 `1..1,000,000,000`으로 제한하고 exact 합산·수량 곱을 사용한다. 제약 추가 전 legacy 범위 밖 row와 `basePrice+additionalPrice` 상한 초과를 스캔하고 발견하면 명시적 정정 승인 없이 migration을 진행하지 않는다. 승인된 비용 변경과 Portal 상품의 legacy admin 수정은 요청 고객가를 신뢰하지 않고 모든 고객 가격, applied policy id/version과 full calculator snapshot history를 원자적으로 갱신한다. B-101은 existing PricingPolicy에 monotonic version을 추가하고 in-place 정책 update마다 version을 증가시킨다.
 - 무옵션 상품도 기존 `OrderItem.productOptionId` 필수 참조를 유지하기 위해 내부 `기본` 옵션 하나를 가진다.
 - `DRAFT`는 여러 asset 요청을 잇는 내부 편집 상태다. 공급처 화면의 단일 `상품 등록` 동작이 submit과 분류를 함께 수행해 별도 승인 요청 단계를 만들지 않는다.
 - 최초 submit은 `firstSubmittedAt`을 한 번만 기록한다. 승인·검토중 상품의 수정으로 다시 `DRAFT`가 되어도 이 값은 지우지 않는다.
 - 구조와 판매 준비 조건을 통과한 일반 상품은 반드시 `AUTO_APPROVED`로 공개한다.
 - 인증, category 또는 법정 필수정보 규칙이 사람 판단을 요구하면 `HIDDEN`과 `REVIEW_REQUIRED`로 Coreable 검토 큐에 보낸다.
 - 공급처 projection은 `supplierDisplayStatus`, allowlisted `reviewReasonCode`, `supplierReviewMessage`을 매핑한 `reviewMessage`, derived `nextAction`만 검토 피드백으로 반환한다. REVIEW_REQUIRED/SUPPLEMENT_REQUESTED/REJECTED는 reason code가 필요하고, 보완·거절은 supplier-safe message도 필요하다. 내부 admin note, reviewer identity와 classifier trace는 제외하고 보완은 같은 등록 동작으로 재제출한다.
-- 기존 `ProductComplianceStatus`와 legacy `PENDING` 공개 의미는 바꾸지 않는다.
+- 기존 `ProductComplianceStatus`와 legacy `PENDING` 공개 의미는 바꾸지 않는다. `CERTIFICATION_REVIEW`에 대한 Coreable `APPROVED`는 portal `reviewStatus`만 통과시키고 `complianceStatus`를 자동 변경하지 않으며, `PENDING`은 판매를 허용하고 `REJECTED`만 판매 준비를 차단한다.
 - 상품·옵션·이미지·상세·고시·가격·검토 변경 이력은 actor type(`ADMIN` / `SUPPLIER` / `SYSTEM`), nullable actor user, supplier tenant 또는 system code, allowlisted business-field before/after, PII-free 사유와 시각을 기록한다. Raw request, actor contact, customer/order data와 arbitrary admin note를 snapshot에 복제하지 않는다. Domeggook/source sync는 SYSTEM이며 zero-UUID를 User FK나 ADMIN으로 위장하지 않는다.
 - supplierReviewMessage와 internalReason은 각각 500자 이하 single-line이며 email, phone, address, customer identifier와 link를 거절한다. 공급처 actor user 연결은 B-098 관계 종료 보관기한 뒤 null 처리하되 actor type, supplier, version과 비PII action evidence는 유지한다.
-- 기존 상품은 `managementChannel=COREABLE`로 backfill하고 portal 생성 상품만 `SUPPLIER_PORTAL`로 고정한다. 이 값은 공급처 payload로 변경할 수 없고 checkout snapshot과 호환 경로 판단에 사용한다.
+- 기존 상품은 `managementChannel=COREABLE`로 backfill하고 portal 생성 상품만 `SUPPLIER_PORTAL`로 고정한다. 이 값은 공급처 payload로 변경할 수 없으며 B-102가 checkout snapshot과 호환 경로 판단에 사용한다.
 - supplier product query/mutation은 supplier ownership뿐 아니라 `managementChannel=SUPPLIER_PORTAL`을 요구한다. LINK_EXISTING은 기존 COREABLE/Domeggook 상품을 공급처 편집 대상으로 자동 이전하지 않는다.
-- supplier/admin detail과 mutation response는 `version`을 반환한다. review-relevant supplier mutation과 admin review action은 `expectedVersion`을 요구하고 성공 시 증가시키며 stale 요청은 아무 변경 없이 `409`다.
+- supplier/admin detail과 mutation response는 `version`을 반환한다. review-relevant supplier mutation과 admin review action은 `expectedVersion`을 요구하고 성공 시 증가시키며 stale 요청은 아무 변경 없이 `409`다. Admin/review/cart/checkout/source writer는 scalar supplier/ownership discovery 뒤 `Supplier -> fresh Product -> ProductOption(id)` 순서로 잠그고, 대기 뒤 fresh owner가 discovery/request tenant와 다르면 conflict 또는 tenant-safe `404`로 끝낸다.
 - 최초 DRAFT submit은 AUTO_APPROVED 또는 REVIEW_REQUIRED로 분류한다. REVIEW_REQUIRED의 admin 전이는 APPROVED/SUPPLEMENT_REQUESTED/REJECTED만 허용한다. SUPPLEMENT_REQUESTED는 공급처 편집 중에도 숨김을 유지하고 재제출 시 반드시 REVIEW_REQUIRED로 돌아간다. AUTO_APPROVED/APPROVED/REVIEW_REQUIRED의 review-relevant 수정은 즉시 HIDDEN/DRAFT로 바꾼 뒤 새 submit을 요구한다. REJECTED는 직접 재제출하지 않고 Coreable 문의로 끝낸다.
 - 보완/거절은 supplier-safe reason code/message와 내부 reason을 분리하고 둘 다 위 PII-free validator를 통과시킨다. 모든 결정은 처리한 정확한 version과 actor를 변경 이력에 남긴다.
 - B-101만 배포된 상태에서는 production supplier portal feature gate를 닫는다. B-102 inventory migration과 checkout guard는 필요조건일 뿐이며 B-100~B-105, 개인정보·email·계약 gate가 모두 준비되기 전에는 portal 상품 고객 구매와 외부 route를 열지 않는다.
 
-B-101은 private 인증문서 파일을 수집하지 않고 structured category/notice/certification fields와 validated public ProductImage만 검토한다. 별도 private 문서가 필요하면 retention/access 정책을 확정하는 후속 범위로 둔다.
+B-101은 private 인증문서 파일을 수집하지 않고 structured category/notice, 기존 admin-managed compliance 상태와 validated public ProductImage만 검토한다. 별도 private 문서가 필요하면 retention/access 정책을 확정하는 후속 범위로 둔다.
 
 Supplier draft deletion rules:
 
 - Product hard delete는 현재 tenant가 소유한 `managementChannel=SUPPLIER_PORTAL`, `reviewStatus=DRAFT`, `firstSubmittedAt=null`인 상품에만 허용한다. 상품 또는 그 모든 Option을 참조하는 CartItem·OrderItem이 하나라도 있으면 거절한다.
 - Option hard delete도 위 Product 단계에서만 허용하며 대상 Option의 CartItem·OrderItem 참조가 없고 최소 한 Option을 남겨야 한다. 제출·검토·공개 뒤에는 Product/Option을 삭제하지 않고 Coreable의 `HIDDEN`/`STOPPED` 상태로 보존한다. 일반 soft-delete tombstone은 추가하지 않는다.
-- DELETE는 expected Product version을 요구한다. Service는 Product와 모든 Option을 id 순서로 잠그고 참조를 다시 확인한 뒤 deletion history를 append한다. Product hard delete는 DetailBlock -> ProductImage -> ProductOption/ProductNotice -> Product 순서로 metadata를 명시적으로 지운다. CartItem·OrderItem FK는 required/restrict로 유지한다.
-- Cart 추가와 checkout의 CartItem·OrderItem 생성도 Product -> Option 잠금 뒤 resource/saleability를 다시 확인한다. 참조 생성이 먼저면 delete는 `409`, delete가 먼저면 구매 writer는 `404`/판매불가로 끝나며 raw FK 오류를 반환하지 않는다.
-- Portal upload가 만든 ProductImage metadata는 single-use unique server-owned `storageObjectKey`를 보존한다. Metadata 삭제와 immutable key의 durable cleanup job을 같은 transaction에 저장한 뒤 binary를 idempotent하게 지운다. Not-found는 성공으로 처리하고 실패는 재시도하며 삭제 metadata를 복구하지 않는다. Legacy/external URL은 server-owned key가 없으면 binary 삭제 대상이 아니다.
+- DELETE는 expected Product version을 요구한다. Service는 scalar ownership discovery 뒤 `Supplier -> fresh Product -> 모든 Option(id)` 순서로 잠그고 tenant/version/참조를 다시 확인한 뒤 deletion history를 append한다. Product hard delete는 DetailBlock -> ProductImage -> ProductOption/ProductNotice -> Product 순서로 metadata를 명시적으로 지운다. CartItem·OrderItem FK는 required/restrict로 유지한다.
+- Cart 추가와 checkout의 CartItem·OrderItem 생성도 같은 잠금 계약 뒤 fresh ownership, resource/saleability와 참조 guard를 다시 확인한다. Stale ownership은 conflict 또는 tenant-safe `404`로 끝나며 dangling row나 raw FK 오류를 반환하지 않는다.
+- Portal upload가 만든 ProductImage metadata는 single-use unique server-owned `storageObjectKey`를 보존한다. Admin thumbnail/gallery upload도 upload endpoint가 발급한 같은 Product의 URL/key pair만 metadata에 연결할 수 있고, cleanup job이 생긴 tombstone key는 pending/terminal 여부와 무관하게 재첨부할 수 없으며 reorder/replace에서 계속 유지된 key만 보존한다. Metadata 삭제와 제거된 immutable key의 unique cleanup job enqueue를 같은 transaction에 저장하고 반복 enqueue는 멱등 처리한다. Worker는 binary 삭제 직전 live metadata 참조를 검사해 있으면 삭제 없이 `COMPLETED/LIVE_REFERENCE`로 끝내고, 이후 그 metadata가 실제 제거되면 같은 job을 `PENDING`으로 다시 연다. Not-found는 성공으로 처리하고 실패는 재시도하며 삭제 metadata를 복구하지 않는다. Legacy/external URL은 server-owned key가 없으면 binary 삭제 대상이 아니다.
 
 ### Option Inventory And Reservation (Planned B-102)
 
@@ -1748,7 +1749,7 @@ Rules:
 
 ### Supplier Tenant, Email, And Browser Security
 
-Status: Dynamic `ROLE_SUPPLIER`, invite/session feature gating, allowed Origin/Referer checks and B-100 invite email/retention boundaries are Implemented. Resource-specific tenant queries and operational email behavior owned by `B-101` through `B-105` remain Planned.
+Status: Dynamic `ROLE_SUPPLIER`, invite/session feature gating, allowed Origin/Referer checks, B-100 invite email/retention boundaries and B-101 catalog tenant queries are Implemented. Operational resource/email behavior owned by `B-102` through `B-105` remains Planned.
 
 - Supplier-side actor FK는 영구 식별자가 아니다. Invite 소비자와 catalog/inventory/lifecycle actor는 B-098 관계 종료 보관기한 뒤 null 처리하고, Shipment/shortage/claim actor는 parent Order/Claim 법정 보존기한까지 보존한 뒤 null 처리하거나 parent와 함께 파기한다. Actor type, supplier/business object, action, state/version과 timestamp 같은 비PII 증적은 해당 원장의 보존 규칙에 따라 남길 수 있다. `SupplierPiiAccessLog`는 이 일반 규칙 대신 1년 뒤 row 자체를 삭제한다.
 
