@@ -4,24 +4,6 @@
 
 ## Now
 
-### B-106 운영 배포 복구와 V40 가격 데이터 호환
-
-Status: In Progress
-
-Notes:
-- 공급처 포털 구현 병합 뒤 누락된 운영 환경값과 V40 이전 음수 source option 가격 때문에 API가 기동하지 못한 장애를 복구한다.
-- 공급처 포털은 별도 release gate가 끝날 때까지 `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다.
-- 기존 고객 판매가와 옵션별 총 공급원가를 바꾸지 않는 데이터 보정 뒤에만 V40 이상을 배포한다.
-
-Tasks:
-- [x] 운영 DB·업로드를 백업하고 누락된 supplier portal 환경값을 secret 비노출 방식으로 설정한다.
-- [x] 마지막 정상 API/Web 이미지로 운영 서비스를 복구한다.
-- [x] 도매꾹 음수 option delta를 최저 option 기준의 nonnegative base/delta로 정규화하고 경계·overflow 회귀 테스트를 추가한다.
-- [x] Deploy workflow를 manual-only로 바꾸고 환경 preflight, 배포 전 백업과 실패 rollback을 추가한다.
-- [x] 실제 production backup 복제본에서 V39 사전 보정과 V40~V44 migration, 앱 schema validation을 리허설한다.
-- [x] V39 운영 데이터를 감사 이력과 함께 보정하고 금액 불변식을 검증한다.
-- [ ] PR CI·병합 뒤 최신 main을 수동 배포하고 V44 migration, 공개 경로와 feature flag를 검증한다.
-
 ### B-099 외부 공급처 포털 정책과 구현 설계
 
 Status: Review Ready

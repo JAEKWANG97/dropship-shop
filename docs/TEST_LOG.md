@@ -2,16 +2,19 @@
 
 실행한 검증만 기록한다. 실제 외부 서비스 검증은 자동 테스트 결과와 합치지 않는다.
 
-## 2026-09-02 B-106 Production Deploy Recovery And V40 Compatibility
+## 2026-09-03 B-106 Production Deploy Recovery And V40 Compatibility
 
-- 판정: 로컬 구현·실제 production backup rehearsal·운영 V39 사전 보정까지 PASS다. 최신 `main` 배포와 V44 운영 검증은 아직 남아 있으므로 B-106은 `In Progress`다. 독립 SQL 검토는 Blocker/Major 0이었다.
+- 판정: 복구·호환 보정·reviewed main 수동 배포와 독립 운영 검증까지 PASS하여 B-106을 완료했다. 배포 workflow와 사전 보정 SQL 독립 검토는 Blocker/Major 0이었다.
+- PR/CI: PR #58을 merge commit `465a0f29e4d7772f41b1ea956f1e3a94896af105`로 병합했다. 최초 API CI에서 cutoff test가 scheduler와 DB `timestamp(6)` 반올림에 경합한 1건을 발견해 미래 시각·microsecond 정밀도로 고정했다. 대상 `cleanTest`와 최신 CI run `33648740285`의 API/Web/whitespace가 모두 통과했다.
 - API: `cd apps/api && ./gradlew cleanTest test --no-daemon` → `83 suites / 380 tests / 0 failures / 0 errors / 0 skipped`; `./gradlew bootJar --no-daemon` PASS. 도매꾹 음수 option delta 정규화의 성공·경계·음수 총액·overflow를 포함한다.
 - Web: `npm run lint` → `0 errors / 기존 <img> warnings 3`; `npm run build` → 34 pages production build PASS.
 - DB rehearsal: S3 production dump `coreable-db-20260902-202331.dump`를 격리 PostgreSQL 17에 복원했다. V38→V39→사전 보정→V40~V44 적용, Hibernate schema validation과 앱 기동이 성공했다. 결과는 음수 option 0, repair audit 81, invalid actor/source range/order snapshot 0이었고 V44에서 보정 SQL 재실행은 version guard로 commit 전에 중단됐다. 임시 DB/container/dump는 검증 뒤 제거했다.
 - 운영 V39 보정: 실행 직전 `coreable-db-20260902-220230.dump`를 백업하고 API를 중지했다. 34개 음수 option·13개 상품·68개 non-null option guard 아래 total source cost, 고객가와 주문 snapshot을 보존하며 상품 13개+option 68개 system audit을 한 transaction으로 기록하고 legacy audit NOT NULL을 선해제했다. API를 기존 SHA로 다시 띄운 뒤 V39, 음수 0, audit 81, readiness `UP`, 활성 주문 `SUPPLIER_ORDERED=1`/`SUPPLIER_ORDER_PENDING=1`을 확인했다.
-- 운영 gate: `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지했다. 새 normalization code 배포 전 legacy writer가 음수 delta를 복원하지 않도록 `DOMEGGOOK_CATALOG_SYNC_ENABLED=false`로 두었다. 공개 `/api/health`, `/`, `/products`는 모두 HTTP 200이다.
-- 정적 품질: `git diff --check` PASS. Deploy workflow는 manual-only, per-run SecureString token, 환경·backup preflight, EC2 flock, PostgreSQL config fail-closed, app-service-only recreate, timeout/cancel, candidate 시작 전·Flyway 불변 rollback과 시작 시도 후 roll-forward를 검증 중이다. V40 미적용 운영에서 실행한 readiness guard는 `v40_success=0`, V39, 음수 option 0, repair audit 81, nullable `YES`로 PASS했다.
-- 남은 검증: PR CI·병합, reviewed main SHA의 수동 Deploy, 운영 V44·image SHA·전체 service health·공개 경로·supplier portal false, 새 API에서 catalog sync 재활성화를 확인한다.
+- 운영 배포: manual-only Deploy run `33649335647`이 verify, preflight, build-and-push와 deploy를 모두 통과했다. Preflight backup은 `coreable-db-20260903-003828.dump`, mutation 직전 backup은 `coreable-db-20260903-004047.dump`이며 각각 1,358,390 bytes다. API/Web는 정확한 merge SHA image, API/PostgreSQL은 `healthy`, Web/nginx는 `running`, Flyway는 V44다.
+- 운영 데이터: 음수 source option 0, repair audit 81, invalid repair actor/source range/order snapshot 0이며 활성 주문은 `SUPPLIER_ORDERED=1`/`SUPPLIER_ORDER_PENDING=1`로 유지됐다. 공개 `/`, `/products`, `/api/health`, `www`는 HTTP 200이고 `/api/supplier/orders`는 feature gate에서 `404`다.
+- 운영 gate와 credential: `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지했다. Per-run `/coreable/deploy/ghcr-token-*` Parameter Store 항목과 `.deploy-recovery-*` directory는 0개다.
+- Catalog sync: 새 API에서 `DOMEGGOOK_CATALOG_SYNC_ENABLED=true`, dry-run `false`의 기존 운영 상태를 복원했다. 첫 20건의 `source_synced_at`이 갱신됐고 18건 성공, 2건은 upstream `해당 정보가 존재하지 않습니다`로 `source_sync_error`와 warning을 남겼다. 음수 option과 source 가격 범위 위반은 계속 0이고 API/public health는 유지됐다. 두 upstream 품목은 stable error code와 transient 오류를 구분하기 전 자동 품절로 변경하지 않았다.
+- 정적 품질: `git diff --check`, workflow YAML, actionlint, ShellCheck, outer/embedded Bash syntax와 V40 guard mock branch를 통과했다. GitHub runner의 Actions Node 20/setup-java v4 deprecation과 기존 `<img>` 경고 3건은 비차단 후속 정리다.
 
 ## 2026-08-30 B-105 Supplier Shortage And Claim Facts
 

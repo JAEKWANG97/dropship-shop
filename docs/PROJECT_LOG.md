@@ -1208,3 +1208,13 @@
 - 운영 조치: fresh S3 backup `coreable-db-20260902-220230.dump` 뒤 API를 잠깐 중지해 보정했다. 운영은 V39, 음수 option 0, repair audit 81, API readiness `UP`, 공개 핵심 경로 HTTP 200이며 기존 활성 주문 두 건의 상태는 유지됐다. 공급처 포털과 legacy catalog sync는 각각 `false`로 유지한다.
 - 검증: API `83 suites / 380 tests`, bootJar, Web lint/build, `git diff --check`, 실제 production backup의 V38→V39→repair→V44/Hibernate validation/app startup rehearsal을 통과했다. 독립 SQL 검토 Blocker/Major는 0이다.
 - 후속작업: workflow 최종 독립 review 뒤 commit/PR/CI/merge하고 reviewed main SHA를 수동 배포한다. 운영 V44와 image SHA, service/public health, supplier portal false를 확인한 다음 새 API에서 catalog sync를 재활성화하고 B-106을 완료 이력으로 옮긴다.
+
+## 2026-09-03 00:57 KST
+
+- 관련 항목: B-106
+- 완료: PR #58의 latest CI run `33648740285`가 API/Web/whitespace를 모두 통과했고 merge SHA `465a0f29e4d7772f41b1ea956f1e3a94896af105`를 수동 Deploy run `33649335647`로 운영 반영했다. Preflight와 mutation 직전 DB backup은 각각 `coreable-db-20260903-003828.dump`, `coreable-db-20260903-004047.dump`다.
+- 운영 검증: Flyway V44, 음수 source option 0, repair audit 81, 잘못된 actor/source range/order snapshot 0을 확인했다. API/PostgreSQL은 healthy, Web/nginx는 running이고 API/Web image는 merge SHA와 일치한다. 공개 `/`, `/products`, `/api/health`, `www`는 HTTP 200이고 supplier route는 `404`다. 임시 deploy token과 recovery directory는 0개다.
+- CI 개선: 첫 PR API run은 cutoff test가 background scheduler와 DB `timestamp(6)` 반올림에 경합해 1건 실패했다. 운영 코드는 바꾸지 않고 미래 cutoff를 microsecond로 절삭해 저장·비교 정밀도를 맞췄으며 대상 `cleanTest`와 전체 CI를 다시 통과했다.
+- Catalog sync: 장애 대응 중 임시 비활성화했던 catalog sync를 새 API에서 재활성화했다. 첫 실제 20건은 18건 성공했고 2건은 upstream `해당 정보가 존재하지 않습니다`를 오류로 기록했다. 음수 option·가격 범위 위반은 0이고 API/public health와 기존 활성 주문 두 건은 유지됐다.
+- 결정·제한: `APP_SUPPLIER_PORTAL_ENABLED=false`를 계속 유지한다. Upstream 정보 없음 2건은 현재 정책대로 기존 상품 상태를 보존했으며, stable error code로 확정 판매종료와 transient 오류를 구분하기 전 자동 품절로 추정 변경하지 않는다. Actions Node 20/setup-java v4 deprecation과 기존 `<img>` 경고 3건은 별도 비차단 정리 대상으로 남긴다.
+- 상태: B-106을 완료 이력으로 옮겼다.
