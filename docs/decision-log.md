@@ -1595,3 +1595,23 @@ Consequences:
 - 실제 JWT 관리자 세션에는 `ROLE_ADMIN`과 `ROLE_CUSTOMER`를 함께 부여한다.
 - 고객 전용 구매 API는 관리자 본인 계정의 데이터만 사용하므로 기존 소유권 경계를 유지한다.
 - 고객 탈퇴 API는 `ROLE_ADMIN`이 함께 있는 세션을 거부해 운영 계정이 고객 화면에서 삭제되지 않게 한다.
+
+## 2026-09-02: Normalize Negative Source Option Deltas And Require Manual Production Deploy
+
+Decision:
+
+도매꾹이 음수 option delta를 반환하면 최저 delta를 상품 source base로 이동해 모든 저장 delta를 0 이상으로 정규화한다. 운영 배포는 `main` push 자동 실행을 중단하고 수동 실행만 허용하며, 환경 preflight와 백업을 통과한 뒤에만 새 이미지를 적용한다.
+
+Context:
+
+B-100 이후 production 기동에 필요한 supplier portal 환경값이 없었고, 이를 보완한 다음에는 V40의 nonnegative source option 제약이 legacy 음수 delta 34건을 차단했다. 실제 production backup 리허설에서는 V40이 legacy system audit의 `admin_user_id`를 constraint 해제 전에 `NULL`로 바꾸는 두 번째 호환 문제도 확인했다. 기존 workflow는 새 이미지와 설정을 먼저 적용한 뒤 readiness를 확인해 실패 시 서비스가 중단된 상태로 남았다.
+
+Consequences:
+
+- 정규화는 `normalizedSourcePrice=sourcePrice+minimumDelta`, `normalizedOptionDelta=optionDelta-minimumDelta`을 사용하며 각 option의 총 공급원가를 정확히 보존한다.
+- 정규화된 base/delta가 허용 범위를 벗어나거나 음수 총액·산술 overflow가 생기면 source snapshot 적용을 거절하고 기존 catalog 값을 유지한다.
+- V40 이전 운영 데이터 정정은 고객 `base_price`/`additional_price`와 주문 snapshot을 바꾸지 않고 system audit history를 같은 트랜잭션에 기록한다.
+- 이미 공개된 V40 checksum은 바꾸지 않는다. V39 사전 정정에서 legacy audit `admin_user_id`의 NOT NULL을 먼저 해제하고, API를 중지한 상태에서 실행하며 새 normalization code가 배포될 때까지 legacy catalog sync를 비활성화한다.
+- V40 미적용 production preflight는 V39, 음수 option 0, repair audit 81, nullable legacy audit actor column을 모두 확인해 사전 정정 누락을 candidate 시작 전에 차단한다.
+- production `APP_SUPPLIER_PORTAL_ENABLED=false`를 preflight에서 강제하며 별도 release gate 결정 없이는 배포로 포털을 열 수 없다.
+- 배포 전 백업을 실행하고 이전 image tag·compose·nginx를 보존한다. Candidate API 시작을 시도하지 않았고 Flyway version도 그대로임을 증명한 실패만 이전 stack으로 복구한다. Candidate 시작을 시도했거나 schema가 전진·조회불가이면 구버전 API/Web을 금지하고 새 stack을 roll-forward 재기동하며, 검증하지 못하면 artifact를 보존한 채 실패한다. 성공 후에만 오래된 이미지를 정리한다.

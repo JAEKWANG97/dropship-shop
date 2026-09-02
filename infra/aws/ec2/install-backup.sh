@@ -42,4 +42,4 @@ CRON
 
 chmod 0644 /etc/cron.d/coreable-backup
 
-echo "Coreable backup installed. Configure /root/.aws with the coreable-backup-writer key before scheduled runs."
+echo "Coreable backup installed. Attach the least-privilege S3 backup policy to the EC2 instance role before scheduled runs."

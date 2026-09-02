@@ -2,6 +2,17 @@
 
 실행한 검증만 기록한다. 실제 외부 서비스 검증은 자동 테스트 결과와 합치지 않는다.
 
+## 2026-09-02 B-106 Production Deploy Recovery And V40 Compatibility
+
+- 판정: 로컬 구현·실제 production backup rehearsal·운영 V39 사전 보정까지 PASS다. 최신 `main` 배포와 V44 운영 검증은 아직 남아 있으므로 B-106은 `In Progress`다. 독립 SQL 검토는 Blocker/Major 0이었다.
+- API: `cd apps/api && ./gradlew cleanTest test --no-daemon` → `83 suites / 380 tests / 0 failures / 0 errors / 0 skipped`; `./gradlew bootJar --no-daemon` PASS. 도매꾹 음수 option delta 정규화의 성공·경계·음수 총액·overflow를 포함한다.
+- Web: `npm run lint` → `0 errors / 기존 <img> warnings 3`; `npm run build` → 34 pages production build PASS.
+- DB rehearsal: S3 production dump `coreable-db-20260902-202331.dump`를 격리 PostgreSQL 17에 복원했다. V38→V39→사전 보정→V40~V44 적용, Hibernate schema validation과 앱 기동이 성공했다. 결과는 음수 option 0, repair audit 81, invalid actor/source range/order snapshot 0이었고 V44에서 보정 SQL 재실행은 version guard로 commit 전에 중단됐다. 임시 DB/container/dump는 검증 뒤 제거했다.
+- 운영 V39 보정: 실행 직전 `coreable-db-20260902-220230.dump`를 백업하고 API를 중지했다. 34개 음수 option·13개 상품·68개 non-null option guard 아래 total source cost, 고객가와 주문 snapshot을 보존하며 상품 13개+option 68개 system audit을 한 transaction으로 기록하고 legacy audit NOT NULL을 선해제했다. API를 기존 SHA로 다시 띄운 뒤 V39, 음수 0, audit 81, readiness `UP`, 활성 주문 `SUPPLIER_ORDERED=1`/`SUPPLIER_ORDER_PENDING=1`을 확인했다.
+- 운영 gate: `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지했다. 새 normalization code 배포 전 legacy writer가 음수 delta를 복원하지 않도록 `DOMEGGOOK_CATALOG_SYNC_ENABLED=false`로 두었다. 공개 `/api/health`, `/`, `/products`는 모두 HTTP 200이다.
+- 정적 품질: `git diff --check` PASS. Deploy workflow는 manual-only, per-run SecureString token, 환경·backup preflight, EC2 flock, PostgreSQL config fail-closed, app-service-only recreate, timeout/cancel, candidate 시작 전·Flyway 불변 rollback과 시작 시도 후 roll-forward를 검증 중이다. V40 미적용 운영에서 실행한 readiness guard는 `v40_success=0`, V39, 음수 option 0, repair audit 81, nullable `YES`로 PASS했다.
+- 남은 검증: PR CI·병합, reviewed main SHA의 수동 Deploy, 운영 V44·image SHA·전체 service health·공개 경로·supplier portal false, 새 API에서 catalog sync 재활성화를 확인한다.
+
 ## 2026-08-30 B-105 Supplier Shortage And Claim Facts
 
 - 판정: V44/API/Web 구현과 문서 동기화, 전체 회귀와 독립 backend/Web/호환성 검토를 완료해 `Review Ready`다. 최종 audit은 blocker/major/minor 0건이다. Task list는 facts 없는 summary이고 detail만 fact history를 반환하며, `orderDetailAvailable`은 supplier claim-task DTO에만 존재하고 supplier resource 조회는 resource id와 supplier id를 같은 DB predicate에 포함한다.

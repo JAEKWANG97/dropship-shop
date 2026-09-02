@@ -1,20 +1,9 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "AGENTS.md"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
-  packages: write
+permissions: {}
 
 concurrency:
   group: deploy-production
@@ -24,10 +13,13 @@ env:
   REGISTRY: ghcr.io
   API_IMAGE: ghcr.io/jaekwang97/dropship-shop-api
   WEB_IMAGE: ghcr.io/jaekwang97/dropship-shop-web
+  GHCR_TOKEN_PARAMETER: /coreable/deploy/ghcr-token-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -54,9 +46,243 @@ jobs:
       - name: Check whitespace
         run: git diff --check
 
+  preflight:
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 22
+    permissions:
+      id-token: write
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6.1.1
+        with:
+          aws-region: ap-northeast-2
+          role-to-assume: arn:aws:iam::445567114845:role/coreable-github-deploy
+      - name: Validate production environment and back up data
+        run: |
+          set -euo pipefail
+          command_id=
+          command_status=
+          command_finished=0
+
+          terminal_status() {
+            case "$1" in
+              Success|Failed|Cancelled|TimedOut) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          cancel_active_command() {
+            if [[ -n "$command_id" && "$command_finished" != 1 ]]; then
+              aws ssm cancel-command --command-id "$command_id" >/dev/null 2>&1 || true
+            fi
+          }
+
+          wait_for_terminal() {
+            local wait_seconds="$1" deadline
+            deadline=$((SECONDS + wait_seconds))
+            while ((SECONDS < deadline)); do
+              command_status=$(aws ssm get-command-invocation \
+                --command-id "$command_id" \
+                --instance-id i-0c795cb4b0f0b4177 \
+                --query Status \
+                --cli-connect-timeout 5 \
+                --cli-read-timeout 10 \
+                --output text 2>/dev/null || true)
+              if terminal_status "$command_status"; then
+                return 0
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          runner_cleanup() {
+            local exit_status=$?
+            trap - EXIT INT TERM
+            cancel_active_command
+            exit "$exit_status"
+          }
+
+          trap runner_cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          remote_script=$(cat <<'SCRIPT'
+          set -Eeuo pipefail
+
+          env_file=/opt/coreable/.env
+
+          env_value() {
+            local key="$1" count line
+            count=$(grep -c "^${key}=" "$env_file" || true)
+            if [[ "$count" != 1 ]]; then
+              echo "Preflight failed: ${key} must be present exactly once." >&2
+              return 1
+            fi
+            line=$(grep "^${key}=" "$env_file")
+            printf '%s' "${line#*=}"
+          }
+
+          require_nonempty() {
+            local value
+            value=$(env_value "$1")
+            if [[ -z "${value//[[:space:]]/}" || "$value" == '""' || "$value" == "''" ]]; then
+              echo "Preflight failed: $1 must be non-empty." >&2
+              return 1
+            fi
+          }
+
+          validate_env() {
+            local enabled hmac redirect success_redirect web_origin key https_host_regex
+            https_host_regex='[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+'
+            for key in \
+              APP_BANK_TRANSFER_BANK_NAME \
+              APP_BANK_TRANSFER_ACCOUNT_NUMBER \
+              APP_BANK_TRANSFER_ACCOUNT_HOLDER \
+              API_IMAGE \
+              WEB_IMAGE; do
+              require_nonempty "$key"
+            done
+
+            enabled=$(env_value APP_SUPPLIER_PORTAL_ENABLED)
+            [[ "$enabled" == false ]] || {
+              echo "Preflight failed: APP_SUPPLIER_PORTAL_ENABLED must remain exactly false until the release gate opens." >&2
+              return 1
+            }
+
+            hmac=$(env_value APP_SUPPLIER_PORTAL_HMAC_SECRET)
+            if [[ -z "${hmac//[[:space:]]/}" || ${#hmac} -lt 32 ]]; then
+              echo "Preflight failed: APP_SUPPLIER_PORTAL_HMAC_SECRET must contain at least 32 characters." >&2
+              return 1
+            fi
+
+            redirect=$(env_value OAUTH_KAKAO_SUPPLIER_REDIRECT_URI)
+            success_redirect=$(env_value APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI)
+            for key in "$redirect" "$success_redirect"; do
+              [[ "$key" =~ ^https://${https_host_regex}(/[^[:space:]#]*)?$ ]] || {
+                echo "Preflight failed: supplier redirect URIs must be absolute HTTPS URLs." >&2
+                return 1
+              }
+            done
+
+            web_origin=$(env_value DROPSHIP_WEB_ORIGIN)
+            [[ "$web_origin" =~ ^https://${https_host_regex}$ ]] || {
+              echo "Preflight failed: DROPSHIP_WEB_ORIGIN must be a canonical HTTPS origin without a path or trailing slash." >&2
+              return 1
+            }
+          }
+
+          production_psql() {
+            docker compose \
+              --project-directory /opt/coreable \
+              --env-file "$env_file" \
+              -f /opt/coreable/compose.prod.yml \
+              exec -T postgres \
+              sh -ceu 'export PGPASSWORD="$POSTGRES_PASSWORD"; exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'
+          }
+
+          validate_v40_readiness() {
+            local result v40_success latest_success negative_options repair_audits admin_nullable extra
+            v40_success=$(production_psql <<'SQL'
+          SELECT count(*)
+          FROM flyway_schema_history
+          WHERE version = '40' AND success IS TRUE;
+          SQL
+            )
+            if [[ ! "$v40_success" =~ ^[0-9]+$ ]]; then
+              echo "Preflight failed: V40 migration status is invalid." >&2
+              return 1
+            fi
+
+            if ((v40_success > 0)); then
+              echo "V40 readiness: applied=true."
+              return 0
+            fi
+
+            result=$(production_psql <<'SQL'
+          SELECT
+              COALESCE((SELECT version FROM flyway_schema_history WHERE success IS TRUE AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1), ''),
+              (SELECT count(*) FROM product_options WHERE source_additional_price < 0),
+              (SELECT count(*) FROM product_change_histories WHERE reason = 'V40_PREDEPLOY_SOURCE_OPTION_NORMALIZATION_20260902'),
+              COALESCE((SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'product_change_histories' AND column_name = 'admin_user_id'), 'MISSING');
+          SQL
+            )
+            [[ "$result" != *$'\n'* ]] || {
+              echo "Preflight failed: V40 readiness query returned an unexpected row count." >&2
+              return 1
+            }
+            IFS='|' read -r \
+              latest_success \
+              negative_options \
+              repair_audits \
+              admin_nullable \
+              extra <<< "$result"
+            if [[ ! "$negative_options" =~ ^[0-9]+$ \
+              || ! "$repair_audits" =~ ^[0-9]+$ \
+              || -n "$extra" ]]; then
+              echo "Preflight failed: V40 readiness query returned an invalid status." >&2
+              return 1
+            fi
+
+            printf 'V40 readiness: applied=false latest_success=%s negative_source_options=%s repair_audit_rows=%s admin_user_id_nullable=%s\n' \
+              "$latest_success" \
+              "$negative_options" \
+              "$repair_audits" \
+              "$admin_nullable"
+            [[ "$latest_success" == 39 \
+              && "$negative_options" == 0 \
+              && "$repair_audits" == 81 \
+              && "$admin_nullable" == YES ]] || {
+              echo "Preflight failed: production is not ready for the V40 migration." >&2
+              return 1
+            }
+          }
+
+          test -f "$env_file"
+          test -f /opt/coreable/compose.prod.yml
+          test -f /opt/coreable/nginx.conf
+          test -x /opt/coreable/backup.sh
+          test -f /var/lib/coreable/proxy/certs/cloudflare-origin.pem
+          test -f /var/lib/coreable/proxy/certs/cloudflare-origin.key
+          validate_env
+          validate_v40_readiness
+          /opt/coreable/backup.sh
+          echo "Production environment validated and backup completed."
+          SCRIPT
+          )
+          commands=$(jq -n \
+            --arg script "$remote_script" \
+            '{commands: [("flock -x -w 30 --no-fork /var/lock/coreable-deploy.lock bash -c " + ($script | @sh))],
+              executionTimeout: ["900"]}')
+          command_id=$(aws ssm send-command \
+            --instance-ids i-0c795cb4b0f0b4177 \
+            --document-name AWS-RunShellScript \
+            --comment "Preflight and backup ${GITHUB_SHA}" \
+            --timeout-seconds 120 \
+            --parameters "$commands" \
+            --query Command.CommandId \
+            --output text)
+          if ! wait_for_terminal 1080; then
+            echo "Preflight polling expired; cancelling the SSM command." >&2
+            cancel_active_command
+            wait_for_terminal 60 || {
+              echo "Preflight SSM command did not reach a terminal state after cancellation." >&2
+              exit 1
+            }
+          fi
+          command_finished=1
+          aws ssm get-command-invocation \
+            --command-id "$command_id" \
+            --instance-id i-0c795cb4b0f0b4177 \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+          test "$command_status" = Success
+
   build-and-push:
     runs-on: ubuntu-24.04-arm
-    needs: verify
+    needs: preflight
+    permissions:
+      contents: read
+      packages: write
     outputs:
       api-image: ${{ steps.meta.outputs.api-image }}
       web-image: ${{ steps.meta.outputs.web-image }}
@@ -106,8 +332,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
+    timeout-minutes: 45
+    permissions:
+      id-token: write
+      packages: read
     steps:
-      - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v6.1.1
         with:
           aws-region: ap-northeast-2
@@ -120,53 +349,430 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          command_id=
+          command_status=
+          command_finished=0
+          token_payload=
+
+          terminal_status() {
+            case "$1" in
+              Success|Failed|Cancelled|TimedOut) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          cancel_active_command() {
+            if [[ -n "$command_id" && "$command_finished" != 1 ]]; then
+              aws ssm cancel-command --command-id "$command_id" >/dev/null 2>&1 || true
+            fi
+          }
+
+          wait_for_terminal() {
+            local wait_seconds="$1" deadline
+            deadline=$((SECONDS + wait_seconds))
+            while ((SECONDS < deadline)); do
+              command_status=$(aws ssm get-command-invocation \
+                --command-id "$command_id" \
+                --instance-id i-0c795cb4b0f0b4177 \
+                --query Status \
+                --cli-connect-timeout 5 \
+                --cli-read-timeout 10 \
+                --output text 2>/dev/null || true)
+              if terminal_status "$command_status"; then
+                return 0
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          runner_cleanup() {
+            local exit_status=$?
+            trap - EXIT INT TERM
+            if [[ -n "$token_payload" && -f "$token_payload" ]]; then
+              rm -f -- "$token_payload"
+            fi
+            aws ssm delete-parameter --name "$GHCR_TOKEN_PARAMETER" >/dev/null 2>&1 || true
+            cancel_active_command
+            exit "$exit_status"
+          }
+
+          trap runner_cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          remote_script=$(cat <<'SCRIPT'
+          set -Eeuo pipefail
+
+          env_file=/opt/coreable/.env
+          compose_file=/opt/coreable/compose.prod.yml
+          nginx_file=/opt/coreable/nginx.conf
+          aws_region=ap-northeast-2
+          main_pid=$BASHPID
+          rollback_dir=
+          rollback_active=0
+          mutation_started=0
+          candidate_api_attempted=0
+          previous_flyway_version=
+          ghcr_token=
+
+          env_value() {
+            local key="$1" count line
+            count=$(grep -c "^${key}=" "$env_file" || true)
+            if [[ "$count" != 1 ]]; then
+              echo "Deploy failed: ${key} must be present exactly once." >&2
+              return 1
+            fi
+            line=$(grep "^${key}=" "$env_file")
+            printf '%s' "${line#*=}"
+          }
+
+          require_nonempty() {
+            local value
+            value=$(env_value "$1")
+            if [[ -z "${value//[[:space:]]/}" || "$value" == '""' || "$value" == "''" ]]; then
+              echo "Deploy failed: $1 must be non-empty." >&2
+              return 1
+            fi
+          }
+
+          validate_env() {
+            local enabled hmac redirect success_redirect web_origin key https_host_regex
+            https_host_regex='[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+'
+            for key in \
+              APP_BANK_TRANSFER_BANK_NAME \
+              APP_BANK_TRANSFER_ACCOUNT_NUMBER \
+              APP_BANK_TRANSFER_ACCOUNT_HOLDER \
+              API_IMAGE \
+              WEB_IMAGE; do
+              require_nonempty "$key"
+            done
+
+            enabled=$(env_value APP_SUPPLIER_PORTAL_ENABLED)
+            [[ "$enabled" == false ]] || {
+              echo "Deploy failed: APP_SUPPLIER_PORTAL_ENABLED must remain exactly false until the release gate opens." >&2
+              return 1
+            }
+
+            hmac=$(env_value APP_SUPPLIER_PORTAL_HMAC_SECRET)
+            if [[ -z "${hmac//[[:space:]]/}" || ${#hmac} -lt 32 ]]; then
+              echo "Deploy failed: APP_SUPPLIER_PORTAL_HMAC_SECRET must contain at least 32 characters." >&2
+              return 1
+            fi
+
+            redirect=$(env_value OAUTH_KAKAO_SUPPLIER_REDIRECT_URI)
+            success_redirect=$(env_value APP_SUPPLIER_PORTAL_SUCCESS_REDIRECT_URI)
+            for key in "$redirect" "$success_redirect"; do
+              [[ "$key" =~ ^https://${https_host_regex}(/[^[:space:]#]*)?$ ]] || {
+                echo "Deploy failed: supplier redirect URIs must be absolute HTTPS URLs." >&2
+                return 1
+              }
+            done
+
+            web_origin=$(env_value DROPSHIP_WEB_ORIGIN)
+            [[ "$web_origin" =~ ^https://${https_host_regex}$ ]] || {
+              echo "Deploy failed: DROPSHIP_WEB_ORIGIN must be a canonical HTTPS origin without a path or trailing slash." >&2
+              return 1
+            }
+          }
+
+          postgres_fingerprint() {
+            docker compose \
+              --project-directory /opt/coreable \
+              --env-file "$env_file" \
+              -f "$1" \
+              config --format json \
+              | jq -ceS 'if (.services.postgres | type) == "object" then .services.postgres else error("postgres service missing") end' \
+              | sha256sum \
+              | awk '{print $1}'
+          }
+
+          flyway_latest_version() {
+            local query_env_file="${1:-$env_file}" query_compose_file="${2:-$compose_file}" version
+            version=$(docker compose \
+              --project-directory /opt/coreable \
+              --env-file "$query_env_file" \
+              -f "$query_compose_file" \
+              exec -T postgres \
+              sh -ceu 'export PGPASSWORD="$POSTGRES_PASSWORD"; exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "SELECT version::text FROM flyway_schema_history WHERE success IS TRUE AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1;"') \
+              || return 1
+            version=${version//$'\r'/}
+            [[ "$version" != *$'\n'* ]] || return 1
+            if [[ -z "$version" ]]; then
+              version=__none__
+            fi
+            printf '%s' "$version"
+          }
+
+          wait_for_api() {
+            local attempt
+            for ((attempt = 0; attempt < 40; attempt++)); do
+              if curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null; then
+                return 0
+              fi
+              sleep 3
+            done
+            return 1
+          }
+
+          wait_for_api_and_web() {
+            local attempt
+            for ((attempt = 0; attempt < 40; attempt++)); do
+              if curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null \
+                && curl -kfsS --resolve "${web_host}:443:127.0.0.1" "${web_origin}/" >/dev/null; then
+                return 0
+              fi
+              sleep 3
+            done
+            return 1
+          }
+
+          rollback() {
+            local failed_status="${1:-1}" api_stopped=0 current_flyway_version='' flyway_unchanged=0
+            local files_restored=0 recovered=0 roll_forward_prepared=0
+            if [[ "$BASHPID" != "$main_pid" ]]; then
+              exit "$failed_status"
+            fi
+            if [[ "$rollback_active" == 1 ]]; then
+              exit "$failed_status"
+            fi
+            rollback_active=1
+            trap - ERR
+            trap '' TERM INT
+            set +e
+            unset ghcr_token
+            docker logout ghcr.io >/dev/null 2>&1 || true
+
+            if [[ "$mutation_started" != 1 ]]; then
+              echo "Deployment failed before runtime mutation; the current stack was left unchanged." >&2
+              if [[ -n "$rollback_dir" && -d "$rollback_dir" ]]; then
+                rm -rf -- "$rollback_dir"
+              fi
+              exit "$failed_status"
+            fi
+
+            echo "Deployment failed; collecting container status and API logs before recovery." >&2
+            docker compose --env-file "$env_file" -f "$compose_file" ps >&2
+            docker compose --env-file "$env_file" -f "$compose_file" logs --tail=200 api >&2
+
+            # Once candidate start was attempted, stop it before reading Flyway
+            # state so a migration cannot commit before an old-image restart.
+            if [[ "$candidate_api_attempted" == 0 ]] \
+              || docker compose \
+                --project-directory /opt/coreable \
+                --env-file "$rollback_dir/.env" \
+                -f "$rollback_dir/compose.prod.yml.next" \
+                stop -t 30 api; then
+              if [[ "$candidate_api_attempted" == 1 ]]; then
+                api_stopped=1
+              fi
+              current_flyway_version=$(flyway_latest_version \
+                "$rollback_dir/.env" \
+                "$rollback_dir/compose.prod.yml")
+              if [[ $? == 0 && "$current_flyway_version" == "$previous_flyway_version" ]]; then
+                flyway_unchanged=1
+              fi
+            fi
+
+            if [[ "$candidate_api_attempted" == 0 && "$flyway_unchanged" == 1 ]]; then
+              if cp -a "$rollback_dir/.env" "$env_file" \
+                && cp -a "$rollback_dir/compose.prod.yml" "$compose_file" \
+                && cp -a "$rollback_dir/nginx.conf" "$nginx_file"; then
+                files_restored=1
+              fi
+
+              if [[ "$files_restored" == 1 \
+                && "$(env_value API_IMAGE)" == "$previous_api_image" \
+                && "$(env_value WEB_IMAGE)" == "$previous_web_image" ]] \
+                && wait_for_api_and_web; then
+                recovered=1
+                echo "Rollback restored deployment files and verified the existing previous API and Web without recreation."
+                rm -rf -- "$rollback_dir"
+              fi
+            else
+              # DB migrations and candidate writes are roll-forward-only. Once
+              # candidate start was attempted, never start the previous API.
+              if [[ "$candidate_api_attempted" == 1 && "$api_stopped" != 1 ]]; then
+                echo "Could not stop the candidate API; treating Flyway state as changed and prohibiting old-API rollback." >&2
+              elif [[ -z "$current_flyway_version" ]]; then
+                echo "Could not read Flyway state; prohibiting old-API rollback." >&2
+              elif [[ "$flyway_unchanged" == 1 ]]; then
+                echo "The candidate API was started; prohibiting old-API rollback even though Flyway is unchanged." >&2
+              else
+                echo "Flyway changed from ${previous_flyway_version} to ${current_flyway_version}; prohibiting old-API rollback." >&2
+              fi
+
+              if [[ "$candidate_api_attempted" == 0 ]]; then
+                docker compose \
+                  --project-directory /opt/coreable \
+                  --env-file "$rollback_dir/.env" \
+                  -f "$rollback_dir/compose.prod.yml.next" \
+                  stop -t 30 api || true
+              fi
+
+              if cp -a "$rollback_dir/.env" "$env_file" \
+                && install -m 0644 "$rollback_dir/compose.prod.yml.next" "$compose_file" \
+                && install -m 0644 "$rollback_dir/nginx.conf.next" "$nginx_file" \
+                && sed -i "s|^API_IMAGE=.*|API_IMAGE=${NEW_API_IMAGE}|" "$env_file" \
+                && sed -i "s|^WEB_IMAGE=.*|WEB_IMAGE=${NEW_WEB_IMAGE}|" "$env_file" \
+                && [[ "$(env_value API_IMAGE)" == "$NEW_API_IMAGE" ]] \
+                && [[ "$(env_value WEB_IMAGE)" == "$NEW_WEB_IMAGE" ]]; then
+                roll_forward_prepared=1
+              fi
+
+              if [[ "$roll_forward_prepared" == 1 ]] \
+                && docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps --force-recreate api \
+                && wait_for_api; then
+                echo "Roll-forward recovery verified the new API; the previous API was not restarted." >&2
+                if docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps --force-recreate web nginx \
+                  && wait_for_api_and_web; then
+                  recovered=1
+                  echo "Roll-forward recovery verified the new API and Web." >&2
+                  rm -rf -- "$rollback_dir"
+                else
+                  echo "Roll-forward recovery could not verify the new Web/nginx; previous Web/nginx were not restored because API compatibility is unproven." >&2
+                fi
+              else
+                echo "Roll-forward recovery could not verify the new API; the previous API was not restarted." >&2
+                docker compose --env-file "$env_file" -f "$compose_file" logs --tail=200 api >&2
+              fi
+
+            fi
+
+            if [[ "$recovered" != 1 ]]; then
+              echo "Automated recovery did not complete; preserved recovery files at $rollback_dir." >&2
+            fi
+            exit "$failed_status"
+          }
+
+          trap 'rollback $?' ERR
+          trap 'rollback 130' INT
+          trap 'rollback 143' TERM
+
+          test -f "$env_file"
+          test -f "$compose_file"
+          test -f "$nginx_file"
+          test -x /opt/coreable/backup.sh
+          test -f /var/lib/coreable/proxy/certs/cloudflare-origin.pem
+          test -f /var/lib/coreable/proxy/certs/cloudflare-origin.key
+          validate_env
+          /opt/coreable/backup.sh
+
+          web_origin=$(env_value DROPSHIP_WEB_ORIGIN)
+          web_host=${web_origin#https://}
+          previous_api_image=$(env_value API_IMAGE)
+          previous_web_image=$(env_value WEB_IMAGE)
+          rollback_dir=$(mktemp -d /opt/coreable/deploy-rollback.XXXXXX)
+          chmod 0700 "$rollback_dir"
+          cp -a "$env_file" "$rollback_dir/.env"
+          cp -a "$compose_file" "$rollback_dir/compose.prod.yml"
+          cp -a "$nginx_file" "$rollback_dir/nginx.conf"
+
+          curl -fsSL "https://raw.githubusercontent.com/${REPOSITORY}/${DEPLOY_SHA}/infra/aws/ec2/compose.prod.yml" \
+            -o "$rollback_dir/compose.prod.yml.next"
+          curl -fsSL "https://raw.githubusercontent.com/${REPOSITORY}/${DEPLOY_SHA}/infra/aws/ec2/nginx.conf" \
+            -o "$rollback_dir/nginx.conf.next"
+          current_postgres_fingerprint=$(postgres_fingerprint "$compose_file")
+          next_postgres_fingerprint=$(postgres_fingerprint "$rollback_dir/compose.prod.yml.next")
+          [[ "$current_postgres_fingerprint" == "$next_postgres_fingerprint" ]] || {
+            echo "Deploy failed: the resolved postgres service differs from production." >&2
+            false
+          }
+          previous_flyway_version=$(flyway_latest_version)
+
+          ghcr_token=$(aws --region "$aws_region" ssm get-parameter \
+            --name "$GHCR_TOKEN_PARAMETER" \
+            --with-decryption \
+            --query Parameter.Value \
+            --output text)
+          aws --region "$aws_region" ssm delete-parameter \
+            --name "$GHCR_TOKEN_PARAMETER" >/dev/null
+          [[ -n "$ghcr_token" && "$ghcr_token" != None ]]
+          printf '%s' "$ghcr_token" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          unset ghcr_token
+
+          docker pull "$NEW_API_IMAGE"
+          docker pull "$NEW_WEB_IMAGE"
+          docker logout ghcr.io >/dev/null 2>&1 || true
+
+          mutation_started=1
+          install -m 0644 "$rollback_dir/compose.prod.yml.next" "$compose_file"
+          install -m 0644 "$rollback_dir/nginx.conf.next" "$nginx_file"
+          sed -i "s|^API_IMAGE=.*|API_IMAGE=${NEW_API_IMAGE}|" "$env_file"
+          sed -i "s|^WEB_IMAGE=.*|WEB_IMAGE=${NEW_WEB_IMAGE}|" "$env_file"
+          [[ "$(env_value API_IMAGE)" == "$NEW_API_IMAGE" ]]
+          [[ "$(env_value WEB_IMAGE)" == "$NEW_WEB_IMAGE" ]]
+
+          candidate_api_attempted=1
+          docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps --force-recreate api
+          wait_for_api
+          docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps --force-recreate web nginx
+          wait_for_api_and_web
+          docker compose --env-file "$env_file" -f "$compose_file" ps
+
+          trap - ERR INT TERM
+          rm -rf -- "$rollback_dir"
+          if ! docker image prune -af --filter until=168h; then
+            echo "Deployment succeeded, but old-image pruning failed." >&2
+          fi
+          SCRIPT
+          )
           commands=$(jq -n \
             --arg api_image "${API_IMAGE}" \
             --arg web_image "${WEB_IMAGE}" \
             --arg ghcr_username "${GHCR_USERNAME}" \
-            --arg ghcr_token "${GHCR_TOKEN}" \
+            --arg ghcr_token_parameter "${GHCR_TOKEN_PARAMETER}" \
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg sha "${GITHUB_SHA}" \
-            '{commands: [
-              "set -eu",
-              "sudo mkdir -p /opt/coreable",
-              ("sudo curl -fsSL " + ("https://raw.githubusercontent.com/" + $repository + "/" + $sha + "/infra/aws/ec2/compose.prod.yml" | @sh) + " -o /opt/coreable/compose.prod.yml"),
-              ("sudo curl -fsSL " + ("https://raw.githubusercontent.com/" + $repository + "/" + $sha + "/infra/aws/ec2/nginx.conf" | @sh) + " -o /opt/coreable/nginx.conf"),
-              "sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.pem",
-              "sudo test -f /var/lib/coreable/proxy/certs/cloudflare-origin.key",
-              "sudo test -f /opt/coreable/.env",
-              "for required_key in APP_BANK_TRANSFER_BANK_NAME APP_BANK_TRANSFER_ACCOUNT_NUMBER APP_BANK_TRANSFER_ACCOUNT_HOLDER; do sudo grep -Eq \"^${required_key}=.+\" /opt/coreable/.env || exit 1; done",
-              ("printf %s " + ($ghcr_token | @sh) + " | sudo docker login ghcr.io -u " + ($ghcr_username | @sh) + " --password-stdin"),
-              ("sudo sed -i " + ("s|^API_IMAGE=.*|API_IMAGE=" + $api_image + "|" | @sh) + " /opt/coreable/.env"),
-              ("sudo sed -i " + ("s|^WEB_IMAGE=.*|WEB_IMAGE=" + $web_image + "|" | @sh) + " /opt/coreable/.env"),
-              "cd /opt/coreable",
-              "sudo docker compose --env-file .env -f compose.prod.yml pull",
-              "sudo docker logout ghcr.io >/dev/null 2>&1 || true",
-              "sudo docker compose --env-file .env -f compose.prod.yml up -d",
-              "sudo docker compose --env-file .env -f compose.prod.yml ps",
-              "healthy=0; for i in $(seq 1 40); do if curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null; then healthy=1; break; fi; sleep 3; done; if [ \"${healthy}\" != 1 ]; then sudo docker compose --env-file .env -f compose.prod.yml logs --tail=200 api; exit 1; fi",
-              "sudo docker image prune -af --filter until=168h"
-            ]}')
+            --arg script "$remote_script" \
+            '{commands: [("env NEW_API_IMAGE=" + ($api_image | @sh)
+              + " NEW_WEB_IMAGE=" + ($web_image | @sh)
+              + " GHCR_USERNAME=" + ($ghcr_username | @sh)
+              + " GHCR_TOKEN_PARAMETER=" + ($ghcr_token_parameter | @sh)
+              + " REPOSITORY=" + ($repository | @sh)
+              + " DEPLOY_SHA=" + ($sha | @sh)
+              + " flock -x -w 30 --no-fork /var/lock/coreable-deploy.lock"
+              + " timeout --signal=TERM --kill-after=480s 780s bash -c " + ($script | @sh))],
+              executionTimeout: ["1500"]}')
+
+          [[ -n "$GHCR_TOKEN" ]]
+          umask 077
+          token_payload=$(mktemp)
+          chmod 0600 "$token_payload"
+          jq -n \
+            --arg name "$GHCR_TOKEN_PARAMETER" \
+            '{Name: $name, Type: "SecureString", Value: env.GHCR_TOKEN, Overwrite: true}' \
+            > "$token_payload"
+          aws ssm put-parameter \
+            --cli-input-json "file://${token_payload}" >/dev/null
+          unset GHCR_TOKEN
+          rm -f -- "$token_payload"
+          token_payload=
+
           command_id=$(aws ssm send-command \
             --instance-ids i-0c795cb4b0f0b4177 \
             --document-name AWS-RunShellScript \
             --comment "Deploy ${GITHUB_SHA}" \
+            --timeout-seconds 120 \
             --parameters "${commands}" \
             --query Command.CommandId \
             --output text)
-          for _ in $(seq 1 90); do
-            command_status=$(aws ssm get-command-invocation \
-              --command-id "${command_id}" \
-              --instance-id i-0c795cb4b0f0b4177 \
-              --query Status \
-              --output text 2>/dev/null || true)
-            case "${command_status}" in
-              Success|Failed|Cancelled|TimedOut) break ;;
-            esac
-            sleep 2
-          done
+          if ! wait_for_terminal 1620; then
+            echo "Deploy polling expired; cancelling the SSM command." >&2
+            cancel_active_command
+            wait_for_terminal 600 || {
+              echo "Deploy SSM command did not reach a terminal state after cancellation." >&2
+              exit 1
+            }
+          fi
+          command_finished=1
           aws ssm get-command-invocation \
             --command-id "${command_id}" \
             --instance-id i-0c795cb4b0f0b4177 \
             --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
           test "${command_status}" = Success
+      - name: Remove temporary deployment credential
+        if: always()
+        run: |
+          aws ssm delete-parameter \
+            --name "$GHCR_TOKEN_PARAMETER" >/dev/null 2>&1 || true

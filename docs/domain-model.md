@@ -1377,6 +1377,7 @@ Rules:
 - 공급처 요청은 supplierId, 고객 판매가인 `basePrice`, 상품 판매 상태, compliance 상태와 review 상태를 받지 않는다.
 - Coreable 서버가 active pricing policy로 고객 판매가를 계산한다.
 - 가격 계산은 `basePrice=price(sourcePrice)`, `optionCustomerTotal=price(sourcePrice+sourceAdditionalPrice)`, `additionalPrice=optionCustomerTotal-basePrice`다. `price`는 동일 markup, resale-minimum floor와 rounding rule을 적용한다. B-101 이후 모든 writer는 `sourcePrice`와 `sourceAdditionalPrice`를 각각 `0..100,000,000` 정수 KRW, customer unit price를 `1..1,000,000,000`으로 제한하고 exact 합산·수량 곱을 사용한다. 제약 추가 전 legacy 범위 밖 row와 `basePrice+additionalPrice` 상한 초과를 스캔하고 발견하면 명시적 정정 승인 없이 migration을 진행하지 않는다. 승인된 비용 변경과 Portal 상품의 legacy admin 수정은 요청 고객가를 신뢰하지 않고 모든 고객 가격, applied policy id/version과 full calculator snapshot history를 원자적으로 갱신한다. B-101은 existing PricingPolicy에 monotonic version을 추가하고 in-place 정책 update마다 version을 증가시킨다.
+- 도매꾹 source가 음수 option delta를 반환하는 경우 `minimumDelta < 0`이면 `normalizedSourcePrice=sourcePrice+minimumDelta`, `normalizedOptionDelta=optionDelta-minimumDelta`로 정규화한다. 모든 option의 총 공급원가는 전후 동일하고 저장되는 base/delta는 각각 nonnegative 범위여야 하며, 음수 총액·범위 초과·overflow snapshot은 적용하지 않는다.
 - 무옵션 상품도 기존 `OrderItem.productOptionId` 필수 참조를 유지하기 위해 내부 `기본` 옵션 하나를 가진다.
 - `DRAFT`는 여러 asset 요청을 잇는 내부 편집 상태다. 공급처 화면의 단일 `상품 등록` 동작이 submit과 분류를 함께 수행해 별도 승인 요청 단계를 만들지 않는다.
 - 최초 submit은 `firstSubmittedAt`을 한 번만 기록한다. 승인·검토중 상품의 수정으로 다시 `DRAFT`가 되어도 이 값은 지우지 않는다.

@@ -1199,3 +1199,12 @@
 - 검증: API 전체 `83 suites / 379 tests`, PostgreSQL 17 smoke `13/13`, Web typecheck, lint `0 errors / 기존 warnings 3`, production build 34 pages, B-105 Desktop/Mobile Playwright `24 passed`와 기존 fulfillment `26 passed` 등 `50/50`, `git diff --check`와 Markdown fence parity를 통과했다. 독립 Web 재검토 blocker/major는 0건이다.
 - 제한: 실제 supplier/admin 로그인 live E2E, 실제 claim-work email 도착, PostgreSQL application-level 경합과 unpaged 목록·scheduler 성능 부하는 미검증이다. 배포와 production flag 활성화는 하지 않았다.
 - 상태·후속작업: B-105는 독립 backend/Web/호환성 audit의 blocker/major/minor 0건으로 `Review Ready`다. branch/PR CI를 마친 뒤에도 privacy notice, 실제 email, B-098 계약 증적 등 별도 release gate가 끝날 때까지 외부 포털을 열지 않는다.
+
+## 2026-09-02 22:06 KST
+
+- 관련 항목: B-106
+- 문제: B-100~B-105 병합 뒤 production API가 supplier portal 필수 환경값 누락으로 먼저 기동하지 못했고, 값을 보완한 다음에는 V40이 legacy 음수 source option delta를 거절했다. 실제 backup 복제본에서는 legacy system audit의 `admin_user_id`를 NOT NULL 해제 전에 `NULL`로 backfill하는 두 번째 V40 호환 문제도 확인했다. 기존 자동 Deploy는 실패 뒤 새 설정을 남겨 장애를 지속시킬 수 있었다.
+- 해결방안: 누락된 환경값을 비밀값 비노출로 설정하고 마지막 정상 SHA로 서비스를 복구했다. 도매꾹 snapshot은 최저 delta를 base로 이동해 option별 총 공급원가를 보존하도록 수정했다. V39 사전 보정은 정확한 운영 row-count guard, 금액·주문 snapshot 불변식, 81개 system audit과 audit column 선해제를 한 transaction에 묶었다. Deploy는 manual-only, preflight backup, per-run SecureString GHCR credential, host lock, PostgreSQL config 동등성, app-service-only 교체와 schema-aware recovery로 강화했다.
+- 운영 조치: fresh S3 backup `coreable-db-20260902-220230.dump` 뒤 API를 잠깐 중지해 보정했다. 운영은 V39, 음수 option 0, repair audit 81, API readiness `UP`, 공개 핵심 경로 HTTP 200이며 기존 활성 주문 두 건의 상태는 유지됐다. 공급처 포털과 legacy catalog sync는 각각 `false`로 유지한다.
+- 검증: API `83 suites / 380 tests`, bootJar, Web lint/build, `git diff --check`, 실제 production backup의 V38→V39→repair→V44/Hibernate validation/app startup rehearsal을 통과했다. 독립 SQL 검토 Blocker/Major는 0이다.
+- 후속작업: workflow 최종 독립 review 뒤 commit/PR/CI/merge하고 reviewed main SHA를 수동 배포한다. 운영 V44와 image SHA, service/public health, supplier portal false를 확인한 다음 새 API에서 catalog sync를 재활성화하고 B-106을 완료 이력으로 옮긴다.
