@@ -413,7 +413,7 @@ class SupplierFulfillmentApiIntegrationTest {
 	void cutoffIsInclusiveAndUnicodeAndShortPhoneAreMaskedDeterministically() throws Exception {
 		Fixture fixture = paidPortalOrder("cutoff-mask", "🦕민", "12-34");
 		var fulfillment = fulfillmentRepository.findByOrder_Id(fixture.order().getId()).orElseThrow();
-		Instant exactCutoff = Instant.now().plus(1, ChronoUnit.DAYS);
+		Instant exactCutoff = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
 		fulfillment.shortenPiiAccessCutoffAt(exactCutoff);
 		fulfillmentRepository.saveAndFlush(fulfillment);
 		assertThat(handoverService.enforceCutoffLazy(fulfillment.getId(), exactCutoff)).isTrue();
