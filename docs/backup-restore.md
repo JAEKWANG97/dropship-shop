@@ -11,7 +11,7 @@ Resources:
 - EC2 instance: `i-0c795cb4b0f0b4177`
 - Root EBS volume: `vol-0d886b1bea4f76982`
 - Backup bucket: `s3://coreable-backups-prod`
-- Backup IAM user: `coreable-backup-writer`
+- Backup IAM role: `coreable-temp-ssm-role`
 - Backup script: `/opt/coreable/backup.sh`
 - Backup log: `/var/log/coreable-backup.log`
 - Local DB backup directory: `/var/backups/coreable/db`
@@ -30,7 +30,7 @@ Resources:
 - Current DLM policy: `policy-07f1e7ad6713e55f9`.
 - Root volume `DeleteOnTermination`: `false`.
 
-The EC2 host must use only the minimal IAM access key for `coreable-backup-writer`. Do not leave root or admin AWS credentials under `/opt/coreable`, `/home/ubuntu/.aws`, or any application directory.
+The EC2 host uses its instance role with S3 access limited to the backup bucket's `db/*` and `uploads/*` prefixes. Do not store static AWS credentials under `/root/.aws`, `/opt/coreable`, `/home/ubuntu/.aws`, or any application directory.
 
 The `09:00 KST` start and `01:00 KST` stop schedules are only for the pre-launch environment. Disable the stop schedule before accepting real customer orders.
 
@@ -39,7 +39,7 @@ The `09:00 KST` start and `01:00 KST` stop schedules are only for the pre-launch
 Run this on EC2:
 
 ```sh
-ssh ubuntu@43.200.135.171
+aws ssm start-session --target i-0c795cb4b0f0b4177
 sudo /opt/coreable/backup.sh
 sudo tail -n 50 /var/log/coreable-backup.log
 ```
@@ -51,7 +51,7 @@ aws s3 ls s3://coreable-backups-prod/db/ --recursive | tail -n 10
 aws s3 ls s3://coreable-backups-prod/uploads/products/ --recursive | wc -l
 ```
 
-Verify from EC2 that the scheduled credential is the least-privilege backup user:
+Verify from EC2 that the scheduled credential is the instance role:
 
 ```sh
 sudo aws sts get-caller-identity --query Arn --output text
@@ -60,7 +60,7 @@ sudo aws sts get-caller-identity --query Arn --output text
 Expected ARN:
 
 ```text
-arn:aws:iam::445567114845:user/coreable-backup-writer
+arn:aws:sts::445567114845:assumed-role/coreable-temp-ssm-role/*
 ```
 
 ## Restore Rehearsal
@@ -68,7 +68,7 @@ arn:aws:iam::445567114845:user/coreable-backup-writer
 Use a temporary container first. This does not touch the running production database.
 
 ```sh
-ssh ubuntu@43.200.135.171
+aws ssm start-session --target i-0c795cb4b0f0b4177
 
 latest="$(sudo aws s3 ls s3://coreable-backups-prod/db/ --recursive | awk '{print $4}' | sort | tail -n 1)"
 test -n "$latest"
@@ -110,7 +110,7 @@ Use `--no-owner`. The dump can contain the production role name, and a rehearsal
 This is destructive. Before running it, take an EBS snapshot or confirm that the latest S3 dump is usable through the restore rehearsal above.
 
 ```sh
-ssh ubuntu@43.200.135.171
+aws ssm start-session --target i-0c795cb4b0f0b4177
 cd /opt/coreable
 set -a
 . ./.env
@@ -142,7 +142,7 @@ sudo docker compose --env-file .env -f compose.prod.yml up -d
 Restore product uploads from S3 to the EC2 local volume:
 
 ```sh
-ssh ubuntu@43.200.135.171
+aws ssm start-session --target i-0c795cb4b0f0b4177
 sudo mkdir -p /var/lib/coreable/uploads/products
 sudo aws s3 sync s3://coreable-backups-prod/uploads/products/ /var/lib/coreable/uploads/products/
 sudo find /var/lib/coreable/uploads/products -type d -exec chmod 0755 {} +
@@ -175,10 +175,10 @@ aws dlm get-lifecycle-policy \
 Credential hygiene:
 
 ```sh
-ssh ubuntu@43.200.135.171 \
-  'sudo aws sts get-caller-identity --query Arn --output text && \
-   sudo test ! -d /home/ubuntu/.aws && \
-   sudo find /opt/coreable -type f \( -name credentials -o -name config -o -name "*.pem" -o -name "*.key" \) -print'
+aws ssm start-session --target i-0c795cb4b0f0b4177
+sudo aws sts get-caller-identity --query Arn --output text
+sudo test ! -d /home/ubuntu/.aws
+sudo find /opt/coreable -type f \( -name credentials -o -name config -o -name "*.pem" -o -name "*.key" \) -print
 ```
 
 The final `find` command should not print AWS credentials or root/admin keys.

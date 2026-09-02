@@ -64,6 +64,18 @@
 - [x] Supplier/admin 전체 Web surface, `/admin/shortage-reports?reportId=...` master/detail, shortage 주문 링크 부재와 capability/claim-task 링크의 fail-closed 렌더링을 Desktop/Mobile에서 검증한다.
 - [x] V44 fresh/upgrade, FK·unique·check·index, 공통 lock 순서와 전체 API suite, Web lint/build를 검증한다.
 
+### B-106 Production Deploy Recovery And V40 Compatibility
+
+- [x] 도매꾹 음수 option delta를 정규화해 각 option 총 공급원가를 보존하고, normalized base/delta의 음수·1억원 초과·overflow를 `PRICE_INVALID`로 거절한다.
+- [x] 전체 API suite와 PostgreSQL migration smoke, Web lint/build, workflow YAML과 embedded Bash syntax를 검증한다.
+- [x] 실제 production backup 복제본을 V38→V39→사전 보정→V40~V44로 올리고 Hibernate schema validation과 앱 기동, 81개 system audit 변환, 금액/범위 불변식을 검증한다.
+- [x] 사전 보정 SQL을 V44에 재실행하면 schema-version guard가 commit 전에 중단하는지 검증한다.
+- [x] Deploy가 `workflow_dispatch` 전용이고 production portal `false`, 필수 환경값, 배포 전 백업을 fail closed로 검사하는지 확인한다.
+- [x] V40 미적용 production preflight가 V39·음수 option 0·repair audit 81·legacy audit column nullable을 모두 요구하고 실제 운영 상태에서 통과하는지 확인한다.
+- [x] config/image pull의 mutation 전 실패는 old stack을 건드리지 않고, file mutation 뒤 candidate 시작 미시도·Flyway 불변을 모두 증명한 실패는 old files와 기존 service health를 복구하며, 시작 시도·schema 전진·조회불가에서는 new stack만 roll-forward 재기동하고 성공 전 prune하지 않는지 정적으로 검토한다.
+- [x] 운영 V39의 대상 row 수와 정규화 전후 option 총 공급원가, 고객가, 주문 snapshot 불변을 확인하고 system audit history와 함께 한 트랜잭션으로 보정한다.
+- [ ] 최신 main 수동 Deploy가 V40~V44를 적용하고 API/Web/PostgreSQL health, 공개 경로, 배포 SHA와 supplier portal `false`를 만족하는지 확인한다.
+
 ## Production Read-Only
 
 - [x] 홈페이지·상품 목록·상품 상세·정책·회사·고객문의 접근

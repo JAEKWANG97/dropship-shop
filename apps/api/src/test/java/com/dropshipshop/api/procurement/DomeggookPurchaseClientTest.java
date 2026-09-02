@@ -1,6 +1,7 @@
 package com.dropshipshop.api.procurement;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import java.io.IOException;
@@ -37,8 +38,9 @@ class DomeggookPurchaseClientTest {
 			byte[] body = """
 				{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":450,"resale":{"minimum":600}},
 				"qty":{"inventory":"197035","domeMoq":"12","supplyUnit":%s,"supplyLoq":60},
-				"selectOpt":{"data":{"01":{"name":"대형","sup":"1","hid":"0","supPrice":"50","qty":"2"},
-				"02":{"name":"소형","sup":"1","hid":"0","supPrice":"0","qty":"0"}}},
+				"selectOpt":{"data":{"01":{"name":"대형","sup":"1","hid":"0","supPrice":"-50","qty":"2"},
+				"02":{"name":"소형","sup":"1","hid":"0","supPrice":"0","qty":"0"},
+				"03":{"name":"중형","sup":"1","hid":"0","supPrice":"75","qty":"3"}}},
 				"deli":{"supply":{"type":"고정배송비","fee":"3000"}}}}
 				""".formatted(supplyUnit.get()).getBytes(StandardCharsets.UTF_8);
 			exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -63,7 +65,7 @@ class DomeggookPurchaseClientTest {
 		assertThat(quote.orderUnit()).isEqualTo(6);
 		assertThat(quote.maximumOrderQuantity()).isEqualTo(60);
 		assertThat(quote.stockQuantity()).isEqualTo(197035);
-		assertThat(quote.sourceUnitPrice()).isEqualTo(500);
+		assertThat(quote.sourceUnitPrice()).isEqualTo(400);
 		assertThat(quote.optionAvailable()).isTrue();
 		assertThat(quote.acceptsOrderQuantity(6)).isTrue();
 		assertThat(quote.acceptsOrderQuantity(12)).isTrue();
@@ -72,14 +74,86 @@ class DomeggookPurchaseClientTest {
 		assertThat(quote.hasStock(197036)).isFalse();
 
 		DomeggookPurchaseClient.CatalogSnapshot snapshot = client.catalogSnapshot("63511465");
+		assertThat(snapshot.sourcePrice()).isEqualTo(400);
 		assertThat(snapshot.minimumResalePrice()).isEqualTo(600);
 		assertThat(snapshot.minimumOrderQuantity()).isEqualTo(6);
 		assertThat(snapshot.orderQuantityStep()).isEqualTo(6);
-		assertThat(snapshot.options()).extracting("sourceOptionCode", "available")
-			.containsExactly(tuple("01", true), tuple("02", false));
+		assertThat(snapshot.options()).extracting("sourceOptionCode", "sourceAdditionalPrice", "available")
+			.containsExactly(tuple("01", 0L, true), tuple("02", 50L, false), tuple("03", 125L, true));
+		assertThat(client.quote("63511465", "02").sourceUnitPrice()).isEqualTo(450);
+		assertThat(client.quote("63511465", "03").sourceUnitPrice()).isEqualTo(525);
 
 		supplyUnit.set("100");
 		assertThat(client.catalogSnapshot("63511465").minimumOrderQuantity()).isEqualTo(100);
+	}
+
+	@Test
+	void enforcesSupplierPriceBoundsAndRejectsInvalidTotals() throws IOException {
+		AtomicReference<String> response = new AtomicReference<>();
+		server = HttpServer.create(new InetSocketAddress(0), 0);
+		server.createContext("/", exchange -> {
+			byte[] body = response.get().getBytes(StandardCharsets.UTF_8);
+			exchange.getResponseHeaders().add("Content-Type", "application/json");
+			exchange.sendResponseHeaders(200, body.length);
+			exchange.getResponseBody().write(body);
+			exchange.close();
+		});
+		server.start();
+
+		String endpoint = "http://localhost:" + server.getAddress().getPort();
+		DomeggookPurchaseClient client = new DomeggookPurchaseClient(
+			new DomeggookProperties(true, false, false, true, 20, "key", "user", "password", "127.0.0.1", endpoint),
+			new ObjectMapper(),
+			RestClient.builder().baseUrl(endpoint).build()
+		);
+		response.set(detail(100, "-101"));
+
+		assertThatThrownBy(() -> client.catalogSnapshot("63511465"))
+			.isInstanceOfSatisfying(DomeggookApiException.class,
+				exception -> assertThat(exception.code()).isEqualTo("PRICE_INVALID"));
+
+		response.set(detail(100_000_001, "-1"));
+		DomeggookPurchaseClient.CatalogSnapshot boundary = client.catalogSnapshot("63511465");
+		assertThat(boundary.sourcePrice()).isEqualTo(100_000_000);
+		assertThat(boundary.options().getFirst().sourceAdditionalPrice()).isZero();
+
+		response.set(detail(100_000_001, "0"));
+		assertThatThrownBy(() -> client.catalogSnapshot("63511465"))
+			.isInstanceOfSatisfying(DomeggookApiException.class,
+				exception -> assertThat(exception.code()).isEqualTo("PRICE_INVALID"));
+
+		response.set("""
+			{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":100},
+			"qty":{"inventory":"1","supplyUnit":"1"},"selectOpt":{"data":{
+			"01":{"name":"할인","sup":"1","hid":"0","supPrice":"-1","qty":"1"},
+			"02":{"name":"추가","sup":"1","hid":"0","supPrice":"100000000","qty":"1"}}}}}
+			""");
+		assertThatThrownBy(() -> client.catalogSnapshot("63511465"))
+			.isInstanceOfSatisfying(DomeggookApiException.class,
+				exception -> assertThat(exception.code()).isEqualTo("PRICE_INVALID"));
+
+		response.set("""
+			{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":100},
+			"qty":{"inventory":"1","supplyUnit":"1"},"selectOpt":{"data":{
+			"01":{"name":"할인","sup":"1","hid":"0","supPrice":"-1","qty":"1"},
+			"02":{"name":"overflow","sup":"1","hid":"0","supPrice":"9223372036854775807","qty":"1"}}}}}
+			""");
+		assertThatThrownBy(() -> client.catalogSnapshot("63511465"))
+			.isInstanceOfSatisfying(DomeggookApiException.class,
+				exception -> assertThat(exception.code()).isEqualTo("PRICE_INVALID"));
+
+		response.set(detail(Long.MAX_VALUE, "1"));
+		assertThatThrownBy(() -> client.catalogSnapshot("63511465"))
+			.isInstanceOfSatisfying(DomeggookApiException.class,
+				exception -> assertThat(exception.code()).isEqualTo("PRICE_INVALID"));
+	}
+
+	private String detail(long basePrice, String additionalPrice) {
+		return """
+			{"domeggook":{"basis":{"status":"판매중"},"price":{"supply":%d},
+			"qty":{"inventory":"1","supplyUnit":"1"},
+			"selectOpt":{"data":{"01":{"name":"기본","sup":"1","hid":"0","supPrice":"%s","qty":"1"}}}}}
+			""".formatted(basePrice, additionalPrice);
 	}
 
 	@Test

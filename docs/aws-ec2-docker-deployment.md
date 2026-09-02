@@ -56,18 +56,23 @@ Security group baseline:
 - HTTP `80`: Cloudflare public IPv4 ranges only
 - HTTPS `443`: Cloudflare public IPv4 ranges only
 
-GitHub Actions assumes `coreable-github-deploy` through OIDC only from this repository's `main` branch. The role can send `AWS-RunShellScript` only to the production EC2 instance and read that command's result. No long-lived AWS key or public SSH ingress is used for deployment.
+GitHub Actions assumes `coreable-github-deploy` through OIDC only from this repository's `main` branch. The role can send `AWS-RunShellScript` only to the production EC2 instance, read/cancel that command, and put/delete only the per-run deploy-token SecureString prefix. The EC2 role can get/delete only that prefix. No long-lived AWS key or public SSH ingress is used for deployment.
 
 ## One-Time Server Setup
 
-After SSH access works:
+Use Session Manager and download only files from a reviewed immutable commit. Public SSH ingress is not required:
 
 ```sh
-scp infra/aws/ec2/bootstrap-ubuntu.sh ubuntu@<elastic-ip>:/tmp/bootstrap-ubuntu.sh
-ssh ubuntu@<elastic-ip> 'sudo bash /tmp/bootstrap-ubuntu.sh'
-ssh ubuntu@<elastic-ip> 'sudo mkdir -p /opt/coreable /var/lib/coreable/proxy/certs'
-scp infra/aws/ec2/compose.prod.yml infra/aws/ec2/nginx.conf ubuntu@<elastic-ip>:/tmp/
-ssh ubuntu@<elastic-ip> 'sudo cp /tmp/compose.prod.yml /opt/coreable/compose.prod.yml && sudo cp /tmp/nginx.conf /opt/coreable/nginx.conf'
+aws ssm start-session --target i-0c795cb4b0f0b4177
+DEPLOY_SHA=<reviewed-commit-sha>
+setup_dir=$(mktemp -d /tmp/coreable-setup.XXXXXX)
+base_url="https://raw.githubusercontent.com/JAEKWANG97/dropship-shop/${DEPLOY_SHA}/infra/aws/ec2"
+curl -fsSL "${base_url}/bootstrap-ubuntu.sh" -o "${setup_dir}/bootstrap-ubuntu.sh"
+curl -fsSL "${base_url}/compose.prod.yml" -o "${setup_dir}/compose.prod.yml"
+curl -fsSL "${base_url}/nginx.conf" -o "${setup_dir}/nginx.conf"
+sudo bash "${setup_dir}/bootstrap-ubuntu.sh"
+sudo install -m 0644 "${setup_dir}/compose.prod.yml" /opt/coreable/compose.prod.yml
+sudo install -m 0644 "${setup_dir}/nginx.conf" /opt/coreable/nginx.conf
 ```
 
 Create `/opt/coreable/.env` from `infra/aws/ec2/env.example` and replace all `change-me` or blank values. Keep this file only on the server.
@@ -75,38 +80,47 @@ Create `/opt/coreable/.env` from `infra/aws/ec2/env.example` and replace all `ch
 Install the backup script after Docker and the AWS CLI are available:
 
 ```sh
-scp infra/aws/ec2/backup.sh infra/aws/ec2/install-backup.sh ubuntu@<elastic-ip>:/tmp/
-ssh ubuntu@<elastic-ip> 'sudo mkdir -p /tmp/coreable-backup-install && sudo mv /tmp/backup.sh /tmp/install-backup.sh /tmp/coreable-backup-install/ && sudo bash /tmp/coreable-backup-install/install-backup.sh'
+curl -fsSL "${base_url}/backup.sh" -o "${setup_dir}/backup.sh"
+curl -fsSL "${base_url}/install-backup.sh" -o "${setup_dir}/install-backup.sh"
+sudo bash "${setup_dir}/install-backup.sh"
 ```
 
-The scheduled backup uses the least-privilege IAM user `coreable-backup-writer` and uploads DB dumps and product uploads to `s3://coreable-backups-prod`. See `docs/backup-restore.md` for restore commands and verification.
+The scheduled backup uses the EC2 instance role with least-privilege access and uploads DB dumps and product uploads to `s3://coreable-backups-prod`. Do not configure a static AWS key on the host. See `docs/backup-restore.md` for restore commands and verification.
 
-Install the Cloudflare Origin Certificate and private key on the server. Do not commit or print the key:
-
-```sh
-scp tmp/cloudflare-origin.pem tmp/cloudflare-origin.key ubuntu@<elastic-ip>:/tmp/
-ssh ubuntu@<elastic-ip> 'sudo install -m 0644 /tmp/cloudflare-origin.pem /var/lib/coreable/proxy/certs/cloudflare-origin.pem && sudo install -m 0600 /tmp/cloudflare-origin.key /var/lib/coreable/proxy/certs/cloudflare-origin.key && sudo rm -f /tmp/cloudflare-origin.pem /tmp/cloudflare-origin.key'
-```
+Provision the Cloudflare Origin Certificate and private key through a private secret-delivery path available inside the managed instance. Install them as `/var/lib/coreable/proxy/certs/cloudflare-origin.pem` mode `0644` and `/var/lib/coreable/proxy/certs/cloudflare-origin.key` mode `0600`. Do not pass the private key through GitHub, a public object, Run Command parameters or logs.
 
 ## GitHub Authentication
 
-No EC2 SSH secret or long-lived AWS access key is required. The workflow requests a short-lived AWS credential through GitHub OIDC and passes the job-scoped `GITHUB_TOKEN` to the managed instance only for the GHCR pull.
+No EC2 SSH secret or long-lived AWS access key is required. The workflow requests a short-lived AWS credential through GitHub OIDC and writes the job-scoped `GITHUB_TOKEN` to a unique `/coreable/deploy/ghcr-token-<run>-<attempt>` Parameter Store key as `SecureString`. The Run Command carries only that parameter name, so a delayed command cannot consume a later run's credential. EC2 decrypts it at runtime, immediately deletes that exact parameter, pipes the value to `docker login --password-stdin`, and unsets it; the runner also performs best-effort deletion on every exit path.
 
 Application secrets stay on EC2 in `/opt/coreable/.env`, not in GitHub Actions.
 
 ## Deploy Flow
 
-On push to `main`:
+Production deploy is manual-only through the `Deploy` workflow's `workflow_dispatch`. A push or merge to `main` does not deploy by itself.
 
-1. GitHub Actions builds API and Web Docker images for `linux/arm64`.
-2. Images are pushed to GHCR with both commit SHA and `latest` tags.
-3. Actions sends an SSM command that downloads the commit SHA's compose/nginx config.
-4. EC2 updates `API_IMAGE` and `WEB_IMAGE` in `/opt/coreable/.env`.
-5. EC2 runs `docker compose pull && docker compose up -d`.
-6. Actions checks `http://localhost:8080/actuator/health/readiness`.
-7. After readiness succeeds, EC2 prunes Docker images older than 168 hours to avoid filling the 20GB disk with SHA-tagged images.
+1. GitHub Actions runs the complete API tests and Web lint/build.
+2. The preflight checks required bank-transfer and supplier-portal settings without printing their values, requires the production supplier portal flag to remain disabled, and verifies the one-time V40 repair state before running `/opt/coreable/backup.sh`. Once V40 is applied, the repair-specific check is skipped.
+3. API and Web Docker images are built for `linux/arm64` and pushed to GHCR with both commit SHA and `latest` tags.
+4. Actions sends an SSM command that acquires the host deploy lock, revalidates the environment, takes a fresh backup immediately before runtime mutation, and preserves the current image tags, compose file and nginx config in a root-only temporary directory.
+5. EC2 validates the commit SHA's compose/nginx config, rejects a production PostgreSQL service change, and pulls both exact image tags before runtime mutation. It then updates `API_IMAGE` and `WEB_IMAGE` and recreates only API, Web and nginx; persistent PostgreSQL changes require a separate maintenance procedure.
+6. Actions verifies API readiness and the HTTPS Web response through local nginx.
+7. A config download, validation or image-pull failure before mutation leaves the current stack untouched. On a later failure the candidate API is stopped before reading Flyway state. The previous deployment files are restored without recreating the already-running old services only when candidate API startup was never attempted and the latest successful migration version is provably unchanged.
+8. Once candidate API startup has been attempted, recovery is roll-forward-only even if Flyway did not advance: new code may already have written data that the previous binary cannot read. A schema advance or unreadable migration state has the same boundary. Recovery retries only the new API and new Web/nginx. Unverified recovery keeps root-only artifacts and fails the workflow for manual handling.
+9. Only after successful readiness does EC2 prune Docker images older than 168 hours.
 
-Manual deploy is available through the `Deploy` workflow's `workflow_dispatch`.
+### One-Time V39 To V40 Production Repair
+
+The audited production snapshot at V39 contains 34 negative source option deltas across 13 products. V40 also backfills legacy system audit actors to a nullable `admin_user_id`; the published migration performs that backfill before its later `DROP NOT NULL`. Run `infra/aws/ec2/remediate-v40-negative-source-options.sql` once before the first V40 deploy. Do not edit the published V40 migration checksum.
+
+Treat the repair and the first V40 deploy as one maintenance sequence:
+
+1. Acquire `/var/lock/coreable-deploy.lock`, take a fresh `/opt/coreable/backup.sh` backup, and confirm the current schema is exactly V39 with the audited 34 negative options, 13 products and 68 non-null affected options.
+2. Set `DOMEGGOOK_CATALOG_SYNC_ENABLED=false`, preserve the previous env file, and stop the API before applying the repair through the production PostgreSQL container.
+3. Require the script to report zero negative options plus 13 product and 68 option audit rows. It also preserves every option's total source cost, all customer prices and the order-item monetary snapshot in one transaction, and releases the legacy audit-column NOT NULL constraint needed by V40.
+4. If service must resume before the new deploy, restart the previous API only with catalog sync still disabled. Do not re-enable the legacy writer between the repair commit and V40.
+5. Manually run the `Deploy` workflow for the reviewed `main` SHA. Require schema V44, healthy API/Web/PostgreSQL/nginx, matching API/Web image SHA and `APP_SUPPLIER_PORTAL_ENABLED=false`.
+6. Re-enable catalog sync and recreate only the now-current API after its negative-delta normalization code is verified. Any count, invariant or migration mismatch stops the sequence; do not weaken the guards or force V40.
 
 ## Build Time And Cache
 
@@ -123,9 +137,7 @@ The deploy workflow uses Docker BuildKit GitHub Actions cache:
 
 The first run after cache setup may still be slow because it warms the cache. Later runs can reuse dependency and image layers. Next.js application changes can still require a full `npm run build` inside the Web image, so the cache reduces repeated work but does not remove the ARM64 build cost entirely.
 
-Deploy is skipped when only `docs/**`, `README.md`, or `AGENTS.md` changes. Workflow, app, or infra changes still trigger deploy.
-
-Deploy workflow concurrency is `deploy-production` with `cancel-in-progress: false`. Consecutive pushes wait in order instead of running two EC2 deploy scripts at the same time.
+Deploy workflow concurrency is `deploy-production` with `cancel-in-progress: false`, and both remote phases use the same EC2 `flock`. Consecutive manual runs wait in GitHub while delayed/orphaned SSM commands also fail closed instead of running two host deploy scripts at the same time.
 
 ## Production Bank Transfer Account
 
@@ -215,9 +227,11 @@ OAuth redirect URIs:
 Validate on the EC2 host:
 
 ```sh
-ssh ubuntu@43.200.135.171 'cd /opt/coreable && sudo docker compose --env-file .env -f compose.prod.yml ps'
-ssh ubuntu@43.200.135.171 'curl -fsS http://localhost:8080/actuator/health/readiness'
-ssh ubuntu@43.200.135.171 'curl -fsS http://localhost:8080/api/health'
+aws ssm start-session --target i-0c795cb4b0f0b4177
+cd /opt/coreable
+sudo docker compose --env-file .env -f compose.prod.yml ps
+curl -fsS http://localhost:8080/actuator/health/readiness
+curl -fsS http://localhost:8080/api/health
 ```
 
 Validate origin HTTPS directly. Cloudflare Origin Certificates are not trusted by the local OS trust store, so direct `curl` needs `-k` or the Cloudflare Origin CA root. This check validates origin routing and TLS service; Cloudflare `Full (strict)` performs the trusted validation from Cloudflare's edge:
@@ -234,7 +248,6 @@ curl -fsS https://coreable-saf.com/api/health
 curl -fsS https://coreable-saf.com/actuator/health/readiness
 curl -IfsS https://coreable-saf.com
 curl -IfsS https://www.coreable-saf.com
-ssh ubuntu@<elastic-ip> 'cd /opt/coreable && sudo docker compose --env-file .env -f compose.prod.yml ps'
 ```
 
 Browser smoke:

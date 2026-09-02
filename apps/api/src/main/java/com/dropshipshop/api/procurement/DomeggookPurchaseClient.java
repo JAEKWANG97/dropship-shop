@@ -15,6 +15,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import com.dropshipshop.api.common.money.MoneyMath;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -94,17 +96,46 @@ class DomeggookPurchaseClient {
 		if (supplyUnit < 1 || supplyUnit > Integer.MAX_VALUE) {
 			throw new DomeggookApiException("MOQ_INVALID", "Domeggook product has an invalid supply unit", false);
 		}
+		List<SourceOption> options = options(
+			detail.path("selectOpt"),
+			detail.path("qty").path("inventory").isMissingNode() ? null : number(detail.path("qty").path("inventory")),
+			onSale
+		);
+		long minimumAdditionalPrice = options.stream()
+			.mapToLong(SourceOption::sourceAdditionalPrice)
+			.min()
+			.orElse(0);
+		try {
+			if (minimumAdditionalPrice < 0) {
+				basePrice = Math.addExact(basePrice, minimumAdditionalPrice);
+				List<SourceOption> normalized = new ArrayList<>(options.size());
+				for (SourceOption option : options) {
+					normalized.add(new SourceOption(
+						option.sourceOptionCode(),
+						option.name(),
+						Math.subtractExact(option.sourceAdditionalPrice(), minimumAdditionalPrice),
+						option.sourceStockQuantity(),
+						option.available(),
+						option.sortOrder()
+					));
+				}
+				options = List.copyOf(normalized);
+			}
+			MoneyMath.requireSupplierUnitCost(basePrice, "sourcePrice");
+			for (SourceOption option : options) {
+				MoneyMath.requireSupplierUnitCost(option.sourceAdditionalPrice(), "sourceAdditionalPrice");
+				Math.addExact(basePrice, option.sourceAdditionalPrice());
+			}
+		} catch (ArithmeticException | IllegalArgumentException exception) {
+			throw new DomeggookApiException("PRICE_INVALID", "Domeggook product has an invalid supply price", false);
+		}
 		return new CatalogSnapshot(
 			onSale,
 			basePrice,
 			minimumResalePrice,
 			(int) supplyUnit,
 			(int) supplyUnit,
-			options(
-				detail.path("selectOpt"),
-				detail.path("qty").path("inventory").isMissingNode() ? null : number(detail.path("qty").path("inventory")),
-				onSale
-			)
+			options
 		);
 	}
 
