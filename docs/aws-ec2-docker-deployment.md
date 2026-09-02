@@ -47,8 +47,10 @@ Current deployment:
 
 - EC2 instance id: `i-0c795cb4b0f0b4177`
 - Elastic IP: `43.200.135.171`
-- Latest successful deploy workflow: `30336534473`
-- Deployed image tag: `087e97e7b84e504705f98890f5f24d4afe2c49e4`
+- Latest successful deploy workflow: `33649335647`
+- Deployed image tag: `465a0f29e4d7772f41b1ea956f1e3a94896af105`
+- Database schema: Flyway `V44`
+- Supplier portal release gate: `APP_SUPPLIER_PORTAL_ENABLED=false`
 
 Security group baseline:
 

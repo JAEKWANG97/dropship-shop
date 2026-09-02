@@ -74,7 +74,8 @@
 - [x] V40 미적용 production preflight가 V39·음수 option 0·repair audit 81·legacy audit column nullable을 모두 요구하고 실제 운영 상태에서 통과하는지 확인한다.
 - [x] config/image pull의 mutation 전 실패는 old stack을 건드리지 않고, file mutation 뒤 candidate 시작 미시도·Flyway 불변을 모두 증명한 실패는 old files와 기존 service health를 복구하며, 시작 시도·schema 전진·조회불가에서는 new stack만 roll-forward 재기동하고 성공 전 prune하지 않는지 정적으로 검토한다.
 - [x] 운영 V39의 대상 row 수와 정규화 전후 option 총 공급원가, 고객가, 주문 snapshot 불변을 확인하고 system audit history와 함께 한 트랜잭션으로 보정한다.
-- [ ] 최신 main 수동 Deploy가 V40~V44를 적용하고 API/Web/PostgreSQL health, 공개 경로, 배포 SHA와 supplier portal `false`를 만족하는지 확인한다.
+- [x] PR #58의 최신 CI와 main 수동 Deploy run `33649335647`이 성공하고 V40~V44, API/Web/PostgreSQL health, 공개 경로, merge SHA `465a0f2`와 supplier portal `false`를 만족하는지 확인한다.
+- [x] 새 API에서 catalog sync를 재활성화해 첫 20건 실행, 음수 option·가격 범위 위반 0, 18건 성공과 upstream 정보 없음 2건의 오류 기록, 임시 deploy token 0을 확인한다.
 
 ## Production Read-Only
 

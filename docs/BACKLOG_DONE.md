@@ -2,6 +2,16 @@
 
 완료된 backlog 항목을 보관한다. 현재 작업 큐는 `docs/BACKLOG.md`를 기준으로 본다.
 
+## 2026-09-03
+
+- B-106 운영 배포 복구와 V40 가격 데이터 호환
+  - 복구: 공급처 포털 환경값 누락과 V40 이전 음수 source option delta로 실패하던 운영 API를 마지막 정상 이미지로 먼저 복구하고, 공급처 포털은 계속 비활성으로 유지했다.
+  - 호환: 기존 고객 판매가와 option별 총 공급원가를 보존하는 정규화, V39 row-count·금액·주문 snapshot guard와 81개 system audit을 적용했다. 실제 운영 backup 복제본에서 V38→V39→보정→V40~V44와 앱 schema validation을 리허설했다.
+  - 배포 안전화: Deploy를 manual-only로 전환하고 환경·V40 readiness preflight, 실행 직전 이중 백업, per-run SecureString credential, EC2 lock, PostgreSQL config 동등성, app-only 교체와 schema-aware recovery를 적용했다.
+  - 운영 반영: PR #58과 수동 Deploy run `33649335647`로 merge SHA `465a0f29e4d7772f41b1ea956f1e3a94896af105`를 배포했다. 운영은 Flyway V44, API/PostgreSQL healthy, Web/nginx running, 공개 핵심 경로 HTTP 200이고 supplier route는 `404`다.
+  - 검증: 음수 source option, 잘못된 repair actor, source 가격 범위와 주문 snapshot 위반은 모두 0이고 임시 배포 token과 recovery directory도 남지 않았다. Catalog sync를 재활성화한 첫 20건 중 18건은 성공했고 공급처가 `해당 정보가 존재하지 않습니다`를 반환한 2건은 기존 오류 기록 경로로 보존했다.
+  - 운영 경계: `APP_SUPPLIER_PORTAL_ENABLED=false`를 유지한다. 위 2개 upstream 품목은 자동 품절로 단정하지 않고 stable error code와 transient 오류를 구분하는 후속 검토 대상으로 남긴다.
+
 ## 2026-08-06
 
 - B-065 관리자 주문 목록 서버 페이징과 필터
